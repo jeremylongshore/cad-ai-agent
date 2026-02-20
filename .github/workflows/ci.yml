@@ -54,7 +54,7 @@ jobs:
         run: pytest --cov=cad_dxf_agent --cov-report=term-missing -v
       - name: Upload coverage
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: coverage-report
           path: .coverage
