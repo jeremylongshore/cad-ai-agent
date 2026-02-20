@@ -9,8 +9,10 @@ import ezdxf
 
 from ..models.config_schema import RevisionNoteConfig
 from ..models.ops_schema import AppliedChange, OpType
+from ..otel import get_tracer
 
 logger = logging.getLogger(__name__)
+tracer = get_tracer(__name__)
 
 
 def generate_note_text(
@@ -57,27 +59,30 @@ def insert_revision_note(
     Operates on an already-edited DXF (post-apply). Saves to output_path.
     Returns the note text that was inserted.
     """
-    doc = ezdxf.readfile(str(dxf_path))
-    msp = doc.modelspace()
+    with tracer.start_as_current_span("cad.revision_note") as span:
+        span.set_attribute("cad.revision.layer", config.layer_name)
 
-    # Ensure the notes layer exists
-    if config.layer_name not in doc.layers:
-        doc.layers.add(config.layer_name, color=7)
+        doc = ezdxf.readfile(str(dxf_path))
+        msp = doc.modelspace()
 
-    note_text = generate_note_text(changes, config)
+        # Ensure the notes layer exists
+        if config.layer_name not in doc.layers:
+            doc.layers.add(config.layer_name, color=7)
 
-    msp.add_mtext(
-        note_text,
-        dxfattribs={
-            "layer": config.layer_name,
-            "insert": (config.anchor_point.x, config.anchor_point.y),
-            "char_height": config.text_height,
-        },
-    )
+        note_text = generate_note_text(changes, config)
 
-    doc.saveas(str(output_path))
-    logger.info("Inserted revision note on layer %s: %s", config.layer_name, note_text)
-    return note_text
+        msp.add_mtext(
+            note_text,
+            dxfattribs={
+                "layer": config.layer_name,
+                "insert": (config.anchor_point.x, config.anchor_point.y),
+                "char_height": config.text_height,
+            },
+        )
+
+        doc.saveas(str(output_path))
+        logger.info("Inserted revision note on layer %s: %s", config.layer_name, note_text)
+        return note_text
 
 
 def _summarize_change(change: AppliedChange) -> str:

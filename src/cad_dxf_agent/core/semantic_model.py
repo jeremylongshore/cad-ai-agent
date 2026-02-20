@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 from ..models.cad_schema import DrawingContext
+from ..otel import get_tracer
+
+tracer = get_tracer(__name__)
 
 
 def build_planner_context(context: DrawingContext) -> dict:
@@ -11,36 +14,39 @@ def build_planner_context(context: DrawingContext) -> dict:
     This is the information the planner sees to make targeting decisions.
     It does NOT include raw DXF data.
     """
-    layer_summary = [
-        {
-            "name": layer.name,
-            "protected": layer.protected,
-            "entity_count": sum(
-                1 for e in context.entities if e.layer.upper() == layer.name.upper()
-            ),
-        }
-        for layer in context.layers
-    ]
+    with tracer.start_as_current_span("cad.build_context") as span:
+        span.set_attribute("cad.entities.count", context.entity_count)
 
-    entity_summary = [
-        {
-            "handle": e.handle,
-            "type": e.entity_type.value,
-            "layer": e.layer,
-            "insert_point": (
-                {"x": e.insert_point.x, "y": e.insert_point.y} if e.insert_point else None
-            ),
-            "text": e.text_content,
-            "block_name": e.block_name,
-        }
-        for e in context.entities
-    ]
+        layer_summary = [
+            {
+                "name": layer.name,
+                "protected": layer.protected,
+                "entity_count": sum(
+                    1 for e in context.entities if e.layer.upper() == layer.name.upper()
+                ),
+            }
+            for layer in context.layers
+        ]
 
-    return {
-        "file_path": context.file_path,
-        "entity_count": context.entity_count,
-        "layers": layer_summary,
-        "entities": entity_summary,
-        "blocks": context.blocks,
-        "unsupported_types": context.unsupported_entity_types,
-    }
+        entity_summary = [
+            {
+                "handle": e.handle,
+                "type": e.entity_type.value,
+                "layer": e.layer,
+                "insert_point": (
+                    {"x": e.insert_point.x, "y": e.insert_point.y} if e.insert_point else None
+                ),
+                "text": e.text_content,
+                "block_name": e.block_name,
+            }
+            for e in context.entities
+        ]
+
+        return {
+            "file_path": context.file_path,
+            "entity_count": context.entity_count,
+            "layers": layer_summary,
+            "entities": entity_summary,
+            "blocks": context.blocks,
+            "unsupported_types": context.unsupported_entity_types,
+        }

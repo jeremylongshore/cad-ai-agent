@@ -32,6 +32,11 @@ class Settings:
         )
         self.revision_notes_layer: str = os.getenv("CAD_REVISION_NOTES_LAYER", "AI_REV_NOTES")
 
+        # OpenTelemetry
+        self.otel_enabled: bool = os.getenv("OTEL_ENABLED", "").lower() in ("1", "true", "yes")
+        self.otel_exporter: str = os.getenv("OTEL_EXPORTER", "console")
+        self.otel_endpoint: str | None = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
+
         # Logging
         self.log_level: str = os.getenv("CAD_LOG_LEVEL", "INFO")
 

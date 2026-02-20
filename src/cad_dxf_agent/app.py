@@ -14,6 +14,10 @@ def main():
         datefmt="%H:%M:%S",
     )
 
+    from .otel import init_otel
+
+    init_otel()
+
     from PySide6.QtWidgets import QApplication
 
     from .ui.main_window import MainWindow

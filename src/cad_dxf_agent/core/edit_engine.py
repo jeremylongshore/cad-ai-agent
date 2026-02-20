@@ -8,8 +8,10 @@ from pathlib import Path
 import ezdxf
 
 from ..models.ops_schema import AppliedChange, ChangeSet, EditOperation, OpType
+from ..otel import get_tracer
 
 logger = logging.getLogger(__name__)
+tracer = get_tracer(__name__)
 
 
 class EditEngine:
@@ -29,20 +31,25 @@ class EditEngine:
 
         Returns list of AppliedChange records.
         """
-        results = []
-        for op in changeset.operations:
-            result = self._apply_operation(op)
-            results.append(result)
-            self._applied.append(result)
-        return results
+        with tracer.start_as_current_span("cad.apply_changeset") as span:
+            span.set_attribute("cad.ops.count", changeset.op_count)
+            results = []
+            for op in changeset.operations:
+                result = self._apply_operation(op)
+                results.append(result)
+                self._applied.append(result)
+            span.set_attribute("cad.ops.success_count", sum(1 for r in results if r.success))
+            return results
 
     def save(self, output_path: str | Path) -> Path:
         """Save the modified document to a new path."""
-        output_path = Path(output_path)
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        self.doc.saveas(str(output_path))
-        logger.info("Saved edited DXF to: %s", output_path)
-        return output_path
+        with tracer.start_as_current_span("cad.save") as span:
+            output_path = Path(output_path)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            self.doc.saveas(str(output_path))
+            span.set_attribute("cad.save.output_basename", output_path.name)
+            logger.info("Saved edited DXF to: %s", output_path)
+            return output_path
 
     @property
     def applied_changes(self) -> list[AppliedChange]:
