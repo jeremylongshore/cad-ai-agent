@@ -1,0 +1,36 @@
+name: CAD Parser Compatibility Issue
+description: Report a DXF file that fails to parse or produces incorrect results
+title: "[Parser]: "
+labels: ["bug", "cad"]
+body:
+  - type: markdown
+    attributes:
+      value: Report DXF files that fail to load, parse incorrectly, or produce broken output.
+  - type: textarea
+    id: description
+    attributes:
+      label: Issue Description
+      description: What went wrong when processing the DXF file?
+    validations:
+      required: true
+  - type: input
+    id: source-software
+    attributes:
+      label: Source CAD Software
+      description: What software created the DXF?
+      placeholder: "AutoCAD 2024, BricsCAD, etc."
+  - type: input
+    id: dxf-version
+    attributes:
+      label: DXF Version
+      placeholder: "R2018, R2013, etc."
+  - type: textarea
+    id: entities
+    attributes:
+      label: Affected Entity Types
+      description: Which entity types are involved?
+  - type: textarea
+    id: error
+    attributes:
+      label: Error Output
+      render: shell

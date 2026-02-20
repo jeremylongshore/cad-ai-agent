@@ -1,0 +1,40 @@
+name: Prompt/Planner Mis-target Issue
+description: Report when the planner targets the wrong entity or misinterprets a prompt
+title: "[Planner]: "
+labels: ["bug", "llm"]
+body:
+  - type: textarea
+    id: prompt
+    attributes:
+      label: User Prompt
+      description: What prompt did you give?
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Target
+      description: What entity/area should the planner have targeted?
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Planner Output
+      description: What did the planner actually produce?
+      render: json
+  - type: dropdown
+    id: provider
+    attributes:
+      label: LLM Provider
+      options:
+        - Mock (offline)
+        - OpenAI
+        - Anthropic
+        - Google
+        - Other
+  - type: textarea
+    id: drawing-context
+    attributes:
+      label: Drawing Context
+      description: Describe the drawing (layer names, entity types, block names).

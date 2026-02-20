@@ -1,0 +1,32 @@
+name: Release Dry Run
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install build tools
+        run: pip install build
+      - name: Build package
+        run: python -m build
+      - name: Verify dist
+        run: |
+          ls -la dist/
+          pip install dist/*.whl
+          python -c "import cad_dxf_agent; print('Import OK')"
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
