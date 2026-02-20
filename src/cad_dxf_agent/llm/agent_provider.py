@@ -1,0 +1,415 @@
+"""Agent provider — tool-use loop for Gemini function calling.
+
+Replaces the one-shot GeminiProvider with an iterative agent that:
+  1. Sends the user prompt + drawing context + tool definitions to Gemini
+  2. Gemini returns function calls (find_entities, move_entity, etc.)
+  3. Host executes each call via ToolExecutor
+  4. Results sent back to Gemini for the next turn
+  5. Repeats until Gemini stops calling tools
+  6. Accumulated EditOperations are returned as a ChangeSet
+
+The LLM never touches DXF — it only calls tools.
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+from pathlib import Path
+from typing import Any
+
+from ..models.ops_schema import ChangeSet
+from ..otel import get_tracer
+from ..settings import settings
+from .prompt_templates import AGENT_SYSTEM_PROMPT
+from .providers import PlannerProvider
+from .tool_definitions import ALL_TOOLS
+from .tool_executor import ToolExecutor
+from .vision_describer import describe_drawing
+
+logger = logging.getLogger(__name__)
+tracer = get_tracer(__name__)
+
+# Safety limit on agent turns to prevent infinite loops
+MAX_AGENT_TURNS = 10
+
+
+class AgentProvider(PlannerProvider):
+    """Gemini tool-use agent for CAD editing.
+
+    Uses Gemini function calling to iteratively query and edit the
+    drawing. More reliable than one-shot JSON generation because the
+    LLM can search for entities before acting on them.
+    """
+
+    def __init__(
+        self,
+        project: str | None = None,
+        location: str | None = None,
+        model_name: str | None = None,
+        image_path: str | Path | None = None,
+    ) -> None:
+        self._project = project or settings.gcp_project
+        self._location = location or settings.gcp_location
+        self._model_name = model_name or settings.gemini_model
+        self._image_path = image_path
+        self._model: Any = None  # lazy init
+
+    @property
+    def name(self) -> str:
+        return f"agent ({self._model_name})"
+
+    @property
+    def requires_api_key(self) -> bool:
+        return False  # Uses GCP credentials
+
+    def plan(self, prompt: str, drawing_context: dict) -> ChangeSet:
+        """Run the tool-use agent loop to produce a ChangeSet."""
+        with tracer.start_as_current_span("cad.agent_plan") as span:
+            span.set_attribute("cad.agent.model", self._model_name)
+
+            context = self._reconstruct_context(drawing_context)
+            executor = ToolExecutor(context, settings.protected_layers)
+
+            # Build initial prompt with vision description if available
+            initial_prompt = self._build_initial_prompt(prompt, drawing_context)
+
+            # Run the agent loop
+            model = self._get_model()
+            chat = model.start_chat()
+
+            # Send initial message
+            response = chat.send_message(initial_prompt)
+            turns = 0
+
+            while turns < MAX_AGENT_TURNS:
+                # Check if Gemini wants to call tools
+                function_calls = _extract_function_calls(response)
+                if not function_calls:
+                    # No more tool calls — agent is done
+                    break
+
+                turns += 1
+                span.add_event(
+                    f"agent_turn_{turns}",
+                    {
+                        "tool_count": len(function_calls),
+                    },
+                )
+
+                # Execute each tool call and collect results
+                tool_results = []
+                for fc in function_calls:
+                    tool_name = fc["name"]
+                    tool_args = fc["args"]
+                    logger.info("Agent tool call [%d]: %s(%s)", turns, tool_name, tool_args)
+
+                    try:
+                        result = executor.execute(tool_name, tool_args)
+                    except KeyError:
+                        result = {"error": f"Unknown tool: {tool_name}"}
+                    except Exception as e:
+                        result = {"error": f"Tool execution failed: {e}"}
+
+                    tool_results.append(
+                        {
+                            "name": tool_name,
+                            "response": result,
+                        }
+                    )
+
+                # Send results back to Gemini
+                response = self._send_tool_results(chat, tool_results)
+
+            span.set_attribute("cad.agent.turns", turns)
+            span.set_attribute("cad.agent.ops_count", len(executor.operations))
+
+            ops = executor.operations
+            logger.info(
+                "Agent completed in %d turns, produced %d operations",
+                turns,
+                len(ops),
+            )
+
+            return ChangeSet(
+                prompt=prompt,
+                operations=ops,
+                revision_label=f"Agent edit ({turns} turns): {prompt[:50]}",
+            )
+
+    def _get_model(self):
+        """Lazy-initialize the Gemini model with tool declarations."""
+        if self._model is None:
+            try:
+                import vertexai
+                from vertexai.generative_models import (
+                    FunctionDeclaration,
+                    GenerativeModel,
+                    Tool,
+                )
+
+                vertexai.init(
+                    project=self._project,
+                    location=self._location,
+                )
+
+                # Convert tool dicts to FunctionDeclaration objects
+                declarations = []
+                for tool_def in ALL_TOOLS:
+                    declarations.append(
+                        FunctionDeclaration(
+                            name=str(tool_def["name"]),
+                            description=str(tool_def["description"]),
+                            parameters=dict(tool_def["parameters"]),  # type: ignore[arg-type]
+                        )
+                    )
+                tools = [Tool(function_declarations=declarations)]
+
+                self._model = GenerativeModel(
+                    self._model_name,
+                    system_instruction=AGENT_SYSTEM_PROMPT,
+                    tools=tools,
+                )
+            except ImportError as err:
+                raise ImportError(
+                    "google-cloud-aiplatform not installed. "
+                    "Install with: pip install google-cloud-aiplatform"
+                ) from err
+
+        return self._model
+
+    def _build_initial_prompt(self, prompt: str, drawing_context: dict) -> str:
+        """Build the initial message with drawing context and optional vision."""
+        parts = []
+
+        # Vision description (Stage 1)
+        if self._image_path:
+            try:
+                description = describe_drawing(self._image_path)
+                parts.append(f"DRAWING VISUAL DESCRIPTION:\n{description}\n")
+            except Exception as e:
+                logger.warning("Vision description failed, continuing without: %s", e)
+
+        # Entity summary (always included)
+        entity_summary = json.dumps(drawing_context, indent=2, default=str)
+        parts.append(f"DRAWING ENTITIES (JSON):\n{entity_summary}\n")
+
+        # User prompt
+        parts.append(f"USER REQUEST:\n{prompt}")
+
+        return "\n".join(parts)
+
+    def _send_tool_results(self, chat, tool_results: list[dict]) -> Any:
+        """Send tool execution results back to Gemini."""
+        from vertexai.generative_models import Content, Part
+
+        parts = []
+        for tr in tool_results:
+            part = Part.from_function_response(
+                name=tr["name"],
+                response=tr["response"],
+            )
+            parts.append(part)
+
+        return chat.send_message(Content(role="function", parts=parts))
+
+    def _reconstruct_context(self, drawing_context: dict) -> Any:
+        """Reconstruct a DrawingContext from the planner context dict.
+
+        The planner receives a simplified dict from semantic_model.
+        We reconstruct enough of a DrawingContext to feed the EntityIndex.
+        """
+        from ..models.cad_schema import (
+            DrawingContext,
+            EntityRef,
+            EntityType,
+            LayerRule,
+            Point2D,
+        )
+
+        entities = []
+        for e in drawing_context.get("entities", []):
+            try:
+                point = None
+                if e.get("insert_point"):
+                    point = Point2D(
+                        x=e["insert_point"]["x"],
+                        y=e["insert_point"]["y"],
+                    )
+                entities.append(
+                    EntityRef(
+                        handle=e["handle"],
+                        entity_type=EntityType(e["type"]),
+                        layer=e["layer"],
+                        insert_point=point,
+                        text_content=e.get("text"),
+                        block_name=e.get("block_name"),
+                    )
+                )
+            except (KeyError, ValueError) as exc:
+                logger.warning("Skipping malformed entity: %s", exc)
+
+        layers = []
+        for lyr in drawing_context.get("layers", []):
+            layers.append(
+                LayerRule(
+                    name=lyr["name"],
+                    protected=lyr.get("protected", False),
+                )
+            )
+
+        return DrawingContext(
+            file_path=drawing_context.get("file_path", ""),
+            entities=entities,
+            layers=layers,
+            blocks=drawing_context.get("blocks", []),
+        )
+
+
+class MockAgentProvider(PlannerProvider):
+    """Mock agent provider for testing the tool-use flow without Gemini.
+
+    Simulates a two-turn agent: first searches for an entity, then
+    performs the requested edit operation.
+    """
+
+    @property
+    def name(self) -> str:
+        return "mock-agent"
+
+    @property
+    def requires_api_key(self) -> bool:
+        return False
+
+    def plan(self, prompt: str, drawing_context: dict) -> ChangeSet:
+        """Simulate agent tool-use with deterministic tool calls."""
+        from ..models.cad_schema import (
+            DrawingContext,
+            EntityRef,
+            EntityType,
+            LayerRule,
+            Point2D,
+        )
+
+        # Reconstruct context for executor
+        entities = []
+        for e in drawing_context.get("entities", []):
+            try:
+                point = None
+                if e.get("insert_point"):
+                    point = Point2D(x=e["insert_point"]["x"], y=e["insert_point"]["y"])
+                entities.append(
+                    EntityRef(
+                        handle=e["handle"],
+                        entity_type=EntityType(e["type"]),
+                        layer=e["layer"],
+                        insert_point=point,
+                        text_content=e.get("text"),
+                        block_name=e.get("block_name"),
+                    )
+                )
+            except (KeyError, ValueError):
+                continue
+
+        layers = [
+            LayerRule(name=lyr["name"], protected=lyr.get("protected", False))
+            for lyr in drawing_context.get("layers", [])
+        ]
+
+        context = DrawingContext(
+            file_path=drawing_context.get("file_path", ""),
+            entities=entities,
+            layers=layers,
+            blocks=drawing_context.get("blocks", []),
+        )
+
+        executor = ToolExecutor(context, settings.protected_layers)
+        prompt_lower = prompt.lower()
+
+        # Turn 1: Search for entities
+        if "move" in prompt_lower:
+            executor.execute("find_entities", {"layer": "STRUCTURAL"})
+            # Turn 2: Move first editable entity
+            for e in drawing_context.get("entities", []):
+                protected = {
+                    lyr["name"].upper()
+                    for lyr in drawing_context.get("layers", [])
+                    if lyr.get("protected")
+                }
+                if e.get("layer", "").upper() not in protected:
+                    executor.execute(
+                        "move_entity",
+                        {
+                            "handle": e["handle"],
+                            "dx": 24.0,
+                            "dy": 0.0,
+                        },
+                    )
+                    break
+
+        elif "delete" in prompt_lower or "remove" in prompt_lower:
+            for e in drawing_context.get("entities", []):
+                protected = {
+                    lyr["name"].upper()
+                    for lyr in drawing_context.get("layers", [])
+                    if lyr.get("protected")
+                }
+                if e.get("layer", "").upper() not in protected:
+                    executor.execute("delete_entity", {"handle": e["handle"]})
+                    break
+
+        elif "text" in prompt_lower or "label" in prompt_lower:
+            for e in drawing_context.get("entities", []):
+                if e.get("type") in ("TEXT", "MTEXT") and e.get("text"):
+                    executor.execute(
+                        "edit_text",
+                        {
+                            "handle": e["handle"],
+                            "new_text": "UPDATED BY CAD-DXF-AGENT",
+                        },
+                    )
+                    break
+
+        else:
+            # Default: move first editable entity
+            for e in drawing_context.get("entities", []):
+                protected = {
+                    lyr["name"].upper()
+                    for lyr in drawing_context.get("layers", [])
+                    if lyr.get("protected")
+                }
+                if e.get("layer", "").upper() not in protected:
+                    executor.execute(
+                        "move_entity",
+                        {
+                            "handle": e["handle"],
+                            "dx": 12.0,
+                            "dy": 12.0,
+                        },
+                    )
+                    break
+
+        return ChangeSet(
+            prompt=prompt,
+            operations=executor.operations,
+            revision_label=f"Mock agent edit: {prompt[:50]}",
+        )
+
+
+def _extract_function_calls(response) -> list[dict[str, Any]]:
+    """Extract function call name/args pairs from a Gemini response."""
+    calls = []
+    try:
+        for candidate in response.candidates:
+            for part in candidate.content.parts:
+                if hasattr(part, "function_call") and part.function_call:
+                    fc = part.function_call
+                    calls.append(
+                        {
+                            "name": fc.name,
+                            "args": dict(fc.args) if fc.args else {},
+                        }
+                    )
+    except (AttributeError, TypeError):
+        pass
+    return calls

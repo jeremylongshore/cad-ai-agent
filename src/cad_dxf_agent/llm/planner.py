@@ -36,6 +36,25 @@ def get_provider(provider_name: str | None = None) -> PlannerProvider:
             )
             return MockProvider()
 
+    if name == "agent":
+        try:
+            from .agent_provider import AgentProvider
+
+            return AgentProvider()
+        except ImportError:
+            logger.warning(
+                "google-cloud-aiplatform not installed, falling back to mock-agent. "
+                "Install with: pip install google-cloud-aiplatform"
+            )
+            from .agent_provider import MockAgentProvider
+
+            return MockAgentProvider()
+
+    if name == "mock-agent":
+        from .agent_provider import MockAgentProvider
+
+        return MockAgentProvider()
+
     logger.warning("Unknown provider '%s', falling back to mock", name)
     return MockProvider()
 
