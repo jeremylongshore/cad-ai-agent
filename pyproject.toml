@@ -58,6 +58,10 @@ dev = [
     "bandit>=1.7",
     "opentelemetry-api>=1.21",
     "opentelemetry-sdk>=1.21",
+    "pdfplumber>=0.10",
+    "Pillow>=10.0",
+    "matplotlib>=3.8",
+    "fpdf2>=2.7",
 ]
 
 [project.scripts]
@@ -86,7 +90,7 @@ disallow_untyped_defs = false
 check_untyped_defs = true
 
 [[tool.mypy.overrides]]
-module = ["ezdxf.*", "PySide6.*", "opentelemetry.*", "pdfplumber.*", "matplotlib.*"]
+module = ["ezdxf.*", "PySide6.*", "opentelemetry.*", "pdfplumber.*", "matplotlib.*", "fpdf.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
