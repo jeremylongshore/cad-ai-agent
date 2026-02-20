@@ -49,7 +49,7 @@ draw = [
     "Pillow>=10.0",
 ]
 gemini = [
-    "google-cloud-aiplatform>=1.38",
+    "google-cloud-aiplatform>=1.46",
     "Pillow>=10.0",
 ]
 dev = [

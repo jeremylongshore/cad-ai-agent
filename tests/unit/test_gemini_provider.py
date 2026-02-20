@@ -230,3 +230,17 @@ class TestGeminiProvider:
 
         changeset = provider.plan("Move it", sample_drawing_context)
         assert changeset.op_count == 1
+
+    def test_plan_safety_blocked_response(self, sample_drawing_context):
+        """Raises ValueError when response is blocked by safety filters."""
+        provider = _make_provider()
+
+        blocked_response = MagicMock()
+        # SDK raises ValueError when accessing .text on a blocked response
+        type(blocked_response).text = property(
+            lambda self: (_ for _ in ()).throw(ValueError("Response blocked by safety filters"))
+        )
+        provider._model.generate_content.return_value = blocked_response
+
+        with pytest.raises(ValueError, match="blocked"):
+            provider.plan("Move column", sample_drawing_context)

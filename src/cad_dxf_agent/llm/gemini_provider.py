@@ -149,20 +149,18 @@ class GeminiProvider(PlannerProvider):
         parts: list = []
 
         # Add drawing image if available (vision pipeline)
+        # SDK is guaranteed available here — _get_model() validates it first.
         if image_path is not None:
             img_path = Path(image_path)
             if img_path.exists():
-                try:
-                    from vertexai.generative_models import (  # type: ignore[import-untyped]
-                        Image,
-                        Part,
-                    )
+                from vertexai.generative_models import (  # type: ignore[import-untyped]
+                    Image,
+                    Part,
+                )
 
-                    image = Image.load_from_file(str(img_path))
-                    parts.append(Part.from_image(image))
-                    logger.info("Including drawing image: %s", img_path.name)
-                except ImportError:
-                    logger.warning("Cannot include image: vertexai not installed")
+                image = Image.load_from_file(str(img_path))
+                parts.append(Part.from_image(image))
+                logger.info("Including drawing image: %s", img_path.name)
 
         # Add the text prompt with drawing context
         context_json = json.dumps(drawing_context, indent=2, default=str)
@@ -179,7 +177,12 @@ class GeminiProvider(PlannerProvider):
         """
         response = model.generate_content(contents)
 
-        text = response.text if hasattr(response, "text") else str(response)
+        try:
+            text: str = response.text
+        except ValueError as e:
+            # SDK raises ValueError when response is blocked by safety filters
+            raise ValueError(f"Gemini response blocked: {e}") from e
+
         if not text:
             raise ValueError("Gemini returned empty response")
 
