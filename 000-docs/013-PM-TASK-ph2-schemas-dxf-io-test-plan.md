@@ -64,9 +64,9 @@ Define the complete set of Pydantic models that will be used throughout the pipe
   - Validation blockers prevent apply; warnings are informational only
 
 **Acceptance criteria:**
-- [ ] Every model listed above has a field-level specification
-- [ ] Strict union strategy is documented (how invalid ops are caught)
-- [ ] Error behavior is explicit (what happens when the LLM returns garbage)
+- Every model listed above has a field-level specification
+- Strict union strategy is documented (how invalid ops are caught)
+- Error behavior is explicit (what happens when the LLM returns garbage)
 
 ---
 
@@ -103,10 +103,10 @@ Specify what the DXF reader module does, what it returns, and how it handles the
   - Never raise an error for unsupported entities
 
 **Acceptance criteria:**
-- [ ] Reader I/O contract fully defined (input, output, errors)
-- [ ] Every V1 entity type has its extracted fields listed
-- [ ] ID strategy documented (DXF handles)
-- [ ] Unsupported entity behavior specified (warn, skip, record)
+- Reader I/O contract fully defined (input, output, errors)
+- Every V1 entity type has its extracted fields listed
+- ID strategy documented (DXF handles)
+- Unsupported entity behavior specified (warn, skip, record)
 
 ---
 
@@ -143,10 +143,10 @@ Specify what the DXF writer does, its safety guarantees, and what "roundtrip suc
   - Writer does not apply operations â€” it just saves the document state
 
 **Acceptance criteria:**
-- [ ] Writer contract defined (input, output, constraints)
-- [ ] Save-as naming and directory behavior documented
-- [ ] Preservation guarantees explicit (original untouched, non-targeted entities unchanged)
-- [ ] Roundtrip success defined in testable terms
+- Writer contract defined (input, output, constraints)
+- Save-as naming and directory behavior documented
+- Preservation guarantees explicit (original untouched, non-targeted entities unchanged)
+- Roundtrip success defined in testable terms
 
 ---
 
@@ -186,10 +186,10 @@ Plan how test fixtures will be created, what they contain, and where they live.
   - DXF version pinned (R2018)
 
 **Acceptance criteria:**
-- [ ] Fixture spec includes all V1 entity types
-- [ ] At least one protected-layer entity included
-- [ ] Programmatic generation approach documented (no committed binary files)
-- [ ] Determinism requirements stated
+- Fixture spec includes all V1 entity types
+- At least one protected-layer entity included
+- Programmatic generation approach documented (no committed binary files)
+- Determinism requirements stated
 
 ---
 
@@ -242,10 +242,10 @@ Define the test matrix, CI constraints, and coverage expectations for Phases 3â€
   - No hard coverage gate initially; revisit after Phase 4
 
 **Acceptance criteria:**
-- [ ] Test matrix documented with every test scenario listed
-- [ ] CI expectations clear (no API keys, cross-platform, cross-Python)
-- [ ] Coverage targets stated
-- [ ] Roundtrip test defined in concrete terms
+- Test matrix documented with every test scenario listed
+- CI expectations clear (no API keys, cross-platform, cross-Python)
+- Coverage targets stated
+- Roundtrip test defined in concrete terms
 
 ---
 

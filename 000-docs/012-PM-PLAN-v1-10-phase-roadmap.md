@@ -232,7 +232,7 @@ The cad-dxf-agent V1 build follows a ten-phase progression from bare repo to shi
 Phase 1 → Phase 2 → Phase 3 → Phase 4 → Phase 5 → Phase 6 → Phase 7 → Phase 8 → Phase 9 → Phase 10
 ```
 
-Each phase depends on the previous one completing its exit criteria.
+Each phase strictly depends on the successful completion of the previous one. A phase cannot begin until every exit criterion of its predecessor is met and verified.
 
 ## Beads epic mapping
 
