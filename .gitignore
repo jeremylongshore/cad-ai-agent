@@ -53,3 +53,6 @@ tmp/
 *.spec
 *.exe
 *.msi
+
+# bv (beads viewer) local config and caches
+.bv/
