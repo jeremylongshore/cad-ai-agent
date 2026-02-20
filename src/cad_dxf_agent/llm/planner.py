@@ -24,9 +24,17 @@ def get_provider(provider_name: str | None = None) -> PlannerProvider:
     if name == "mock":
         return MockProvider()
 
-    # Future: add real providers here
-    # elif name == "openai": return OpenAIProvider(...)
-    # elif name == "anthropic": return AnthropicProvider(...)
+    if name in ("gemini", "google", "vertex"):
+        try:
+            from .gemini_provider import GeminiProvider
+
+            return GeminiProvider()
+        except ImportError:
+            logger.warning(
+                "google-cloud-aiplatform not installed, falling back to mock. "
+                "Install with: pip install google-cloud-aiplatform"
+            )
+            return MockProvider()
 
     logger.warning("Unknown provider '%s', falling back to mock", name)
     return MockProvider()

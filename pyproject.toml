@@ -48,6 +48,10 @@ draw = [
     "matplotlib>=3.8",
     "Pillow>=10.0",
 ]
+gemini = [
+    "google-cloud-aiplatform>=1.38",
+    "Pillow>=10.0",
+]
 dev = [
     "pytest>=8.0",
     "pytest-cov>=5.0",
@@ -90,7 +94,7 @@ disallow_untyped_defs = false
 check_untyped_defs = true
 
 [[tool.mypy.overrides]]
-module = ["ezdxf.*", "PySide6.*", "opentelemetry.*", "pdfplumber.*", "matplotlib.*", "fpdf.*"]
+module = ["ezdxf.*", "PySide6.*", "opentelemetry.*", "pdfplumber.*", "matplotlib.*", "fpdf.*", "google.*", "vertexai.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

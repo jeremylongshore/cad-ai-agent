@@ -48,6 +48,12 @@ class Settings:
         self.render_dpi: int = int(os.getenv("CAD_RENDER_DPI", "150"))
         self.render_background: str = os.getenv("CAD_RENDER_BACKGROUND", "white")
 
+        # Gemini / Vertex AI (V2)
+        self.gcp_project: str | None = os.getenv("CAD_GCP_PROJECT")
+        self.gcp_location: str = os.getenv("CAD_GCP_LOCATION", "us-central1")
+        self.gemini_model: str = os.getenv("CAD_GEMINI_MODEL", "gemini-1.5-pro")
+        self.gemini_max_retries: int = int(os.getenv("CAD_GEMINI_MAX_RETRIES", "1"))
+
         # Local API
         self.api_host: str = os.getenv("CAD_API_HOST", "127.0.0.1")
         self.api_port: int = int(os.getenv("CAD_API_PORT", "8321"))
