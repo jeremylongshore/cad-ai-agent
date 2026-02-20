@@ -40,6 +40,14 @@ otel = [
     "opentelemetry-exporter-otlp>=1.21",
     "opentelemetry-semantic-conventions>=0.42b0",
 ]
+convert = [
+    "pdfplumber>=0.10",
+    "Pillow>=10.0",
+]
+draw = [
+    "matplotlib>=3.8",
+    "Pillow>=10.0",
+]
 dev = [
     "pytest>=8.0",
     "pytest-cov>=5.0",
@@ -78,7 +86,7 @@ disallow_untyped_defs = false
 check_untyped_defs = true
 
 [[tool.mypy.overrides]]
-module = ["ezdxf.*", "PySide6.*", "opentelemetry.*"]
+module = ["ezdxf.*", "PySide6.*", "opentelemetry.*", "pdfplumber.*", "matplotlib.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
