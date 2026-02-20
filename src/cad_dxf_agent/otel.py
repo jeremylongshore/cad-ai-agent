@@ -14,10 +14,10 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-_otel_initialized = False
+# Internal provider reference — avoids the global set_tracer_provider limitation
+_provider: Any = None
 
 try:
-    from opentelemetry import trace
     from opentelemetry.sdk.resources import Resource
     from opentelemetry.sdk.trace import TracerProvider
     from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter
@@ -33,9 +33,9 @@ def init_otel(service_name: str = "cad-dxf-agent") -> None:
     No-op if OTEL_ENABLED env var is not truthy or if OTel is not installed.
     Safe to call multiple times — only the first call takes effect.
     """
-    global _otel_initialized
+    global _provider
 
-    if _otel_initialized:
+    if _provider is not None:
         return
 
     if not _HAS_OTEL:
@@ -67,8 +67,7 @@ def init_otel(service_name: str = "cad-dxf-agent") -> None:
         logger.info("OTel: using console exporter")
 
     provider.add_span_processor(BatchSpanProcessor(exporter))
-    trace.set_tracer_provider(provider)
-    _otel_initialized = True
+    _provider = provider
     logger.info("OpenTelemetry tracing initialized (service=%s)", service_name)
 
 
@@ -77,45 +76,40 @@ def init_otel_testing(exporter: Any) -> None:
 
     Uses a SimpleSpanProcessor for immediate export.
     """
-    global _otel_initialized
+    global _provider
 
     if not _HAS_OTEL:
         return
 
-    from opentelemetry.sdk.resources import Resource
-    from opentelemetry.sdk.trace import TracerProvider
     from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 
     resource = Resource.create({"service.name": "cad-dxf-agent-test"})
     provider = TracerProvider(resource=resource)
     provider.add_span_processor(SimpleSpanProcessor(exporter))
-    trace.set_tracer_provider(provider)
-    _otel_initialized = True
+    _provider = provider
 
 
 def reset_otel() -> None:
     """Reset OTel state (for test teardown)."""
-    global _otel_initialized
-    _otel_initialized = False
+    global _provider
 
-    if not _HAS_OTEL:
-        return
-
-    provider = trace.get_tracer_provider()
-    if hasattr(provider, "shutdown"):
+    if _provider is not None and hasattr(_provider, "shutdown"):
         with contextlib.suppress(Exception):
-            provider.shutdown()
+            _provider.shutdown()
 
-    # Reset to default no-op provider
-    trace.set_tracer_provider(trace.NoOpTracerProvider())
+    _provider = None
 
 
 def get_tracer(name: str = "cad-dxf-agent") -> Any:
-    """Return an OTel tracer. Returns a no-op tracer if OTel is not available."""
+    """Return a lazy tracer that delegates to the current provider.
+
+    Returns a no-op tracer if OTel is not installed. If OTel is installed but
+    not yet initialized, the tracer will produce no-op spans until init is called.
+    """
     if not _HAS_OTEL:
         return _NoOpTracer()
 
-    return trace.get_tracer(name)
+    return _LazyTracer(name)
 
 
 @contextmanager
@@ -125,10 +119,6 @@ def span(name: str, attributes: dict[str, Any] | None = None) -> Generator[Any, 
     Yields the span (or a no-op object if OTel is disabled).
     """
     tracer = get_tracer()
-    if isinstance(tracer, _NoOpTracer):
-        yield _NoOpSpan()
-        return
-
     with tracer.start_as_current_span(name) as s:
         if attributes:
             for k, v in attributes.items():
@@ -136,8 +126,30 @@ def span(name: str, attributes: dict[str, Any] | None = None) -> Generator[Any, 
         yield s
 
 
+class _LazyTracer:
+    """Tracer that delegates to the current _provider at call time.
+
+    This ensures module-level ``tracer = get_tracer(__name__)`` works correctly
+    even if OTel is initialized after import.
+    """
+
+    def __init__(self, name: str) -> None:
+        self._name = name
+
+    @contextmanager
+    def start_as_current_span(
+        self, name: str, **kwargs: Any
+    ) -> Generator[Any, None, None]:
+        if _provider is not None:
+            real_tracer = _provider.get_tracer(self._name)
+            with real_tracer.start_as_current_span(name, **kwargs) as s:
+                yield s
+        else:
+            yield _NoOpSpan()
+
+
 class _NoOpSpan:
-    """Minimal stand-in when OTel is not installed."""
+    """Minimal stand-in when OTel is not installed or not initialized."""
 
     def set_attribute(self, key: str, value: Any) -> None:
         pass
