@@ -8,9 +8,11 @@ from pathlib import Path
 import ezdxf
 
 from ..models.cad_schema import DrawingContext, EntityRef, EntityType, LayerRule, Point2D
+from ..otel import get_tracer
 from ..settings import settings
 
 logger = logging.getLogger(__name__)
+tracer = get_tracer(__name__)
 
 SUPPORTED_TYPES = {t.value for t in EntityType}
 
@@ -21,43 +23,51 @@ def load_dxf(file_path: str | Path) -> DrawingContext:
     Only model space entities of supported V1 types are indexed.
     Unsupported entity types are recorded but skipped.
     """
-    file_path = Path(file_path)
-    if not file_path.exists():
-        raise FileNotFoundError(f"DXF file not found: {file_path}")
+    with tracer.start_as_current_span("cad.load_dxf") as span:
+        file_path = Path(file_path)
+        if not file_path.exists():
+            raise FileNotFoundError(f"DXF file not found: {file_path}")
 
-    doc = ezdxf.readfile(str(file_path))
-    msp = doc.modelspace()
+        span.set_attribute("cad.file.name", file_path.name)
 
-    entities: list[EntityRef] = []
-    unsupported: set[str] = set()
-    blocks: list[str] = [block.name for block in doc.blocks if not block.name.startswith("*")]
+        doc = ezdxf.readfile(str(file_path))
+        msp = doc.modelspace()
 
-    for entity in msp:
-        dxf_type = entity.dxftype()
-        if dxf_type not in SUPPORTED_TYPES:
-            unsupported.add(dxf_type)
-            continue
+        entities: list[EntityRef] = []
+        unsupported: set[str] = set()
+        blocks: list[str] = [block.name for block in doc.blocks if not block.name.startswith("*")]
 
-        ref = _parse_entity(entity, dxf_type)
-        if ref is not None:
-            entities.append(ref)
+        for entity in msp:
+            dxf_type = entity.dxftype()
+            if dxf_type not in SUPPORTED_TYPES:
+                unsupported.add(dxf_type)
+                continue
 
-    layers = _build_layer_rules(doc)
+            ref = _parse_entity(entity, dxf_type)
+            if ref is not None:
+                entities.append(ref)
 
-    if unsupported:
-        logger.info("Skipped unsupported entity types: %s", ", ".join(sorted(unsupported)))
+        layers = _build_layer_rules(doc)
 
-    return DrawingContext(
-        file_path=str(file_path),
-        entities=entities,
-        layers=layers,
-        blocks=blocks,
-        unsupported_entity_types=sorted(unsupported),
-        metadata={
-            "dxf_version": doc.dxfversion,
-            "encoding": doc.encoding,
-        },
-    )
+        if unsupported:
+            logger.info("Skipped unsupported entity types: %s", ", ".join(sorted(unsupported)))
+
+        ctx = DrawingContext(
+            file_path=str(file_path),
+            entities=entities,
+            layers=layers,
+            blocks=blocks,
+            unsupported_entity_types=sorted(unsupported),
+            metadata={
+                "dxf_version": doc.dxfversion,
+                "encoding": doc.encoding,
+            },
+        )
+
+        span.set_attribute("cad.entities.count", len(entities))
+        span.set_attribute("cad.layers.count", len(layers))
+
+        return ctx
 
 
 def _parse_entity(entity: ezdxf.entities.DXFGraphic, dxf_type: str) -> EntityRef | None:

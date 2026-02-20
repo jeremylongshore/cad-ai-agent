@@ -35,6 +35,7 @@ from cad_dxf_agent.core.semantic_model import build_planner_context
 from cad_dxf_agent.core.validators import validate_changeset
 from cad_dxf_agent.llm.planner import run_planner
 from cad_dxf_agent.models.config_schema import RevisionNoteConfig, RuleConfig
+from cad_dxf_agent.otel import init_otel
 
 
 def create_sample_dxf(path: Path) -> Path:
@@ -75,6 +76,8 @@ def create_sample_dxf(path: Path) -> Path:
 
 
 def main() -> int:
+    init_otel()
+
     print("=" * 60)
     print("cad-dxf-agent SMOKE TEST (mock planner, no API key)")
     print("=" * 60)

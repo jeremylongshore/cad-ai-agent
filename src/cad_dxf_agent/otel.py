@@ -8,11 +8,9 @@ from __future__ import annotations
 
 import contextlib
 import logging
+from collections.abc import Generator
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, Any, Generator
-
-if TYPE_CHECKING:
-    pass
+from typing import Any
 
 logger = logging.getLogger(__name__)
 

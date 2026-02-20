@@ -5,11 +5,13 @@ from __future__ import annotations
 import logging
 
 from ..models.ops_schema import ChangeSet
+from ..otel import get_tracer
 from ..settings import settings
 from .mock_provider import MockProvider
 from .providers import PlannerProvider
 
 logger = logging.getLogger(__name__)
+tracer = get_tracer(__name__)
 
 
 def get_provider(provider_name: str | None = None) -> PlannerProvider:
@@ -45,16 +47,19 @@ def run_planner(
     Returns:
         Validated ChangeSet with structured operations.
     """
-    if provider is None:
-        provider = get_provider()
+    with tracer.start_as_current_span("cad.run_planner") as span:
+        if provider is None:
+            provider = get_provider()
 
-    logger.info("Running planner [%s] for prompt: %s", provider.name, prompt[:80])
+        span.set_attribute("cad.mode", provider.name)
+        logger.info("Running planner [%s] for prompt: %s", provider.name, prompt[:80])
 
-    changeset = provider.plan(prompt, drawing_context)
+        changeset = provider.plan(prompt, drawing_context)
 
-    logger.info(
-        "Planner returned %d operation(s) for prompt: %s",
-        changeset.op_count,
-        prompt[:80],
-    )
-    return changeset
+        span.set_attribute("cad.ops.count", changeset.op_count)
+        logger.info(
+            "Planner returned %d operation(s) for prompt: %s",
+            changeset.op_count,
+            prompt[:80],
+        )
+        return changeset

@@ -8,7 +8,10 @@ from ..models.cad_schema import DrawingContext
 from ..models.changes_schema import ValidationResult
 from ..models.config_schema import RuleConfig
 from ..models.ops_schema import ChangeSet, EditOperation, OpType
+from ..otel import get_tracer
 from .entity_index import EntityIndex
+
+tracer = get_tracer(__name__)
 
 
 def validate_changeset(
@@ -21,14 +24,20 @@ def validate_changeset(
     Returns a ValidationResult with blockers and warnings.
     Blockers prevent apply; warnings are informational.
     """
-    result = ValidationResult()
-    index = EntityIndex(context)
-    protected_upper = [layer.upper() for layer in rules.protected_layers]
+    with tracer.start_as_current_span("cad.validate") as span:
+        span.set_attribute("cad.ops.count", changeset.op_count)
 
-    for i, op in enumerate(changeset.operations):
-        _validate_operation(op, i, index, protected_upper, rules, result)
+        result = ValidationResult()
+        index = EntityIndex(context)
+        protected_upper = [layer.upper() for layer in rules.protected_layers]
 
-    return result
+        for i, op in enumerate(changeset.operations):
+            _validate_operation(op, i, index, protected_upper, rules, result)
+
+        span.set_attribute("cad.validation.valid", result.valid)
+        span.set_attribute("cad.validation.blockers", len(result.blockers))
+
+        return result
 
 
 def _validate_operation(
