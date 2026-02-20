@@ -40,6 +40,14 @@ class Settings:
         # Logging
         self.log_level: str = os.getenv("CAD_LOG_LEVEL", "INFO")
 
+        # Conversion (V2)
+        self.oda_path: str | None = os.getenv("CAD_ODA_PATH")  # auto-detected if None
+        self.target_dxf_version: str = os.getenv("CAD_TARGET_DXF_VERSION", "R2010")
+
+        # Rendering (V2)
+        self.render_dpi: int = int(os.getenv("CAD_RENDER_DPI", "150"))
+        self.render_background: str = os.getenv("CAD_RENDER_BACKGROUND", "white")
+
         # Local API
         self.api_host: str = os.getenv("CAD_API_HOST", "127.0.0.1")
         self.api_port: int = int(os.getenv("CAD_API_PORT", "8321"))
