@@ -49,7 +49,7 @@ The cad-dxf-agent V1 build follows a ten-phase progression from bare repo to shi
 
 ## Phase 2 — Core data schemas, DXF read/write contracts, fixture strategy, and test plan
 
-**Status:** In progress (planning only, no implementation code)
+**Status:** Complete
 **Beads epic:** `cad-xoh`
 
 **Deliverables:**
@@ -67,24 +67,25 @@ The cad-dxf-agent V1 build follows a ten-phase progression from bare repo to shi
 
 ---
 
-## Phase 3 — Implement Pydantic schemas and DXF reader
+## Phase 3 — Entity index, context builder, and deterministic selectors
 
-**Status:** Not started
+**Status:** Complete
 **Depends on:** Phase 2
+**Beads epic:** `cad-85u`
+**AAR:** [020-AA-AACR-phase-03-aar.md](020-AA-AACR-phase-03-aar.md)
 
 **Deliverables:**
-- Pydantic models: EntityType, Point2D, EntityRef, LayerRule, DrawingContext
-- DXF reader module (model space entities, V1 types only, skip unsupported with warnings)
-- Entity index (lookup by handle, layer, type)
-- Semantic model (JSON-serializable planner context builder)
-- Unit tests for schemas, reader, and index
-- Programmatic DXF test fixtures
+- Enhanced EntityIndex with `filter()`, `search_text()`, `nearest()`, `get_by_id()`
+- Context builder with full/subset serialization and token-economy summaries
+- Deterministic selectors module (5 resolve functions for target resolution)
+- 68 new unit tests across 3 test files (118 total suite)
+- Phase 3 beads doc and AAR
 
 **Exit criteria:**
-- `load_dxf()` loads a sample DXF and returns a valid DrawingContext
-- Entity index lookups return correct results
-- Unsupported entity types logged but not fatal
-- All unit tests pass
+- EntityIndex supports id/layer/type/text/nearest queries
+- Context builder supports full + subset serialization and summaries
+- Deterministic selectors exist and are unit-tested
+- CI lint clean, all 118 tests pass in ~2.7s
 
 ---
 
@@ -239,8 +240,8 @@ Each phase strictly depends on the successful completion of the previous one. A 
 | Phase | Beads ID | Status |
 |-------|----------|--------|
 | 1 | `cad-6kc.1` | Complete |
-| 2 | `cad-xoh` | In progress |
-| 3 | — | Not started |
+| 2 | `cad-xoh` | Complete |
+| 3 | `cad-85u` | Complete |
 | 4 | — | Not started |
 | 5 | — | Not started |
 | 6 | — | Not started |

@@ -25,6 +25,7 @@
 | 009 | TASK | [009-PM-TASK-v1-beads-plan.md](009-PM-TASK-v1-beads-plan.md) |
 | 012 | PLAN | [012-PM-PLAN-v1-10-phase-roadmap.md](012-PM-PLAN-v1-10-phase-roadmap.md) |
 | 013 | TASK | [013-PM-TASK-ph2-schemas-dxf-io-test-plan.md](013-PM-TASK-ph2-schemas-dxf-io-test-plan.md) |
+| 019 | TASK | [019-PM-TASK-ph3-entity-index-context-selectors.md](019-PM-TASK-ph3-entity-index-context-selectors.md) |
 
 ### DR — Documentation & Reference
 | # | Type | File |
@@ -47,6 +48,7 @@
 |---|------|------|
 | 010 | AACR | [010-AA-AACR-phase-01-aar.md](010-AA-AACR-phase-01-aar.md) |
 | 011 | AACR | [011-AA-AACR-otel-instrumentation-aar.md](011-AA-AACR-otel-instrumentation-aar.md) |
+| 020 | AACR | [020-AA-AACR-phase-03-aar.md](020-AA-AACR-phase-03-aar.md) |
 
 ## Chronological Listing
 
@@ -70,6 +72,8 @@
 | 016 | AT | SPEC | DXF writer contract |
 | 017 | AT | SPEC | Test fixture strategy |
 | 018 | TQ | SPEC | Unit and roundtrip test plan |
+| 019 | PM | TASK | Phase 3 entity index, context builder, selectors |
+| 020 | AA | AACR | Phase 3 AAR |
 
 ## Quick Reference
 
