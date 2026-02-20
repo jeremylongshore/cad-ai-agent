@@ -142,9 +142,7 @@ class _LazyTracer:
         self._name = name
 
     @contextmanager
-    def start_as_current_span(
-        self, name: str, **kwargs: Any
-    ) -> Generator[Any, None, None]:
+    def start_as_current_span(self, name: str, **kwargs: Any) -> Generator[Any, None, None]:
         if _provider is not None:
             real_tracer = _provider.get_tracer(self._name)
             with real_tracer.start_as_current_span(name, **kwargs) as s:

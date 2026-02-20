@@ -11,9 +11,7 @@ from ..models.cad_schema import DrawingContext, EntityRef
 from .entity_index import EntityIndex
 
 
-def resolve_target_by_id(
-    context: DrawingContext, entity_id: str
-) -> EntityRef | None:
+def resolve_target_by_id(context: DrawingContext, entity_id: str) -> EntityRef | None:
     """Resolve a single entity by its DXF handle (id).
 
     Returns None if no entity matches.
@@ -36,9 +34,7 @@ def resolve_targets_by_layer_type(
     return index.filter(layer=layer, entity_type=entity_type)
 
 
-def resolve_targets_by_text(
-    context: DrawingContext, query: str
-) -> list[EntityRef]:
+def resolve_targets_by_text(context: DrawingContext, query: str) -> list[EntityRef]:
     """Resolve TEXT/MTEXT entities whose content matches the query.
 
     Uses normalized token matching (case-insensitive, all tokens
@@ -65,9 +61,7 @@ def resolve_target_nearest_point(
     return index.nearest(x, y, entity_type=entity_type, layer=layer)
 
 
-def resolve_candidate_set(
-    context: DrawingContext, prompt_hints: dict
-) -> list[EntityRef]:
+def resolve_candidate_set(context: DrawingContext, prompt_hints: dict) -> list[EntityRef]:
     """Resolve a candidate set from structured prompt hints.
 
     Accepts a dict with optional keys:

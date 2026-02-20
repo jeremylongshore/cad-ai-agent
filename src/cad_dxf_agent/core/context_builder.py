@@ -155,9 +155,7 @@ def _serialize_entities(entities: list[EntityRef]) -> list[dict[str, Any]]:
             "type": e.entity_type.value,
             "layer": e.layer,
             "insert_point": (
-                {"x": e.insert_point.x, "y": e.insert_point.y}
-                if e.insert_point
-                else None
+                {"x": e.insert_point.x, "y": e.insert_point.y} if e.insert_point else None
             ),
             "text": e.text_content,
             "block_name": e.block_name,
@@ -166,9 +164,7 @@ def _serialize_entities(entities: list[EntityRef]) -> list[dict[str, Any]]:
     ]
 
 
-def _subset_summary(
-    selected: list[EntityRef], context: DrawingContext
-) -> dict[str, Any]:
+def _subset_summary(selected: list[EntityRef], context: DrawingContext) -> dict[str, Any]:
     """Summary for a subset context."""
     counts_by_type: Counter[str] = Counter()
     for e in selected:

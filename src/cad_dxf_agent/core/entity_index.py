@@ -64,9 +64,7 @@ class EntityIndex:
         candidates = self._all
 
         if layer is not None:
-            layer_set = set(
-                e.handle for e in self._by_layer.get(layer.upper(), [])
-            )
+            layer_set = set(e.handle for e in self._by_layer.get(layer.upper(), []))
             candidates = [e for e in candidates if e.handle in layer_set]
 
         if entity_type is not None:
@@ -74,9 +72,7 @@ class EntityIndex:
                 etype = EntityType(entity_type)
             except ValueError:
                 return []
-            type_set = set(
-                e.handle for e in self._by_type.get(etype, [])
-            )
+            type_set = set(e.handle for e in self._by_type.get(etype, []))
             candidates = [e for e in candidates if e.handle in type_set]
 
         return candidates

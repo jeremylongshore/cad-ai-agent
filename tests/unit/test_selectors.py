@@ -44,18 +44,14 @@ def test_resolve_by_type(sample_context):
 
 def test_resolve_by_layer_and_type(sample_context):
     """Resolve by both layer and type returns intersection."""
-    results = resolve_targets_by_layer_type(
-        sample_context, layer="NOTES", entity_type="TEXT"
-    )
+    results = resolve_targets_by_layer_type(sample_context, layer="NOTES", entity_type="TEXT")
     assert len(results) == 1
     assert results[0].text_content == "Column C-4"
 
 
 def test_resolve_by_layer_type_no_match(sample_context):
     """No match returns empty list."""
-    results = resolve_targets_by_layer_type(
-        sample_context, layer="NOTES", entity_type="LINE"
-    )
+    results = resolve_targets_by_layer_type(sample_context, layer="NOTES", entity_type="LINE")
     assert results == []
 
 
@@ -93,9 +89,7 @@ def test_resolve_nearest(sample_context):
 
 def test_resolve_nearest_with_filters(sample_context):
     """Nearest with type filter restricts candidates."""
-    result = resolve_target_nearest_point(
-        sample_context, 10.0, 10.0, entity_type="INSERT"
-    )
+    result = resolve_target_nearest_point(sample_context, 10.0, 10.0, entity_type="INSERT")
     assert result is not None
     assert result.entity_type == EntityType.INSERT
 
