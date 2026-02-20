@@ -14,3 +14,6 @@
 # Git
 .gitattributes export-ignore
 .gitignore export-ignore
+
+# Use bd merge for beads JSONL files
+.beads/issues.jsonl merge=beads
