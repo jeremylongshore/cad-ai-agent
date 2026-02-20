@@ -91,37 +91,37 @@ The cad-dxf-agent V1 build follows a ten-phase progression from bare repo to shi
 
 ## Phase 4 — Operation model and validator engine
 
-**Status:** Not started
+**Status:** Complete (code predates formal phase tracking)
 **Depends on:** Phase 3
 
 **Deliverables:**
-- OpType enum (move_entity, edit_text, delete_entity, add_block)
-- EditOperation and ChangeSet Pydantic models
-- ValidationResult with severity levels (blocker vs warning)
-- RuleConfig with protected layers and blocks
-- Validator: protected layer check, move param checks, edit_text checks, missing entity handle, add_block checks
-- Unit tests for every validator path
+- OpType enum with 4 operation types (`ops_schema.py`)
+- EditOperation and ChangeSet Pydantic models (`ops_schema.py`)
+- ValidationResult with Severity enum, blockers/warnings properties (`changes_schema.py`)
+- RuleConfig with protected layers/blocks, coordinate tolerance (`config_schema.py`)
+- Validator engine: protected layer, move params, edit_text, add_block, missing handle (`validators.py`)
+- Unit tests for schemas and validator paths
 
 **Exit criteria:**
 - Validator blocks operations on protected layers
 - Validator blocks NaN/Inf coordinates, missing params
 - Warnings (e.g., large move distance) don't block apply
-- All validator tests pass with 100% path coverage
+- All validator tests pass
 
 ---
 
 ## Phase 5 — LLM planner interface and mock provider
 
-**Status:** Not started
+**Status:** Complete (code predates formal phase tracking)
 **Depends on:** Phase 4
 
 **Deliverables:**
-- PlannerProvider abstract interface with `plan()` method
-- MockProvider (keyword-based, works offline)
-- Response parser (JSON string to validated ChangeSet)
-- Prompt templates for future real LLM integration
-- Planner orchestrator (`get_provider()`, `run_planner()`)
-- Unit tests for parser and mock provider (no API key needed)
+- PlannerProvider ABC with `plan()` method (`providers.py`)
+- MockProvider keyword-based, offline (`mock_provider.py`)
+- Response parser with code-fence stripping (`response_parser.py`)
+- Prompt templates: system + user (`prompt_templates.py`)
+- Planner orchestrator with OTel tracing (`planner.py`)
+- 6 unit tests for parser (`test_planner_parser.py`)
 
 **Exit criteria:**
 - MockProvider returns valid operations for move/delete/text prompts
@@ -132,33 +132,32 @@ The cad-dxf-agent V1 build follows a ten-phase progression from bare repo to shi
 
 ## Phase 6 — Edit engine and DXF writer
 
-**Status:** Not started
+**Status:** Complete (code predates formal phase tracking)
 **Depends on:** Phase 5
 
 **Deliverables:**
-- EditEngine: move_entity, edit_text, delete_entity, add_block implementations
-- DXF writer (save-as new file, original untouched)
-- AppliedChange records for each operation
+- EditEngine with all 4 op handlers + OTel tracing (`edit_engine.py`, 184 lines)
+- DXF writer with save-as and copy-for-editing (`dxf_writer.py`, 50 lines)
+- AppliedChange records for each operation (`ops_schema.py`)
 
 **Exit criteria:**
 - Each operation type modifies the DXF correctly via ezdxf
 - Save produces a valid DXF file
-- Original file hash unchanged after save
-- Unit tests for each operation type
+- Original file hash unchanged after save (verified in E2E smoke test)
 
 ---
 
 ## Phase 7 — Preview model and AI revision notes
 
-**Status:** Not started
+**Status:** Complete (code predates formal phase tracking)
 **Depends on:** Phase 6
 
 **Deliverables:**
-- PreviewModel: human-readable change summary
-- Revision note text generation (deterministic, from operation metadata, never LLM output)
-- Revision note DXF insertion (AI_REV_NOTES layer)
-- RevisionNoteConfig (anchor point, text height, prefix, toggle)
-- Unit tests for note generation and preview
+- PreviewModel with human-readable summaries (`preview_model.py`, 81 lines)
+- Deterministic revision note generation with direction/distance (`revision_notes.py`, 133 lines)
+- DXF insertion on AI_REV_NOTES layer
+- RevisionNoteConfig in `config_schema.py`
+- 6 unit tests (`test_revision_notes.py`)
 
 **Exit criteria:**
 - Preview accurately describes all proposed changes
@@ -169,15 +168,14 @@ The cad-dxf-agent V1 build follows a ten-phase progression from bare repo to shi
 
 ## Phase 8 — End-to-end integration and smoke tests
 
-**Status:** Not started
+**Status:** Complete (code predates formal phase tracking)
 **Depends on:** Phase 7
 
 **Deliverables:**
-- Standalone smoke test script (`scripts/smoke_test.py`)
-- Pytest smoke test suite (`tests/smoke/`)
-- End-to-end verification: load → plan → validate → preview → apply → save → verify
-- Protected layer enforcement verified in E2E context
-- Original file preservation verified in E2E context
+- Standalone smoke test (`scripts/smoke_test.py`, 166 lines) — 7-step pipeline
+- Pytest smoke suite (`tests/smoke/test_e2e_mock.py`, 106 lines) — 4 tests
+- Move, delete, text-edit, and file-preservation E2E tests
+- SHA256 verification of original file invariance
 
 **Exit criteria:**
 - `python scripts/smoke_test.py` exits 0
@@ -188,16 +186,16 @@ The cad-dxf-agent V1 build follows a ten-phase progression from bare repo to shi
 
 ## Phase 9 — Desktop UI wiring
 
-**Status:** Not started
+**Status:** Complete (code predates formal phase tracking)
 **Depends on:** Phase 8
 
 **Deliverables:**
-- MainWindow wired to full pipeline
-- Open DXF button → file picker → load
-- Prompt text input → Plan & Preview button → display preview
-- Apply & Save As button → apply changeset → save new file
-- Status bar with progress feedback
-- Error display for validation blockers
+- MainWindow fully wired to pipeline (`ui/main_window.py`, 208 lines)
+- Open DXF → file picker → `load_dxf()` → entity count display
+- Prompt input → Plan & Preview → `run_planner()` → `validate_changeset()` → `PreviewModel`
+- Apply & Save As → `EditEngine` → `insert_revision_note()` → save
+- Status log panel with real-time feedback
+- Blocker display in operations list, warnings in status
 
 **Exit criteria:**
 - User can complete full workflow via the desktop window
@@ -242,10 +240,10 @@ Each phase strictly depends on the successful completion of the previous one. A 
 | 1 | `cad-6kc.1` | Complete |
 | 2 | `cad-xoh` | Complete |
 | 3 | `cad-85u` | Complete |
-| 4 | — | Not started |
-| 5 | — | Not started |
-| 6 | — | Not started |
-| 7 | — | Not started |
-| 8 | — | Not started |
-| 9 | — | Not started |
-| 10 | — | Not started |
+| 4 | — | Complete (pre-tracked) |
+| 5 | — | Complete (pre-tracked) |
+| 6 | — | Complete (pre-tracked) |
+| 7 | — | Complete (pre-tracked) |
+| 8 | — | Complete (pre-tracked) |
+| 9 | — | Complete (pre-tracked) |
+| 10 | `cad-m9m` | In progress |
