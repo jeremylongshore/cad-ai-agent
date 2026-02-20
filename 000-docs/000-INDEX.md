@@ -19,6 +19,8 @@
 | # | Type | File |
 |---|------|------|
 | 009 | TASK | [009-PM-TASK-v1-beads-plan.md](009-PM-TASK-v1-beads-plan.md) |
+| 012 | PLAN | [012-PM-PLAN-v1-10-phase-roadmap.md](012-PM-PLAN-v1-10-phase-roadmap.md) |
+| 013 | TASK | [013-PM-TASK-ph2-schemas-dxf-io-test-plan.md](013-PM-TASK-ph2-schemas-dxf-io-test-plan.md) |
 
 ### DR — Documentation & Reference
 | # | Type | File |
@@ -56,8 +58,10 @@
 | 009 | PM | TASK | V1 beads plan |
 | 010 | AA | AACR | Phase 01 AAR |
 | 011 | AA | AACR | OTel instrumentation AAR |
+| 012 | PM | PLAN | V1 ten-phase roadmap |
+| 013 | PM | TASK | Phase 2 schemas, DXF I/O, and test plan |
 
 ## Quick Reference
 
 - **CC codes:** AT=Architecture, PP=Product, PM=Project Mgmt, DR=Documentation, TQ=Testing, BL=Business, AA=After Action
-- **Type codes:** ADEC=Decision, ARCH=Architecture, PROD=Product, TASK=Task, GUID=Guide, SECU=Security, POLI=Policy, AACR=After Action Review
+- **Type codes:** ADEC=Decision, ARCH=Architecture, PROD=Product, TASK=Task, GUID=Guide, SECU=Security, POLI=Policy, AACR=After Action Review, PLAN=Roadmap
