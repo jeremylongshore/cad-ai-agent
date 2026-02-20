@@ -126,7 +126,7 @@ def _convert_dwg(source_path: Path, output_dir: str | Path | None) -> Conversion
     """Convert DWG to DXF using ODA File Converter via ezdxf.addons.odafc."""
     from ezdxf.addons import odafc
 
-    if not odafc.is_installed():
+    if not odafc.is_installed():  # type: ignore[attr-defined]
         return ConversionResult(
             source_path=source_path,
             source_format="dwg",
@@ -143,7 +143,7 @@ def _convert_dwg(source_path: Path, output_dir: str | Path | None) -> Conversion
 
     try:
         target_version = _version_to_odafc(settings.target_dxf_version)
-        doc = odafc.readfile(str(source_path))
+        doc = odafc.readfile(str(source_path))  # type: ignore[attr-defined]
         doc.saveas(str(output_path), fmt=target_version)
 
         logger.info("DWG → DXF: %s → %s", source_path.name, output_path)
