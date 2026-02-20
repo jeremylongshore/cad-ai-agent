@@ -39,6 +39,7 @@
 | # | Type | File |
 |---|------|------|
 | 010 | AACR | [010-AA-AACR-phase-01-aar.md](010-AA-AACR-phase-01-aar.md) |
+| 011 | AACR | [011-AA-AACR-otel-instrumentation-aar.md](011-AA-AACR-otel-instrumentation-aar.md) |
 
 ## Chronological Listing
 
@@ -54,6 +55,7 @@
 | 008 | PP | PROD | PRD addendum |
 | 009 | PM | TASK | V1 beads plan |
 | 010 | AA | AACR | Phase 01 AAR |
+| 011 | AA | AACR | OTel instrumentation AAR |
 
 ## Quick Reference
 
