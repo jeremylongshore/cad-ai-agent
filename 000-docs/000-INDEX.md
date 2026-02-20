@@ -9,6 +9,10 @@
 | 005 | ADEC | [005-AT-ADEC-llm-plans-not-dxf.md](005-AT-ADEC-llm-plans-not-dxf.md) |
 | 006 | ADEC | [006-AT-ADEC-ai-revision-notes.md](006-AT-ADEC-ai-revision-notes.md) |
 | 007 | ARCH | [007-AT-ARCH-v1-blueprint.md](007-AT-ARCH-v1-blueprint.md) |
+| 014 | SPEC | [014-AT-SPEC-pydantic-schema-specification.md](014-AT-SPEC-pydantic-schema-specification.md) |
+| 015 | SPEC | [015-AT-SPEC-dxf-reader-contract.md](015-AT-SPEC-dxf-reader-contract.md) |
+| 016 | SPEC | [016-AT-SPEC-dxf-writer-contract.md](016-AT-SPEC-dxf-writer-contract.md) |
+| 017 | SPEC | [017-AT-SPEC-fixture-strategy.md](017-AT-SPEC-fixture-strategy.md) |
 
 ### PP — Product & Planning
 | # | Type | File |
@@ -31,6 +35,7 @@
 | # | Type | File |
 |---|------|------|
 | 002 | SECU | [002-TQ-SECU-security-policy.md](002-TQ-SECU-security-policy.md) |
+| 018 | SPEC | [018-TQ-SPEC-unit-roundtrip-test-plan.md](018-TQ-SPEC-unit-roundtrip-test-plan.md) |
 
 ### BL — Business & Legal
 | # | Type | File |
@@ -60,8 +65,13 @@
 | 011 | AA | AACR | OTel instrumentation AAR |
 | 012 | PM | PLAN | V1 ten-phase roadmap |
 | 013 | PM | TASK | Phase 2 schemas, DXF I/O, and test plan |
+| 014 | AT | SPEC | Pydantic data schema specification |
+| 015 | AT | SPEC | DXF reader contract |
+| 016 | AT | SPEC | DXF writer contract |
+| 017 | AT | SPEC | Test fixture strategy |
+| 018 | TQ | SPEC | Unit and roundtrip test plan |
 
 ## Quick Reference
 
 - **CC codes:** AT=Architecture, PP=Product, PM=Project Mgmt, DR=Documentation, TQ=Testing, BL=Business, AA=After Action
-- **Type codes:** ADEC=Decision, ARCH=Architecture, PROD=Product, TASK=Task, GUID=Guide, SECU=Security, POLI=Policy, AACR=After Action Review, PLAN=Roadmap
+- **Type codes:** ADEC=Decision, ARCH=Architecture, SPEC=Specification, PROD=Product, TASK=Task, GUID=Guide, SECU=Security, POLI=Policy, AACR=After Action Review, PLAN=Roadmap
