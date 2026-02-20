@@ -160,6 +160,45 @@ CAD_PROTECTED_LAYERS=TITLE,TITLEBLOCK,SEAL,REVISION,CUSTOM_LAYER
 
 Any operation targeting an entity on a protected layer will be blocked by the validator.
 
+## Observability (OpenTelemetry)
+
+Optional distributed tracing for pipeline performance insights. Off by default, CI-safe (no network calls when disabled).
+
+### Enable
+
+```bash
+# Install OTel extras
+pip install -e ".[otel]"
+
+# Enable console exporter (prints spans to stdout)
+OTEL_ENABLED=1 python scripts/smoke_test.py
+
+# Or send to an OTLP collector (Jaeger, Grafana Tempo, etc.)
+OTEL_ENABLED=1 OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317 python scripts/smoke_test.py
+```
+
+### Spans Emitted
+
+| Span Name | Attributes |
+|-----------|------------|
+| `cad.load_dxf` | `cad.file.name`, `cad.entities.count`, `cad.layers.count` |
+| `cad.build_context` | `cad.entities.count` |
+| `cad.run_planner` | `cad.mode`, `cad.ops.count` |
+| `cad.validate` | `cad.ops.count`, `cad.validation.valid`, `cad.validation.blockers` |
+| `cad.apply_changeset` | `cad.ops.count`, `cad.ops.success_count` |
+| `cad.save` | `cad.save.output_basename` |
+| `cad.revision_note` | `cad.revision.layer` |
+
+**Privacy:** No full file paths, no drawing text content, no API keys are ever included in span attributes.
+
+### Environment Variables
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `OTEL_ENABLED` | _(unset)_ | Enable tracing (`1`, `true`, `yes`) |
+| `OTEL_EXPORTER` | `console` | Exporter type: `console` or `otlp` |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | _(unset)_ | OTLP collector URL |
+
 ## Project Structure
 
 ```
@@ -167,6 +206,7 @@ cad-dxf-agent/
   src/cad_dxf_agent/
     app.py                  # Entry point
     settings.py             # Env-based configuration
+    otel.py                 # OpenTelemetry bootstrap
     core/
       dxf_reader.py         # DXF → DrawingContext
       dxf_writer.py         # Save-as new DXF

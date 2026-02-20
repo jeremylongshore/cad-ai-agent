@@ -95,6 +95,13 @@ All settings via environment variables (`.env` file, `.gitignore`d):
 | `CAD_PROTECTED_LAYERS` | `TITLE,TITLEBLOCK,SEAL,REVISION` | Comma-separated protected layers |
 | `CAD_REVISION_NOTES_ENABLED` | `true` | Insert revision notes after edits |
 | `CAD_REVISION_NOTES_LAYER` | `AI_REV_NOTES` | Layer name for revision notes |
+| `OTEL_ENABLED` | _(unset)_ | Enable OpenTelemetry tracing (`1`, `true`, `yes`) |
+| `OTEL_EXPORTER` | `console` | Span exporter: `console` or `otlp` |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | _(unset)_ | OTLP collector endpoint (e.g., `http://localhost:4317`) |
+
+### Observability (OpenTelemetry)
+
+Optional tracing via `otel.py` bootstrap module. Off by default, CI-safe (no network). Each pipeline stage emits a span (e.g., `cad.load_dxf`, `cad.run_planner`, `cad.validate`). No full file paths or drawing text in span attributes. Install extras: `pip install -e ".[otel]"`.
 
 ## Testing
 
