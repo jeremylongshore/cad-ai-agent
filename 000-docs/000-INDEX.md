@@ -18,6 +18,7 @@
 | # | Type | File |
 |---|------|------|
 | 008 | PROD | [008-PP-PROD-prd-addendum.md](008-PP-PROD-prd-addendum.md) |
+| 021 | PROD | [021-PP-PROD-v2-prd-scope-expansion.md](021-PP-PROD-v2-prd-scope-expansion.md) |
 
 ### PM — Project Management
 | # | Type | File |
@@ -74,6 +75,7 @@
 | 018 | TQ | SPEC | Unit and roundtrip test plan |
 | 019 | PM | TASK | Phase 3 entity index, context builder, selectors |
 | 020 | AA | AACR | Phase 3 AAR |
+| 021 | PP | PROD | V2 PRD scope expansion |
 
 ## Quick Reference
 
