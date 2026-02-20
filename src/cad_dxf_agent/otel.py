@@ -68,6 +68,11 @@ def init_otel(service_name: str = "cad-dxf-agent") -> None:
 
     provider.add_span_processor(BatchSpanProcessor(exporter))
     _provider = provider
+
+    import atexit
+
+    atexit.register(provider.shutdown)
+
     logger.info("OpenTelemetry tracing initialized (service=%s)", service_name)
 
 
@@ -155,6 +160,14 @@ class _NoOpSpan:
         pass
 
     def add_event(self, name: str, attributes: dict[str, Any] | None = None) -> None:
+        pass
+
+    def record_exception(
+        self, exception: BaseException, attributes: dict[str, Any] | None = None
+    ) -> None:
+        pass
+
+    def set_status(self, status: Any, description: str | None = None) -> None:
         pass
 
 
