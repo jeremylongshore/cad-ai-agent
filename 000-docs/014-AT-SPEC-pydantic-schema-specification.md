@@ -84,7 +84,7 @@ Describes a layer's state and protection status.
 | `frozen` | `bool` | no | `False` | Whether the layer is frozen |
 | `color` | `int \| None` | no | `None` | AutoCAD color index (ACI) |
 
-**Protection resolution:** A layer is marked `protected=True` when its name (case-insensitive) matches any entry in `RuleConfig.protected_layers`.
+**Protection resolution:** A layer is marked `protected=True` by the reader when its name (case-insensitive) matches any entry in `settings.protected_layers` (loaded from the `CAD_PROTECTED_LAYERS` environment variable). The validator separately checks against the `RuleConfig.protected_layers` list passed by the caller. Both default to `["TITLE", "TITLEBLOCK", "SEAL", "REVISION"]`.
 
 ---
 

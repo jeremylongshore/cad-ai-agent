@@ -75,7 +75,7 @@ src/cad_dxf_agent/
 ### Data Models (Pydantic)
 
 - `DrawingContext` — normalized view of a loaded DXF (entities, layers, blocks, metadata)
-- `EntityRef` — single entity with handle, type, layer, position, text content
+- `EntityRef` — single entity with handle, type, layer, position, text content, block name, attributes
 - `EditOperation` — one op with `OpType`, target handle, layer, params dict
 - `ChangeSet` — batch of operations from a single prompt
 - `ValidationResult` — blockers (prevent apply) and warnings (informational)

@@ -86,7 +86,7 @@ Only model-space entities are processed. Paper space, layout tabs, and entities 
 | `handle` | `entity.dxf.handle` | Hex string |
 | `entity_type` | `EntityType.LWPOLYLINE` | — |
 | `layer` | `entity.dxf.layer` | Layer name |
-| `insert_point` | `entity.get_points("xy")[0]` → `Point2D(x, y)` | First vertex of the polyline |
+| `insert_point` | `entity.get_points(format="xy")[0]` → `Point2D(x, y)` | First vertex of the polyline |
 | `text_content` | — | Always `None` |
 | `block_name` | — | Always `None` |
 
