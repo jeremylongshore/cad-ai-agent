@@ -1,0 +1,55 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+*.egg
+dist/
+build/
+.eggs/
+*.whl
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment / secrets
+.env
+.env.local
+.env.production
+*.pem
+*.key
+
+# Testing
+.coverage
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# DXF working files (keep samples/)
+*.dxf.bak
+output/
+temp/
+tmp/
+
+# Distribution
+*.spec
+*.exe
+*.msi
