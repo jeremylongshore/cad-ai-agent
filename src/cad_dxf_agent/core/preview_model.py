@@ -39,11 +39,7 @@ class PreviewModel:
         entity_index = EntityIndex(self.context)
 
         for i, op in enumerate(self.changeset.operations):
-            entity = (
-                entity_index.get_by_handle(op.target_handle)
-                if op.target_handle
-                else None
-            )
+            entity = entity_index.get_by_handle(op.target_handle) if op.target_handle else None
             desc = self._describe_op(op, entity)
             self._items.append(PreviewItem(i, desc, op.target_handle))
 

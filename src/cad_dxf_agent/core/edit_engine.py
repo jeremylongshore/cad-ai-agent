@@ -73,9 +73,7 @@ class EditEngine:
         assert op.target_handle is not None
         entity = self._find_entity(op.target_handle)
         if entity is None:
-            return AppliedChange(
-                operation=op, success=False, description="Entity not found"
-            )
+            return AppliedChange(operation=op, success=False, description="Entity not found")
 
         dx = op.params.get("dx", 0)
         dy = op.params.get("dy", 0)
@@ -89,17 +87,13 @@ class EditEngine:
                 description=f"Moved entity {op.target_handle} by ({dx}, {dy})",
             )
         except Exception as e:
-            return AppliedChange(
-                operation=op, success=False, description=f"Move failed: {e}"
-            )
+            return AppliedChange(operation=op, success=False, description=f"Move failed: {e}")
 
     def _apply_edit_text(self, op: EditOperation) -> AppliedChange:
         assert op.target_handle is not None
         entity = self._find_entity(op.target_handle)
         if entity is None:
-            return AppliedChange(
-                operation=op, success=False, description="Entity not found"
-            )
+            return AppliedChange(operation=op, success=False, description="Entity not found")
 
         new_text = op.params.get("new_text", "")
         dxf_type = entity.dxftype()
@@ -123,17 +117,13 @@ class EditEngine:
                 description=f"Updated text on {op.target_handle} to: {new_text!r}",
             )
         except Exception as e:
-            return AppliedChange(
-                operation=op, success=False, description=f"Edit text failed: {e}"
-            )
+            return AppliedChange(operation=op, success=False, description=f"Edit text failed: {e}")
 
     def _apply_delete(self, op: EditOperation) -> AppliedChange:
         assert op.target_handle is not None
         entity = self._find_entity(op.target_handle)
         if entity is None:
-            return AppliedChange(
-                operation=op, success=False, description="Entity not found"
-            )
+            return AppliedChange(operation=op, success=False, description="Entity not found")
 
         try:
             self.msp.delete_entity(entity)
@@ -144,9 +134,7 @@ class EditEngine:
                 description=f"Deleted entity {op.target_handle}",
             )
         except Exception as e:
-            return AppliedChange(
-                operation=op, success=False, description=f"Delete failed: {e}"
-            )
+            return AppliedChange(operation=op, success=False, description=f"Delete failed: {e}")
 
     def _apply_add_block(self, op: EditOperation) -> AppliedChange:
         block_name: str = op.params.get("block_name", "")
@@ -185,6 +173,4 @@ class EditEngine:
                 description=f"Inserted block {block_name} at ({x}, {y})",
             )
         except Exception as e:
-            return AppliedChange(
-                operation=op, success=False, description=f"Add block failed: {e}"
-            )
+            return AppliedChange(operation=op, success=False, description=f"Add block failed: {e}")

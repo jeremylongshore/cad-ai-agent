@@ -96,14 +96,10 @@ class MockProvider(PlannerProvider):
             revision_label=f"Mock edit: {prompt[:50]}",
         )
 
-    def _find_editable_entity(
-        self, entities: list[dict], context: dict
-    ) -> dict | None:
+    def _find_editable_entity(self, entities: list[dict], context: dict) -> dict | None:
         """Find the first entity not on a protected layer."""
         protected = {
-            layer["name"].upper()
-            for layer in context.get("layers", [])
-            if layer.get("protected")
+            layer["name"].upper() for layer in context.get("layers", []) if layer.get("protected")
         }
         for entity in entities:
             if entity.get("layer", "").upper() not in protected:
