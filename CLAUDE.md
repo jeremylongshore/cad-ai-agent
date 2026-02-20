@@ -54,7 +54,7 @@ User Prompt → Planner → ChangeSet → Validator → Preview → EditEngine �
 
 ### Key Architectural Rules
 
-- **LLM never touches DXF directly** (ADR 0002). It returns structured `EditOperation` objects with `OpType` enum: `move_entity`, `edit_text`, `delete_entity`, `add_block`. Invalid/unsupported ops reject the entire changeset.
+- **LLM never touches DXF directly** (see `000-docs/005-AT-ADEC-llm-plans-not-dxf.md`). It returns structured `EditOperation` objects with `OpType` enum: `move_entity`, `edit_text`, `delete_entity`, `add_block`. Invalid/unsupported ops reject the entire changeset.
 - **Protected layers** (TITLE, TITLEBLOCK, SEAL, REVISION) cannot be edited. The validator blocks any operation targeting entities on these layers.
 - **Revision notes are deterministic** — generated from operation metadata, never from freeform LLM output.
 - **V1 entity types**: LINE, LWPOLYLINE, TEXT, MTEXT, INSERT only. All other types are skipped during load.
@@ -111,4 +111,4 @@ GitHub Actions on push/PR to main: lint, format check, mypy, tests (matrix: ubun
 
 ## Task Tracking
 
-This project uses `bd` (beads) for issue tracking. Run `bd ready` to find available work. See AGENTS.md for the full session workflow.
+This project uses `bd` (beads) for issue tracking. Run `bd ready` to find available work. See `000-docs/001-DR-GUID-agent-instructions.md` for the full session workflow. All project docs are in `000-docs/` — see `000-docs/000-INDEX.md` for the full inventory.

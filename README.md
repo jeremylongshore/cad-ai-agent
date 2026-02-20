@@ -27,8 +27,8 @@ Local-first DXF layout editor with LLM-assisted prompt-to-edit planning, validat
 | Windows + Linux | Cloud deployment |
 
 For full details see:
-- [V1 Blueprint](docs/specs/v1-blueprint.md) — engineering architecture and module map
-- [PRD Addendum](docs/specs/prd-addendum-v1.md) — product requirements and acceptance criteria
+- [V1 Blueprint](000-docs/007-AT-ARCH-v1-blueprint.md) — engineering architecture and module map
+- [PRD Addendum](000-docs/008-PP-PROD-prd-addendum.md) — product requirements and acceptance criteria
 
 ## Quickstart
 
@@ -198,20 +198,20 @@ cad-dxf-agent/
     fixtures/               # Test fixture helpers
   scripts/
     smoke_test.py           # Standalone smoke test
-  docs/
-    specs/                  # V1 blueprint, PRD addendum
-    beads/                  # Beads epic/task plan
-    adr/                    # Architecture Decision Records
+  000-docs/                  # All project docs (flat, sequenced, categorized)
 ```
 
 ## Documentation
 
-- [V1 Blueprint](docs/specs/v1-blueprint.md) — architecture, module map, scope
-- [PRD Addendum](docs/specs/prd-addendum-v1.md) — product requirements, acceptance criteria
-- [Beads V1 Plan](docs/beads/v1-beads-plan.md) — epics, tasks, dependencies
-- [ADR 0001: Local-First Architecture](docs/adr/0001-local-first-architecture.md)
-- [ADR 0002: LLM Plans, Not DXF Edits](docs/adr/0002-llm-plans-not-dxf-edits.md)
-- [ADR 0003: AI Revision Notes on Safe Layer](docs/adr/0003-ai-revision-notes-safe-layer.md)
+All docs live in [`000-docs/`](000-docs/000-INDEX.md) using flat chronological filing.
+
+- [V1 Blueprint](000-docs/007-AT-ARCH-v1-blueprint.md) — architecture, module map, scope
+- [PRD Addendum](000-docs/008-PP-PROD-prd-addendum.md) — product requirements, acceptance criteria
+- [Beads V1 Plan](000-docs/009-PM-TASK-v1-beads-plan.md) — epics, tasks, dependencies
+- [ADR 0001: Local-First Architecture](000-docs/004-AT-ADEC-local-first-architecture.md)
+- [ADR 0002: LLM Plans, Not DXF Edits](000-docs/005-AT-ADEC-llm-plans-not-dxf.md)
+- [ADR 0003: AI Revision Notes on Safe Layer](000-docs/006-AT-ADEC-ai-revision-notes.md)
+- [Phase 1 AAR](000-docs/010-AA-AACR-phase-01-aar.md) — after action review
 
 ## License
 
