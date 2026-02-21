@@ -166,15 +166,15 @@ def _parse_entity(
             try:
                 defpoint = entity.dxf.defpoint
                 insert_point = Point2D(x=defpoint.x, y=defpoint.y)
-            except Exception:  # noqa: S110
-                pass
+            except Exception:
+                logger.debug("DIMENSION %s: no insert or defpoint", handle)
     elif dxf_type == "HATCH":
         try:
             elevation = entity.dxf.get("elevation", None)
             if elevation is not None:
                 insert_point = Point2D(x=0.0, y=0.0)
-        except Exception:  # noqa: S110
-            pass
+        except Exception:
+            logger.debug("HATCH %s: elevation read failed", handle)
         # Try to compute centroid from boundary paths
         if insert_point is None:
             try:
@@ -190,24 +190,24 @@ def _parse_entity(
                             x=sum(xs) / len(xs),
                             y=sum(ys) / len(ys),
                         )
-            except Exception:  # noqa: S110
-                pass
+            except Exception:
+                logger.debug("HATCH %s: centroid computation failed", handle)
     elif dxf_type == "SPLINE":
         try:
             control_points = list(entity.control_points)  # type: ignore[attr-defined]
             if control_points:
                 cp = control_points[0]
                 insert_point = Point2D(x=cp[0], y=cp[1])
-        except Exception:  # noqa: S110
-            pass
+        except Exception:
+            logger.debug("SPLINE %s: control point read failed", handle)
     elif dxf_type == "POLYLINE":
         try:
             vertices = list(entity.vertices)  # type: ignore[attr-defined]
             if vertices:
                 loc = vertices[0].dxf.location
                 insert_point = Point2D(x=loc.x, y=loc.y)
-        except Exception:  # noqa: S110
-            pass
+        except Exception:
+            logger.debug("POLYLINE %s: vertex read failed", handle)
     elif dxf_type == "MLEADER":
         try:
             ctx = entity.context  # type: ignore[attr-defined]
@@ -217,21 +217,21 @@ def _parse_entity(
                     x=ctx.mtext.insert.x,
                     y=ctx.mtext.insert.y,
                 )
-        except Exception:  # noqa: S110
-            pass
+        except Exception:
+            logger.debug("MLEADER %s: context read failed", handle)
     elif dxf_type == "LEADER":
         try:
             vertices = list(entity.vertices)  # type: ignore[attr-defined]
             if vertices:
                 insert_point = Point2D(x=vertices[0].x, y=vertices[0].y)
-        except Exception:  # noqa: S110
-            pass
+        except Exception:
+            logger.debug("LEADER %s: vertex read failed", handle)
     elif dxf_type == "SOLID":
         try:
             vtx0 = entity.dxf.vtx0
             insert_point = Point2D(x=vtx0.x, y=vtx0.y)
-        except Exception:  # noqa: S110
-            pass
+        except Exception:
+            logger.debug("SOLID %s: vtx0 read failed", handle)
 
     return EntityRef(
         handle=handle,

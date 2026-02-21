@@ -182,7 +182,7 @@ def _convert_pdf(source_path: Path, output_dir: str | Path | None) -> Conversion
     has_fitz = False
     has_pdfplumber = False
     try:
-        import fitz  # noqa: F401
+        import fitz  # noqa: F401  # availability check only
 
         has_fitz = True
     except ImportError:
@@ -190,7 +190,7 @@ def _convert_pdf(source_path: Path, output_dir: str | Path | None) -> Conversion
 
     if not has_fitz:
         try:
-            import pdfplumber  # noqa: F401
+            import pdfplumber  # noqa: F401  # availability check only
 
             has_pdfplumber = True
         except ImportError:
