@@ -55,6 +55,14 @@ def sample_dxf(tmp_path: Path) -> Path:
     block.add_circle((0, 0), radius=2)
     msp.add_blockref("COLUMN_MARK", insert=(25, 25), dxfattribs={"layer": "STRUCTURAL"})
 
+    # V2 entity types
+    msp.add_circle((60, 60), radius=5, dxfattribs={"layer": "STRUCTURAL"})
+    msp.add_arc(
+        (80, 80), radius=10, start_angle=0, end_angle=90, dxfattribs={"layer": "STRUCTURAL"}
+    )
+    dim = msp.add_aligned_dim(p1=(0, 0), p2=(100, 0), distance=5, dxfattribs={"layer": "NOTES"})
+    dim.render()  # Generate dimension geometry block for renderer
+
     dxf_path = tmp_path / "sample.dxf"
     doc.saveas(str(dxf_path))
     return dxf_path

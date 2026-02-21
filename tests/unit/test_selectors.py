@@ -33,7 +33,7 @@ def test_resolve_by_id_miss(sample_context):
 def test_resolve_by_layer(sample_context):
     """Resolve by layer returns all entities on that layer."""
     results = resolve_targets_by_layer_type(sample_context, layer="STRUCTURAL")
-    assert len(results) == 3
+    assert len(results) == 5  # LINE + LWPOLYLINE + INSERT + CIRCLE + ARC
 
 
 def test_resolve_by_type(sample_context):
@@ -120,7 +120,7 @@ def test_candidate_set_by_id_miss(sample_context):
 def test_candidate_set_by_layer(sample_context):
     """Candidate set filtered by layer."""
     results = resolve_candidate_set(sample_context, {"layer": "STRUCTURAL"})
-    assert len(results) == 3
+    assert len(results) == 5
 
 
 def test_candidate_set_by_text(sample_context):
@@ -162,7 +162,7 @@ def test_candidate_set_spatial_with_layer(sample_context):
 def test_candidate_set_empty_hints(sample_context):
     """Empty hints dict returns all entities."""
     results = resolve_candidate_set(sample_context, {})
-    assert len(results) == 6
+    assert len(results) == 9
 
 
 def test_candidate_set_id_takes_priority(sample_context):

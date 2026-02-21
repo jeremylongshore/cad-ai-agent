@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
+from typing import Any
 
 import ezdxf
 
@@ -119,6 +120,8 @@ def _parse_entity(
     text_content = None
     block_name = None
 
+    attributes: dict[str, Any] = {}
+
     if dxf_type == "LINE":
         start = entity.dxf.start
         insert_point = Point2D(x=start.x, y=start.y)
@@ -138,6 +141,97 @@ def _parse_entity(
         insert = entity.dxf.insert
         insert_point = Point2D(x=insert.x, y=insert.y)
         block_name = entity.dxf.name
+    elif dxf_type == "CIRCLE":
+        center = entity.dxf.center
+        insert_point = Point2D(x=center.x, y=center.y)
+        attributes["radius"] = entity.dxf.radius
+    elif dxf_type == "ARC":
+        center = entity.dxf.center
+        insert_point = Point2D(x=center.x, y=center.y)
+        attributes["radius"] = entity.dxf.radius
+        attributes["start_angle"] = entity.dxf.start_angle
+        attributes["end_angle"] = entity.dxf.end_angle
+    elif dxf_type == "ELLIPSE":
+        center = entity.dxf.center
+        insert_point = Point2D(x=center.x, y=center.y)
+        attributes["ratio"] = entity.dxf.ratio
+    elif dxf_type == "DIMENSION":
+        # Override text or measured value
+        text_content = entity.dxf.get("text", "") or ""  # type: ignore[assignment]
+        try:
+            insert = entity.dxf.insert
+            insert_point = Point2D(x=insert.x, y=insert.y)
+        except Exception:
+            # Some dimension subtypes lack an insert; fall back to defpoint
+            try:
+                defpoint = entity.dxf.defpoint
+                insert_point = Point2D(x=defpoint.x, y=defpoint.y)
+            except Exception:  # noqa: S110
+                pass
+    elif dxf_type == "HATCH":
+        try:
+            elevation = entity.dxf.get("elevation", None)
+            if elevation is not None:
+                insert_point = Point2D(x=0.0, y=0.0)
+        except Exception:  # noqa: S110
+            pass
+        # Try to compute centroid from boundary paths
+        if insert_point is None:
+            try:
+                paths = entity.paths  # type: ignore[attr-defined]
+                if paths:
+                    xs, ys = [], []
+                    for path in paths:
+                        for v in getattr(path, "vertices", []):
+                            xs.append(v[0])
+                            ys.append(v[1])
+                    if xs and ys:
+                        insert_point = Point2D(
+                            x=sum(xs) / len(xs),
+                            y=sum(ys) / len(ys),
+                        )
+            except Exception:  # noqa: S110
+                pass
+    elif dxf_type == "SPLINE":
+        try:
+            control_points = list(entity.control_points)  # type: ignore[attr-defined]
+            if control_points:
+                cp = control_points[0]
+                insert_point = Point2D(x=cp[0], y=cp[1])
+        except Exception:  # noqa: S110
+            pass
+    elif dxf_type == "POLYLINE":
+        try:
+            vertices = list(entity.vertices)  # type: ignore[attr-defined]
+            if vertices:
+                loc = vertices[0].dxf.location
+                insert_point = Point2D(x=loc.x, y=loc.y)
+        except Exception:  # noqa: S110
+            pass
+    elif dxf_type == "MLEADER":
+        try:
+            ctx = entity.context  # type: ignore[attr-defined]
+            if hasattr(ctx, "mtext") and ctx.mtext:
+                text_content = ctx.mtext.default_content
+                insert_point = Point2D(
+                    x=ctx.mtext.insert.x,
+                    y=ctx.mtext.insert.y,
+                )
+        except Exception:  # noqa: S110
+            pass
+    elif dxf_type == "LEADER":
+        try:
+            vertices = list(entity.vertices)  # type: ignore[attr-defined]
+            if vertices:
+                insert_point = Point2D(x=vertices[0].x, y=vertices[0].y)
+        except Exception:  # noqa: S110
+            pass
+    elif dxf_type == "SOLID":
+        try:
+            vtx0 = entity.dxf.vtx0
+            insert_point = Point2D(x=vtx0.x, y=vtx0.y)
+        except Exception:  # noqa: S110
+            pass
 
     return EntityRef(
         handle=handle,
@@ -147,6 +241,7 @@ def _parse_entity(
         insert_point=insert_point,
         text_content=text_content,
         block_name=block_name,
+        attributes=attributes,
     )
 
 
