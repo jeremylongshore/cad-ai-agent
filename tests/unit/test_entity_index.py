@@ -53,13 +53,15 @@ def test_get_by_id_is_alias(entity_index, sample_context):
 
 
 def test_get_by_layer_structural(entity_index):
-    """STRUCTURAL layer returns LINE, LWPOLYLINE, INSERT."""
+    """STRUCTURAL layer returns LINE, LWPOLYLINE, INSERT, CIRCLE, ARC."""
     results = entity_index.get_by_layer("STRUCTURAL")
     types = {e.entity_type for e in results}
     assert EntityType.LINE in types
     assert EntityType.LWPOLYLINE in types
     assert EntityType.INSERT in types
-    assert len(results) == 3
+    assert EntityType.CIRCLE in types
+    assert EntityType.ARC in types
+    assert len(results) == 5
 
 
 # --- I-04: Lookup by layer is case-insensitive ---
@@ -98,7 +100,7 @@ def test_handles_complete(entity_index, sample_context):
 def test_count_property(entity_index, sample_context):
     """Count matches entity_count of the source context."""
     assert entity_index.count == sample_context.entity_count
-    assert entity_index.count == 6
+    assert entity_index.count == 9
 
 
 # --- filter() combined layer + type ---
@@ -114,7 +116,7 @@ def test_filter_layer_and_type(entity_index):
 def test_filter_layer_only(entity_index):
     """Filter by layer only returns all entities on that layer."""
     results = entity_index.filter(layer="NOTES")
-    assert len(results) == 2  # TEXT + MTEXT
+    assert len(results) == 3  # TEXT + MTEXT + DIMENSION
 
 
 def test_filter_type_only(entity_index):
@@ -126,12 +128,12 @@ def test_filter_type_only(entity_index):
 def test_filter_no_args(entity_index):
     """Filter with no args returns all entities."""
     results = entity_index.filter()
-    assert len(results) == 6
+    assert len(results) == 9
 
 
 def test_filter_invalid_type(entity_index):
     """Filter with invalid entity type returns empty list."""
-    results = entity_index.filter(entity_type="CIRCLE")
+    results = entity_index.filter(entity_type="VIEWPORT")
     assert results == []
 
 

@@ -9,13 +9,24 @@ from pydantic import BaseModel, Field
 
 
 class EntityType(StrEnum):
-    """Supported V1 entity types."""
+    """Supported entity types."""
 
     LINE = "LINE"
     LWPOLYLINE = "LWPOLYLINE"
     TEXT = "TEXT"
     MTEXT = "MTEXT"
     INSERT = "INSERT"
+    # V2 types — structural drawings
+    CIRCLE = "CIRCLE"
+    ARC = "ARC"
+    DIMENSION = "DIMENSION"
+    HATCH = "HATCH"
+    SPLINE = "SPLINE"
+    POLYLINE = "POLYLINE"
+    ELLIPSE = "ELLIPSE"
+    MLEADER = "MLEADER"
+    SOLID = "SOLID"
+    LEADER = "LEADER"
 
 
 class Point2D(BaseModel):

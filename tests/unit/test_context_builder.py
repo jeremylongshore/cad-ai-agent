@@ -27,13 +27,13 @@ def test_full_context_has_all_fields(sample_context):
 def test_full_context_entity_count(sample_context):
     """Full context entity count matches source."""
     result = full_context(sample_context)
-    assert result["entity_count"] == 6
+    assert result["entity_count"] == 9
 
 
 def test_full_context_entities_serialized(sample_context):
     """Full context serializes all entities as dicts with expected keys."""
     result = full_context(sample_context)
-    assert len(result["entities"]) == 6
+    assert len(result["entities"]) == 9
     entity = result["entities"][0]
     assert "handle" in entity
     assert "type" in entity
@@ -45,7 +45,7 @@ def test_full_context_layers_have_counts(sample_context):
     """Layer summaries include entity counts."""
     result = full_context(sample_context)
     structural = next(lr for lr in result["layers"] if lr["name"] == "STRUCTURAL")
-    assert structural["entity_count"] == 3  # LINE + LWPOLYLINE + INSERT
+    assert structural["entity_count"] == 5  # LINE + LWPOLYLINE + INSERT + CIRCLE + ARC
 
 
 def test_full_context_includes_blocks(sample_context):
@@ -72,13 +72,13 @@ def test_subset_by_entity_ids(sample_context):
     handles = [sample_context.entities[0].handle, sample_context.entities[1].handle]
     result = subset_context(sample_context, entity_ids=handles)
     assert result["entity_count"] == 2
-    assert result["total_entity_count"] == 6
+    assert result["total_entity_count"] == 9
 
 
 def test_subset_by_layer(sample_context):
     """Subset context filtered by layer returns entities on that layer."""
     result = subset_context(sample_context, layers=["NOTES"])
-    assert result["entity_count"] == 2  # TEXT + MTEXT on NOTES
+    assert result["entity_count"] == 3  # TEXT + MTEXT + DIMENSION on NOTES
 
 
 def test_subset_by_entity_type(sample_context):
@@ -110,15 +110,15 @@ def test_subset_combined_filters(sample_context):
 def test_subset_no_filters_returns_all(sample_context):
     """Subset with no filters returns all entities."""
     result = subset_context(sample_context)
-    assert result["entity_count"] == 6
+    assert result["entity_count"] == 9
 
 
 def test_subset_has_summary(sample_context):
     """Subset context includes a summary section."""
     result = subset_context(sample_context, layers=["STRUCTURAL"])
     assert "summary" in result
-    assert result["summary"]["selected_count"] == 3
-    assert result["summary"]["total_count"] == 6
+    assert result["summary"]["selected_count"] == 5
+    assert result["summary"]["total_count"] == 9
 
 
 # --- token_economy_summary ---
@@ -127,14 +127,14 @@ def test_subset_has_summary(sample_context):
 def test_token_economy_entity_count(sample_context):
     """Summary reports correct entity count."""
     summary = token_economy_summary(sample_context)
-    assert summary["entity_count"] == 6
+    assert summary["entity_count"] == 9
 
 
 def test_token_economy_counts_by_layer(sample_context):
     """Summary breaks down counts by layer."""
     summary = token_economy_summary(sample_context)
-    assert summary["counts_by_layer"]["STRUCTURAL"] == 3
-    assert summary["counts_by_layer"]["NOTES"] == 2
+    assert summary["counts_by_layer"]["STRUCTURAL"] == 5
+    assert summary["counts_by_layer"]["NOTES"] == 3
     assert summary["counts_by_layer"]["TITLE"] == 1
 
 
@@ -167,7 +167,7 @@ def test_token_economy_protected_layers(sample_context):
 def test_token_economy_block_count(sample_context):
     """Summary reports block count."""
     summary = token_economy_summary(sample_context)
-    assert summary["block_count"] == 1  # COLUMN_MARK
+    assert summary["block_count"] >= 1  # COLUMN_MARK + dimension geometry block
 
 
 def test_token_economy_empty_context():

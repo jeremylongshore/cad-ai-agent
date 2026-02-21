@@ -294,6 +294,16 @@ class MainWindow(QMainWindow):
 
             # DWG/PDF conversion if needed
             if file_path.suffix.lower() in (".dwg", ".pdf"):
+                # Show PDF quality warning
+                if file_path.suffix.lower() == ".pdf":
+                    QMessageBox.warning(
+                        self,
+                        "PDF Conversion — Experimental",
+                        "PDF conversion is experimental. Curves may be approximated "
+                        "as line segments and some geometry may be lost.\n\n"
+                        "For best results, export as DXF or DWG from your CAD software.",
+                    )
+
                 try:
                     from ..core.converter import convert_to_dxf
 
@@ -301,6 +311,8 @@ class MainWindow(QMainWindow):
                     if result.success:
                         file_path = result.output_path
                         self._log_status(f"Converted {path} to DXF")
+                        for w in result.warnings:
+                            self._log_status(f"Warning: {w}")
                     else:
                         QMessageBox.warning(
                             self,

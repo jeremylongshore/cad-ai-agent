@@ -42,7 +42,7 @@ class TestEntityRef:
         with pytest.raises(ValidationError):
             EntityRef(
                 handle="X",
-                entity_type="CIRCLE",  # Not in V1
+                entity_type="VIEWPORT",  # Not a supported type
                 layer="0",
             )
 

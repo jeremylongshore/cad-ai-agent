@@ -27,6 +27,7 @@ class EntityIndex:
             self._by_layer[entity.layer.upper()].append(entity)
             self._by_type[entity.entity_type].append(entity)
 
+            # Index text content from TEXT, MTEXT, DIMENSION, MLEADER
             if entity.text_content:
                 for token in _normalize_tokens(entity.text_content):
                     self._text_index[token].append(entity)
@@ -55,11 +56,13 @@ class EntityIndex:
         self,
         layer: str | None = None,
         entity_type: str | None = None,
+        limit: int | None = None,
     ) -> list[EntityRef]:
         """Filter entities by layer and/or type. Both are optional.
 
         When both are provided, returns the intersection.
         When neither is provided, returns all entities.
+        Optional ``limit`` caps the number of results returned.
         """
         candidates = self._all
 
@@ -74,6 +77,9 @@ class EntityIndex:
                 return []
             type_set = set(e.handle for e in self._by_type.get(etype, []))
             candidates = [e for e in candidates if e.handle in type_set]
+
+        if limit is not None and limit > 0:
+            candidates = candidates[:limit]
 
         return candidates
 
@@ -137,6 +143,38 @@ class EntityIndex:
                 best = entity
 
         return best
+
+    # --- Spatial windowing ---
+
+    def find_in_radius(
+        self,
+        x: float,
+        y: float,
+        radius: float,
+        entity_type: str | None = None,
+        layer: str | None = None,
+    ) -> list[EntityRef]:
+        """Find all entities within ``radius`` drawing units of (x, y).
+
+        Entities without an insert_point are excluded.
+        Optional type/layer filters narrow the candidate set.
+        Results are sorted by distance (nearest first).
+        """
+        candidates = self.filter(layer=layer, entity_type=entity_type)
+        results: list[tuple[float, EntityRef]] = []
+        r_sq = radius * radius
+
+        for entity in candidates:
+            if entity.insert_point is None:
+                continue
+            dx = entity.insert_point.x - x
+            dy = entity.insert_point.y - y
+            dist_sq = dx * dx + dy * dy
+            if dist_sq <= r_sq:
+                results.append((dist_sq, entity))
+
+        results.sort(key=lambda pair: pair[0])
+        return [e for _, e in results]
 
     # --- Utility ---
 

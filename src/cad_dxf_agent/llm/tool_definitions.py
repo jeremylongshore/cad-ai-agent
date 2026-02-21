@@ -17,11 +17,30 @@ from typing import Any
 #   name, description, parameters (JSON Schema object)
 # ---------------------------------------------------------------------------
 
+_ALL_ENTITY_TYPES = [
+    "LINE",
+    "LWPOLYLINE",
+    "TEXT",
+    "MTEXT",
+    "INSERT",
+    "CIRCLE",
+    "ARC",
+    "DIMENSION",
+    "HATCH",
+    "SPLINE",
+    "POLYLINE",
+    "ELLIPSE",
+    "MLEADER",
+    "SOLID",
+    "LEADER",
+]
+
 FIND_ENTITIES = {
     "name": "find_entities",
     "description": (
         "Search for entities in the drawing by layer, type, and/or text content. "
-        "Returns a list of matching entities with handle, type, layer, position, and text."
+        "Returns a list of matching entities with handle, type, layer, position, and text. "
+        "Results are limited to the first `limit` matches (default 50)."
     ),
     "parameters": {
         "type": "object",
@@ -32,14 +51,22 @@ FIND_ENTITIES = {
             },
             "entity_type": {
                 "type": "string",
-                "description": "Filter by entity type: LINE, LWPOLYLINE, TEXT, MTEXT, INSERT",
-                "enum": ["LINE", "LWPOLYLINE", "TEXT", "MTEXT", "INSERT"],
+                "description": (
+                    "Filter by entity type. Supported types: LINE, LWPOLYLINE, TEXT, MTEXT, "
+                    "INSERT, CIRCLE, ARC, DIMENSION, HATCH, SPLINE, POLYLINE, ELLIPSE, "
+                    "MLEADER, SOLID, LEADER"
+                ),
+                "enum": _ALL_ENTITY_TYPES,
             },
             "text_contains": {
                 "type": "string",
                 "description": (
                     "Search for entities whose text contains this string (case-insensitive)"
                 ),
+            },
+            "limit": {
+                "type": "integer",
+                "description": "Maximum number of entities to return (default 50)",
             },
         },
         "required": [],
@@ -68,7 +95,8 @@ FIND_NEAREST = {
     "name": "find_nearest",
     "description": (
         "Find the nearest entity to a given point. Useful for locating entities "
-        "at grid intersections or near specific coordinates."
+        "at grid intersections or near specific coordinates. "
+        "Use `radius` to limit the search to a spatial window."
     ),
     "parameters": {
         "type": "object",
@@ -78,11 +106,18 @@ FIND_NEAREST = {
             "entity_type": {
                 "type": "string",
                 "description": "Optional type filter",
-                "enum": ["LINE", "LWPOLYLINE", "TEXT", "MTEXT", "INSERT"],
+                "enum": _ALL_ENTITY_TYPES,
             },
             "layer": {
                 "type": "string",
                 "description": "Optional layer filter (case-insensitive)",
+            },
+            "radius": {
+                "type": "number",
+                "description": (
+                    "Optional search radius in drawing units. "
+                    "Only entities within this distance are considered."
+                ),
             },
         },
         "required": ["x", "y"],

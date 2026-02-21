@@ -70,6 +70,7 @@ class ToolExecutor:
         layer = args.get("layer")
         entity_type = args.get("entity_type")
         text_contains = args.get("text_contains")
+        limit = int(args.get("limit", 50))
 
         candidates = self._index.filter(layer=layer, entity_type=entity_type)
 
@@ -78,9 +79,11 @@ class ToolExecutor:
             match_handles = {e.handle for e in text_matches}
             candidates = [e for e in candidates if e.handle in match_handles]
 
+        total = len(candidates)
         return {
-            "count": len(candidates),
-            "entities": [_entity_to_dict(e) for e in candidates[:50]],
+            "count": total,
+            "entities": [_entity_to_dict(e) for e in candidates[:limit]],
+            "truncated": total > limit,
         }
 
     def _get_entity(self, args: dict[str, Any]) -> dict[str, Any]:
@@ -93,6 +96,24 @@ class ToolExecutor:
     def _find_nearest(self, args: dict[str, Any]) -> dict[str, Any]:
         x = args["x"]
         y = args["y"]
+        radius = args.get("radius")
+
+        if radius is not None:
+            # Spatial window query — return all entities within radius
+            results = self._index.find_in_radius(
+                x,
+                y,
+                float(radius),
+                entity_type=args.get("entity_type"),
+                layer=args.get("layer"),
+            )
+            if not results:
+                return {"error": "No matching entities found within radius"}
+            return {
+                "count": len(results),
+                "entities": [_entity_to_dict(e) for e in results[:50]],
+            }
+
         entity = self._index.nearest(
             x,
             y,
@@ -234,4 +255,6 @@ def _entity_to_dict(entity: EntityRef) -> dict[str, Any]:
         d["text"] = entity.text_content
     if entity.block_name:
         d["block_name"] = entity.block_name
+    if entity.attributes:
+        d["attributes"] = entity.attributes
     return d

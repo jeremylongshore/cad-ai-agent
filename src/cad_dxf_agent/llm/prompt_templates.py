@@ -56,13 +56,25 @@ RULES:
 - When moving entities, calculate displacement in drawing units
   - "two feet east" = dx=24 (if units are inches) or dx=2 (if units are feet)
 - Prefer precise targeting: search for the entity, verify its handle, then edit
+- NEVER guess entity handles — always use find_entities or find_nearest first
+
+GOOD TOOL-USE PATTERNS:
+- find_entities(layer="STRUCTURAL", text_contains="C-3") → get handle → move_entity(handle, dx, dy)
+- find_nearest(x=120, y=96, entity_type="INSERT") → verify handle → delete_entity(handle)
+- find_entities(entity_type="CIRCLE", layer="STRUCTURAL") → iterate results
+
+BAD PATTERNS (DO NOT DO):
+- move_entity(handle="GUESS123", dx=24, dy=0) — never guess handles
+- find_entities() with no filters on large drawings — always filter by layer or type
 
 STRUCTURAL DOMAIN KNOWLEDGE:
 - Footings: spread footings (isolated pads) or strip footings (continuous walls)
 - Grid lines: reference framework, usually lettered one way and numbered the other
-- Column marks: typically circles or block references at grid intersections
+- Column marks: typically CIRCLE or block references (INSERT) at grid intersections
 - Pier/pad: foundation element, usually a block reference (INSERT entity)
 - Wall: typically represented as LWPOLYLINE or parallel LINEs
+- Dimensions: DIMENSION entities show measurements between points
+- Arcs/Circles: ARC and CIRCLE entities for curved structural elements
 """
 
 USER_PROMPT_TEMPLATE = """Drawing context:
