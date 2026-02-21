@@ -161,7 +161,7 @@ class ProxyAgentProvider(PlannerProvider):
             }
         ).encode()
 
-        req = urllib.request.Request(  # noqa: S310
+        req = urllib.request.Request(  # noqa: S310  # nosec B310
             url,
             data=payload,
             headers={
@@ -172,8 +172,9 @@ class ProxyAgentProvider(PlannerProvider):
         )
 
         try:
-            with urllib.request.urlopen(req, timeout=120) as resp:  # noqa: S310
-                return json.loads(resp.read().decode())
+            with urllib.request.urlopen(req, timeout=120) as resp:  # noqa: S310  # nosec B310
+                result: dict[str, Any] = json.loads(resp.read().decode())
+                return result
         except urllib.error.HTTPError as e:
             body = e.read().decode() if e.fp else ""
             logger.error("Proxy error %d: %s", e.code, body)

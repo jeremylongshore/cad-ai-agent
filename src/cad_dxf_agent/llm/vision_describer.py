@@ -73,7 +73,7 @@ def describe_drawing(image_path: str | Path) -> str:
                 [Part.from_image(image), VISION_PROMPT]  # type: ignore[arg-type]
             )
 
-            description = response.text
+            description: str = str(response.text)
             if not description:
                 raise RuntimeError("Gemini returned empty vision description")
 
