@@ -17,9 +17,17 @@ import time
 from collections import defaultdict
 from typing import Any
 
+import vertexai
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
+from vertexai.generative_models import (
+    Content,
+    FunctionDeclaration,
+    GenerativeModel,
+    Part,
+    Tool,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +46,9 @@ DEFAULT_MODEL = os.getenv("CAD_GEMINI_MODEL", "gemini-2.5-flash")
 
 # Rate limiting (per-key, in-memory — good enough for MVP)
 MAX_REQUESTS_PER_MINUTE = int(os.getenv("CAD_RATE_LIMIT_RPM", "30"))
+
+# Initialize Vertex AI once at startup
+vertexai.init(project=GCP_PROJECT, location=GCP_LOCATION)
 
 app = FastAPI(title="CAD DXF Agent Proxy", version="1.0.0")
 
@@ -87,7 +98,12 @@ def _validate_license(request: Request) -> str:
         raise HTTPException(status_code=401, detail="Missing Authorization header")
     key = auth[7:].strip()
 
-    if ALLOWED_LICENSE_KEYS and key not in ALLOWED_LICENSE_KEYS:
+    if not ALLOWED_LICENSE_KEYS:
+        raise HTTPException(
+            status_code=500,
+            detail="Server misconfigured: CAD_ALLOWED_LICENSE_KEYS not set",
+        )
+    if key not in ALLOWED_LICENSE_KEYS:
         raise HTTPException(status_code=403, detail="Invalid license key")
 
     if not _check_rate_limit(key):
@@ -112,17 +128,6 @@ async def generate(body: GenerateRequest, request: Request):
     _validate_license(request)
 
     try:
-        import vertexai
-        from vertexai.generative_models import (
-            Content,
-            FunctionDeclaration,
-            GenerativeModel,
-            Part,
-            Tool,
-        )
-
-        vertexai.init(project=GCP_PROJECT, location=GCP_LOCATION)
-
         model_name = body.model or DEFAULT_MODEL
 
         # Rebuild tools if provided
@@ -180,11 +185,6 @@ async def generate(body: GenerateRequest, request: Request):
         result = _serialize_response(response)
         return JSONResponse(content=result)
 
-    except ImportError as err:
-        raise HTTPException(
-            status_code=500,
-            detail="google-cloud-aiplatform not installed on proxy",
-        ) from err
     except Exception as e:
         logger.error("Gemini proxy error: %s", e, exc_info=True)
         raise HTTPException(status_code=502, detail=f"Upstream error: {e}") from e

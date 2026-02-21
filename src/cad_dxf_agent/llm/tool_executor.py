@@ -106,16 +106,13 @@ class ToolExecutor:
     def _list_layers(self, args: dict[str, Any]) -> dict[str, Any]:
         layers = []
         for layer in self._context.layers:
-            entity_count = sum(
-                1 for e in self._context.entities if e.layer.upper() == layer.name.upper()
-            )
             layers.append(
                 {
                     "name": layer.name,
                     "protected": layer.name.upper() in self._protected,
                     "visible": layer.visible,
                     "frozen": layer.frozen,
-                    "entity_count": entity_count,
+                    "entity_count": len(self._index.get_by_layer(layer.name)),
                 }
             )
         return {"layers": layers}

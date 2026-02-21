@@ -115,7 +115,7 @@ def _serialize(doc: ezdxf.document.Drawing) -> bytes:
     """Serialize a DXF document to bytes."""
     stream = io.StringIO()
     doc.write(stream)
-    return stream.getvalue().encode(doc.encoding)
+    return stream.getvalue().encode("utf-8")
 
 
 def _deserialize(data: bytes) -> ezdxf.document.Drawing:
