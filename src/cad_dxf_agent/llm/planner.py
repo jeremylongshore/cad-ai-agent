@@ -55,6 +55,17 @@ def get_provider(provider_name: str | None = None) -> PlannerProvider:
 
         return MockAgentProvider()
 
+    if name in ("proxy", "proxy-agent"):
+        try:
+            from .proxy_client import ProxyAgentProvider
+
+            return ProxyAgentProvider()
+        except ValueError as e:
+            logger.warning("Proxy provider misconfigured (%s), falling back to mock-agent", e)
+            from .agent_provider import MockAgentProvider
+
+            return MockAgentProvider()
+
     logger.warning("Unknown provider '%s', falling back to mock", name)
     return MockProvider()
 
