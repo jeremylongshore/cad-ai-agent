@@ -1,0 +1,60 @@
+name: Build Windows Installer
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          pip install -e ".[gui,convert,draw]"
+          pip install pyinstaller
+
+      - name: Run tests
+        run: |
+          pip install -e ".[dev]"
+          pytest tests/unit/ -q
+
+      - name: Build with PyInstaller
+        run: |
+          pyinstaller installer/cad-dxf-agent.spec --noconfirm
+
+      - name: Verify build output
+        run: |
+          dir dist\cad-dxf-agent\
+          dist\cad-dxf-agent\cad-dxf-agent.exe --help || echo "GUI app, no --help"
+
+      - name: Build Inno Setup installer
+        uses: Minionguyjpro/Inno-Setup-Action@v1.2.4
+        with:
+          path: installer/setup.iss
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: dist/cad-dxf-agent-setup-*.exe
+
+      - name: Upload to release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/cad-dxf-agent-setup-*.exe
+          draft: true

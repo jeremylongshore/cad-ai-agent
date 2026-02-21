@@ -31,6 +31,7 @@ class EntityRef(BaseModel):
     handle: str = Field(description="DXF entity handle (unique within the drawing)")
     entity_type: EntityType
     layer: str
+    space: str = Field(default="Model", description="Space: 'Model' or layout name")
     insert_point: Point2D | None = None
     text_content: str | None = None
     block_name: str | None = None
@@ -47,6 +48,13 @@ class LayerRule(BaseModel):
     color: int | None = None
 
 
+class LayoutInfo(BaseModel):
+    """Metadata about a DXF layout (paper space tab)."""
+
+    name: str
+    entity_count: int = 0
+
+
 class DrawingContext(BaseModel):
     """Normalized context model for a loaded DXF drawing."""
 
@@ -54,6 +62,7 @@ class DrawingContext(BaseModel):
     entities: list[EntityRef] = Field(default_factory=list)
     layers: list[LayerRule] = Field(default_factory=list)
     blocks: list[str] = Field(default_factory=list)
+    layouts: list[LayoutInfo] = Field(default_factory=list)
     unsupported_entity_types: list[str] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
 

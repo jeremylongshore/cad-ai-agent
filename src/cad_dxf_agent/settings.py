@@ -51,8 +51,13 @@ class Settings:
         # Gemini / Vertex AI (V2)
         self.gcp_project: str | None = os.getenv("CAD_GCP_PROJECT")
         self.gcp_location: str = os.getenv("CAD_GCP_LOCATION", "us-central1")
-        self.gemini_model: str = os.getenv("CAD_GEMINI_MODEL", "gemini-1.5-pro")
+        self.gemini_model: str = os.getenv("CAD_GEMINI_MODEL", "gemini-2.5-flash")
+        self.vision_model: str = os.getenv("CAD_VISION_MODEL", "gemini-2.5-flash")
         self.gemini_max_retries: int = int(os.getenv("CAD_GEMINI_MAX_RETRIES", "1"))
+
+        # Cloud Run proxy (optional — lets users skip GCP credentials)
+        self.proxy_url: str | None = os.getenv("CAD_PROXY_URL")
+        self.license_key: str | None = os.getenv("CAD_LICENSE_KEY")
 
         # Local API
         self.api_host: str = os.getenv("CAD_API_HOST", "127.0.0.1")
