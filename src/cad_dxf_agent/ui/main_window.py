@@ -106,6 +106,10 @@ class MainWindow(QMainWindow):
         export_pdf.triggered.connect(lambda: self._on_export("pdf"))
         file_menu.addAction(export_pdf)
 
+        export_dwg = QAction("Export as D&WG...", self)
+        export_dwg.triggered.connect(lambda: self._on_export("dwg"))
+        file_menu.addAction(export_dwg)
+
         file_menu.addSeparator()
 
         quit_action = QAction("&Quit", self)
@@ -477,6 +481,7 @@ class MainWindow(QMainWindow):
             "dxf": "DXF Files (*.dxf)",
             "png": "PNG Images (*.png)",
             "pdf": "PDF Documents (*.pdf)",
+            "dwg": "DWG Files (*.dwg)",
         }
         suffix = f".{fmt}"
         default_name = self._dxf_path.with_suffix(suffix)
@@ -497,25 +502,63 @@ class MainWindow(QMainWindow):
                 shutil.copy2(str(self._dxf_path), output_path)
                 self._log_status(f"Exported DXF to: {output_path}")
 
-            elif fmt in ("png", "pdf"):
+            elif fmt == "png":
                 try:
-                    from ..core.renderer import render_dxf
+                    from ..core.renderer import render_dxf_to_png
 
-                    result = render_dxf(
-                        self._dxf_path,
-                        output_format=fmt,
-                        output_path=output_path,
-                    )
+                    result = render_dxf_to_png(self._dxf_path, output_path)
                     if result.success:
-                        self._log_status(f"Exported {fmt.upper()} to: {output_path}")
+                        self._log_status(f"Exported PNG to: {output_path}")
                     else:
                         QMessageBox.warning(self, "Export", f"Export issue: {result.error}")
                 except ImportError:
                     QMessageBox.warning(
                         self,
                         "Missing Renderer",
-                        f"{fmt.upper()} export requires the draw extra.\n"
+                        "PNG export requires the draw extra.\n"
                         "Install with: pip install -e '.[draw]'",
+                    )
+
+            elif fmt == "pdf":
+                try:
+                    from ..core.renderer import render_dxf_to_pdf
+
+                    result = render_dxf_to_pdf(self._dxf_path, output_path)
+                    if result.success:
+                        self._log_status(f"Exported PDF to: {output_path}")
+                    else:
+                        QMessageBox.warning(self, "Export", f"Export issue: {result.error}")
+                except ImportError:
+                    QMessageBox.warning(
+                        self,
+                        "Missing Renderer",
+                        "PDF export requires the draw extra.\n"
+                        "Install with: pip install -e '.[draw]'",
+                    )
+
+            elif fmt == "dwg":
+                try:
+                    from ezdxf.addons import odafc
+
+                    if not odafc.is_installed():  # type: ignore[attr-defined]
+                        QMessageBox.warning(
+                            self,
+                            "ODA Not Found",
+                            "DWG export requires ODA File Converter.\n"
+                            "Download free from:\n"
+                            "https://www.opendesign.com/guestfiles/oda_file_converter",
+                        )
+                    else:
+                        import ezdxf
+
+                        doc = ezdxf.readfile(str(self._dxf_path))
+                        odafc.export_dwg(doc, str(output_path))  # type: ignore[attr-defined]
+                        self._log_status(f"Exported DWG to: {output_path}")
+                except ImportError:
+                    QMessageBox.warning(
+                        self,
+                        "Missing ODA",
+                        "DWG export requires ezdxf with ODA File Converter.",
                     )
 
         except Exception as e:
