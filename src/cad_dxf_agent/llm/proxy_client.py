@@ -14,6 +14,7 @@ from typing import Any
 from ..models.ops_schema import ChangeSet
 from ..otel import get_tracer
 from ..settings import settings
+from .agent_provider import AgentProvider
 from .prompt_templates import AGENT_SYSTEM_PROMPT
 from .providers import PlannerProvider
 from .tool_definitions import ALL_TOOLS
@@ -196,7 +197,7 @@ class ProxyAgentProvider(PlannerProvider):
         return calls
 
     def _build_initial_prompt(self, prompt: str, drawing_context: dict) -> str:
-        """Build the initial message with drawing context."""
+        """Build the initial message with compact context summary."""
         parts = []
 
         if self._image_path:
@@ -206,8 +207,9 @@ class ProxyAgentProvider(PlannerProvider):
             except Exception as e:
                 logger.warning("Vision description failed: %s", e)
 
-        entity_summary = json.dumps(drawing_context, indent=2, default=str)
-        parts.append(f"DRAWING ENTITIES (JSON):\n{entity_summary}\n")
+        # Compact summary instead of full entity JSON
+        compact = AgentProvider._build_compact_summary(drawing_context)
+        parts.append(compact)
         parts.append(f"USER REQUEST:\n{prompt}")
 
         return "\n".join(parts)

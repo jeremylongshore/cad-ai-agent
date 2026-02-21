@@ -63,6 +63,41 @@ class TestMockAgentProvider:
         assert "Mock agent" in changeset.revision_label
 
 
+class TestCompactContext:
+    """Test that agent uses compact context instead of full entity JSON."""
+
+    def test_initial_prompt_is_compact(self, sample_context):
+        """Initial prompt should NOT contain full entity JSON."""
+        from cad_dxf_agent.llm.agent_provider import AgentProvider
+
+        ctx = build_planner_context(sample_context)
+        summary = AgentProvider._build_compact_summary(ctx)
+        assert "DRAWING SUMMARY:" in summary
+        assert "Total entities:" in summary
+        assert "Do NOT guess entity handles" in summary
+        # Should NOT contain raw entity handles
+        for e in ctx.get("entities", []):
+            assert e["handle"] not in summary
+
+    def test_compact_context_includes_layer_summary(self, sample_context):
+        """Compact context includes layer names and counts."""
+        from cad_dxf_agent.llm.agent_provider import AgentProvider
+
+        ctx = build_planner_context(sample_context)
+        summary = AgentProvider._build_compact_summary(ctx)
+        assert "STRUCTURAL" in summary
+        assert "NOTES" in summary
+        assert "PROTECTED" in summary  # TITLE layer is protected
+
+    def test_compact_context_includes_blocks(self, sample_context):
+        """Compact context lists available blocks."""
+        from cad_dxf_agent.llm.agent_provider import AgentProvider
+
+        ctx = build_planner_context(sample_context)
+        summary = AgentProvider._build_compact_summary(ctx)
+        assert "COLUMN_MARK" in summary
+
+
 class TestGetProvider:
     """Test that the planner factory routes to agent providers."""
 

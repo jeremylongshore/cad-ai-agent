@@ -13,7 +13,6 @@ The LLM never touches DXF — it only calls tools.
 
 from __future__ import annotations
 
-import json
 import logging
 from pathlib import Path
 from typing import Any
@@ -179,7 +178,11 @@ class AgentProvider(PlannerProvider):
         return self._model
 
     def _build_initial_prompt(self, prompt: str, drawing_context: dict) -> str:
-        """Build the initial message with drawing context and optional vision."""
+        """Build the initial message with compact context and optional vision.
+
+        Uses a summary instead of full entity JSON to keep the prompt small.
+        The agent discovers specific entities via query tools.
+        """
         parts = []
 
         # Vision description (Stage 1)
@@ -190,14 +193,65 @@ class AgentProvider(PlannerProvider):
             except Exception as e:
                 logger.warning("Vision description failed, continuing without: %s", e)
 
-        # Entity summary (always included)
-        entity_summary = json.dumps(drawing_context, indent=2, default=str)
-        parts.append(f"DRAWING ENTITIES (JSON):\n{entity_summary}\n")
+        # Compact context summary (not full entity JSON)
+        compact = self._build_compact_summary(drawing_context)
+        parts.append(compact)
 
         # User prompt
         parts.append(f"USER REQUEST:\n{prompt}")
 
         return "\n".join(parts)
+
+    @staticmethod
+    def _build_compact_summary(drawing_context: dict) -> str:
+        """Build a compact text summary from the planner context dict."""
+        from collections import Counter
+        from pathlib import Path
+
+        entities = drawing_context.get("entities", [])
+        layers = drawing_context.get("layers", [])
+        blocks = drawing_context.get("blocks", [])
+        file_path = drawing_context.get("file_path", "unknown")
+
+        counts_by_layer: Counter[str] = Counter()
+        counts_by_type: Counter[str] = Counter()
+        text_labels: list[str] = []
+
+        for e in entities:
+            counts_by_layer[e.get("layer", "")] += 1
+            counts_by_type[e.get("type", "")] += 1
+            if e.get("text"):
+                text_labels.append(e["text"])
+
+        protected = [lyr["name"] for lyr in layers if lyr.get("protected")]
+
+        lines = [
+            "DRAWING SUMMARY:",
+            f"- File: {Path(file_path).name}",
+            f"- Total entities: {len(entities)}",
+            f"- Entity types: {', '.join(f'{t}({n})' for t, n in counts_by_type.most_common())}",
+            "- Layers:",
+        ]
+
+        for lyr in layers:
+            count = counts_by_layer.get(lyr["name"], 0)
+            prot = " (PROTECTED)" if lyr["name"] in protected else ""
+            lines.append(f"    {lyr['name']}: {count} entities{prot}")
+
+        if blocks:
+            lines.append(f"- Blocks available: {', '.join(blocks)}")
+
+        if text_labels:
+            sample = text_labels[:5]
+            lines.append(f"- Sample text labels: {sample}")
+
+        lines.append("")
+        lines.append(
+            "Use find_entities(), get_entity(), find_nearest() to query specific entities."
+        )
+        lines.append("Do NOT guess entity handles — always search first.")
+
+        return "\n".join(lines)
 
     def _send_tool_results(self, chat, tool_results: list[dict]) -> Any:
         """Send tool execution results back to Gemini."""
