@@ -165,49 +165,83 @@ def _convert_dwg(source_path: Path, output_dir: str | Path | None) -> Conversion
         )
 
 
+_PDF_WARNING = (
+    "PDF conversion is experimental and lossy. Curves may be approximated as "
+    "line segments. For best results, export as DXF or DWG from your CAD software."
+)
+
+
 def _convert_pdf(source_path: Path, output_dir: str | Path | None) -> ConversionResult:
     """Convert vector PDF to DXF by extracting geometric primitives.
 
-    Only handles CAD-generated vector PDFs. Scanned/raster PDFs are out of scope.
+    Prefers PyMuPDF (fitz) for better curve/arc extraction. Falls back to
+    pdfplumber if PyMuPDF is not installed. Only handles CAD-generated
+    vector PDFs — scanned/raster PDFs are out of scope.
     """
+    # Try PyMuPDF first (better curve support), fall back to pdfplumber
+    has_fitz = False
+    has_pdfplumber = False
     try:
-        import pdfplumber
+        import fitz  # noqa: F401
+
+        has_fitz = True
     except ImportError:
+        pass
+
+    if not has_fitz:
+        try:
+            import pdfplumber  # noqa: F401
+
+            has_pdfplumber = True
+        except ImportError:
+            pass
+
+    if not has_fitz and not has_pdfplumber:
         return ConversionResult(
             source_path=source_path,
             source_format="pdf",
             output_path=source_path,
             success=False,
-            error="pdfplumber not installed. Install with: pip install pdfplumber",
+            error=(
+                "No PDF library installed. Install with: "
+                "pip install pymupdf  (recommended) or  pip install pdfplumber"
+            ),
         )
 
     output_path = _get_output_path(source_path, output_dir)
-    warnings: list[str] = []
+    warnings: list[str] = [_PDF_WARNING]
 
     try:
         doc = ezdxf.new(dxfversion=_version_to_acdb(settings.target_dxf_version))
         msp = doc.modelspace()
-
         total_entities = 0
 
-        with pdfplumber.open(str(source_path)) as pdf:
-            if len(pdf.pages) == 0:
-                return ConversionResult(
-                    source_path=source_path,
-                    source_format="pdf",
-                    output_path=source_path,
-                    success=False,
-                    error="PDF has no pages",
-                )
-
-            for page_num, page in enumerate(pdf.pages):
-                page_entities = _extract_pdf_page(msp, page, page_num)
-                total_entities += page_entities
-
+        if has_fitz:
+            total_entities = _extract_pdf_fitz(msp, source_path)
             if total_entities == 0:
                 warnings.append(
                     "No vector geometry found in PDF — may be a raster/scanned document"
                 )
+        else:
+            import pdfplumber as _pdfplumber
+
+            warnings.append("Using pdfplumber fallback — curves will be lost. Install pymupdf.")
+            with _pdfplumber.open(str(source_path)) as pdf:
+                if len(pdf.pages) == 0:
+                    return ConversionResult(
+                        source_path=source_path,
+                        source_format="pdf",
+                        output_path=source_path,
+                        success=False,
+                        error="PDF has no pages",
+                    )
+                for page_num, page in enumerate(pdf.pages):
+                    total_entities += _extract_pdf_page_plumber(msp, page, page_num)
+
+                if total_entities == 0:
+                    warnings.append(
+                        "No vector geometry found in PDF — may be a raster/scanned document"
+                    )
 
         doc.saveas(str(output_path))
         logger.info(
@@ -231,10 +265,188 @@ def _convert_pdf(source_path: Path, output_dir: str | Path | None) -> Conversion
         )
 
 
-def _extract_pdf_page(msp, page, page_num: int) -> int:
-    """Extract vector geometry from a single PDF page into DXF model space.
+# ── PyMuPDF extraction (preferred) ──────────────────────────────
 
-    Returns the count of entities created.
+
+def _extract_pdf_fitz(msp, source_path: Path) -> int:
+    """Extract vector geometry using PyMuPDF's page.get_drawings().
+
+    PyMuPDF recovers Bezier curves, arcs, lines, and rects from PDF
+    content streams — much better than pdfplumber for CAD PDFs.
+    """
+    import math
+
+    import fitz
+
+    pdf_doc = fitz.open(str(source_path))
+    total = 0
+
+    for page_num, page in enumerate(pdf_doc):
+        layer = f"PDF_PAGE_{page_num + 1}" if page_num > 0 else "0"
+        page_height = page.rect.height
+        drawings = page.get_drawings()
+
+        for path_item in drawings:
+            for item in path_item.get("items", []):
+                kind = item[0]
+
+                if kind == "l":  # Line
+                    p1, p2 = item[1], item[2]
+                    x0, y0 = float(p1.x), page_height - float(p1.y)
+                    x1, y1 = float(p2.x), page_height - float(p2.y)
+                    msp.add_line((x0, y0), (x1, y1), dxfattribs={"layer": layer})
+                    total += 1
+
+                elif kind == "re":  # Rectangle
+                    rect = item[1]
+                    x0 = float(rect.x0)
+                    y0 = page_height - float(rect.y0)
+                    x1 = float(rect.x1)
+                    y1 = page_height - float(rect.y1)
+                    points = [(x0, y0), (x1, y0), (x1, y1), (x0, y1)]
+                    msp.add_lwpolyline(points, close=True, dxfattribs={"layer": layer})
+                    total += 1
+
+                elif kind == "c":  # Cubic Bezier curve
+                    p1, p2, p3, p4 = item[1], item[2], item[3], item[4]
+                    arc = _fit_arc_from_bezier(p1, p2, p3, p4, page_height)
+                    if arc:
+                        cx, cy, radius, start_angle, end_angle = arc
+                        msp.add_arc(
+                            center=(cx, cy),
+                            radius=radius,
+                            start_angle=math.degrees(start_angle),
+                            end_angle=math.degrees(end_angle),
+                            dxfattribs={"layer": layer},
+                        )
+                    else:
+                        # Approximate as polyline segments
+                        pts = _bezier_to_points(p1, p2, p3, p4, page_height, segments=8)
+                        if len(pts) >= 2:
+                            msp.add_lwpolyline(pts, dxfattribs={"layer": layer})
+                    total += 1
+
+                elif kind == "qu":  # Quadratic Bezier
+                    p1, p2, p3 = item[1], item[2], item[3]
+                    # Promote to cubic: C0=P0, C1=P0+2/3*(P1-P0), C2=P2+2/3*(P1-P2), C3=P2
+                    c1_x = p1.x + 2 / 3 * (p2.x - p1.x)
+                    c1_y = p1.y + 2 / 3 * (p2.y - p1.y)
+                    c2_x = p3.x + 2 / 3 * (p2.x - p3.x)
+                    c2_y = p3.y + 2 / 3 * (p2.y - p3.y)
+
+                    class _Pt:
+                        def __init__(self, x, y):
+                            self.x = x
+                            self.y = y
+
+                    pts = _bezier_to_points(
+                        p1, _Pt(c1_x, c1_y), _Pt(c2_x, c2_y), p3, page_height, segments=8
+                    )
+                    if len(pts) >= 2:
+                        msp.add_lwpolyline(pts, dxfattribs={"layer": layer})
+                    total += 1
+
+        # Extract text blocks from the page
+        text_blocks = page.get_text("dict", flags=fitz.TEXT_PRESERVE_WHITESPACE).get("blocks", [])
+        for block in text_blocks:
+            if block.get("type") != 0:  # text block
+                continue
+            for line in block.get("lines", []):
+                for span in line.get("spans", []):
+                    text = span.get("text", "").strip()
+                    if not text:
+                        continue
+                    bbox = span.get("bbox", (0, 0, 0, 0))
+                    x = float(bbox[0])
+                    y = page_height - float(bbox[1])
+                    height = max(float(bbox[3]) - float(bbox[1]), 1.0)
+                    msp.add_text(
+                        text,
+                        height=height * 0.7,
+                        dxfattribs={"layer": layer, "insert": (x, y)},
+                    )
+                    total += 1
+
+    pdf_doc.close()
+    return total
+
+
+def _fit_arc_from_bezier(p1, p2, p3, p4, page_height: float):
+    """Try to fit a circular arc to a cubic Bezier curve.
+
+    Returns (cx, cy, radius, start_angle, end_angle) if the Bezier is
+    near-circular, or None if it's a general curve.
+    """
+    import math
+
+    # Convert to DXF coords (flip Y)
+    x0, y0 = float(p1.x), page_height - float(p1.y)
+    x1, y1 = float(p2.x), page_height - float(p2.y)
+    x2, y2 = float(p3.x), page_height - float(p3.y)
+    x3, y3 = float(p4.x), page_height - float(p4.y)
+
+    # Mid-point of the Bezier (t=0.5)
+    mx = 0.125 * (x0 + 3 * x1 + 3 * x2 + x3)
+    my = 0.125 * (y0 + 3 * y1 + 3 * y2 + y3)
+
+    # Try to find circumscribed circle of start, mid, end points
+    ax, ay = x0, y0
+    bx, by = mx, my
+    cx, cy = x3, y3
+
+    d = 2 * (ax * (by - cy) + bx * (cy - ay) + cx * (ay - by))
+    if abs(d) < 1e-10:
+        return None  # Collinear — not an arc
+
+    a_sq = ax * ax + ay * ay
+    b_sq = bx * bx + by * by
+    c_sq = cx * cx + cy * cy
+    ux = (a_sq * (by - cy) + b_sq * (cy - ay) + c_sq * (ay - by)) / d
+    uy = (a_sq * (cx - bx) + b_sq * (ax - cx) + c_sq * (bx - ax)) / d
+
+    r1 = math.hypot(ax - ux, ay - uy)
+    r2 = math.hypot(bx - ux, by - uy)
+    r3 = math.hypot(cx - ux, cy - uy)
+
+    # Check if all three radii match (within 5% tolerance)
+    avg_r = (r1 + r2 + r3) / 3
+    if avg_r < 0.1:
+        return None
+    if max(abs(r1 - avg_r), abs(r2 - avg_r), abs(r3 - avg_r)) / avg_r > 0.05:
+        return None  # Not circular enough
+
+    start_angle = math.atan2(ay - uy, ax - ux)
+    end_angle = math.atan2(cy - uy, cx - ux)
+
+    return (ux, uy, avg_r, start_angle, end_angle)
+
+
+def _bezier_to_points(p1, p2, p3, p4, page_height: float, segments: int = 8):
+    """Approximate a cubic Bezier as polyline points."""
+    points = []
+    for i in range(segments + 1):
+        t = i / segments
+        t2 = t * t
+        t3 = t2 * t
+        mt = 1 - t
+        mt2 = mt * mt
+        mt3 = mt2 * mt
+
+        x = mt3 * p1.x + 3 * mt2 * t * p2.x + 3 * mt * t2 * p3.x + t3 * p4.x
+        y = mt3 * p1.y + 3 * mt2 * t * p2.y + 3 * mt * t2 * p3.y + t3 * p4.y
+
+        points.append((float(x), page_height - float(y)))
+    return points
+
+
+# ── pdfplumber extraction (fallback) ─────────────────────────────
+
+
+def _extract_pdf_page_plumber(msp, page, page_num: int) -> int:
+    """Extract vector geometry from a single PDF page using pdfplumber.
+
+    Fallback when PyMuPDF is not installed. Only extracts lines, rects,
+    and text — curves/arcs are lost.
     """
     count = 0
     layer = f"PDF_PAGE_{page_num + 1}" if page_num > 0 else "0"

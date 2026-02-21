@@ -41,6 +41,10 @@ otel = [
     "opentelemetry-semantic-conventions>=0.42b0",
 ]
 convert = [
+    "pymupdf>=1.24",
+    "Pillow>=10.0",
+]
+convert-fallback = [
     "pdfplumber>=0.10",
     "Pillow>=10.0",
 ]
@@ -63,6 +67,7 @@ dev = [
     "opentelemetry-api>=1.21",
     "opentelemetry-sdk>=1.21",
     "pdfplumber>=0.10",
+    "pymupdf>=1.24",
     "Pillow>=10.0",
     "matplotlib>=3.8",
     "fpdf2>=2.7",
@@ -94,7 +99,7 @@ disallow_untyped_defs = false
 check_untyped_defs = true
 
 [[tool.mypy.overrides]]
-module = ["ezdxf.*", "PySide6.*", "opentelemetry.*", "pdfplumber.*", "matplotlib.*", "fpdf.*", "google.*", "vertexai.*"]
+module = ["ezdxf.*", "PySide6.*", "opentelemetry.*", "pdfplumber.*", "fitz.*", "matplotlib.*", "fpdf.*", "google.*", "vertexai.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

@@ -7,7 +7,7 @@ from pathlib import Path
 import ezdxf
 import pytest
 
-from cad_dxf_agent.core.converter import ConversionResult, convert_to_dxf
+from cad_dxf_agent.core.converter import _PDF_WARNING, ConversionResult, convert_to_dxf
 
 
 class TestDxfPassthrough:
@@ -89,8 +89,6 @@ class TestPdfConversion:
 
     def test_pdf_with_vector_lines(self, tmp_path: Path):
         """Create a simple PDF with vector content and convert it."""
-        # Create a minimal vector PDF using reportlab if available, otherwise
-        # use a hand-crafted minimal PDF
         pdf_path = tmp_path / "drawing.pdf"
         _create_minimal_pdf(pdf_path)
 
@@ -112,6 +110,15 @@ class TestPdfConversion:
         assert result.success is True
         # May or may not have warnings depending on PDF content
 
+    def test_pdf_warning_present(self, tmp_path: Path):
+        """PDF conversion should always include the lossy-conversion warning."""
+        pdf_path = tmp_path / "drawing.pdf"
+        _create_minimal_pdf(pdf_path)
+
+        result = convert_to_dxf(pdf_path, output_dir=tmp_path)
+        assert result.success is True
+        assert _PDF_WARNING in result.warnings
+
 
 class TestConversionResult:
     """ConversionResult data class."""
@@ -128,6 +135,63 @@ class TestConversionResult:
         assert result.source_format == "dxf"
         assert len(result.warnings) == 1
         assert result.error is None
+
+
+class TestArcFitting:
+    """Test the arc-fitting heuristic for Bezier curves."""
+
+    def test_bezier_to_points_returns_correct_count(self):
+        from cad_dxf_agent.core.converter import _bezier_to_points
+
+        class Pt:
+            def __init__(self, x, y):
+                self.x = x
+                self.y = y
+
+        pts = _bezier_to_points(Pt(0, 0), Pt(1, 2), Pt(3, 2), Pt(4, 0), page_height=10, segments=8)
+        assert len(pts) == 9  # segments + 1
+        # First and last points should match start/end (with Y flip)
+        assert abs(pts[0][0] - 0.0) < 0.01
+        assert abs(pts[-1][0] - 4.0) < 0.01
+
+    def test_fit_arc_from_circular_bezier(self):
+        """A Bezier that closely traces a circle should be detected as an arc."""
+        from cad_dxf_agent.core.converter import _fit_arc_from_bezier
+
+        # Quarter circle approximation using standard kappa = 0.5522847498
+        # Center at (0, 0), radius 100, from (100, 0) to (0, 100)
+        k = 0.5522847498
+        page_height = 200.0
+
+        class Pt:
+            def __init__(self, x, y):
+                self.x = x
+                self.y = y
+
+        # PDF coords (Y increases downward), circle at (100, 100) r=100
+        # Start at (200, 100), end at (100, 0)
+        p1 = Pt(200, 100)
+        p2 = Pt(200, 100 - 100 * k)
+        p3 = Pt(100 + 100 * k, 0)
+        p4 = Pt(100, 0)
+
+        result = _fit_arc_from_bezier(p1, p2, p3, p4, page_height)
+        if result is not None:
+            cx, cy, radius, start_angle, end_angle = result
+            assert abs(radius - 100.0) < 10.0  # rough check
+
+    def test_fit_arc_returns_none_for_straight_line(self):
+        """A straight-line Bezier should not be detected as an arc."""
+        from cad_dxf_agent.core.converter import _fit_arc_from_bezier
+
+        class Pt:
+            def __init__(self, x, y):
+                self.x = x
+                self.y = y
+
+        # Collinear points — not an arc
+        result = _fit_arc_from_bezier(Pt(0, 0), Pt(1, 0), Pt(2, 0), Pt(3, 0), page_height=10)
+        assert result is None
 
 
 def _create_minimal_pdf(path: Path, *, empty: bool = False) -> None:
