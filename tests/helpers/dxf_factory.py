@@ -195,3 +195,61 @@ def create_empty_dxf(tmp_path: Path, *, filename: str = "empty.dxf") -> Path:
     dxf_path = tmp_path / filename
     doc.saveas(str(dxf_path))
     return dxf_path
+
+
+def create_drawing_with_layout(
+    tmp_path: Path,
+    *,
+    layout_name: str = "Sheet1",
+    filename: str = "with_layout.dxf",
+) -> Path:
+    """Create a DXF with entities in both model space and a named paper space layout.
+
+    Model space gets:
+    - 2 lines on STRUCTURAL
+    - 1 text on NOTES ("Model Note")
+    - 1 block insert (COLUMN_MARK) on STRUCTURAL
+
+    Paper space layout gets:
+    - 1 text on NOTES ("Layout Note")
+    - 1 line on STRUCTURAL
+    - 1 mtext on NOTES ("Layout Detail")
+
+    Returns path to the saved DXF.
+    """
+    doc = ezdxf.new(dxfversion="R2018")
+    msp = doc.modelspace()
+
+    # Layers
+    doc.layers.add("STRUCTURAL", color=1)
+    doc.layers.add("NOTES", color=3)
+    doc.layers.add("TITLE", color=7)
+
+    # Block definition
+    block = doc.blocks.new("COLUMN_MARK")
+    block.add_circle((0, 0), radius=2)
+
+    # --- Model space entities ---
+    msp.add_line((0, 0), (100, 0), dxfattribs={"layer": "STRUCTURAL"})
+    msp.add_line((0, 0), (0, 100), dxfattribs={"layer": "STRUCTURAL"})
+    msp.add_text(
+        "Model Note",
+        dxfattribs={"layer": "NOTES", "height": 2.5, "insert": (10, 10)},
+    )
+    msp.add_blockref("COLUMN_MARK", insert=(50, 50), dxfattribs={"layer": "STRUCTURAL"})
+
+    # --- Paper space layout ---
+    layout = doc.layouts.new(layout_name)
+    layout.add_text(
+        "Layout Note",
+        dxfattribs={"layer": "NOTES", "height": 3.0, "insert": (5, 5)},
+    )
+    layout.add_line((0, 0), (200, 0), dxfattribs={"layer": "STRUCTURAL"})
+    layout.add_mtext(
+        "Layout Detail",
+        dxfattribs={"layer": "NOTES", "insert": (20, 20), "char_height": 2.0},
+    )
+
+    dxf_path = tmp_path / filename
+    doc.saveas(str(dxf_path))
+    return dxf_path

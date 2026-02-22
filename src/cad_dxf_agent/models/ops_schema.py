@@ -26,6 +26,10 @@ class EditOperation(BaseModel):
         description="Handle of the target entity (required for move/edit/delete)",
     )
     target_layer: str | None = None
+    target_space: str = Field(
+        default="Model",
+        description="Space/layout name: 'Model' or a paper space layout name",
+    )
     params: dict[str, Any] = Field(default_factory=dict)
 
     # move_entity params: dx, dy
