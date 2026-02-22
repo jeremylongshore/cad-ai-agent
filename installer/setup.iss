@@ -5,9 +5,9 @@
 ;   iscc installer/setup.iss
 
 #define AppName "CAD DXF Agent"
-#define AppVersion "1.0.0"
+#define AppVersion "0.1.0"
 #define AppPublisher "Intent Solutions"
-#define AppURL "https://github.com/your-org/cad-dxf-agent"
+#define AppURL "https://github.com/jeremylongshore/cad-dxf-agent"
 #define AppExeName "cad-dxf-agent.exe"
 
 [Setup]

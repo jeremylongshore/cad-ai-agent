@@ -1,4 +1,4 @@
-.PHONY: install lint format typecheck test test-unit test-integration test-cov smoke check run clean
+.PHONY: install lint format typecheck test test-unit test-integration test-cov smoke check run clean build build-clean
 
 install:
 	pip install -e ".[dev]"
@@ -37,6 +37,12 @@ check: lint format typecheck test smoke
 
 run:
 	python -m cad_dxf_agent.app
+
+build:
+	python scripts/build.py
+
+build-clean:
+	python scripts/build.py --clean
 
 clean:
 	rm -rf dist/ build/ *.egg-info .coverage htmlcov/ .mypy_cache/ .ruff_cache/ .pytest_cache/

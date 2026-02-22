@@ -24,29 +24,51 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install -e ".[gui,convert,draw]"
-          pip install pyinstaller
+          pip install -e ".[gui,build]"
 
-      - name: Run tests
+      - name: Run unit tests
         run: |
           pip install -e ".[dev]"
           pytest tests/unit/ -q
 
       - name: Build with PyInstaller
         run: |
-          pyinstaller installer/cad-dxf-agent.spec --noconfirm
+          python scripts/build.py --clean --skip-test
 
       - name: Verify build output
         run: |
           dir dist\cad-dxf-agent\
-          dist\cad-dxf-agent\cad-dxf-agent.exe --help || echo "GUI app, no --help"
+          $size = (Get-ChildItem -Recurse dist\cad-dxf-agent | Measure-Object -Property Length -Sum).Sum / 1MB
+          Write-Output "Bundle size: $([math]::Round($size, 1)) MB"
+          if ($size -lt 10) { throw "Bundle too small — likely missing dependencies" }
+
+      - name: Smoke test (headless)
+        run: |
+          $env:QT_QPA_PLATFORM = "offscreen"
+          $env:CAD_LLM_PROVIDER = "mock"
+          $proc = Start-Process -FilePath "dist\cad-dxf-agent\cad-dxf-agent.exe" -PassThru -NoNewWindow
+          Start-Sleep -Seconds 10
+          if (-not $proc.HasExited) {
+            Stop-Process $proc
+            Write-Output "PASS: bundle started successfully"
+          } else {
+            Write-Output "App exited with code: $($proc.ExitCode)"
+          }
 
       - name: Build Inno Setup installer
+        if: hashFiles('installer/setup.iss') != ''
         uses: Minionguyjpro/Inno-Setup-Action@v1.2.4
         with:
           path: installer/setup.iss
 
+      - name: Upload bundle artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cad-dxf-agent-windows
+          path: dist/cad-dxf-agent/
+
       - name: Upload installer artifact
+        if: hashFiles('dist/cad-dxf-agent-setup-*.exe') != ''
         uses: actions/upload-artifact@v4
         with:
           name: windows-installer
@@ -56,5 +78,6 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/cad-dxf-agent-setup-*.exe
+          files: |
+            dist/cad-dxf-agent-setup-*.exe
           draft: true
