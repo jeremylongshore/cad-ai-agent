@@ -65,3 +65,88 @@ class TestDxfReader:
 
     def test_metadata_present(self, sample_context):
         assert "dxf_version" in sample_context.metadata
+
+
+class TestDxfReaderV2Entities:
+    """Tests for V2 entity types beyond the original V1 set."""
+
+    def test_hatch_entity_parsed(self, tmp_path):
+        """HATCH entities are loaded with centroid position."""
+        import ezdxf
+
+        doc = ezdxf.new(dxfversion="R2018")
+        msp = doc.modelspace()
+        doc.layers.add("STRUCTURAL", color=1)
+        hatch = msp.add_hatch(color=1, dxfattribs={"layer": "STRUCTURAL"})
+        hatch.paths.add_polyline_path([(0, 0), (10, 0), (10, 10), (0, 10)], is_closed=True)
+        dxf_path = tmp_path / "hatch.dxf"
+        doc.saveas(str(dxf_path))
+
+        context = load_dxf(dxf_path)
+        hatches = [e for e in context.entities if e.entity_type == EntityType.HATCH]
+        assert len(hatches) == 1
+        assert hatches[0].insert_point is not None
+
+    def test_spline_entity_parsed(self, tmp_path):
+        """SPLINE entities are loaded."""
+        import ezdxf
+
+        doc = ezdxf.new(dxfversion="R2018")
+        msp = doc.modelspace()
+        doc.layers.add("STRUCTURAL", color=1)
+        msp.add_spline(
+            fit_points=[(0, 0), (5, 10), (10, 0)],
+            dxfattribs={"layer": "STRUCTURAL"},
+        )
+        dxf_path = tmp_path / "spline.dxf"
+        doc.saveas(str(dxf_path))
+
+        context = load_dxf(dxf_path)
+        splines = [e for e in context.entities if e.entity_type == EntityType.SPLINE]
+        assert len(splines) == 1
+
+    def test_ellipse_entity_parsed(self, tmp_path):
+        """ELLIPSE entities are loaded with ratio attribute."""
+        import ezdxf
+
+        doc = ezdxf.new(dxfversion="R2018")
+        msp = doc.modelspace()
+        doc.layers.add("STRUCTURAL", color=1)
+        msp.add_ellipse(
+            center=(30, 30),
+            major_axis=(10, 0, 0),
+            ratio=0.5,
+            dxfattribs={"layer": "STRUCTURAL"},
+        )
+        dxf_path = tmp_path / "ellipse.dxf"
+        doc.saveas(str(dxf_path))
+
+        context = load_dxf(dxf_path)
+        ellipses = [e for e in context.entities if e.entity_type == EntityType.ELLIPSE]
+        assert len(ellipses) == 1
+        assert ellipses[0].attributes.get("ratio") == 0.5
+
+    def test_unsupported_entity_types_recorded(self, tmp_path):
+        """Entity types not in our enum are recorded in unsupported_entity_types."""
+        import ezdxf
+
+        doc = ezdxf.new(dxfversion="R2018")
+        msp = doc.modelspace()
+        # POINT is not in our EntityType enum
+        msp.add_point((5, 5))
+        dxf_path = tmp_path / "point.dxf"
+        doc.saveas(str(dxf_path))
+
+        context = load_dxf(dxf_path)
+        assert "POINT" in context.unsupported_entity_types
+
+    def test_empty_dxf(self, tmp_path):
+        """An empty DXF (no user entities) loads with zero entity count."""
+        import ezdxf
+
+        doc = ezdxf.new(dxfversion="R2018")
+        dxf_path = tmp_path / "empty.dxf"
+        doc.saveas(str(dxf_path))
+
+        context = load_dxf(dxf_path)
+        assert context.entity_count == 0
