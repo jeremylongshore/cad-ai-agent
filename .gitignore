@@ -50,7 +50,6 @@ temp/
 tmp/
 
 # Distribution
-*.spec
 *.exe
 *.msi
 
