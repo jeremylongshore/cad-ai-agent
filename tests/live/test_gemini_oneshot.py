@@ -2,8 +2,7 @@
 
 These tests call the actual Gemini API and validate that the response
 is a structurally valid ChangeSet. They require:
-  - GOOGLE_CLOUD_PROJECT env var set
-  - Valid GCP credentials (gcloud auth application-default login)
+  - Application Default Credentials (gcloud auth application-default login)
   - pip install -e ".[gemini]"
 
 Run with: make test-live  (or pytest tests/live/ -m live_api)

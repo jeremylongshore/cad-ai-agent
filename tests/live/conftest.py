@@ -1,30 +1,45 @@
-"""Conftest for live API tests — skips unless GCP credentials are available."""
+"""Conftest for live API tests — skips unless ADC (Application Default Credentials) work.
+
+Uses the same auth pattern as all other GCP projects:
+  - google.auth.default() for credential + project auto-detection
+  - No special env vars required — just `gcloud auth application-default login`
+"""
 
 from __future__ import annotations
 
-import os
-
 import pytest
 
-# The marker applied to all tests in this directory
 LIVE_API_REASON = (
-    "Live API tests require GOOGLE_CLOUD_PROJECT env var "
-    "and valid GCP credentials (gcloud auth application-default login)"
+    "Live API tests require Application Default Credentials. "
+    "Run: gcloud auth application-default login"
 )
 
 
+def _detect_gcp_project() -> str | None:
+    """Auto-detect GCP project from ADC, same as vertexai.init() does."""
+    try:
+        import google.auth  # type: ignore[import-untyped]
+
+        _, project = google.auth.default()
+        return project
+    except Exception:
+        return None
+
+
 def pytest_collection_modifyitems(config, items):
-    """Auto-skip live_api tests when GCP credentials are not available."""
+    """Auto-skip live_api tests when ADC is not available."""
+    if _detect_gcp_project() is not None:
+        return  # ADC works, don't skip anything
     skip_live = pytest.mark.skip(reason=LIVE_API_REASON)
     for item in items:
-        if "live_api" in item.keywords and not os.getenv("GOOGLE_CLOUD_PROJECT"):
+        if "live_api" in item.keywords:
             item.add_marker(skip_live)
 
 
 @pytest.fixture
 def gcp_project():
-    """Return the GCP project ID from environment."""
-    project = os.getenv("GOOGLE_CLOUD_PROJECT")
+    """Return the GCP project ID auto-detected from ADC."""
+    project = _detect_gcp_project()
     if not project:
         pytest.skip(LIVE_API_REASON)
     return project
@@ -33,6 +48,8 @@ def gcp_project():
 @pytest.fixture
 def gcp_location():
     """Return the GCP location (default: us-central1)."""
+    import os
+
     return os.getenv("CAD_GCP_LOCATION", "us-central1")
 
 
