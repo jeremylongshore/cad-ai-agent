@@ -1,11 +1,16 @@
-"""Conftest for live API tests — skips unless ADC (Application Default Credentials) work.
+"""Conftest for live API tests — skips unless GCP credentials are available.
 
-Uses the same auth pattern as all other GCP projects:
-  - google.auth.default() for credential + project auto-detection
-  - No special env vars required — just `gcloud auth application-default login`
+Project detection order:
+  1. CAD_GCP_PROJECT env var (set in CI via GitHub Actions vars)
+  2. google.auth.default() ADC auto-detection (local dev)
+
+Local dev: `gcloud auth application-default login`
+CI: WIF via google-github-actions/auth@v2 (tokenless)
 """
 
 from __future__ import annotations
+
+import os
 
 import pytest
 
@@ -16,7 +21,10 @@ LIVE_API_REASON = (
 
 
 def _detect_gcp_project() -> str | None:
-    """Auto-detect GCP project from ADC, same as vertexai.init() does."""
+    """Auto-detect GCP project: env var first, then ADC."""
+    project = os.getenv("CAD_GCP_PROJECT")
+    if project:
+        return project
     try:
         import google.auth  # type: ignore[import-untyped]
 
@@ -48,8 +56,6 @@ def gcp_project():
 @pytest.fixture
 def gcp_location():
     """Return the GCP location (default: us-central1)."""
-    import os
-
     return os.getenv("CAD_GCP_LOCATION", "us-central1")
 
 

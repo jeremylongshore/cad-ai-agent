@@ -34,6 +34,18 @@ make run           # python -m cad_dxf_agent.app
 
 Mock mode (`CAD_LLM_PROVIDER=mock`, the default) works without any API key. All tests and the smoke test use mock mode.
 
+### Live API Tests
+
+Live tests in `tests/live/` hit real Gemini via Vertex AI on the `cad-dxf-agent` GCP project.
+
+```bash
+# Local: set ADC + run with project env var
+gcloud auth application-default login
+CAD_GCP_PROJECT=cad-dxf-agent pytest tests/live/ -v -m live_api -s
+
+# CI: runs automatically on push to main via WIF (tokenless, no secrets)
+```
+
 ## Architecture
 
 ### Pipeline Flow
