@@ -1,0 +1,19 @@
+{
+  "prompt": "Move the project title text east",
+  "description": "Agent finds entity on TITLE layer, attempts move, gets rejected — 0 ops produced",
+  "expected_turns": [
+    {
+      "tool_calls": [
+        {"name": "find_entities", "args": {"layer": "TITLE"}}
+      ]
+    },
+    {
+      "tool_calls": [
+        {"name": "move_entity", "args": {"handle": "__TITLE_ENTITY__", "dx": 24.0, "dy": 0.0}}
+      ]
+    }
+  ],
+  "expected_op_types": [],
+  "expected_op_count": 0,
+  "must_not_touch_layers": ["TITLE", "TITLEBLOCK", "SEAL", "REVISION"]
+}

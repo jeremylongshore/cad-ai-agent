@@ -1,4 +1,4 @@
-.PHONY: install lint format typecheck test smoke check run clean
+.PHONY: install lint format typecheck test test-unit test-integration test-cov smoke check run clean
 
 install:
 	pip install -e ".[dev]"
@@ -15,6 +15,12 @@ typecheck:
 
 test:
 	pytest -v
+
+test-unit:
+	pytest tests/unit/ -v
+
+test-integration:
+	pytest tests/integration/ -v -m integration
 
 test-cov:
 	pytest --cov=cad_dxf_agent --cov-report=term-missing -v

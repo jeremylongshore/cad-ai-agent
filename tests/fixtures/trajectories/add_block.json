@@ -1,0 +1,19 @@
+{
+  "prompt": "Insert a new COLUMN_MARK block at grid position E-3",
+  "description": "Agent lists layers, then inserts a block on STRUCTURAL layer",
+  "expected_turns": [
+    {
+      "tool_calls": [
+        {"name": "list_layers", "args": {}}
+      ]
+    },
+    {
+      "tool_calls": [
+        {"name": "add_block", "args": {"block_name": "COLUMN_MARK", "x": 120.0, "y": 60.0, "layer": "STRUCTURAL"}}
+      ]
+    }
+  ],
+  "expected_op_types": ["add_block"],
+  "expected_op_count": 1,
+  "must_not_touch_layers": ["TITLE", "TITLEBLOCK", "SEAL", "REVISION"]
+}
