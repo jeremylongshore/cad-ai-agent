@@ -159,6 +159,7 @@ class ToolExecutor:
             op_type=OpType.MOVE_ENTITY,
             target_handle=handle,
             target_layer=entity.layer,
+            target_space=entity.space,
             params={"dx": args["dx"], "dy": args["dy"]},
         )
         self._operations.append(op)
@@ -182,6 +183,7 @@ class ToolExecutor:
             op_type=OpType.EDIT_TEXT,
             target_handle=handle,
             target_layer=entity.layer,
+            target_space=entity.space,
             params={"new_text": args["new_text"]},
         )
         self._operations.append(op)
@@ -204,6 +206,7 @@ class ToolExecutor:
             op_type=OpType.DELETE_ENTITY,
             target_handle=handle,
             target_layer=entity.layer,
+            target_space=entity.space,
         )
         self._operations.append(op)
         return {
@@ -217,6 +220,7 @@ class ToolExecutor:
         x = args["x"]
         y = args["y"]
         layer = args.get("layer")
+        space = args.get("space", "Model")
 
         if layer and layer.upper() in self._protected:
             return {"error": f"Cannot insert block on protected layer: {layer}"}
@@ -224,6 +228,7 @@ class ToolExecutor:
         op = EditOperation(
             op_type=OpType.ADD_BLOCK,
             target_layer=layer,
+            target_space=space,
             params={
                 "block_name": block_name,
                 "insert_point": {"x": x, "y": y},
@@ -247,6 +252,7 @@ def _entity_to_dict(entity: EntityRef) -> dict[str, Any]:
         "handle": entity.handle,
         "type": entity.entity_type.value,
         "layer": entity.layer,
+        "space": entity.space,
     }
     if entity.insert_point:
         d["x"] = entity.insert_point.x

@@ -18,6 +18,7 @@ class EditEngine:
     """Applies structured operations to a DXF document.
 
     Operates on a working copy — never modifies the original file.
+    Supports both model space and paper space layouts.
     """
 
     def __init__(self, dxf_path: str | Path) -> None:
@@ -25,6 +26,16 @@ class EditEngine:
         self.doc = ezdxf.readfile(str(self.dxf_path))
         self.msp = self.doc.modelspace()
         self._applied: list[AppliedChange] = []
+
+    def _get_layout(self, space: str):
+        """Resolve the ezdxf layout object for a space name.
+
+        Returns model space for 'Model', or the named paper space layout.
+        Raises KeyError if a named layout doesn't exist.
+        """
+        if space == "Model":
+            return self.msp
+        return self.doc.layouts.get(space)
 
     def apply_changeset(self, changeset: ChangeSet) -> list[AppliedChange]:
         """Apply all operations in a validated changeset.
@@ -133,12 +144,19 @@ class EditEngine:
             return AppliedChange(operation=op, success=False, description="Entity not found")
 
         try:
-            self.msp.delete_entity(entity)
+            layout = self._get_layout(op.target_space)
+            layout.delete_entity(entity)
             return AppliedChange(
                 operation=op,
                 success=True,
                 entity_handle=op.target_handle,
                 description=f"Deleted entity {op.target_handle}",
+            )
+        except KeyError:
+            return AppliedChange(
+                operation=op,
+                success=False,
+                description=f"Layout not found: {op.target_space}",
             )
         except Exception as e:
             return AppliedChange(operation=op, success=False, description=f"Delete failed: {e}")
@@ -159,11 +177,13 @@ class EditEngine:
                     description=f"Block definition not found: {block_name}",
                 )
 
+            layout = self._get_layout(op.target_space)
+
             attribs = {}
             if op.target_layer:
                 attribs["layer"] = op.target_layer
 
-            ref = self.msp.add_blockref(
+            ref = layout.add_blockref(
                 block_name,
                 insert=(x, y),
                 dxfattribs={
@@ -178,6 +198,12 @@ class EditEngine:
                 success=True,
                 entity_handle=ref.dxf.handle,
                 description=f"Inserted block {block_name} at ({x}, {y})",
+            )
+        except KeyError:
+            return AppliedChange(
+                operation=op,
+                success=False,
+                description=f"Layout not found: {op.target_space}",
             )
         except Exception as e:
             return AppliedChange(operation=op, success=False, description=f"Add block failed: {e}")

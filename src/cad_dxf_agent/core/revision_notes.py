@@ -53,17 +53,34 @@ def insert_revision_note(
     output_path: str | Path,
     changes: list[AppliedChange],
     config: RevisionNoteConfig,
+    *,
+    layout_name: str = "Model",
 ) -> str:
     """Insert a revision note into a DXF file on the dedicated AI_REV_NOTES layer.
 
     Operates on an already-edited DXF (post-apply). Saves to output_path.
+    When ``layout_name`` is provided and is not "Model", the note is inserted
+    into the named paper space layout instead of model space.
     Returns the note text that was inserted.
     """
     with tracer.start_as_current_span("cad.revision_note") as span:
         span.set_attribute("cad.revision.layer", config.layer_name)
+        span.set_attribute("cad.revision.layout", layout_name)
 
         doc = ezdxf.readfile(str(dxf_path))
-        msp = doc.modelspace()
+
+        # Resolve target layout
+        if layout_name == "Model":
+            target = doc.modelspace()
+        else:
+            try:
+                target = doc.layouts.get(layout_name)
+            except KeyError:
+                logger.warning(
+                    "Layout %r not found, falling back to model space",
+                    layout_name,
+                )
+                target = doc.modelspace()
 
         # Ensure the notes layer exists
         if config.layer_name not in doc.layers:
@@ -71,7 +88,7 @@ def insert_revision_note(
 
         note_text = generate_note_text(changes, config)
 
-        msp.add_mtext(
+        target.add_mtext(
             note_text,
             dxfattribs={
                 "layer": config.layer_name,
@@ -81,7 +98,12 @@ def insert_revision_note(
         )
 
         doc.saveas(str(output_path))
-        logger.info("Inserted revision note on layer %s: %s", config.layer_name, note_text)
+        logger.info(
+            "Inserted revision note on layer %s in %s: %s",
+            config.layer_name,
+            layout_name,
+            note_text,
+        )
         return note_text
 
 
