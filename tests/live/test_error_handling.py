@@ -10,6 +10,24 @@ from __future__ import annotations
 
 import pytest
 
+# google.api_core is only available with [gemini] extras
+_gcp_error_types: tuple[type[Exception], ...] = (
+    ValueError,
+    RuntimeError,
+    ConnectionError,
+    OSError,
+)
+try:
+    from google.api_core import exceptions as gcp_exceptions
+
+    _gcp_error_types += (
+        gcp_exceptions.NotFound,
+        gcp_exceptions.InvalidArgument,
+        gcp_exceptions.PermissionDenied,
+    )
+except ImportError:
+    pass
+
 
 @pytest.mark.live_api
 class TestErrorHandlingLive:
@@ -25,7 +43,7 @@ class TestErrorHandlingLive:
             model_name="gemini-nonexistent-99",
         )
 
-        with pytest.raises((ValueError, RuntimeError, ConnectionError, OSError)):
+        with pytest.raises(_gcp_error_types):
             provider.plan("Move something", planner_context)
 
     def test_invalid_project_raises(self, planner_context):
@@ -37,7 +55,7 @@ class TestErrorHandlingLive:
             location="us-central1",
         )
 
-        with pytest.raises((ValueError, RuntimeError, ConnectionError, OSError)):
+        with pytest.raises(_gcp_error_types):
             provider.plan("Move something", planner_context)
 
     def test_vision_missing_file_raises(self, gcp_project):
