@@ -81,7 +81,12 @@ def _reconstruct_context(drawing_context: dict) -> DrawingContext:
                     block_name=e.get("block_name"),
                 )
             )
-        except (KeyError, ValueError):
+        except (KeyError, ValueError) as exc:
+            import logging
+
+            logging.getLogger(__name__).warning(
+                "Skipping malformed entity in test context: %s (data=%s)", exc, e
+            )
             continue
 
     layers = [
