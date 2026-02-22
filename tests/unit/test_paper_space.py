@@ -252,17 +252,13 @@ class TestRevisionNotesLayout:
         ]
 
         out = tmp_path / "rev_note.dxf"
-        note_text = insert_revision_note(
-            layout_dxf, out, changes, config, layout_name="Sheet1"
-        )
+        note_text = insert_revision_note(layout_dxf, out, changes, config, layout_name="Sheet1")
         assert "Moved entity" in note_text
 
         # Verify note is in the layout
         reloaded = load_dxf(out)
         sheet_entities = [e for e in reloaded.entities if e.space == "Sheet1"]
-        note_entities = [
-            e for e in sheet_entities if e.layer == config.layer_name
-        ]
+        note_entities = [e for e in sheet_entities if e.layer == config.layer_name]
         assert len(note_entities) >= 1
 
     def test_revision_note_default_model_space(self, layout_dxf, tmp_path):
@@ -286,9 +282,7 @@ class TestRevisionNotesLayout:
 
         reloaded = load_dxf(out)
         model_notes = [
-            e
-            for e in reloaded.entities
-            if e.space == "Model" and e.layer == config.layer_name
+            e for e in reloaded.entities if e.space == "Model" and e.layer == config.layer_name
         ]
         assert len(model_notes) >= 1
 
@@ -309,15 +303,11 @@ class TestRevisionNotesLayout:
         ]
 
         out = tmp_path / "rev_fallback.dxf"
-        insert_revision_note(
-            layout_dxf, out, changes, config, layout_name="NoSuchLayout"
-        )
+        insert_revision_note(layout_dxf, out, changes, config, layout_name="NoSuchLayout")
 
         reloaded = load_dxf(out)
         model_notes = [
-            e
-            for e in reloaded.entities
-            if e.space == "Model" and e.layer == config.layer_name
+            e for e in reloaded.entities if e.space == "Model" and e.layer == config.layer_name
         ]
         assert len(model_notes) >= 1
 
@@ -329,9 +319,7 @@ class TestToolExecutorSpaceAwareness:
         """_entity_to_dict includes space field."""
         from cad_dxf_agent.llm.tool_executor import _entity_to_dict
 
-        layout_entity = next(
-            e for e in layout_context.entities if e.space == "Sheet1"
-        )
+        layout_entity = next(e for e in layout_context.entities if e.space == "Sheet1")
         result = _entity_to_dict(layout_entity)
         assert result["space"] == "Sheet1"
 
@@ -358,9 +346,7 @@ class TestToolExecutorSpaceAwareness:
         )
 
         executor = ToolExecutor(layout_context, settings.protected_layers)
-        executor.execute(
-            "move_entity", {"handle": layout_entity.handle, "dx": 5, "dy": 5}
-        )
+        executor.execute("move_entity", {"handle": layout_entity.handle, "dx": 5, "dy": 5})
 
         ops = executor.operations
         assert len(ops) == 1
