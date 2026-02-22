@@ -95,7 +95,7 @@ ignore = ["S101"]  # Allow assert in tests
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["S101", "S106"]
-"scripts/**/*.py" = ["S603", "S607"]  # subprocess calls in build scripts are safe
+"scripts/**/*.py" = ["S603", "S607", "E402"]  # subprocess + sys.path before imports
 
 [tool.mypy]
 python_version = "3.11"
@@ -115,6 +115,7 @@ markers = [
     "smoke: end-to-end smoke tests",
     "slow: tests that take significant time",
     "integration: integration tests (full pipeline, multi-module)",
+    "live_api: tests that call real Gemini API (require GOOGLE_CLOUD_PROJECT)",
 ]
 
 [tool.coverage.run]

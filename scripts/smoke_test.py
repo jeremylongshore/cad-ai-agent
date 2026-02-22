@@ -96,7 +96,7 @@ def main() -> int:
         print("\n[2/7] Loading DXF into DrawingContext...")
         context = load_dxf(input_dxf)
         print(f"  Entities: {context.entity_count}")
-        print(f"  Layers: {[l.name for l in context.layers]}")
+        print(f"  Layers: {[layer.name for layer in context.layers]}")
         print(f"  Protected: {context.get_protected_layers()}")
         print(f"  Blocks: {context.blocks}")
 
