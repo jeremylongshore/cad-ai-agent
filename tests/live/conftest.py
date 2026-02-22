@@ -10,6 +10,8 @@ CI: WIF via google-github-actions/auth@v2 (tokenless)
 
 from __future__ import annotations
 
+import os
+
 import pytest
 
 LIVE_API_REASON = (
@@ -20,8 +22,6 @@ LIVE_API_REASON = (
 
 def _detect_gcp_project() -> str | None:
     """Auto-detect GCP project: env var first, then ADC."""
-    import os
-
     project = os.getenv("CAD_GCP_PROJECT")
     if project:
         return project
@@ -56,8 +56,6 @@ def gcp_project():
 @pytest.fixture
 def gcp_location():
     """Return the GCP location (default: us-central1)."""
-    import os
-
     return os.getenv("CAD_GCP_LOCATION", "us-central1")
 
 

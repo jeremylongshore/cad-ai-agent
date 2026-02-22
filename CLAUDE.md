@@ -39,9 +39,8 @@ Mock mode (`CAD_LLM_PROVIDER=mock`, the default) works without any API key. All 
 Live tests in `tests/live/` hit real Gemini via Vertex AI on the `cad-dxf-agent` GCP project.
 
 ```bash
-# Local: set ADC to cad-dxf-agent project
+# Local: set ADC + run with project env var
 gcloud auth application-default login
-gcloud auth application-default set-quota-project cad-dxf-agent
 CAD_GCP_PROJECT=cad-dxf-agent pytest tests/live/ -v -m live_api -s
 
 # CI: runs automatically on push to main via WIF (tokenless, no secrets)
