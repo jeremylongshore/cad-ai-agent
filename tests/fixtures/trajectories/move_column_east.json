@@ -1,0 +1,19 @@
+{
+  "prompt": "Move column C-4 east by 2 feet",
+  "description": "Agent finds entity by text, then moves it east (dx=24 inches)",
+  "expected_turns": [
+    {
+      "tool_calls": [
+        {"name": "find_entities", "args": {"text_contains": "C-4"}}
+      ]
+    },
+    {
+      "tool_calls": [
+        {"name": "move_entity", "args": {"handle": "__FIRST_MATCH__", "dx": 24.0, "dy": 0.0}}
+      ]
+    }
+  ],
+  "expected_op_types": ["move_entity"],
+  "expected_op_count": 1,
+  "must_not_touch_layers": ["TITLE", "TITLEBLOCK", "SEAL", "REVISION"]
+}

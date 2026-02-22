@@ -105,12 +105,37 @@ Optional tracing via `otel.py` bootstrap module. Off by default, CI-safe (no net
 
 ## Testing
 
-- **Unit tests** (`tests/unit/`): schemas, validators, parser, reader — no DXF files on disk
-- **Smoke tests** (`tests/smoke/`): end-to-end pipeline via `test_e2e_mock.py`
-- **Standalone smoke** (`scripts/smoke_test.py`): creates DXF, runs full pipeline, verifies output
-- **Fixtures** in `tests/conftest.py`: `sample_dxf` creates a temp DXF with all V1 entity types; `sample_context` loads it; `rule_config` provides default rules
-- Pytest markers: `@pytest.mark.smoke`, `@pytest.mark.slow`
-- Coverage threshold: 50% (`fail_under` in pyproject.toml)
+### Test Tiers
+
+| Tier | Location | Count | What |
+|------|----------|-------|------|
+| Unit | `tests/unit/` | ~270 | Schemas, validators, reader, writer, engine, preview, settings, semantic model, snapshots |
+| Integration | `tests/integration/` | ~15 | Full pipeline, undo/redo, agent loop with ScriptedAgentProvider |
+| Smoke | `tests/smoke/` + `scripts/smoke_test.py` | ~5 | End-to-end pipeline via mock planner |
+
+### LLM Testing Patterns
+
+- **ScriptedAgentProvider** (`tests/helpers/scripted_provider.py`): replay canned tool-call sequences through the real `ToolExecutor`. Industry "fake backend" pattern — tests behavior, not implementation.
+- **Golden trajectories** (`tests/fixtures/trajectories/*.json`): JSON files documenting correct agent behavior per prompt type (Google ADK pattern). 5 trajectories: move, delete, edit_text, add_block, protected_layer_reject.
+- **Snapshot tests** (`tests/unit/test_changeset_snapshot.py`): syrupy snapshots catch accidental ChangeSet structure changes when prompts evolve. Run `--snapshot-update` to accept intentional changes.
+
+### Test Helpers
+
+- `tests/helpers/dxf_factory.py` — programmatic DXF builders (structural drawings with 200+ entities, minimal, empty). No stored DXF files.
+- `tests/helpers/changeset_factory.py` — one-liner `make_move()`, `make_delete()`, `make_edit_text()`, `make_add_block()` builders.
+- `tests/conftest.py` — `sample_dxf`, `sample_context`, `rule_config` fixtures.
+
+### Running Tests
+
+```bash
+make test            # All tests
+make test-unit       # Unit tests only
+make test-integration # Integration tests only
+make test-cov        # All tests with coverage report
+```
+
+- Pytest markers: `@pytest.mark.smoke`, `@pytest.mark.slow`, `@pytest.mark.integration`
+- Coverage threshold: 65% (`fail_under` in pyproject.toml)
 
 ## CI
 

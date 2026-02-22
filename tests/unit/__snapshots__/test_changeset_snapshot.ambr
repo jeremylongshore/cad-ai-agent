@@ -1,0 +1,49 @@
+# serializer version: 1
+# name: TestChangeSetSnapshots.test_delete_prompt_snapshot
+  dict({
+    'op_count': 1,
+    'operations': list([
+      dict({
+        'has_target_handle': True,
+        'has_target_layer': True,
+        'op_type': 'delete_entity',
+        'params': dict({
+        }),
+      }),
+    ]),
+    'prompt': 'delete this element',
+  })
+# ---
+# name: TestChangeSetSnapshots.test_move_prompt_snapshot
+  dict({
+    'op_count': 1,
+    'operations': list([
+      dict({
+        'has_target_handle': True,
+        'has_target_layer': True,
+        'op_type': 'move_entity',
+        'params': dict({
+          'dx': 24.0,
+          'dy': 0.0,
+        }),
+      }),
+    ]),
+    'prompt': 'move this column',
+  })
+# ---
+# name: TestChangeSetSnapshots.test_text_prompt_snapshot
+  dict({
+    'op_count': 1,
+    'operations': list([
+      dict({
+        'has_target_handle': True,
+        'has_target_layer': True,
+        'op_type': 'edit_text',
+        'params': dict({
+          'new_text': 'UPDATED BY CAD-DXF-AGENT',
+        }),
+      }),
+    ]),
+    'prompt': 'change text label',
+  })
+# ---

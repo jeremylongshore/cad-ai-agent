@@ -1,0 +1,19 @@
+{
+  "prompt": "Rename column label C-4 to C-4A",
+  "description": "Agent finds text entity containing C-4 and edits it",
+  "expected_turns": [
+    {
+      "tool_calls": [
+        {"name": "find_entities", "args": {"text_contains": "C-4"}}
+      ]
+    },
+    {
+      "tool_calls": [
+        {"name": "edit_text", "args": {"handle": "__FIRST_MATCH__", "new_text": "C-4A"}}
+      ]
+    }
+  ],
+  "expected_op_types": ["edit_text"],
+  "expected_op_count": 1,
+  "must_not_touch_layers": ["TITLE", "TITLEBLOCK", "SEAL", "REVISION"]
+}

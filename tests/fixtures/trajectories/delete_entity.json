@@ -1,0 +1,19 @@
+{
+  "prompt": "Delete the first structural element",
+  "description": "Agent finds a structural entity and deletes it",
+  "expected_turns": [
+    {
+      "tool_calls": [
+        {"name": "find_entities", "args": {"layer": "STRUCTURAL"}}
+      ]
+    },
+    {
+      "tool_calls": [
+        {"name": "delete_entity", "args": {"handle": "__FIRST_MATCH__"}}
+      ]
+    }
+  ],
+  "expected_op_types": ["delete_entity"],
+  "expected_op_count": 1,
+  "must_not_touch_layers": ["TITLE", "TITLEBLOCK", "SEAL", "REVISION"]
+}
