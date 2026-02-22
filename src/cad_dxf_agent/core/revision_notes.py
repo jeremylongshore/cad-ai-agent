@@ -69,7 +69,8 @@ def insert_revision_note(
 
         doc = ezdxf.readfile(str(dxf_path))
 
-        # Resolve target layout
+        # Resolve target layout (BaseLayout is the common type for both)
+        target: ezdxf.layouts.BaseLayout
         if layout_name == "Model":
             target = doc.modelspace()
         else:
