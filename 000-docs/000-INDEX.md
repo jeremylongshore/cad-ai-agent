@@ -14,6 +14,8 @@
 | 016 | SPEC | [016-AT-SPEC-dxf-writer-contract.md](016-AT-SPEC-dxf-writer-contract.md) |
 | 017 | SPEC | [017-AT-SPEC-fixture-strategy.md](017-AT-SPEC-fixture-strategy.md) |
 
+| 025 | ARCH | [025-AT-ARCH-web-mvp.md](025-AT-ARCH-web-mvp.md) |
+
 ### PP — Product & Planning
 | # | Type | File |
 |---|------|------|
@@ -82,6 +84,7 @@
 | 022 | AA | AACR | v0.2.0 testing infrastructure AAR |
 | 023 | AA | AUDT | DevOps operator playbook (appaudit) |
 | 024 | AA | AADR | Performance hardening plan audit |
+| 025 | AT | ARCH | Web MVP architecture |
 
 ## Quick Reference
 

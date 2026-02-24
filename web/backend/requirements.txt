@@ -1,0 +1,8 @@
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+python-multipart>=0.0.12
+firebase-admin>=6.6.0
+ezdxf>=0.18.0
+matplotlib>=3.8.0
+pydantic>=2.0
+python-dotenv>=1.0.0
