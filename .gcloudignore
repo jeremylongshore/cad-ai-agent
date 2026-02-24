@@ -1,0 +1,17 @@
+.git
+.venv
+.tox
+.mypy_cache
+.pytest_cache
+__pycache__
+*.pyc
+node_modules
+dist
+.firebase
+tests/
+samples/
+installer/
+000-docs/
+tasks/
+.beads/
+*.spec
