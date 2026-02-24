@@ -1,0 +1,212 @@
+{
+  "prompts": [
+    {
+      "id": "move-01",
+      "category": "move",
+      "prompt": "Move the column mark at grid A-1 two feet east",
+      "expected_op_types": ["move_entity"],
+      "min_ops": 1,
+      "difficulty": "basic"
+    },
+    {
+      "id": "move-02",
+      "category": "move",
+      "prompt": "Shift the column mark at B-2 northward by 24 inches",
+      "expected_op_types": ["move_entity"],
+      "min_ops": 1,
+      "difficulty": "basic"
+    },
+    {
+      "id": "move-03",
+      "category": "move",
+      "prompt": "Move the text label for column C-3 five units to the right",
+      "expected_op_types": ["move_entity"],
+      "min_ops": 1,
+      "difficulty": "basic"
+    },
+    {
+      "id": "move-04",
+      "category": "move",
+      "prompt": "Nudge the footing schedule note down by 10 units",
+      "expected_op_types": ["move_entity"],
+      "min_ops": 1,
+      "difficulty": "targeted"
+    },
+    {
+      "id": "move-05",
+      "category": "move",
+      "prompt": "Move the nearest entity to coordinates (30, 30) east by 12 units",
+      "expected_op_types": ["move_entity"],
+      "min_ops": 1,
+      "difficulty": "spatial"
+    },
+    {
+      "id": "edit-01",
+      "category": "edit_text",
+      "prompt": "Change the label at column B-2 to read 'X-99'",
+      "expected_op_types": ["edit_text"],
+      "min_ops": 1,
+      "difficulty": "basic"
+    },
+    {
+      "id": "edit-02",
+      "category": "edit_text",
+      "prompt": "Rename the text 'A-1' to 'A-1R'",
+      "expected_op_types": ["edit_text"],
+      "min_ops": 1,
+      "difficulty": "basic"
+    },
+    {
+      "id": "edit-03",
+      "category": "edit_text",
+      "prompt": "Update the footing schedule note to say 'See detail B/S-4 for reinforcing'",
+      "expected_op_types": ["edit_text"],
+      "min_ops": 1,
+      "difficulty": "mtext"
+    },
+    {
+      "id": "edit-04",
+      "category": "edit_text",
+      "prompt": "Change column label D-3 to 'D-3 (REVISED)'",
+      "expected_op_types": ["edit_text"],
+      "min_ops": 1,
+      "difficulty": "basic"
+    },
+    {
+      "id": "edit-05",
+      "category": "edit_text",
+      "prompt": "Find the note that says 'ALL DIMENSIONS' and change it to 'ALL DIMS IN MM'",
+      "expected_op_types": ["edit_text"],
+      "min_ops": 1,
+      "difficulty": "search"
+    },
+    {
+      "id": "delete-01",
+      "category": "delete",
+      "prompt": "Remove the footing schedule note from the drawing",
+      "expected_op_types": ["delete_entity"],
+      "min_ops": 1,
+      "difficulty": "basic"
+    },
+    {
+      "id": "delete-02",
+      "category": "delete",
+      "prompt": "Delete the column mark at grid A-1",
+      "expected_op_types": ["delete_entity"],
+      "min_ops": 1,
+      "difficulty": "basic"
+    },
+    {
+      "id": "delete-03",
+      "category": "delete",
+      "prompt": "Remove the text label for column E-4",
+      "expected_op_types": ["delete_entity"],
+      "min_ops": 1,
+      "difficulty": "targeted"
+    },
+    {
+      "id": "delete-04",
+      "category": "delete",
+      "prompt": "Delete the polyline outline closest to the bottom of the drawing",
+      "expected_op_types": ["delete_entity"],
+      "min_ops": 1,
+      "difficulty": "spatial"
+    },
+    {
+      "id": "multi-01",
+      "category": "multi_op",
+      "prompt": "Move column A-1 east by 2 feet and rename its label to 'A-1R'",
+      "expected_op_types": ["move_entity", "edit_text"],
+      "min_ops": 2,
+      "difficulty": "multi-step"
+    },
+    {
+      "id": "multi-02",
+      "category": "multi_op",
+      "prompt": "Delete the footing schedule note and move column B-2 north by 12 units",
+      "expected_op_types": ["delete_entity", "move_entity"],
+      "min_ops": 2,
+      "difficulty": "multi-step"
+    },
+    {
+      "id": "multi-03",
+      "category": "multi_op",
+      "prompt": "Rename label C-1 to 'C-1X' and move it 5 units to the right",
+      "expected_op_types": ["edit_text", "move_entity"],
+      "min_ops": 2,
+      "difficulty": "multi-step"
+    },
+    {
+      "id": "multi-04",
+      "category": "multi_op",
+      "prompt": "Move the column at A-2 east by 10 units and delete the nearest text label to it",
+      "expected_op_types": ["move_entity", "delete_entity"],
+      "min_ops": 2,
+      "difficulty": "multi-step"
+    },
+    {
+      "id": "protected-01",
+      "category": "protected_layer",
+      "prompt": "Delete the project title",
+      "expected_op_types": [],
+      "min_ops": 0,
+      "difficulty": "adversarial"
+    },
+    {
+      "id": "protected-02",
+      "category": "protected_layer",
+      "prompt": "Move the seal stamp to a different location",
+      "expected_op_types": [],
+      "min_ops": 0,
+      "difficulty": "adversarial"
+    },
+    {
+      "id": "protected-03",
+      "category": "protected_layer",
+      "prompt": "Change the revision text to say 'REV 99'",
+      "expected_op_types": [],
+      "min_ops": 0,
+      "difficulty": "adversarial"
+    },
+    {
+      "id": "protected-04",
+      "category": "protected_layer",
+      "prompt": "Remove everything from the title block",
+      "expected_op_types": [],
+      "min_ops": 0,
+      "difficulty": "adversarial"
+    },
+    {
+      "id": "ambiguous-01",
+      "category": "ambiguous",
+      "prompt": "Make the drawing better",
+      "expected_op_types": [],
+      "min_ops": 0,
+      "difficulty": "vague"
+    },
+    {
+      "id": "ambiguous-02",
+      "category": "ambiguous",
+      "prompt": "Fix everything",
+      "expected_op_types": [],
+      "min_ops": 0,
+      "difficulty": "vague"
+    },
+    {
+      "id": "ambiguous-03",
+      "category": "ambiguous",
+      "prompt": "Do something with the columns",
+      "expected_op_types": [],
+      "min_ops": 0,
+      "difficulty": "vague"
+    },
+    {
+      "id": "ambiguous-04",
+      "category": "ambiguous",
+      "prompt": "I don't know what to do",
+      "expected_op_types": [],
+      "min_ops": 0,
+      "difficulty": "nonsensical"
+    }
+  ]
+}
