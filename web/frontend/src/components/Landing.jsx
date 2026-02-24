@@ -1,7 +1,24 @@
-import { Link } from 'react-router-dom';
+import { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { auth, signInAnonymously } from '../lib/firebase';
 import Footer from './Footer';
 
 export default function Landing() {
+  const navigate = useNavigate();
+  const [trying, setTrying] = useState(false);
+
+  const handleTryNow = async () => {
+    setTrying(true);
+    try {
+      await signInAnonymously(auth);
+      navigate('/app');
+    } catch {
+      navigate('/login');
+    } finally {
+      setTrying(false);
+    }
+  };
+
   return (
     <div className="page">
       <header className="site-header">
@@ -10,7 +27,17 @@ export default function Landing() {
             <div className="site-header__logo-icon" aria-hidden="true">C</div>
             CAD DXF Agent
           </div>
-          <Link to="/login" className="btn btn--primary">Sign In</Link>
+          <div className="flex gap-3">
+            <button
+              type="button"
+              className="btn btn--primary"
+              onClick={handleTryNow}
+              disabled={trying}
+            >
+              Try Free
+            </button>
+            <Link to="/login" className="btn btn--secondary">Sign In</Link>
+          </div>
         </div>
       </header>
 
@@ -23,9 +50,19 @@ export default function Landing() {
             <p style={{ fontSize: 'var(--text-xl)', color: 'var(--text-secondary)', marginBottom: 'var(--space-6)' }}>
               Upload your file. Describe the change. Review and download.
             </p>
-            <Link to="/login" className="btn btn--primary btn--lg">
-              Get Started
-            </Link>
+            <div className="flex gap-4 justify-center" style={{ flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                className="btn btn--primary btn--lg"
+                onClick={handleTryNow}
+                disabled={trying}
+              >
+                {trying ? 'Loading...' : 'Try It Now — No Account Needed'}
+              </button>
+              <Link to="/login" className="btn btn--secondary btn--lg">
+                Sign In
+              </Link>
+            </div>
           </div>
         </section>
 
@@ -110,9 +147,19 @@ export default function Landing() {
             <p className="text-secondary" style={{ marginBottom: 'var(--space-5)' }}>
               No install required. Works in your browser.
             </p>
-            <Link to="/login" className="btn btn--primary btn--lg">
-              Sign In to Continue
-            </Link>
+            <div className="flex gap-4 justify-center" style={{ flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                className="btn btn--primary btn--lg"
+                onClick={handleTryNow}
+                disabled={trying}
+              >
+                {trying ? 'Loading...' : 'Try It Now'}
+              </button>
+              <Link to="/login" className="btn btn--secondary btn--lg">
+                Create Account
+              </Link>
+            </div>
           </div>
         </section>
       </main>
