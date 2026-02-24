@@ -1,4 +1,4 @@
-.PHONY: install lint format typecheck test test-unit test-integration test-live test-cov smoke check run clean build build-clean
+.PHONY: install lint format typecheck test test-unit test-integration test-live test-web test-web-live test-cov smoke check run clean build build-clean
 
 install:
 	pip install -e ".[dev]"
@@ -24,6 +24,12 @@ test-integration:
 
 test-live:
 	pytest tests/live/ -v -m live_api -s
+
+test-web:
+	pytest tests/web/ -v -m web
+
+test-web-live:
+	pytest tests/live/test_deployed_smoke.py -v -m web_live -s
 
 test-cov:
 	pytest --cov=cad_dxf_agent --cov-report=term-missing -v

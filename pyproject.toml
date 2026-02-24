@@ -122,6 +122,8 @@ markers = [
     "live_api: tests that call real Gemini API (require ADC via gcloud auth)",
     "gui: GUI tests (require PySide6 and QT_QPA_PLATFORM=offscreen)",
     "benchmark: performance micro-benchmarks (pytest-benchmark)",
+    "web: web backend API tests (FastAPI TestClient)",
+    "web_live: tests against deployed web backend (require CAD_WEB_URL)",
 ]
 
 [tool.coverage.run]

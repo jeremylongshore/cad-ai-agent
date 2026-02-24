@@ -1,22 +1,20 @@
+import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './hooks/useAuth';
-import Landing from './components/Landing';
-import Login from './components/Login';
+import { auth, signInAnonymously } from './lib/firebase';
 import Workspace from './components/Workspace';
 import Privacy from './components/Privacy';
 import Terms from './components/Terms';
 import NotFound from './components/NotFound';
 
-function ProtectedRoute({ user, children }) {
-  if (!user) return <Navigate to="/login" replace />;
-  return children;
-}
+function AutoAuth({ user, loading, children, onSignOut }) {
+  useEffect(() => {
+    if (!loading && !user) {
+      signInAnonymously(auth).catch(() => {});
+    }
+  }, [user, loading]);
 
-export default function App() {
-  const authState = useAuth();
-  const { user, loading } = authState;
-
-  if (loading) {
+  if (loading || !user) {
     return (
       <div className="flex items-center justify-center" style={{ height: '100vh' }}>
         <div className="spinner spinner--lg" role="status">
@@ -26,19 +24,22 @@ export default function App() {
     );
   }
 
+  return <Workspace user={user} onSignOut={onSignOut} />;
+}
+
+export default function App() {
+  const authState = useAuth();
+  const { user, loading } = authState;
+
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={user ? <Navigate to="/app" replace /> : <Landing />} />
-        <Route path="/login" element={user ? <Navigate to="/app" replace /> : <Login auth={authState} />} />
         <Route
-          path="/app"
-          element={
-            <ProtectedRoute user={user}>
-              <Workspace user={user} onSignOut={authState.signOut} />
-            </ProtectedRoute>
-          }
+          path="/"
+          element={<AutoAuth user={user} loading={loading} onSignOut={authState.signOut} />}
         />
+        <Route path="/app" element={<Navigate to="/" replace />} />
+        <Route path="/login" element={<Navigate to="/" replace />} />
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/terms" element={<Terms />} />
         <Route path="*" element={<NotFound />} />

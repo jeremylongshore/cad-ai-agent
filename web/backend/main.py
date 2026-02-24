@@ -268,7 +268,7 @@ async def apply_changes(body: ApplyRequest, user: dict = Depends(get_user)):
             ]
             changeset = ChangeSet(
                 operations=selected,
-                source_prompt=changeset.source_prompt,
+                prompt=changeset.prompt,
             )
 
         # Apply
