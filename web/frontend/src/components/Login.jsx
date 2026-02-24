@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import Footer from './Footer';
 
 export default function Login({ auth }) {
-  const { error, clearError, signInWithGoogle, signInWithEmail, signUpWithEmail } = auth;
+  const { error, clearError, signInWithGoogle, signInWithEmail, signUpWithEmail, signInAnonymously } = auth;
   const [mode, setMode] = useState('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -23,6 +23,12 @@ export default function Login({ auth }) {
   const handleGoogleSignIn = async () => {
     setSubmitting(true);
     await signInWithGoogle();
+    setSubmitting(false);
+  };
+
+  const handleAnonymous = async () => {
+    setSubmitting(true);
+    await signInAnonymously();
     setSubmitting(false);
   };
 
@@ -107,6 +113,17 @@ export default function Login({ auth }) {
                 </button>
               </div>
             </form>
+
+            <div className="divider">or</div>
+
+            <button
+              type="button"
+              className="btn btn--ghost btn--full"
+              onClick={handleAnonymous}
+              disabled={submitting}
+            >
+              Try without an account
+            </button>
 
             <p className="text-center text-sm mt-4" style={{ color: 'var(--text-secondary)' }}>
               {mode === 'signup' ? (

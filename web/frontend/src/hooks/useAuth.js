@@ -5,6 +5,7 @@ import {
   signInWithPopup,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
+  signInAnonymously as firebaseSignInAnonymously,
   signOut as firebaseSignOut,
   onAuthStateChanged,
 } from '../lib/firebase';
@@ -51,6 +52,15 @@ export function useAuth() {
     }
   }, []);
 
+  const signInAnonymously = useCallback(async () => {
+    setError(null);
+    try {
+      await firebaseSignInAnonymously(auth);
+    } catch (err) {
+      setError(formatAuthError(err));
+    }
+  }, []);
+
   const signOut = useCallback(async () => {
     await firebaseSignOut(auth);
   }, []);
@@ -63,6 +73,7 @@ export function useAuth() {
     signInWithGoogle,
     signInWithEmail,
     signUpWithEmail,
+    signInAnonymously,
     signOut,
   };
 }
