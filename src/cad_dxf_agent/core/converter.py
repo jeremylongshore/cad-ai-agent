@@ -326,24 +326,22 @@ def _extract_pdf_fitz(msp, source_path: Path) -> int:
                             msp.add_lwpolyline(pts, dxfattribs={"layer": layer})
                     total += 1
 
-                elif kind == "qu":  # Quadratic Bezier
-                    p1, p2, p3 = item[1], item[2], item[3]
-                    # Promote to cubic: C0=P0, C1=P0+2/3*(P1-P0), C2=P2+2/3*(P1-P2), C3=P2
-                    c1_x = p1.x + 2 / 3 * (p2.x - p1.x)
-                    c1_y = p1.y + 2 / 3 * (p2.y - p1.y)
-                    c2_x = p3.x + 2 / 3 * (p2.x - p3.x)
-                    c2_y = p3.y + 2 / 3 * (p2.y - p3.y)
-
-                    class _Pt:
-                        def __init__(self, x, y):
-                            self.x = x
-                            self.y = y
-
-                    pts = _bezier_to_points(
-                        p1, _Pt(c1_x, c1_y), _Pt(c2_x, c2_y), p3, page_height, segments=8
-                    )
+                elif kind == "qu":  # Quad (quadrilateral)
+                    # pymupdf >=1.27: ('qu', Quad_object) — Quad[0..3] are Points
+                    # pymupdf <1.27:  ('qu', Point, Point, Point, Point)
+                    if len(item) == 2:
+                        quad = item[1]
+                        pts = [
+                            (float(quad[k].x), page_height - float(quad[k].y))
+                            for k in range(4)
+                        ]
+                    else:
+                        pts = [
+                            (float(item[k].x), page_height - float(item[k].y))
+                            for k in range(1, len(item))
+                        ]
                     if len(pts) >= 2:
-                        msp.add_lwpolyline(pts, dxfattribs={"layer": layer})
+                        msp.add_lwpolyline(pts, close=True, dxfattribs={"layer": layer})
                     total += 1
 
         # Extract text blocks from the page
