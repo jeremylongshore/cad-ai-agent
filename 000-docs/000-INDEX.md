@@ -52,6 +52,7 @@
 | 020 | AACR | [020-AA-AACR-phase-03-aar.md](020-AA-AACR-phase-03-aar.md) |
 | 022 | AACR | [022-AA-AACR-v0.2-testing-infrastructure-aar.md](022-AA-AACR-v0.2-testing-infrastructure-aar.md) |
 | 023 | AUDT | [023-AA-AUDT-appaudit-devops-playbook.md](023-AA-AUDT-appaudit-devops-playbook.md) |
+| 024 | AADR | [024-AA-AADR-perf-plan-audit.md](024-AA-AADR-perf-plan-audit.md) |
 
 ## Chronological Listing
 
@@ -80,8 +81,9 @@
 | 021 | PP | PROD | V2 PRD scope expansion |
 | 022 | AA | AACR | v0.2.0 testing infrastructure AAR |
 | 023 | AA | AUDT | DevOps operator playbook (appaudit) |
+| 024 | AA | AADR | Performance hardening plan audit |
 
 ## Quick Reference
 
 - **CC codes:** AT=Architecture, PP=Product, PM=Project Mgmt, DR=Documentation, TQ=Testing, BL=Business, AA=After Action
-- **Type codes:** ADEC=Decision, ARCH=Architecture, SPEC=Specification, PROD=Product, TASK=Task, GUID=Guide, SECU=Security, POLI=Policy, AACR=After Action Review, PLAN=Roadmap, AUDT=Audit/Playbook
+- **Type codes:** AADR=After Action Decision Record, AACR=After Action Review, ADEC=Decision, ARCH=Architecture, AUDT=Audit/Playbook, GUID=Guide, PLAN=Roadmap, POLI=Policy, PROD=Product, SECU=Security, SPEC=Specification, TASK=Task
