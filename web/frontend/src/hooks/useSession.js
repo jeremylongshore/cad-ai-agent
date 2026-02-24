@@ -1,0 +1,130 @@
+import { useState, useCallback } from 'react';
+import { uploadFile, planEdit, applyChanges, downloadFile, getRenderUrl } from '../lib/api';
+
+export function useSession() {
+  const [sessionId, setSessionId] = useState(null);
+  const [fileInfo, setFileInfo] = useState(null);
+  const [messages, setMessages] = useState([]);
+  const [operations, setOperations] = useState([]);
+  const [selectedOps, setSelectedOps] = useState([]);
+  const [validation, setValidation] = useState(null);
+  const [previewUrls, setPreviewUrls] = useState({ original: null, edited: null, diff: null });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const clearError = useCallback(() => setError(null), []);
+
+  const upload = useCallback(async (file) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await uploadFile(file);
+      setSessionId(data.session_id);
+      setFileInfo(data.file_info);
+      setPreviewUrls((prev) => ({
+        ...prev,
+        original: getRenderUrl(data.session_id, 'original'),
+      }));
+      setMessages([{ role: 'system', text: `Loaded ${file.name} (${data.file_info.entity_count} entities, ${data.file_info.layer_count} layers)` }]);
+      setOperations([]);
+      setSelectedOps([]);
+      setValidation(null);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const sendPrompt = useCallback(async (prompt) => {
+    if (!sessionId) return;
+    setLoading(true);
+    setError(null);
+    setMessages((prev) => [...prev, { role: 'user', text: prompt }]);
+
+    try {
+      const data = await planEdit(sessionId, prompt);
+      const ops = data.operations || [];
+      setOperations(ops);
+      setSelectedOps(ops.map((_, i) => i));
+      setValidation(data.validation || null);
+      setMessages((prev) => [...prev, { role: 'ai', text: data.summary || `${ops.length} operation(s) planned.` }]);
+
+      if (data.preview_url) {
+        setPreviewUrls((prev) => ({ ...prev, edited: data.preview_url }));
+      }
+    } catch (err) {
+      setError(err.message);
+      setMessages((prev) => [...prev, { role: 'ai', text: `Error: ${err.message}` }]);
+    } finally {
+      setLoading(false);
+    }
+  }, [sessionId]);
+
+  const toggleOp = useCallback((index) => {
+    setSelectedOps((prev) =>
+      prev.includes(index) ? prev.filter((i) => i !== index) : [...prev, index]
+    );
+  }, []);
+
+  const apply = useCallback(async () => {
+    if (!sessionId) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await applyChanges(sessionId, selectedOps);
+      setMessages((prev) => [...prev, { role: 'system', text: data.message || 'Changes applied.' }]);
+
+      if (data.render_url) {
+        setPreviewUrls((prev) => ({ ...prev, edited: data.render_url }));
+      }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [sessionId, selectedOps]);
+
+  const download = useCallback(async () => {
+    if (!sessionId) return;
+    setLoading(true);
+    setError(null);
+    try {
+      await downloadFile(sessionId);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [sessionId]);
+
+  const reset = useCallback(() => {
+    setSessionId(null);
+    setFileInfo(null);
+    setMessages([]);
+    setOperations([]);
+    setSelectedOps([]);
+    setValidation(null);
+    setPreviewUrls({ original: null, edited: null, diff: null });
+    setError(null);
+  }, []);
+
+  return {
+    sessionId,
+    fileInfo,
+    messages,
+    operations,
+    selectedOps,
+    validation,
+    previewUrls,
+    loading,
+    error,
+    clearError,
+    upload,
+    sendPrompt,
+    toggleOp,
+    apply,
+    download,
+    reset,
+  };
+}
