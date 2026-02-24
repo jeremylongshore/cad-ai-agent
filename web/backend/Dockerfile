@@ -2,21 +2,17 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-# System deps for matplotlib rendering (headless)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libglib2.0-0 \
-    && rm -rf /var/lib/apt/lists/*
-
 ENV MPLBACKEND=Agg
+ENV PYTHONDONTWRITEBYTECODE=1
 
-# Install Python deps
-COPY web/backend/requirements.txt ./web-requirements.txt
-RUN pip install --no-cache-dir -r web-requirements.txt
+# Install all Python deps in one layer
+COPY web/backend/requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy project source (pipeline code)
+# Copy project source (pipeline code) and install
 COPY src/ ./src/
 COPY pyproject.toml ./
-RUN pip install --no-cache-dir -e ".[draw,convert,gemini]"
+RUN pip install --no-cache-dir -e .
 
 # Copy web backend
 COPY web/backend/ ./web/backend/
