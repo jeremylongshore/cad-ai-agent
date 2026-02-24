@@ -109,11 +109,12 @@ class GeminiProvider(PlannerProvider):
                 return changeset
 
     def _get_model(self):
-        """Lazy-initialize the Gemini model."""
+        """Lazy-initialize the Gemini model with GenerationConfig."""
         if self._model is None:
             try:
                 import vertexai  # type: ignore[import-untyped]
                 from vertexai.generative_models import (
+                    GenerationConfig,  # type: ignore[import-untyped]
                     GenerativeModel,  # type: ignore[import-untyped]
                 )
 
@@ -121,9 +122,18 @@ class GeminiProvider(PlannerProvider):
                     project=self._project,
                     location=self._location,
                 )
+
+                gen_config = GenerationConfig(
+                    temperature=settings.llm_temperature,
+                    top_p=settings.llm_top_p,
+                    top_k=settings.llm_top_k,
+                    max_output_tokens=settings.llm_max_output_tokens,
+                )
+
                 self._model = GenerativeModel(
                     self._model_name,
                     system_instruction=SYSTEM_PROMPT,
+                    generation_config=gen_config,
                 )
             except ImportError as err:
                 raise ImportError(

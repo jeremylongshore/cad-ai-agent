@@ -48,6 +48,17 @@ class Settings:
         self.render_dpi: int = int(os.getenv("CAD_RENDER_DPI", "150"))
         self.render_background: str = os.getenv("CAD_RENDER_BACKGROUND", "white")
 
+        # Planner timeout / retry
+        self.planner_timeout: int = int(os.getenv("CAD_PLANNER_TIMEOUT", "60"))
+        self.planner_max_retries: int = int(os.getenv("CAD_PLANNER_MAX_RETRIES", "2"))
+        self.planner_retry_delay: float = float(os.getenv("CAD_PLANNER_RETRY_DELAY", "1.0"))
+
+        # LLM generation parameters
+        self.llm_temperature: float = float(os.getenv("CAD_LLM_TEMPERATURE", "0.0"))
+        self.llm_top_p: float | None = float(v) if (v := os.getenv("CAD_LLM_TOP_P")) else None
+        self.llm_top_k: int | None = int(v) if (v := os.getenv("CAD_LLM_TOP_K")) else None
+        self.llm_max_output_tokens: int = int(os.getenv("CAD_LLM_MAX_OUTPUT_TOKENS", "4096"))
+
         # Gemini / Vertex AI (V2)
         self.gcp_project: str | None = os.getenv("CAD_GCP_PROJECT")
         self.gcp_location: str = os.getenv("CAD_GCP_LOCATION", "us-central1")

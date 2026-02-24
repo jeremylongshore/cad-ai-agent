@@ -163,6 +163,11 @@ class MainWindow(QMainWindow):
         self.btn_timings.clicked.connect(self._on_show_timings)
         toolbar.addWidget(self.btn_timings)
 
+        self.btn_stats = QPushButton("Stats")
+        self.btn_stats.setEnabled(False)
+        self.btn_stats.clicked.connect(self._on_show_stats)
+        toolbar.addWidget(self.btn_stats)
+
     # ── Main UI ───────────────────────────────────────────────────
 
     def _build_ui(self):
@@ -185,6 +190,13 @@ class MainWindow(QMainWindow):
         self.lbl_file = QLabel("No file loaded")
         file_row.addWidget(self.lbl_file, 1)
         left.addLayout(file_row)
+
+        # Load warnings (hidden by default)
+        self.txt_warnings = QTextEdit()
+        self.txt_warnings.setReadOnly(True)
+        self.txt_warnings.setMaximumHeight(80)
+        self.txt_warnings.hide()
+        left.addWidget(self.txt_warnings)
 
         # Layout selector
         layout_row = QHBoxLayout()
@@ -306,6 +318,31 @@ class MainWindow(QMainWindow):
         for cb in self._op_checkboxes:
             cb.setChecked(False)
 
+    def _show_load_warnings(self, warnings: list):
+        """Display load warnings in the warnings panel."""
+        if not warnings:
+            self.txt_warnings.hide()
+            return
+
+        color_map = {"info": "#2196F3", "warning": "#FF9800", "error": "#F44336"}
+        html_parts = []
+        has_error = False
+        for w in warnings:
+            color = color_map.get(w.severity, "#666")
+            label = w.severity.upper()
+            html_parts.append(
+                f'<span style="color:{color};font-weight:bold;">[{label}]</span> {w.message}'
+            )
+            if w.severity == "error":
+                has_error = True
+
+        self.txt_warnings.setHtml("<br>".join(html_parts))
+        self.txt_warnings.show()
+
+        # Error-level warnings disable the Plan button
+        if has_error:
+            self.btn_plan.setEnabled(False)
+
     # ── Event handlers ────────────────────────────────────────────
 
     def _on_open(self):
@@ -360,6 +397,7 @@ class MainWindow(QMainWindow):
             self.lbl_file.setText(f"{self._dxf_path.name} ({self._context.entity_count} entities)")
             self.btn_plan.setEnabled(True)
             self.btn_apply.setEnabled(False)
+            self.btn_stats.setEnabled(True)
             self._changeset = None
             self._preview = None
             self._clear_ops()
@@ -371,9 +409,20 @@ class MainWindow(QMainWindow):
                 self.cmb_layout.addItem(f"{layout.name} ({layout.entity_count})")
             self.cmb_layout.setEnabled(len(self._context.layouts) > 1)
 
-            # Update status bar
-            self.lbl_entity_count.setText(f"Entities: {self._context.entity_count}")
-            self.lbl_layer_count.setText(f"Layers: {len(self._context.layers)}")
+            # Update status bar with editable/total counts
+            protected_upper = {p.upper() for p in settings.protected_layers}
+            editable_count = sum(
+                1 for e in self._context.entities if e.layer.upper() not in protected_upper
+            )
+            total_layers = len(self._context.layers)
+            protected_count = sum(1 for lyr in self._context.layers if lyr.protected)
+            self.lbl_entity_count.setText(
+                f"Entities: {editable_count}/{self._context.entity_count}"
+            )
+            self.lbl_layer_count.setText(f"Layers: {total_layers - protected_count}/{total_layers}")
+
+            # Display load warnings
+            self._show_load_warnings(self._context.load_warnings)
 
             self._log_status(f"Loaded: {self._dxf_path.name}")
             if self._context.unsupported_entity_types:
@@ -585,6 +634,35 @@ class MainWindow(QMainWindow):
         btn_box = QDialogButtonBox()
         btn_copy = btn_box.addButton("Copy to Clipboard", QDialogButtonBox.ButtonRole.ActionRole)
         btn_copy.clicked.connect(lambda: QApplication.clipboard().setText(text))
+        btn_close = btn_box.addButton(QDialogButtonBox.StandardButton.Close)
+        btn_close.clicked.connect(dlg.close)
+        layout.addWidget(btn_box)
+
+        dlg.exec()
+
+    # ── Stats dialog ─────────────────────────────────────────
+
+    def _on_show_stats(self):
+        if not self._context:
+            return
+
+        from ..core.context_builder import drawing_stats, support_report
+
+        stats = drawing_stats(self._context, protected_layers=settings.protected_layers)
+        report_text = support_report(stats)
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle("Drawing Statistics")
+        dlg.setMinimumSize(500, 400)
+        layout = QVBoxLayout(dlg)
+
+        txt = QPlainTextEdit(report_text)
+        txt.setReadOnly(True)
+        layout.addWidget(txt)
+
+        btn_box = QDialogButtonBox()
+        btn_copy = btn_box.addButton("Copy Report", QDialogButtonBox.ButtonRole.ActionRole)
+        btn_copy.clicked.connect(lambda: QApplication.clipboard().setText(report_text))
         btn_close = btn_box.addButton(QDialogButtonBox.StandardButton.Close)
         btn_close.clicked.connect(dlg.close)
         layout.addWidget(btn_box)

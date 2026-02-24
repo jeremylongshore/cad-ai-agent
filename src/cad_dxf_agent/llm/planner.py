@@ -3,10 +3,14 @@
 from __future__ import annotations
 
 import logging
+import time
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FuturesTimeoutError
 
 from ..models.ops_schema import ChangeSet
 from ..otel import get_tracer
 from ..settings import settings
+from .errors import PlannerRetryExhaustedError, PlannerTimeoutError
 from .mock_provider import MockProvider
 from .providers import PlannerProvider
 
@@ -70,12 +74,30 @@ def get_provider(provider_name: str | None = None) -> PlannerProvider:
     return MockProvider()
 
 
+def _call_with_timeout(
+    provider: PlannerProvider,
+    prompt: str,
+    drawing_context: dict,
+    timeout: int,
+) -> ChangeSet:
+    """Call provider.plan() with a wall-clock timeout."""
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        future = pool.submit(provider.plan, prompt, drawing_context)
+        try:
+            return future.result(timeout=timeout)
+        except FuturesTimeoutError as exc:
+            raise PlannerTimeoutError(timeout) from exc
+
+
 def run_planner(
     prompt: str,
     drawing_context: dict,
     provider: PlannerProvider | None = None,
 ) -> ChangeSet:
     """Run the planner to generate a changeset from a user prompt.
+
+    Tries deterministic planning first for obvious operations.
+    Falls back to the LLM provider with timeout and retry logic.
 
     Args:
         prompt: Natural-language edit request from the user.
@@ -84,20 +106,57 @@ def run_planner(
 
     Returns:
         Validated ChangeSet with structured operations.
+
+    Raises:
+        PlannerTimeoutError: If the planner exceeds wall-clock timeout.
+        PlannerRetryExhaustedError: If all retry attempts fail.
     """
     with tracer.start_as_current_span("cad.run_planner") as span:
         if provider is None:
             provider = get_provider()
 
+        # Try deterministic planner first (no LLM call needed)
+        from .deterministic_planner import deterministic_plan
+
+        det_result = deterministic_plan(prompt, drawing_context)
+        if det_result is not None:
+            span.set_attribute("cad.mode", "deterministic")
+            span.set_attribute("cad.ops.count", det_result.op_count)
+            logger.info(
+                "Deterministic plan used (%d ops) for prompt: %s",
+                det_result.op_count,
+                prompt[:80],
+            )
+            return det_result
+
         span.set_attribute("cad.mode", provider.name)
         logger.info("Running planner [%s] for prompt: %s", provider.name, prompt[:80])
 
-        changeset = provider.plan(prompt, drawing_context)
+        timeout = settings.planner_timeout
+        max_retries = settings.planner_max_retries
+        retry_delay = settings.planner_retry_delay
+        last_error: Exception | None = None
 
-        span.set_attribute("cad.ops.count", changeset.op_count)
-        logger.info(
-            "Planner returned %d operation(s) for prompt: %s",
-            changeset.op_count,
-            prompt[:80],
-        )
-        return changeset
+        for attempt in range(1, max_retries + 1):
+            try:
+                changeset = _call_with_timeout(provider, prompt, drawing_context, timeout)
+                span.set_attribute("cad.ops.count", changeset.op_count)
+                span.set_attribute("cad.planner.attempt", attempt)
+                logger.info(
+                    "Planner returned %d operation(s) on attempt %d for prompt: %s",
+                    changeset.op_count,
+                    attempt,
+                    prompt[:80],
+                )
+                return changeset
+            except PlannerTimeoutError:
+                raise  # Timeout is not retryable
+            except Exception as exc:
+                last_error = exc
+                logger.warning("Planner attempt %d/%d failed: %s", attempt, max_retries, exc)
+                if attempt < max_retries:
+                    delay = retry_delay * (2 ** (attempt - 1))
+                    logger.info("Retrying in %.1fs...", delay)
+                    time.sleep(delay)
+
+        raise PlannerRetryExhaustedError(max_retries, last_error)

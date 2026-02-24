@@ -14,6 +14,7 @@ from ..models.cad_schema import (
     EntityType,
     LayerRule,
     LayoutInfo,
+    LoadWarning,
     Point2D,
 )
 from ..otel import get_tracer
@@ -87,6 +88,11 @@ def load_dxf(file_path: str | Path) -> DrawingContext:
                 ", ".join(sorted(unsupported)),
             )
 
+        # Generate load-time warnings
+        warnings = _generate_load_warnings(
+            entities, layers, sorted(unsupported), settings.protected_layers
+        )
+
         ctx = DrawingContext(
             file_path=str(file_path),
             entities=entities,
@@ -94,6 +100,7 @@ def load_dxf(file_path: str | Path) -> DrawingContext:
             blocks=blocks,
             layouts=layout_infos,
             unsupported_entity_types=sorted(unsupported),
+            load_warnings=warnings,
             metadata={
                 "dxf_version": doc.dxfversion,
                 "encoding": doc.encoding,
@@ -243,6 +250,66 @@ def _parse_entity(
         block_name=block_name,
         attributes=attributes,
     )
+
+
+def _generate_load_warnings(
+    entities: list[EntityRef],
+    layers: list[LayerRule],
+    unsupported_types: list[str],
+    protected_layer_names: list[str],
+) -> list[LoadWarning]:
+    """Generate actionable warnings based on loading results."""
+    warnings: list[LoadWarning] = []
+
+    # EMPTY_DRAWING: no supported entities at all
+    if not entities:
+        warnings.append(
+            LoadWarning(
+                code="EMPTY_DRAWING",
+                message="Drawing has 0 supported entities.",
+                severity="error",
+            )
+        )
+        return warnings  # No point checking further
+
+    # UNSUPPORTED_TYPES: some entity types were skipped
+    if unsupported_types:
+        warnings.append(
+            LoadWarning(
+                code="UNSUPPORTED_TYPES",
+                message=(
+                    f"{len(unsupported_types)} entity type(s) skipped: "
+                    f"{', '.join(unsupported_types)}. These cannot be edited."
+                ),
+                severity="info",
+                details={"types": unsupported_types},
+            )
+        )
+
+    # ALL_PROTECTED: every entity is on a protected layer
+    protected_upper = {p.upper() for p in protected_layer_names}
+    editable = [e for e in entities if e.layer.upper() not in protected_upper]
+    if not editable:
+        warnings.append(
+            LoadWarning(
+                code="ALL_PROTECTED",
+                message="All entities are on protected layers. No editable entities.",
+                severity="warning",
+            )
+        )
+
+    # LARGE_DRAWING: many entities may cause large LLM context
+    if len(entities) >= 500:
+        warnings.append(
+            LoadWarning(
+                code="LARGE_DRAWING",
+                message=f"Drawing has {len(entities)} entities. LLM context may be large.",
+                severity="info",
+                details={"entity_count": len(entities)},
+            )
+        )
+
+    return warnings
 
 
 def _build_layer_rules(doc: ezdxf.document.Drawing) -> list[LayerRule]:

@@ -66,6 +66,15 @@ class LayoutInfo(BaseModel):
     entity_count: int = 0
 
 
+class LoadWarning(BaseModel):
+    """Warning generated during DXF loading."""
+
+    code: str
+    message: str
+    severity: str = "info"  # "info" | "warning" | "error"
+    details: dict[str, Any] = Field(default_factory=dict)
+
+
 class DrawingContext(BaseModel):
     """Normalized context model for a loaded DXF drawing."""
 
@@ -75,6 +84,7 @@ class DrawingContext(BaseModel):
     blocks: list[str] = Field(default_factory=list)
     layouts: list[LayoutInfo] = Field(default_factory=list)
     unsupported_entity_types: list[str] = Field(default_factory=list)
+    load_warnings: list[LoadWarning] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
 
     @property
