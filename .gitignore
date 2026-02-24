@@ -49,6 +49,9 @@ output/
 temp/
 tmp/
 
+# Live test reports (uploaded as CI artifacts, not committed)
+tests/live/reports/
+
 # Distribution
 *.exe
 *.msi

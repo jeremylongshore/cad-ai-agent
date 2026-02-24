@@ -63,6 +63,7 @@ class MainWindow(QMainWindow):
         self.setMinimumSize(1100, 700)
 
         self._dxf_path: Path | None = None
+        self._source_path: Path | None = None  # original file before conversion
         self._context = None
         self._changeset: ChangeSet | None = None
         self._preview = None
@@ -78,7 +79,6 @@ class MainWindow(QMainWindow):
         # Pipeline worker state
         self._worker: PipelineWorker | None = None
         self._last_stages: list = []
-        self._plan_stage_count = 4  # build_context, planner, validate, preview
         self._apply_stage_count = 3  # edit_engine, save, revision_notes
 
         self._build_menu()
@@ -289,6 +289,11 @@ class MainWindow(QMainWindow):
         status.addWidget(self.lbl_layer_count)
         status.addPermanentWidget(self.lbl_provider)
 
+    @property
+    def _vision_active(self) -> bool:
+        """Whether the vision render stage will run."""
+        return settings.vision_enabled and settings.llm_provider not in ("mock", "mock-agent")
+
     # ── Helpers ───────────────────────────────────────────────────
 
     def _log_status(self, msg: str):
@@ -389,12 +394,14 @@ class MainWindow(QMainWindow):
                     )
                     return
 
-            self._dxf_path = file_path
+            self._source_path = Path(path)  # original file (for display)
+            self._dxf_path = file_path  # working copy (may differ after conversion)
             self._context = load_dxf(self._dxf_path)
             self._history = EditHistory(self._dxf_path, max_snapshots=settings.max_undo_snapshots)
 
-            # Update UI
-            self.lbl_file.setText(f"{self._dxf_path.name} ({self._context.entity_count} entities)")
+            # Update UI — show original filename
+            display_name = self._source_path.name
+            self.lbl_file.setText(f"{display_name} ({self._context.entity_count} entities)")
             self.btn_plan.setEnabled(True)
             self.btn_apply.setEnabled(False)
             self.btn_stats.setEnabled(True)
@@ -453,10 +460,12 @@ class MainWindow(QMainWindow):
         self._log_status(f"Planning: {prompt[:60]}...")
         self.btn_plan.setEnabled(False)
         self.btn_apply.setEnabled(False)
-        self._show_progress(self._plan_stage_count)
+        # build_context + [render_vision] + planner + validate + preview
+        plan_stage_count = 5 if self._vision_active else 4
+        self._show_progress(plan_stage_count)
 
         worker = PipelineWorker(self)
-        worker.setup_plan(prompt, self._context, self._rule_config)
+        worker.setup_plan(prompt, self._context, self._rule_config, dxf_path=self._dxf_path)
         worker.stage_started.connect(self._on_stage_started)
         worker.stage_finished.connect(self._on_stage_finished)
         worker.plan_succeeded.connect(self._on_plan_succeeded)

@@ -115,7 +115,15 @@ jobs:
       - name: Install dependencies
         run: pip install -e ".[dev,gemini]"
       - name: Run live API tests
-        run: pytest tests/live/ -v -m live_api -s
+        run: |
+          mkdir -p tests/live/reports
+          pytest tests/live/ -v -m live_api -s --log-cli-level=INFO 2>&1 | tee tests/live/reports/live-test-run.log
         env:
           CAD_GCP_PROJECT: ${{ vars.GCP_PROJECT_ID }}
           CAD_GCP_LOCATION: us-central1
+      - name: Upload live test logs
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: live-test-logs
+          path: tests/live/reports/live-test-run.log

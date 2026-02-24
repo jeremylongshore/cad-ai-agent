@@ -44,6 +44,9 @@ class Settings:
         self.oda_path: str | None = os.getenv("CAD_ODA_PATH")  # auto-detected if None
         self.target_dxf_version: str = os.getenv("CAD_TARGET_DXF_VERSION", "R2010")
 
+        # Vision pipeline (render DXF → PNG → Gemini vision → text description)
+        self.vision_enabled: bool = os.getenv("CAD_VISION_ENABLED", "true").lower() == "true"
+
         # Rendering (V2)
         self.render_dpi: int = int(os.getenv("CAD_RENDER_DPI", "150"))
         self.render_background: str = os.getenv("CAD_RENDER_BACKGROUND", "white")

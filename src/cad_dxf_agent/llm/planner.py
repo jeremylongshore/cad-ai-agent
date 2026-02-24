@@ -6,6 +6,7 @@ import logging
 import time
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FuturesTimeoutError
+from pathlib import Path
 
 from ..models.ops_schema import ChangeSet
 from ..models.trace_schema import PlannerTrace
@@ -19,10 +20,17 @@ logger = logging.getLogger(__name__)
 tracer = get_tracer(__name__)
 
 
-def get_provider(provider_name: str | None = None) -> PlannerProvider:
+def get_provider(
+    provider_name: str | None = None,
+    image_path: Path | None = None,
+) -> PlannerProvider:
     """Get the configured planner provider.
 
     Defaults to mock provider if no provider is configured or if CAD_LLM_PROVIDER=mock.
+
+    Args:
+        provider_name: Override for the provider name.
+        image_path: Optional path to a rendered PNG for vision-augmented planning.
     """
     name = (provider_name or settings.llm_provider).lower()
 
@@ -45,7 +53,7 @@ def get_provider(provider_name: str | None = None) -> PlannerProvider:
         try:
             from .agent_provider import AgentProvider
 
-            return AgentProvider()
+            return AgentProvider(image_path=image_path)
         except ImportError:
             logger.warning(
                 "google-cloud-aiplatform not installed, falling back to mock-agent. "
@@ -64,7 +72,7 @@ def get_provider(provider_name: str | None = None) -> PlannerProvider:
         try:
             from .proxy_client import ProxyAgentProvider
 
-            return ProxyAgentProvider()
+            return ProxyAgentProvider(image_path=image_path)
         except ValueError as e:
             logger.warning("Proxy provider misconfigured (%s), falling back to mock-agent", e)
             from .agent_provider import MockAgentProvider
@@ -94,6 +102,7 @@ def run_planner(
     prompt: str,
     drawing_context: dict,
     provider: PlannerProvider | None = None,
+    image_path: Path | None = None,
 ) -> ChangeSet:
     """Run the planner to generate a changeset from a user prompt.
 
@@ -104,6 +113,7 @@ def run_planner(
         prompt: Natural-language edit request from the user.
         drawing_context: Drawing context dict from semantic_model.build_planner_context().
         provider: Optional override for the planner provider.
+        image_path: Optional path to a rendered PNG for vision-augmented planning.
 
     Returns:
         Validated ChangeSet with structured operations.
@@ -114,7 +124,7 @@ def run_planner(
     """
     with tracer.start_as_current_span("cad.run_planner") as span:
         if provider is None:
-            provider = get_provider()
+            provider = get_provider(image_path=image_path)
 
         # Try deterministic planner first (no LLM call needed)
         from .deterministic_planner import deterministic_plan
