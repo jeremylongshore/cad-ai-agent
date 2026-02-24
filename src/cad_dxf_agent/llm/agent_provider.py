@@ -77,6 +77,9 @@ class AgentProvider(PlannerProvider):
             model = self._get_model()
             chat = model.start_chat()
 
+            # Per-turn timeout: total timeout / max turns
+            per_turn_timeout = max(settings.planner_timeout // MAX_AGENT_TURNS, 5)
+
             # Send initial message
             response = chat.send_message(initial_prompt)
             turns = 0
@@ -84,6 +87,13 @@ class AgentProvider(PlannerProvider):
             while turns < MAX_AGENT_TURNS:
                 # Check if Gemini wants to call tools
                 function_calls = _extract_function_calls(response)
+                text_parts = _extract_text(response)
+
+                # Fail-fast: no tool calls AND no text → abort
+                if not function_calls and not text_parts:
+                    logger.warning("Agent returned empty response on turn %d, aborting", turns)
+                    break
+
                 if not function_calls:
                     # No more tool calls — agent is done
                     break
@@ -117,8 +127,21 @@ class AgentProvider(PlannerProvider):
                         }
                     )
 
-                # Send results back to Gemini
-                response = self._send_tool_results(chat, tool_results)
+                # Send results back to Gemini with per-turn timeout
+                from concurrent.futures import ThreadPoolExecutor
+                from concurrent.futures import TimeoutError as FuturesTimeoutError
+
+                from .errors import PlannerTimeoutError
+
+                with ThreadPoolExecutor(max_workers=1) as pool:
+                    future = pool.submit(self._send_tool_results, chat, tool_results)
+                    try:
+                        response = future.result(timeout=per_turn_timeout)
+                    except FuturesTimeoutError as exc:
+                        raise PlannerTimeoutError(
+                            per_turn_timeout,
+                            f"Agent turn {turns} timed out after {per_turn_timeout}s",
+                        ) from exc
 
             span.set_attribute("cad.agent.turns", turns)
             span.set_attribute("cad.agent.ops_count", len(executor.operations))
@@ -137,12 +160,13 @@ class AgentProvider(PlannerProvider):
             )
 
     def _get_model(self):
-        """Lazy-initialize the Gemini model with tool declarations."""
+        """Lazy-initialize the Gemini model with tool declarations and GenerationConfig."""
         if self._model is None:
             try:
                 import vertexai
                 from vertexai.generative_models import (
                     FunctionDeclaration,
+                    GenerationConfig,
                     GenerativeModel,
                     Tool,
                 )
@@ -164,10 +188,18 @@ class AgentProvider(PlannerProvider):
                     )
                 tools = [Tool(function_declarations=declarations)]
 
+                gen_config = GenerationConfig(
+                    temperature=settings.llm_temperature,
+                    top_p=settings.llm_top_p,
+                    top_k=settings.llm_top_k,
+                    max_output_tokens=settings.llm_max_output_tokens,
+                )
+
                 self._model = GenerativeModel(
                     self._model_name,
                     system_instruction=AGENT_SYSTEM_PROMPT,
                     tools=tools,
+                    generation_config=gen_config,
                 )
             except ImportError as err:
                 raise ImportError(
@@ -467,3 +499,16 @@ def _extract_function_calls(response) -> list[dict[str, Any]]:
     except (AttributeError, TypeError):
         pass
     return calls
+
+
+def _extract_text(response) -> list[str]:
+    """Extract text parts from a Gemini response (for fail-fast detection)."""
+    texts = []
+    try:
+        for candidate in response.candidates:
+            for part in candidate.content.parts:
+                if hasattr(part, "text") and part.text:
+                    texts.append(part.text)
+    except (AttributeError, TypeError):
+        pass
+    return texts
