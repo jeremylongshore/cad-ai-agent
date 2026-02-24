@@ -344,7 +344,7 @@ make security      # bandit + pip-audit
 **Current:** Manual tagging + dry-run workflow
 
 1. Update `CHANGELOG.md` with release notes
-2. Bump version in `pyproject.toml`
+2. Bump version in `src/cad_dxf_agent/__init__.py`
 3. Tag: `git tag v0.1.0`
 4. Push tag: `git push origin v0.1.0`
 5. `release-dryrun.yml` runs:
