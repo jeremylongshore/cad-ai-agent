@@ -205,7 +205,13 @@ class PipelineWorker(QThread):
         # Stage 2: Run planner
         changeset, sr = self._timed_stage(
             PipelineStage.RUN_PLANNER,
-            lambda: run_planner(self._prompt, drawing_ctx, image_path=image_path),
+            lambda: run_planner(
+                self._prompt,
+                drawing_ctx,
+                image_path=image_path,
+                context=self._context,
+                rule_config=self._rule_config,
+            ),
         )
         stages.append(sr)
         if not sr.success or self._cancelled:

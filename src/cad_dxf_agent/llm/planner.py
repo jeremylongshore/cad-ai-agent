@@ -8,6 +8,9 @@ from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FuturesTimeoutError
 from pathlib import Path
 
+from ..core.validators import validate_changeset
+from ..models.cad_schema import DrawingContext
+from ..models.config_schema import RuleConfig
 from ..models.ops_schema import ChangeSet
 from ..models.trace_schema import PlannerTrace
 from ..otel import get_tracer
@@ -98,22 +101,49 @@ def _call_with_timeout(
             raise PlannerTimeoutError(timeout) from exc
 
 
+def _format_validation_feedback(
+    original_prompt: str,
+    blockers: list,
+) -> str:
+    """Format validation blockers into a corrective prompt for the LLM."""
+    blocker_lines = "\n".join(
+        f"  - Op {b.operation_index}: {b.message}"
+        if b.operation_index is not None
+        else f"  - {b.message}"
+        for b in blockers
+    )
+    return (
+        f"Your previous changeset was rejected by validation with these errors:\n"
+        f"{blocker_lines}\n\n"
+        f"Please fix these issues and try again. Original request: {original_prompt}"
+    )
+
+
 def run_planner(
     prompt: str,
     drawing_context: dict,
     provider: PlannerProvider | None = None,
     image_path: Path | None = None,
+    context: DrawingContext | None = None,
+    rule_config: RuleConfig | None = None,
 ) -> ChangeSet:
     """Run the planner to generate a changeset from a user prompt.
 
     Tries deterministic planning first for obvious operations.
     Falls back to the LLM provider with timeout and retry logic.
 
+    When *context* and *rule_config* are provided, validates the changeset
+    after each LLM call.  If validation finds blockers, the errors are
+    formatted into a corrective prompt and the LLM is re-called (up to
+    ``settings.planner_max_validation_retries`` times).
+
     Args:
         prompt: Natural-language edit request from the user.
         drawing_context: Drawing context dict from semantic_model.build_planner_context().
         provider: Optional override for the planner provider.
         image_path: Optional path to a rendered PNG for vision-augmented planning.
+        context: Optional DrawingContext for in-loop validation.
+        rule_config: Optional RuleConfig for in-loop validation.
 
     Returns:
         Validated ChangeSet with structured operations.
@@ -157,7 +187,6 @@ def run_planner(
         for attempt in range(1, max_retries + 1):
             try:
                 changeset = _call_with_timeout(provider, prompt, drawing_context, timeout)
-                span.set_attribute("cad.ops.count", changeset.op_count)
                 span.set_attribute("cad.planner.attempt", attempt)
                 logger.info(
                     "Planner returned %d operation(s) on attempt %d for prompt: %s",
@@ -165,6 +194,32 @@ def run_planner(
                     attempt,
                     prompt[:80],
                 )
+
+                # Validation feedback loop (only when context + rules provided)
+                if context is not None and rule_config is not None:
+                    max_val_retries = settings.planner_max_validation_retries
+                    for val_attempt in range(1, max_val_retries + 1):
+                        result = validate_changeset(changeset, context, rule_config)
+                        if not result.blockers:
+                            break
+                        logger.warning(
+                            "Validation found %d blocker(s) on attempt %d/%d: %s",
+                            len(result.blockers),
+                            val_attempt,
+                            max_val_retries,
+                            "; ".join(b.message for b in result.blockers),
+                        )
+                        if val_attempt >= max_val_retries:
+                            logger.warning(
+                                "Validation retries exhausted, returning last changeset"
+                            )
+                            break
+                        corrective = _format_validation_feedback(prompt, result.blockers)
+                        changeset = _call_with_timeout(
+                            provider, corrective, drawing_context, timeout
+                        )
+
+                span.set_attribute("cad.ops.count", changeset.op_count)
                 return changeset
             except PlannerTimeoutError:
                 raise  # Timeout is not retryable

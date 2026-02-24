@@ -55,6 +55,9 @@ class Settings:
         self.planner_timeout: int = int(os.getenv("CAD_PLANNER_TIMEOUT", "60"))
         self.planner_max_retries: int = int(os.getenv("CAD_PLANNER_MAX_RETRIES", "2"))
         self.planner_retry_delay: float = float(os.getenv("CAD_PLANNER_RETRY_DELAY", "1.0"))
+        self.planner_max_validation_retries: int = int(
+            os.getenv("CAD_PLANNER_MAX_VALIDATION_RETRIES", "2")
+        )
 
         # LLM generation parameters
         self.llm_temperature: float = float(os.getenv("CAD_LLM_TEMPERATURE", "0.0"))
