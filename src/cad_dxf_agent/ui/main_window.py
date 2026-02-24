@@ -8,6 +8,7 @@ Full-featured desktop UI for Tony's structural drawing edits:
 - Undo/redo (Ctrl+Z / Ctrl+Y)
 - Export menu (DXF, PNG, PDF)
 - Status bar with entity count and layer info
+- Non-blocking pipeline with progress indicators
 """
 
 from __future__ import annotations
@@ -19,13 +20,18 @@ from pathlib import Path
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import (
+    QApplication,
     QCheckBox,
     QComboBox,
+    QDialog,
+    QDialogButtonBox,
     QFileDialog,
     QHBoxLayout,
     QLabel,
     QMainWindow,
     QMessageBox,
+    QPlainTextEdit,
+    QProgressBar,
     QPushButton,
     QScrollArea,
     QSplitter,
@@ -37,16 +43,11 @@ from PySide6.QtWidgets import (
 )
 
 from ..core.dxf_reader import load_dxf
-from ..core.edit_engine import EditEngine
 from ..core.edit_history import EditHistory
-from ..core.preview_model import PreviewModel
-from ..core.revision_notes import insert_revision_note
-from ..core.semantic_model import build_planner_context
-from ..core.validators import validate_changeset
-from ..llm.planner import run_planner
 from ..models.config_schema import RevisionNoteConfig, RuleConfig
 from ..models.ops_schema import ChangeSet, EditOperation
 from ..settings import settings
+from .pipeline_worker import ApplyResult, PipelineWorker, PlanResult
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +74,12 @@ class MainWindow(QMainWindow):
             enabled=settings.revision_notes_enabled,
             layer_name=settings.revision_notes_layer,
         )
+
+        # Pipeline worker state
+        self._worker: PipelineWorker | None = None
+        self._last_stages: list = []
+        self._plan_stage_count = 4  # build_context, planner, validate, preview
+        self._apply_stage_count = 3  # edit_engine, save, revision_notes
 
         self._build_menu()
         self._build_toolbar()
@@ -149,6 +156,13 @@ class MainWindow(QMainWindow):
         self.btn_redo.clicked.connect(self._on_redo)
         toolbar.addWidget(self.btn_redo)
 
+        toolbar.addSeparator()
+
+        self.btn_timings = QPushButton("Timings")
+        self.btn_timings.setEnabled(False)
+        self.btn_timings.clicked.connect(self._on_show_timings)
+        toolbar.addWidget(self.btn_timings)
+
     # ── Main UI ───────────────────────────────────────────────────
 
     def _build_ui(self):
@@ -200,6 +214,16 @@ class MainWindow(QMainWindow):
         self.btn_apply.clicked.connect(self._on_apply)
         btn_row.addWidget(self.btn_apply)
         left.addLayout(btn_row)
+
+        # Progress bar (hidden by default)
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setTextVisible(False)
+        self.progress_bar.hide()
+        left.addWidget(self.progress_bar)
+
+        self.lbl_stage = QLabel("")
+        self.lbl_stage.hide()
+        left.addWidget(self.lbl_stage)
 
         # Status log
         left.addWidget(QLabel("Log:"))
@@ -374,39 +398,23 @@ class MainWindow(QMainWindow):
         if prompt not in self._prompt_history:
             self._prompt_history.append(prompt)
 
-        try:
-            self._log_status(f"Planning: {prompt[:60]}...")
-            drawing_ctx = build_planner_context(self._context)
-            self._changeset = run_planner(prompt, drawing_ctx)
+        # Cancel any running worker
+        self._cancel_worker()
 
-            validation = validate_changeset(self._changeset, self._context, self._rule_config)
-            self._preview = PreviewModel(self._changeset, self._context, validation)
+        self._log_status(f"Planning: {prompt[:60]}...")
+        self.btn_plan.setEnabled(False)
+        self.btn_apply.setEnabled(False)
+        self._show_progress(self._plan_stage_count)
 
-            # Build per-operation checkboxes
-            self._clear_ops()
-            for item in self._preview.items:
-                cb = QCheckBox(str(item))
-                cb.setChecked(True)
-                self._op_checkboxes.append(cb)
-                self.ops_layout.addWidget(cb)
-
-            if not validation.valid:
-                for b in validation.blockers:
-                    lbl = QLabel(f"BLOCKED: {b.message}")
-                    lbl.setStyleSheet("color: red; font-weight: bold;")
-                    self.ops_layout.addWidget(lbl)
-                self._log_status(f"Plan blocked: {len(validation.blockers)} issue(s)")
-                self.btn_apply.setEnabled(False)
-            else:
-                self._log_status(f"Plan valid: {self._changeset.op_count} operation(s)")
-                self.btn_apply.setEnabled(True)
-
-            for w in validation.warnings:
-                self._log_status(f"Warning: {w.message}")
-
-        except Exception as e:
-            QMessageBox.critical(self, "Planner Error", f"Planning failed:\n{e}")
-            logger.error("Planner error: %s", traceback.format_exc())
+        worker = PipelineWorker(self)
+        worker.setup_plan(prompt, self._context, self._rule_config)
+        worker.stage_started.connect(self._on_stage_started)
+        worker.stage_finished.connect(self._on_stage_finished)
+        worker.plan_succeeded.connect(self._on_plan_succeeded)
+        worker.plan_failed.connect(self._on_plan_failed)
+        worker.finished.connect(self._on_worker_finished)
+        self._worker = worker
+        worker.start()
 
     def _on_apply(self):
         if not self._changeset or not self._dxf_path:
@@ -422,6 +430,7 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "No Operations", "Select at least one operation to apply.")
             return
 
+        # File dialog stays on main thread (native dialog)
         output_path, _ = QFileDialog.getSaveFileName(
             self,
             "Save As New DXF",
@@ -431,42 +440,158 @@ class MainWindow(QMainWindow):
         if not output_path:
             return
 
-        try:
-            filtered = ChangeSet(
-                prompt=self._changeset.prompt,
-                operations=selected_ops,
-                revision_label=self._changeset.revision_label,
-            )
+        # Cancel any running worker
+        self._cancel_worker()
 
-            engine = EditEngine(self._dxf_path)
-            results = engine.apply_changeset(filtered)
+        filtered = ChangeSet(
+            prompt=self._changeset.prompt,
+            operations=selected_ops,
+            revision_label=self._changeset.revision_label,
+        )
 
-            # Capture snapshot for undo before saving
-            if self._history:
-                self._history.push(
-                    engine.doc,
-                    f"Applied {len(selected_ops)} op(s)",
-                )
-                self._update_undo_redo()
+        self.btn_plan.setEnabled(False)
+        self.btn_apply.setEnabled(False)
+        self._show_progress(self._apply_stage_count)
 
-            engine.save(output_path)
+        worker = PipelineWorker(self)
+        worker.setup_apply(
+            filtered, self._dxf_path, output_path, self._rule_config, self._rev_config
+        )
+        worker.stage_started.connect(self._on_stage_started)
+        worker.stage_finished.connect(self._on_stage_finished)
+        worker.apply_succeeded.connect(self._on_apply_succeeded)
+        worker.apply_failed.connect(self._on_apply_failed)
+        worker.finished.connect(self._on_worker_finished)
+        self._worker = worker
+        worker.start()
 
-            success_count = sum(1 for r in results if r.success)
-            self._log_status(f"Applied {success_count}/{len(results)} operations")
+    # ── Worker signal slots ──────────────────────────────────────
 
-            # Insert revision note if enabled
-            if self._rev_config.enabled:
-                note_text = insert_revision_note(
-                    output_path, output_path, results, self._rev_config
-                )
-                self._log_status(f"Revision note: {note_text}")
+    def _on_stage_started(self, stage_name: str):
+        self.lbl_stage.setText(f"Stage: {stage_name}...")
+        self.statusBar().showMessage(f"Running: {stage_name}")
 
-            self._log_status(f"Saved to: {output_path}")
-            QMessageBox.information(self, "Success", f"Saved to:\n{output_path}")
+    def _on_stage_finished(self, stage_name: str, duration_ms: float):
+        self._log_status(f"  {stage_name}: {duration_ms:.0f} ms")
+        self.progress_bar.setValue(self.progress_bar.value() + 1)
 
-        except Exception as e:
-            QMessageBox.critical(self, "Apply Error", f"Apply/save failed:\n{e}")
-            logger.error("Apply error: %s", traceback.format_exc())
+    def _on_plan_succeeded(self, result: PlanResult):
+        self._last_stages = result.stages
+        self.btn_timings.setEnabled(True)
+        self._changeset = result.changeset
+        self._preview = result.preview
+
+        # Build per-operation checkboxes
+        self._clear_ops()
+        for item in self._preview.items:
+            cb = QCheckBox(str(item))
+            cb.setChecked(True)
+            self._op_checkboxes.append(cb)
+            self.ops_layout.addWidget(cb)
+
+        if not result.validation.valid:
+            for b in result.validation.blockers:
+                lbl = QLabel(f"BLOCKED: {b.message}")
+                lbl.setStyleSheet("color: red; font-weight: bold;")
+                self.ops_layout.addWidget(lbl)
+            self._log_status(f"Plan blocked: {len(result.validation.blockers)} issue(s)")
+            self.btn_apply.setEnabled(False)
+        else:
+            self._log_status(f"Plan valid: {self._changeset.op_count} operation(s)")
+            self.btn_apply.setEnabled(True)
+
+        for w in result.validation.warnings:
+            self._log_status(f"Warning: {w.message}")
+
+    def _on_plan_failed(self, error: str):
+        QMessageBox.critical(self, "Planner Error", f"Planning failed:\n{error}")
+        logger.error("Planner error: %s", error)
+        self.btn_plan.setEnabled(self._context is not None)
+
+    def _on_apply_succeeded(self, result: ApplyResult):
+        self._last_stages = result.stages
+        self.btn_timings.setEnabled(True)
+
+        # Push to edit history for undo support
+        if self._history:
+            success_count = sum(1 for r in result.applied_changes if r.success)
+            self._history.push(result.engine_doc, f"Applied {success_count} op(s)")
+            self._update_undo_redo()
+
+        success_count = sum(1 for r in result.applied_changes if r.success)
+        total = len(result.applied_changes)
+        self._log_status(f"Applied {success_count}/{total} operations")
+
+        if result.note_text:
+            self._log_status(f"Revision note: {result.note_text}")
+
+        self._log_status(f"Saved to: {result.output_path}")
+        QMessageBox.information(self, "Success", f"Saved to:\n{result.output_path}")
+
+    def _on_apply_failed(self, error: str):
+        QMessageBox.critical(self, "Apply Error", f"Apply/save failed:\n{error}")
+        logger.error("Apply error: %s", error)
+
+    def _on_worker_finished(self):
+        self._hide_progress()
+        self._worker = None
+        self.btn_plan.setEnabled(self._context is not None)
+
+    # ── Progress helpers ───────────────────────────────────────
+
+    def _show_progress(self, stage_count: int):
+        self.progress_bar.setMaximum(stage_count)
+        self.progress_bar.setValue(0)
+        self.progress_bar.show()
+        self.lbl_stage.show()
+
+    def _hide_progress(self):
+        self.progress_bar.hide()
+        self.lbl_stage.hide()
+        self.lbl_stage.setText("")
+        self.statusBar().clearMessage()
+
+    def _cancel_worker(self):
+        if self._worker is not None and self._worker.isRunning():
+            self._worker.cancel()
+            self._worker.wait(5000)
+            self._worker = None
+
+    # ── Timings dialog ─────────────────────────────────────────
+
+    def _on_show_timings(self):
+        if not self._last_stages:
+            return
+
+        lines = ["Stage Timings", "=" * 40]
+        total_ms = 0.0
+        for sr in self._last_stages:
+            status = "OK" if sr.success else f"FAIL: {sr.error}"
+            lines.append(f"  {sr.stage.value:20s}  {sr.duration_ms:8.1f} ms  {status}")
+            total_ms += sr.duration_ms
+        lines.append("-" * 40)
+        lines.append(f"  {'Total':20s}  {total_ms:8.1f} ms")
+        text = "\n".join(lines)
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle("Pipeline Timings")
+        dlg.setMinimumSize(450, 300)
+        layout = QVBoxLayout(dlg)
+
+        txt = QPlainTextEdit(text)
+        txt.setReadOnly(True)
+        layout.addWidget(txt)
+
+        btn_box = QDialogButtonBox()
+        btn_copy = btn_box.addButton("Copy to Clipboard", QDialogButtonBox.ButtonRole.ActionRole)
+        btn_copy.clicked.connect(lambda: QApplication.clipboard().setText(text))
+        btn_close = btn_box.addButton(QDialogButtonBox.StandardButton.Close)
+        btn_close.clicked.connect(dlg.close)
+        layout.addWidget(btn_box)
+
+        dlg.exec()
+
+    # ── Undo / Redo ────────────────────────────────────────────
 
     def _on_undo(self):
         if not self._history or not self._history.can_undo:
@@ -576,3 +701,9 @@ class MainWindow(QMainWindow):
         except Exception as e:
             QMessageBox.critical(self, "Export Error", f"Export failed:\n{e}")
             logger.error("Export error: %s", traceback.format_exc())
+
+    # ── Window lifecycle ───────────────────────────────────────
+
+    def closeEvent(self, event):  # noqa: N802
+        self._cancel_worker()
+        super().closeEvent(event)
