@@ -50,6 +50,8 @@
 | 010 | AACR | [010-AA-AACR-phase-01-aar.md](010-AA-AACR-phase-01-aar.md) |
 | 011 | AACR | [011-AA-AACR-otel-instrumentation-aar.md](011-AA-AACR-otel-instrumentation-aar.md) |
 | 020 | AACR | [020-AA-AACR-phase-03-aar.md](020-AA-AACR-phase-03-aar.md) |
+| 022 | AACR | [022-AA-AACR-v0.2-testing-infrastructure-aar.md](022-AA-AACR-v0.2-testing-infrastructure-aar.md) |
+| 023 | AUDT | [023-AA-AUDT-appaudit-devops-playbook.md](023-AA-AUDT-appaudit-devops-playbook.md) |
 
 ## Chronological Listing
 
@@ -76,8 +78,10 @@
 | 019 | PM | TASK | Phase 3 entity index, context builder, selectors |
 | 020 | AA | AACR | Phase 3 AAR |
 | 021 | PP | PROD | V2 PRD scope expansion |
+| 022 | AA | AACR | v0.2.0 testing infrastructure AAR |
+| 023 | AA | AUDT | DevOps operator playbook (appaudit) |
 
 ## Quick Reference
 
 - **CC codes:** AT=Architecture, PP=Product, PM=Project Mgmt, DR=Documentation, TQ=Testing, BL=Business, AA=After Action
-- **Type codes:** ADEC=Decision, ARCH=Architecture, SPEC=Specification, PROD=Product, TASK=Task, GUID=Guide, SECU=Security, POLI=Policy, AACR=After Action Review, PLAN=Roadmap
+- **Type codes:** ADEC=Decision, ARCH=Architecture, SPEC=Specification, PROD=Product, TASK=Task, GUID=Guide, SECU=Security, POLI=Policy, AACR=After Action Review, PLAN=Roadmap, AUDT=Audit/Playbook

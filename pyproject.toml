@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "cad-dxf-agent"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Local-first DXF layout editor with LLM-assisted prompt-to-edit planning, validation, preview, and safe save-as DXF workflow."
 readme = "README.md"
 license = "MIT"
@@ -80,6 +80,9 @@ dev = [
 
 [project.scripts]
 cad-dxf-agent = "cad_dxf_agent.app:main"
+
+[tool.hatch.version]
+path = "src/cad_dxf_agent/__init__.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/cad_dxf_agent"]
