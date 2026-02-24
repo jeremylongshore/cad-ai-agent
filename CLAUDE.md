@@ -30,6 +30,14 @@ pytest tests/unit/test_validators.py::test_name -v
 
 # Launch desktop app (requires PySide6: pip install -e ".[gui]")
 make run           # python -m cad_dxf_agent.app
+
+# Web app (local dev)
+cd web/frontend && npm run dev                         # Frontend on :3000
+CAD_WEB_DEV_MODE=1 uvicorn web.backend.main:app --port 8322  # Backend on :8322
+
+# Web app (deploy)
+cd web/frontend && npm run build && firebase deploy --only hosting  # Frontend
+gcloud builds submit --config web/backend/cloudbuild.yaml .        # Backend
 ```
 
 Mock mode (`CAD_LLM_PROVIDER=mock`, the default) works without any API key. All tests and the smoke test use mock mode.
