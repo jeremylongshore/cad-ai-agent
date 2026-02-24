@@ -14,13 +14,24 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Python 3.12
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: "pip"
+
+      - name: Extract version
+        id: version
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            echo "version=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
+          else
+            version=$(python -c "import re; print(re.search(r'__version__\s*=\s*\"(.+?)\"', open('src/cad_dxf_agent/__init__.py').read()).group(1))")
+            echo "version=$version" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Install dependencies
         run: |
@@ -60,16 +71,17 @@ jobs:
         uses: Minionguyjpro/Inno-Setup-Action@v1.2.4
         with:
           path: installer/setup.iss
+          options: /DAppVersion=${{ steps.version.outputs.version }}
 
       - name: Upload bundle artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: cad-dxf-agent-windows
           path: dist/cad-dxf-agent/
 
       - name: Upload installer artifact
         if: hashFiles('dist/cad-dxf-agent-setup-*.exe') != ''
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: windows-installer
           path: dist/cad-dxf-agent-setup-*.exe
