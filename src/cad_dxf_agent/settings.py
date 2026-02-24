@@ -70,6 +70,9 @@ class Settings:
         self.proxy_url: str | None = os.getenv("CAD_PROXY_URL")
         self.license_key: str | None = os.getenv("CAD_LICENSE_KEY")
 
+        # Edit history
+        self.max_undo_snapshots: int = int(os.getenv("CAD_MAX_UNDO_SNAPSHOTS", "50"))
+
         # Local API
         self.api_host: str = os.getenv("CAD_API_HOST", "127.0.0.1")
         self.api_port: int = int(os.getenv("CAD_API_PORT", "8321"))

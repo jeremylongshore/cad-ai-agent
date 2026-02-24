@@ -24,11 +24,12 @@ class EditHistory:
     restored document.
     """
 
-    def __init__(self, initial_path: str | Path) -> None:
+    def __init__(self, initial_path: str | Path, max_snapshots: int = 0) -> None:
         self._initial_path = Path(initial_path)
         self._snapshots: list[bytes] = []
         self._cursor: int = -1  # Points to current snapshot; -1 = initial
         self._labels: list[str] = []
+        self._max_snapshots = max_snapshots
 
         # Capture the initial state
         doc = ezdxf.readfile(str(self._initial_path))
@@ -38,6 +39,7 @@ class EditHistory:
         """Capture current document state as a new snapshot.
 
         Discards any redo history beyond the current cursor position.
+        Evicts the oldest snapshot when max_snapshots is exceeded.
         """
         # Truncate redo stack
         self._snapshots = self._snapshots[: self._cursor + 1]
@@ -47,6 +49,14 @@ class EditHistory:
         self._snapshots.append(snapshot)
         self._labels.append(label)
         self._cursor = len(self._snapshots) - 1
+
+        # Evict oldest if over cap (0 = unlimited)
+        if self._max_snapshots > 0 and len(self._snapshots) > self._max_snapshots:
+            excess = len(self._snapshots) - self._max_snapshots
+            self._snapshots = self._snapshots[excess:]
+            self._labels = self._labels[excess:]
+            self._cursor -= excess
+            logger.debug("Evicted %d oldest snapshot(s), cap=%d", excess, self._max_snapshots)
 
         logger.debug(
             "Snapshot pushed [%d]: %s (%d bytes)",

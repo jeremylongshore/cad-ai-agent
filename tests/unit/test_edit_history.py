@@ -134,3 +134,62 @@ class TestEditHistory:
         msp = doc.modelspace()
         texts = [e.dxf.text for e in msp if e.dxftype() == "TEXT"]
         assert "ORIGINAL" in texts
+
+
+class TestEditHistoryMaxSnapshots:
+    def test_unlimited_by_default(self, dxf_file):
+        """Default max_snapshots=0 means no eviction."""
+        history = EditHistory(dxf_file)
+        for i in range(10):
+            doc = ezdxf.readfile(str(dxf_file))
+            history.push(doc, f"edit {i}")
+        assert history.depth == 10
+
+    def test_cap_evicts_oldest(self, dxf_file):
+        """When cap is hit, oldest snapshots are evicted."""
+        history = EditHistory(dxf_file, max_snapshots=3)
+        for i in range(5):
+            doc = ezdxf.readfile(str(dxf_file))
+            history.push(doc, f"edit {i}")
+        assert history.depth == 3
+        assert history.current_label == "edit 4"
+
+    def test_cap_preserves_undo(self, dxf_file):
+        """After eviction, remaining snapshots are still undoable."""
+        history = EditHistory(dxf_file, max_snapshots=3)
+        for i in range(5):
+            doc = ezdxf.readfile(str(dxf_file))
+            history.push(doc, f"edit {i}")
+
+        # Should be able to undo 3 times (3 snapshots → initial)
+        for _ in range(3):
+            result = history.undo()
+            assert result is not None
+        # Now at initial
+        assert history.current_label == "initial"
+        assert history.undo() is None
+
+    def test_cap_of_one(self, dxf_file):
+        """Edge case: max_snapshots=1 keeps only the latest."""
+        history = EditHistory(dxf_file, max_snapshots=1)
+        for i in range(4):
+            doc = ezdxf.readfile(str(dxf_file))
+            history.push(doc, f"edit {i}")
+        assert history.depth == 1
+        assert history.current_label == "edit 3"
+
+    def test_cap_with_undo_and_new_push(self, dxf_file):
+        """Undo then push respects the cap after truncation."""
+        history = EditHistory(dxf_file, max_snapshots=3)
+        for i in range(3):
+            doc = ezdxf.readfile(str(dxf_file))
+            history.push(doc, f"edit {i}")
+        assert history.depth == 3
+
+        # Undo once, then push a new edit
+        history.undo()
+        doc = ezdxf.readfile(str(dxf_file))
+        history.push(doc, "edit new")
+        # Redo was truncated: edit 0, edit 1, edit new = 3 (at cap)
+        assert history.depth == 3
+        assert history.current_label == "edit new"

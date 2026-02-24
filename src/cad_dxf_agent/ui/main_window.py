@@ -391,7 +391,7 @@ class MainWindow(QMainWindow):
 
             self._dxf_path = file_path
             self._context = load_dxf(self._dxf_path)
-            self._history = EditHistory(self._dxf_path)
+            self._history = EditHistory(self._dxf_path, max_snapshots=settings.max_undo_snapshots)
 
             # Update UI
             self.lbl_file.setText(f"{self._dxf_path.name} ({self._context.entity_count} entities)")
