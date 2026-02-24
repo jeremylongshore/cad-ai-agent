@@ -35,6 +35,26 @@ def _changeset_to_comparable(changeset):
     }
 
 
+class TestChangeSetTraceExclusion:
+    def test_planner_trace_excluded_from_model_dump(self, sample_dxf):
+        """planner_trace must not appear in model_dump() (snapshot safety)."""
+        context = load_dxf(sample_dxf)
+        planner_ctx = build_planner_context(context)
+        changeset = run_planner("move this column", planner_ctx)
+
+        dumped = changeset.model_dump()
+        assert "planner_trace" not in dumped
+
+    def test_planner_trace_excluded_from_json(self, sample_dxf):
+        """planner_trace must not appear in JSON serialization."""
+        context = load_dxf(sample_dxf)
+        planner_ctx = build_planner_context(context)
+        changeset = run_planner("move this column", planner_ctx)
+
+        json_str = changeset.model_dump_json()
+        assert "planner_trace" not in json_str
+
+
 class TestChangeSetSnapshots:
     def test_move_prompt_snapshot(self, sample_dxf, snapshot):
         """Snapshot: 'move' prompt produces a stable changeset structure."""
