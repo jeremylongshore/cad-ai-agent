@@ -62,6 +62,7 @@ build = [
 dev = [
     "pytest>=8.0",
     "pytest-cov>=5.0",
+    "pytest-benchmark>=5.0",
     "syrupy>=4.0",
     "ruff>=0.5",
     "mypy>=1.10",
@@ -120,6 +121,7 @@ markers = [
     "integration: integration tests (full pipeline, multi-module)",
     "live_api: tests that call real Gemini API (require ADC via gcloud auth)",
     "gui: GUI tests (require PySide6 and QT_QPA_PLATFORM=offscreen)",
+    "benchmark: performance micro-benchmarks (pytest-benchmark)",
 ]
 
 [tool.coverage.run]
