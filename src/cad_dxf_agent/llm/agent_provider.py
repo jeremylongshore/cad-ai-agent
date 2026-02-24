@@ -14,10 +14,12 @@ The LLM never touches DXF — it only calls tools.
 from __future__ import annotations
 
 import logging
+import time
 from pathlib import Path
 from typing import Any
 
 from ..models.ops_schema import ChangeSet
+from ..models.trace_schema import AgentTurn, PlannerTrace, ToolCall
 from ..otel import get_tracer
 from ..settings import settings
 from .prompt_templates import AGENT_SYSTEM_PROMPT
@@ -83,6 +85,8 @@ class AgentProvider(PlannerProvider):
             # Send initial message
             response = chat.send_message(initial_prompt)
             turns = 0
+            trace_turns: list[AgentTurn] = []
+            loop_t0 = time.monotonic()
 
             while turns < MAX_AGENT_TURNS:
                 # Check if Gemini wants to call tools
@@ -99,6 +103,7 @@ class AgentProvider(PlannerProvider):
                     break
 
                 turns += 1
+                turn_t0 = time.monotonic()
                 span.add_event(
                     f"agent_turn_{turns}",
                     {
@@ -108,18 +113,29 @@ class AgentProvider(PlannerProvider):
 
                 # Execute each tool call and collect results
                 tool_results = []
+                traced_calls: list[ToolCall] = []
                 for fc in function_calls:
                     tool_name = fc["name"]
                     tool_args = fc["args"]
                     logger.info("Agent tool call [%d]: %s(%s)", turns, tool_name, tool_args)
 
+                    tc_t0 = time.monotonic()
                     try:
                         result = executor.execute(tool_name, tool_args)
                     except KeyError:
                         result = {"error": f"Unknown tool: {tool_name}"}
                     except Exception as e:
                         result = {"error": f"Tool execution failed: {e}"}
+                    tc_ms = (time.monotonic() - tc_t0) * 1000
 
+                    traced_calls.append(
+                        ToolCall(
+                            name=tool_name,
+                            args=tool_args,
+                            result=result if isinstance(result, dict) else {"value": result},
+                            duration_ms=tc_ms,
+                        )
+                    )
                     tool_results.append(
                         {
                             "name": tool_name,
@@ -143,6 +159,16 @@ class AgentProvider(PlannerProvider):
                             f"Agent turn {turns} timed out after {per_turn_timeout}s",
                         ) from exc
 
+                turn_ms = (time.monotonic() - turn_t0) * 1000
+                trace_turns.append(
+                    AgentTurn(
+                        turn_number=turns,
+                        tool_calls=traced_calls,
+                        duration_ms=turn_ms,
+                    )
+                )
+
+            total_ms = (time.monotonic() - loop_t0) * 1000
             span.set_attribute("cad.agent.turns", turns)
             span.set_attribute("cad.agent.ops_count", len(executor.operations))
 
@@ -153,11 +179,20 @@ class AgentProvider(PlannerProvider):
                 len(ops),
             )
 
-            return ChangeSet(
+            trace = PlannerTrace(
+                provider_name=self.name,
+                total_turns=turns,
+                total_duration_ms=total_ms,
+                turns=trace_turns,
+            )
+
+            changeset = ChangeSet(
                 prompt=prompt,
                 operations=ops,
                 revision_label=f"Agent edit ({turns} turns): {prompt[:50]}",
             )
+            changeset.planner_trace = trace
+            return changeset
 
     def _get_model(self):
         """Lazy-initialize the Gemini model with tool declarations and GenerationConfig."""
@@ -411,10 +446,32 @@ class MockAgentProvider(PlannerProvider):
 
         executor = ToolExecutor(context, settings.protected_layers)
         prompt_lower = prompt.lower()
+        trace_turns: list[AgentTurn] = []
+        loop_t0 = time.monotonic()
+
+        def _traced_execute(tool_name: str, tool_args: dict) -> ToolCall:
+            """Execute a tool and return a ToolCall with timing."""
+            tc_t0 = time.monotonic()
+            result = executor.execute(tool_name, tool_args)
+            tc_ms = (time.monotonic() - tc_t0) * 1000
+            return ToolCall(
+                name=tool_name,
+                args=tool_args,
+                result=result if isinstance(result, dict) else {"value": result},
+                duration_ms=tc_ms,
+            )
 
         # Turn 1: Search for entities
         if "move" in prompt_lower:
-            executor.execute("find_entities", {"layer": "STRUCTURAL"})
+            turn_t0 = time.monotonic()
+            tc = _traced_execute("find_entities", {"layer": "STRUCTURAL"})
+            trace_turns.append(
+                AgentTurn(
+                    turn_number=1,
+                    tool_calls=[tc],
+                    duration_ms=(time.monotonic() - turn_t0) * 1000,
+                )
+            )
             # Turn 2: Move first editable entity
             for e in drawing_context.get("entities", []):
                 protected = {
@@ -423,13 +480,17 @@ class MockAgentProvider(PlannerProvider):
                     if lyr.get("protected")
                 }
                 if e.get("layer", "").upper() not in protected:
-                    executor.execute(
+                    turn_t0 = time.monotonic()
+                    tc = _traced_execute(
                         "move_entity",
-                        {
-                            "handle": e["handle"],
-                            "dx": 24.0,
-                            "dy": 0.0,
-                        },
+                        {"handle": e["handle"], "dx": 24.0, "dy": 0.0},
+                    )
+                    trace_turns.append(
+                        AgentTurn(
+                            turn_number=2,
+                            tool_calls=[tc],
+                            duration_ms=(time.monotonic() - turn_t0) * 1000,
+                        )
                     )
                     break
 
@@ -441,18 +502,31 @@ class MockAgentProvider(PlannerProvider):
                     if lyr.get("protected")
                 }
                 if e.get("layer", "").upper() not in protected:
-                    executor.execute("delete_entity", {"handle": e["handle"]})
+                    turn_t0 = time.monotonic()
+                    tc = _traced_execute("delete_entity", {"handle": e["handle"]})
+                    trace_turns.append(
+                        AgentTurn(
+                            turn_number=1,
+                            tool_calls=[tc],
+                            duration_ms=(time.monotonic() - turn_t0) * 1000,
+                        )
+                    )
                     break
 
         elif "text" in prompt_lower or "label" in prompt_lower:
             for e in drawing_context.get("entities", []):
                 if e.get("type") in ("TEXT", "MTEXT") and e.get("text"):
-                    executor.execute(
+                    turn_t0 = time.monotonic()
+                    tc = _traced_execute(
                         "edit_text",
-                        {
-                            "handle": e["handle"],
-                            "new_text": "UPDATED BY CAD-DXF-AGENT",
-                        },
+                        {"handle": e["handle"], "new_text": "UPDATED BY CAD-DXF-AGENT"},
+                    )
+                    trace_turns.append(
+                        AgentTurn(
+                            turn_number=1,
+                            tool_calls=[tc],
+                            duration_ms=(time.monotonic() - turn_t0) * 1000,
+                        )
                     )
                     break
 
@@ -465,21 +539,35 @@ class MockAgentProvider(PlannerProvider):
                     if lyr.get("protected")
                 }
                 if e.get("layer", "").upper() not in protected:
-                    executor.execute(
+                    turn_t0 = time.monotonic()
+                    tc = _traced_execute(
                         "move_entity",
-                        {
-                            "handle": e["handle"],
-                            "dx": 12.0,
-                            "dy": 12.0,
-                        },
+                        {"handle": e["handle"], "dx": 12.0, "dy": 12.0},
+                    )
+                    trace_turns.append(
+                        AgentTurn(
+                            turn_number=1,
+                            tool_calls=[tc],
+                            duration_ms=(time.monotonic() - turn_t0) * 1000,
+                        )
                     )
                     break
 
-        return ChangeSet(
+        total_ms = (time.monotonic() - loop_t0) * 1000
+        trace = PlannerTrace(
+            provider_name=self.name,
+            total_turns=len(trace_turns),
+            total_duration_ms=total_ms,
+            turns=trace_turns,
+        )
+
+        changeset = ChangeSet(
             prompt=prompt,
             operations=executor.operations,
             revision_label=f"Mock agent edit: {prompt[:50]}",
         )
+        changeset.planner_trace = trace
+        return changeset
 
 
 def _extract_function_calls(response) -> list[dict[str, Any]]:

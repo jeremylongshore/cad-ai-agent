@@ -8,6 +8,7 @@ from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FuturesTimeoutError
 
 from ..models.ops_schema import ChangeSet
+from ..models.trace_schema import PlannerTrace
 from ..otel import get_tracer
 from ..settings import settings
 from .errors import PlannerRetryExhaustedError, PlannerTimeoutError
@@ -126,6 +127,12 @@ def run_planner(
                 "Deterministic plan used (%d ops) for prompt: %s",
                 det_result.op_count,
                 prompt[:80],
+            )
+            det_result.planner_trace = PlannerTrace(
+                provider_name="deterministic",
+                total_turns=0,
+                total_duration_ms=0.0,
+                deterministic=True,
             )
             return det_result
 

@@ -41,9 +41,12 @@ class EditOperation(BaseModel):
 class ChangeSet(BaseModel):
     """A set of operations to apply as a batch."""
 
+    model_config = {"arbitrary_types_allowed": True}
+
     operations: list[EditOperation] = Field(default_factory=list)
     prompt: str = ""
     revision_label: str | None = None
+    planner_trace: Any = Field(default=None, exclude=True)
 
     @property
     def op_count(self) -> int:

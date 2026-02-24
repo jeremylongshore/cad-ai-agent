@@ -158,7 +158,7 @@ class MainWindow(QMainWindow):
 
         toolbar.addSeparator()
 
-        self.btn_timings = QPushButton("Timings")
+        self.btn_timings = QPushButton("Trace")
         self.btn_timings.setEnabled(False)
         self.btn_timings.clicked.connect(self._on_show_timings)
         toolbar.addWidget(self.btn_timings)
@@ -606,25 +606,63 @@ class MainWindow(QMainWindow):
             self._worker.wait(5000)
             self._worker = None
 
-    # ── Timings dialog ─────────────────────────────────────────
+    # ── Trace dialog ──────────────────────────────────────────
 
     def _on_show_timings(self):
         if not self._last_stages:
             return
 
-        lines = ["Stage Timings", "=" * 40]
+        lines = ["Pipeline Stages", "=" * 50]
         total_ms = 0.0
         for sr in self._last_stages:
             status = "OK" if sr.success else f"FAIL: {sr.error}"
             lines.append(f"  {sr.stage.value:20s}  {sr.duration_ms:8.1f} ms  {status}")
             total_ms += sr.duration_ms
-        lines.append("-" * 40)
+        lines.append("-" * 50)
         lines.append(f"  {'Total':20s}  {total_ms:8.1f} ms")
+
+        # Agent trace section
+        trace = getattr(self._changeset, "planner_trace", None) if self._changeset else None
+        if trace is not None:
+            lines.append("")
+            if trace.deterministic:
+                lines.append("Deterministic Planner (no LLM call)")
+                lines.append("=" * 50)
+                ops_desc = ", ".join(
+                    op.op_type.value for op in self._changeset.operations  # type: ignore[union-attr]
+                )
+                lines.append(f"Pattern matched: {ops_desc}")
+                lines.append("0 ms (no API call)")
+            else:
+                lines.append(f"Agent Trace ({trace.provider_name})")
+                lines.append("=" * 50)
+                for turn in trace.turns:
+                    lines.append(f"Turn {turn.turn_number} ({turn.duration_ms:.1f} ms)")
+                    for tc in turn.tool_calls:
+                        args_str = ", ".join(f"{k}={v!r}" for k, v in tc.args.items())
+                        lines.append(f"  -> {tc.name}({args_str})")
+                        # Compact result summary
+                        if "error" in tc.result:
+                            err = tc.result["error"]
+                            lines.append(f"     <- ERROR: {err} ({tc.duration_ms:.1f} ms)")
+                        elif "count" in tc.result:
+                            lines.append(
+                                f"     <- {tc.result['count']} results ({tc.duration_ms:.1f} ms)"
+                            )
+                        else:
+                            keys = list(tc.result.keys())[:3]
+                            preview = ", ".join(keys) if keys else "OK"
+                            lines.append(f"     <- {preview} ({tc.duration_ms:.1f} ms)")
+                    lines.append("")
+                lines.append(
+                    f"Total: {trace.total_turns} turn(s), {trace.total_duration_ms:.1f} ms"
+                )
+
         text = "\n".join(lines)
 
         dlg = QDialog(self)
-        dlg.setWindowTitle("Pipeline Timings")
-        dlg.setMinimumSize(450, 300)
+        dlg.setWindowTitle("Pipeline Trace")
+        dlg.setMinimumSize(550, 400)
         layout = QVBoxLayout(dlg)
 
         txt = QPlainTextEdit(text)
@@ -632,7 +670,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(txt)
 
         btn_box = QDialogButtonBox()
-        btn_copy = btn_box.addButton("Copy to Clipboard", QDialogButtonBox.ButtonRole.ActionRole)
+        btn_copy = btn_box.addButton("Copy Trace", QDialogButtonBox.ButtonRole.ActionRole)
         btn_copy.clicked.connect(lambda: QApplication.clipboard().setText(text))
         btn_close = btn_box.addButton(QDialogButtonBox.StandardButton.Close)
         btn_close.clicked.connect(dlg.close)

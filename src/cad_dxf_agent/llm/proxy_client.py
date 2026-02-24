@@ -8,10 +8,12 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from pathlib import Path
 from typing import Any
 
 from ..models.ops_schema import ChangeSet
+from ..models.trace_schema import AgentTurn, PlannerTrace, ToolCall
 from ..otel import get_tracer
 from ..settings import settings
 from .agent_provider import AgentProvider
@@ -86,6 +88,9 @@ class ProxyAgentProvider(PlannerProvider):
             ]
 
             turns = 0
+            trace_turns: list[AgentTurn] = []
+            loop_t0 = time.monotonic()
+
             while turns < MAX_AGENT_TURNS:
                 # Send request to proxy
                 response = self._proxy_generate(contents, tool_declarations)
@@ -95,22 +100,34 @@ class ProxyAgentProvider(PlannerProvider):
                     break
 
                 turns += 1
+                turn_t0 = time.monotonic()
                 span.add_event(f"agent_turn_{turns}", {"tool_count": len(function_calls)})
 
                 # Execute tools locally
                 tool_results = []
+                traced_calls: list[ToolCall] = []
                 for fc in function_calls:
                     tool_name = fc["name"]
                     tool_args = fc["args"]
                     logger.info("Proxy agent tool call [%d]: %s(%s)", turns, tool_name, tool_args)
 
+                    tc_t0 = time.monotonic()
                     try:
                         result = executor.execute(tool_name, tool_args)
                     except KeyError:
                         result = {"error": f"Unknown tool: {tool_name}"}
                     except Exception as e:
                         result = {"error": f"Tool execution failed: {e}"}
+                    tc_ms = (time.monotonic() - tc_t0) * 1000
 
+                    traced_calls.append(
+                        ToolCall(
+                            name=tool_name,
+                            args=tool_args,
+                            result=result if isinstance(result, dict) else {"value": result},
+                            duration_ms=tc_ms,
+                        )
+                    )
                     tool_results.append({"name": tool_name, "response": result})
 
                 # Add model's function calls to conversation
@@ -132,14 +149,33 @@ class ProxyAgentProvider(PlannerProvider):
                     )
                 contents.append({"role": "function", "parts": fn_parts})
 
+                turn_ms = (time.monotonic() - turn_t0) * 1000
+                trace_turns.append(
+                    AgentTurn(
+                        turn_number=turns,
+                        tool_calls=traced_calls,
+                        duration_ms=turn_ms,
+                    )
+                )
+
+            total_ms = (time.monotonic() - loop_t0) * 1000
             span.set_attribute("cad.agent.turns", turns)
             span.set_attribute("cad.agent.ops_count", len(executor.operations))
 
-            return ChangeSet(
+            trace = PlannerTrace(
+                provider_name=self.name,
+                total_turns=turns,
+                total_duration_ms=total_ms,
+                turns=trace_turns,
+            )
+
+            changeset = ChangeSet(
                 prompt=prompt,
                 operations=executor.operations,
                 revision_label=f"Proxy agent edit ({turns} turns): {prompt[:50]}",
             )
+            changeset.planner_trace = trace
+            return changeset
 
     def _proxy_generate(
         self,
