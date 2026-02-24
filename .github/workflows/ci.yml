@@ -51,7 +51,7 @@ jobs:
       - name: Install dependencies
         run: pip install -e ".[dev]"
       - name: Run tests with coverage
-        run: pytest --cov=cad_dxf_agent --cov-report=term-missing -v
+        run: pytest --cov=cad_dxf_agent --cov-report=term-missing -v --ignore=tests/benchmark
       - name: Upload coverage
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
         uses: actions/upload-artifact@v6
@@ -75,6 +75,25 @@ jobs:
         run: pytest tests/gui/ -v -m gui
         env:
           QT_QPA_PLATFORM: offscreen
+
+  benchmark:
+    runs-on: ubuntu-latest
+    needs: [test]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: pip install -e ".[dev]"
+      - name: Run benchmarks
+        run: pytest tests/benchmark/ -v --benchmark-json=benchmark.json
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v6
+        with:
+          name: benchmark-results
+          path: benchmark.json
 
   live-test:
     runs-on: ubuntu-latest
