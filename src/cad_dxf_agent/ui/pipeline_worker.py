@@ -21,6 +21,7 @@ from ..models.cad_schema import DrawingContext
 from ..models.changes_schema import ValidationResult
 from ..models.config_schema import RevisionNoteConfig, RuleConfig
 from ..models.ops_schema import AppliedChange, ChangeSet
+from ..settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +30,7 @@ class PipelineStage(StrEnum):
     """Named stages in the plan/apply pipeline."""
 
     BUILD_CONTEXT = "Build Context"
+    RENDER_VISION = "Render Vision"
     RUN_PLANNER = "Run Planner"
     VALIDATE = "Validate"
     PREVIEW = "Preview"
@@ -111,12 +113,14 @@ class PipelineWorker(QThread):
         prompt: str,
         context: DrawingContext,
         rule_config: RuleConfig,
+        dxf_path: Path | None = None,
     ) -> None:
         """Configure for a plan run. Call before start()."""
         self._mode = "plan"
         self._prompt = prompt
         self._context = context
         self._rule_config = rule_config
+        self._dxf_path = dxf_path
 
     def setup_apply(
         self,
@@ -175,10 +179,33 @@ class PipelineWorker(QThread):
             self.plan_failed.emit(sr.error or "Cancelled")
             return
 
+        # Stage 1.5: Render for vision (optional)
+        image_path = None
+        if (
+            self._dxf_path
+            and settings.vision_enabled
+            and settings.llm_provider not in ("mock", "mock-agent")
+        ):
+            try:
+                from ..core.renderer import render_dxf_to_png
+
+                render_result, sr = self._timed_stage(
+                    PipelineStage.RENDER_VISION,
+                    lambda: render_dxf_to_png(self._dxf_path, dpi=settings.render_dpi),  # type: ignore[arg-type]
+                )
+                stages.append(sr)
+                if sr.success and render_result is not None and render_result.success:
+                    image_path = render_result.output_path
+                    logger.info("Vision render: %s", image_path)
+                elif not sr.success:
+                    logger.warning("Vision render failed: %s (continuing without)", sr.error)
+            except ImportError:
+                logger.info("matplotlib not installed, skipping vision render")
+
         # Stage 2: Run planner
         changeset, sr = self._timed_stage(
             PipelineStage.RUN_PLANNER,
-            lambda: run_planner(self._prompt, drawing_ctx),
+            lambda: run_planner(self._prompt, drawing_ctx, image_path=image_path),
         )
         stages.append(sr)
         if not sr.success or self._cancelled:
