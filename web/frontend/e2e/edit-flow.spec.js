@@ -71,6 +71,33 @@ print(json.dumps({"original": orig, "edited": edited}))
   }
 }
 
+/**
+ * Apply changes and download the edited DXF file.
+ * Returns the local path where the downloaded file was saved.
+ */
+async function applyAndDownload(page, filenamePrefix = '') {
+  const applyBtn = page.locator('button').filter({ hasText: 'Apply Changes' });
+  await expect(applyBtn).toBeEnabled({ timeout: 5_000 });
+  await applyBtn.click();
+
+  await expect(
+    page.locator('.preview__tab--active')
+  ).toHaveText('Edited', { timeout: APPLY_TIMEOUT });
+
+  const downloadBtn = page.locator('button').filter({ hasText: 'Download Edited DXF' });
+  await expect(downloadBtn).toBeVisible({ timeout: 5_000 });
+
+  const downloadPromise = page.waitForEvent('download', { timeout: APPLY_TIMEOUT });
+  await downloadBtn.click();
+  const download = await downloadPromise;
+
+  const downloadDir = path.join(PROJECT_ROOT, 'web', 'frontend', 'test-results');
+  fs.mkdirSync(downloadDir, { recursive: true });
+  const savedPath = path.join(downloadDir, `${filenamePrefix}${download.suggestedFilename()}`);
+  await download.saveAs(savedPath);
+  return savedPath;
+}
+
 test.describe('Full Edit Flow', () => {
   test('upload → prompt "move" → see ops → apply → download valid edited DXF', async ({ page }) => {
     await page.goto('/');
@@ -106,42 +133,16 @@ test.describe('Full Edit Flow', () => {
     // AI message in chat
     await expect(page.locator('.message--ai').first()).toBeVisible();
 
-    // 4. Apply Changes (no download yet)
-    const applyBtn = page.locator('button').filter({ hasText: 'Apply Changes' });
-    await expect(applyBtn).toBeEnabled({ timeout: 5_000 });
-    await applyBtn.click();
-
-    // 5. Verify Edited tab is active + image visible
-    await expect(
-      page.locator('.preview__tab--active')
-    ).toHaveText('Edited', { timeout: APPLY_TIMEOUT });
+    // 4. Apply + download + verify edited preview image
+    const savedPath = await applyAndDownload(page);
     await expect(
       page.locator('.preview__image-wrap img[alt="edited drawing preview"]')
     ).toBeVisible({ timeout: 10_000 });
 
-    // 6. Download via separate button
-    const downloadBtn = page.locator('button').filter({ hasText: 'Download Edited DXF' });
-    await expect(downloadBtn).toBeVisible({ timeout: 5_000 });
-
-    const downloadPromise = page.waitForEvent('download', { timeout: APPLY_TIMEOUT });
-    await downloadBtn.click();
-
-    // 7. Verify download filename
-    const download = await downloadPromise;
-    const filename = download.suggestedFilename();
-    expect(filename).toMatch(/_edited\.dxf$/);
-
-    // 8. Save and validate the actual DXF content
-    const downloadDir = path.join(PROJECT_ROOT, 'web', 'frontend', 'test-results');
-    fs.mkdirSync(downloadDir, { recursive: true });
-    const savedPath = path.join(downloadDir, filename);
-    await download.saveAs(savedPath);
-
-    // File must be non-trivial size (not empty or error page)
+    // 5. Validate the actual DXF content
     const stat = fs.statSync(savedPath);
     expect(stat.size).toBeGreaterThan(1000); // real DXF is always > 1KB
 
-    // Validate with ezdxf — must be a parseable DXF with entities
     const result = validateDxf(savedPath);
     expect(result.valid, `DXF validation failed: ${result.error || 'unknown'}`).toBe(true);
     expect(result.entities).toBeGreaterThan(0);
@@ -161,7 +162,7 @@ test.describe('Full Edit Flow', () => {
     const allSame = [...editedPositions].every(p => origPositions.has(p));
     expect(allSame, 'Move should change at least one INSERT position').toBe(false);
 
-    console.log(`Downloaded DXF: ${filename}, ${stat.size} bytes, ${result.entities} entities, version ${result.version}`);
+    console.log(`Downloaded DXF: ${path.basename(savedPath)}, ${stat.size} bytes, ${result.entities} entities, version ${result.version}`);
     console.log(`Move validation: ${cmp.original.count} → ${cmp.edited.count} entities, position changed: ${!allSame}`);
   });
 
@@ -183,25 +184,7 @@ test.describe('Full Edit Flow', () => {
     await expect(page.locator('.op-item__type').first()).toBeVisible({ timeout: PLAN_TIMEOUT });
 
     // Apply + download
-    const applyBtn = page.locator('button').filter({ hasText: 'Apply Changes' });
-    await expect(applyBtn).toBeEnabled({ timeout: 5_000 });
-    await applyBtn.click();
-
-    await expect(
-      page.locator('.preview__tab--active')
-    ).toHaveText('Edited', { timeout: APPLY_TIMEOUT });
-
-    const downloadBtn = page.locator('button').filter({ hasText: 'Download Edited DXF' });
-    await expect(downloadBtn).toBeVisible({ timeout: 5_000 });
-
-    const downloadPromise = page.waitForEvent('download', { timeout: APPLY_TIMEOUT });
-    await downloadBtn.click();
-    const download = await downloadPromise;
-
-    const downloadDir = path.join(PROJECT_ROOT, 'web', 'frontend', 'test-results');
-    fs.mkdirSync(downloadDir, { recursive: true });
-    const savedPath = path.join(downloadDir, `delete_${download.suggestedFilename()}`);
-    await download.saveAs(savedPath);
+    const savedPath = await applyAndDownload(page, 'delete_');
 
     // Semantic validation: entity count decreased
     const originalPath = path.join(DXF_ZOO, 'r2000_blocks.dxf');
@@ -235,25 +218,7 @@ test.describe('Full Edit Flow', () => {
     await expect(page.locator('.message--ai').first()).toBeVisible();
 
     // Apply + download
-    const applyBtn = page.locator('button').filter({ hasText: 'Apply Changes' });
-    await expect(applyBtn).toBeEnabled({ timeout: 5_000 });
-    await applyBtn.click();
-
-    await expect(
-      page.locator('.preview__tab--active')
-    ).toHaveText('Edited', { timeout: APPLY_TIMEOUT });
-
-    const downloadBtn = page.locator('button').filter({ hasText: 'Download Edited DXF' });
-    await expect(downloadBtn).toBeVisible({ timeout: 5_000 });
-
-    const downloadPromise = page.waitForEvent('download', { timeout: APPLY_TIMEOUT });
-    await downloadBtn.click();
-    const download = await downloadPromise;
-
-    const downloadDir = path.join(PROJECT_ROOT, 'web', 'frontend', 'test-results');
-    fs.mkdirSync(downloadDir, { recursive: true });
-    const savedPath = path.join(downloadDir, `edittext_${download.suggestedFilename()}`);
-    await download.saveAs(savedPath);
+    const savedPath = await applyAndDownload(page, 'edittext_');
 
     // Semantic validation: text content changed
     const originalPath = path.join(DXF_ZOO, 'r2000_blocks.dxf');
@@ -264,7 +229,6 @@ test.describe('Full Edit Flow', () => {
     expect(cmp.edited.count).toBe(cmp.original.count);
     // At least one TEXT value differs
     const origTexts = new Set(cmp.original.texts);
-    const editedTexts = new Set(cmp.edited.texts);
     const textsIdentical = cmp.edited.texts.length === cmp.original.texts.length
       && cmp.edited.texts.every(t => origTexts.has(t));
     expect(textsIdentical, 'edit_text should change at least one TEXT value').toBe(false);

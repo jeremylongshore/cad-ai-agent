@@ -5,6 +5,8 @@ from __future__ import annotations
 import ezdxf
 import pytest
 
+WORKER_TIMEOUT_MS = 10_000
+
 
 def _extract_dxf_summary(path: str) -> dict:
     """Extract entity counts, INSERT positions, and TEXT values from a DXF file."""
@@ -45,7 +47,7 @@ def _run_plan_apply(qapp, sample_dxf, rule_config, prompt, output_path):
     plan_worker.plan_succeeded.connect(lambda r: plan_results.append(r))
     plan_worker.plan_failed.connect(lambda e: plan_errors.append(e))
     plan_worker.start()
-    assert plan_worker.wait(10000), "Plan worker timed out"
+    assert plan_worker.wait(WORKER_TIMEOUT_MS), "Plan worker timed out"
     qapp.processEvents()
     assert len(plan_errors) == 0, f"Plan failed: {plan_errors}"
     assert len(plan_results) == 1
@@ -59,7 +61,7 @@ def _run_plan_apply(qapp, sample_dxf, rule_config, prompt, output_path):
     apply_worker.apply_succeeded.connect(lambda r: apply_results.append(r))
     apply_worker.apply_failed.connect(lambda e: apply_errors.append(e))
     apply_worker.start()
-    assert apply_worker.wait(10000), "Apply worker timed out"
+    assert apply_worker.wait(WORKER_TIMEOUT_MS), "Apply worker timed out"
     qapp.processEvents()
     assert len(apply_errors) == 0, f"Apply failed: {apply_errors}"
     assert len(apply_results) == 1
@@ -84,7 +86,7 @@ class TestGuiPlanWorkflow:
         worker.plan_succeeded.connect(lambda r: results.append(r))
         worker.plan_failed.connect(lambda e: errors.append(e))
         worker.start()
-        assert worker.wait(10000), "Worker timed out"
+        assert worker.wait(WORKER_TIMEOUT_MS), "Worker timed out"
         qapp.processEvents()  # flush queued cross-thread signals
 
         assert len(errors) == 0, f"Plan failed: {errors}"
@@ -112,7 +114,7 @@ class TestGuiPlanWorkflow:
         plan_results = []
         plan_worker.plan_succeeded.connect(lambda r: plan_results.append(r))
         plan_worker.start()
-        assert plan_worker.wait(10000)
+        assert plan_worker.wait(WORKER_TIMEOUT_MS)
         qapp.processEvents()  # flush queued cross-thread signals
         assert len(plan_results) == 1
 
@@ -126,7 +128,7 @@ class TestGuiPlanWorkflow:
         apply_worker.apply_succeeded.connect(lambda r: apply_results.append(r))
         apply_worker.apply_failed.connect(lambda e: apply_errors.append(e))
         apply_worker.start()
-        assert apply_worker.wait(10000)
+        assert apply_worker.wait(WORKER_TIMEOUT_MS)
         qapp.processEvents()  # flush queued cross-thread signals
 
         assert len(apply_errors) == 0, f"Apply failed: {apply_errors}"
