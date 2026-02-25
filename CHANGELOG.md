@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-02-25
+
+### Added
+- Wire OpenTelemetry init in web backend lifespan, enabling all 7 pipeline spans for web requests (#32)
+- Google Cloud Trace exporter option (`OTEL_EXPORTER=gcp-trace`) with ADC support on Cloud Run (#33)
+- `gcp-trace` optional dependency group in pyproject.toml
+- Web OTel tests verifying spans propagate through upload→plan flow
+
+### Changed
+- Test count: 573 → 578 tests (coverage maintained at 68%)
+
+### Fixed
+- Ruff format compliance across codebase (9 files reformatted)
+
 ## [0.2.0] - 2026-02-24
 
 ### Added
