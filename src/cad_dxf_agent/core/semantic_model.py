@@ -11,11 +11,23 @@ from ..otel import get_tracer
 tracer = get_tracer(__name__)
 
 
+ENTITY_CAP = 500
+"""Maximum entities included in verbose planner context.
+
+Real-world DXF files can have thousands of entities, producing millions of
+tokens when serialised as JSON.  Cap at 500 to stay safely within LLM
+context limits (~1M tokens for Gemini).
+"""
+
+
 def build_planner_context(context: DrawingContext) -> dict:
     """Build a JSON-serializable summary of the drawing for the LLM planner.
 
     This is the information the planner sees to make targeting decisions.
     It does NOT include raw DXF data. Includes all spaces (model + layouts).
+
+    If the drawing has more than *ENTITY_CAP* entities the list is truncated
+    and ``entities_truncated`` / ``total_entity_count`` fields are added.
     """
     with tracer.start_as_current_span("cad.build_context") as span:
         span.set_attribute("cad.entities.count", context.entity_count)
@@ -31,6 +43,11 @@ def build_planner_context(context: DrawingContext) -> dict:
             for layer in context.layers
         ]
 
+        entities = context.entities
+        truncated = len(entities) > ENTITY_CAP
+        if truncated:
+            entities = entities[:ENTITY_CAP]
+
         entity_summary = [
             {
                 "handle": e.handle,
@@ -43,14 +60,14 @@ def build_planner_context(context: DrawingContext) -> dict:
                 "text": e.text_content,
                 "block_name": e.block_name,
             }
-            for e in context.entities
+            for e in entities
         ]
 
         layout_summary = [
             {"name": layout.name, "entity_count": layout.entity_count} for layout in context.layouts
         ]
 
-        return {
+        result = {
             "file_path": context.file_path,
             "entity_count": context.entity_count,
             "layers": layer_summary,
@@ -59,6 +76,13 @@ def build_planner_context(context: DrawingContext) -> dict:
             "layouts": layout_summary,
             "unsupported_types": context.unsupported_entity_types,
         }
+
+        if truncated:
+            result["entities_truncated"] = True
+            result["total_entity_count"] = context.entity_count
+            span.set_attribute("cad.entities.truncated", True)
+
+        return result
 
 
 def build_compact_context(context: DrawingContext) -> str:

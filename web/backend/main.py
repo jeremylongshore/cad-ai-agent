@@ -317,12 +317,16 @@ async def apply_changes(body: ApplyRequest, user: dict = Depends(get_user)):
 async def render(
     session_id: str = Query(...),
     type: str = Query("original"),
-    user: dict = Depends(get_user),
 ):
-    """Return a PNG render of the drawing."""
+    """Return a PNG render of the drawing.
+
+    No auth required — the session UUID is unguessable and serves as
+    the access credential.  This avoids the problem where Firebase
+    Hosting rewrites strip the Authorization header on proxied GETs.
+    """
     try:
-        session = session_mgr.get(session_id, user["uid"])
-    except (KeyError, PermissionError) as e:
+        session = session_mgr.get_by_id(session_id)
+    except KeyError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
     render_map = {
@@ -345,12 +349,15 @@ async def render(
 @app.get("/api/download")
 async def download(
     session_id: str = Query(...),
-    user: dict = Depends(get_user),
 ):
-    """Download the edited DXF file."""
+    """Download the edited DXF file.
+
+    No auth required — same rationale as /api/render (Firebase rewrites
+    strip Authorization headers on proxied GET requests).
+    """
     try:
-        session = session_mgr.get(session_id, user["uid"])
-    except (KeyError, PermissionError) as e:
+        session = session_mgr.get_by_id(session_id)
+    except KeyError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
     if session.edited_path is None or not session.edited_path.exists():

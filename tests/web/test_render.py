@@ -56,6 +56,8 @@ class TestRender:
         resp = client.get("/api/render?session_id=nonexistent000000&type=original")
         assert resp.status_code == 404
 
-    def test_render_requires_auth(self, unauth_client):
-        resp = unauth_client.get("/api/render?session_id=anything&type=original")
-        assert resp.status_code == 401
+    def test_render_no_auth_required(self, unauth_client):
+        """Render endpoint works without auth (session UUID is the credential)."""
+        resp = unauth_client.get("/api/render?session_id=nonexistent000000&type=original")
+        # 404, not 401 — the endpoint is reachable, session just doesn't exist
+        assert resp.status_code == 404

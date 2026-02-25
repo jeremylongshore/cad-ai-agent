@@ -76,6 +76,23 @@ class SessionManager:
 
         return session
 
+    def get_by_id(self, session_id: str) -> Session:
+        """Get a session by ID without ownership check.
+
+        Used for read-only endpoints (render, download) where the
+        session UUID itself serves as the access credential.
+        """
+        with self._lock:
+            session = self._sessions.get(session_id)
+
+        if session is None:
+            raise KeyError(f"Session not found: {session_id}")
+        if time.time() - session.created_at > SESSION_TTL_SECONDS:
+            self.delete(session_id)
+            raise KeyError(f"Session expired: {session_id}")
+
+        return session
+
     def delete(self, session_id: str) -> None:
         """Delete a session and its temp directory."""
         with self._lock:

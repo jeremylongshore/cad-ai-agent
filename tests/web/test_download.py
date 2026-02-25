@@ -39,6 +39,8 @@ class TestDownload:
         resp = client.get("/api/download?session_id=nonexistent000000")
         assert resp.status_code == 404
 
-    def test_download_requires_auth(self, unauth_client):
-        resp = unauth_client.get("/api/download?session_id=anything")
-        assert resp.status_code == 401
+    def test_download_no_auth_required(self, unauth_client):
+        """Download endpoint works without auth (session UUID is the credential)."""
+        resp = unauth_client.get("/api/download?session_id=nonexistent000000")
+        # 404, not 401 — the endpoint is reachable, session just doesn't exist
+        assert resp.status_code == 404
