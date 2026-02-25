@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 const TABS = [
   { key: 'original', label: 'Original' },
@@ -10,6 +10,10 @@ export default function PreviewPanel({ previewUrls, operations, selectedOps, onT
   const [activeTab, setActiveTab] = useState('original');
   const hasEdited = !!previewUrls.edited;
   const hasOperations = operations.length > 0;
+
+  useEffect(() => {
+    if (previewUrls.edited) setActiveTab('edited');
+  }, [previewUrls.edited]);
 
   return (
     <div className="preview">
@@ -70,7 +74,7 @@ export default function PreviewPanel({ previewUrls, operations, selectedOps, onT
             onClick={onApply}
             disabled={loading || selectedOps.length === 0}
           >
-            {loading ? <span className="spinner" aria-hidden="true" /> : 'Apply & Download'}
+            {loading ? <span className="spinner" aria-hidden="true" /> : 'Apply Changes'}
           </button>
         </div>
       )}
