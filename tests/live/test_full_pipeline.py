@@ -64,9 +64,7 @@ def _pick_prompt(category: str) -> dict:
 class TestFullPipelineLive:
     """End-to-end pipeline tests with real Gemini agent."""
 
-    def test_move_full_pipeline(
-        self, gcp_project, gcp_location, structural_drawing, tmp_path
-    ):
+    def test_move_full_pipeline(self, gcp_project, gcp_location, structural_drawing, tmp_path):
         """Move prompt → agent → validate → apply → save → verify round-trip."""
         from cad_dxf_agent.llm.agent_provider import AgentProvider
 
@@ -102,9 +100,7 @@ class TestFullPipelineLive:
             out_ctx = load_dxf(out_path)
             assert out_ctx.entity_count == original_count  # move preserves count
 
-    def test_edit_text_full_pipeline(
-        self, gcp_project, gcp_location, structural_drawing, tmp_path
-    ):
+    def test_edit_text_full_pipeline(self, gcp_project, gcp_location, structural_drawing, tmp_path):
         """Edit text prompt → agent → validate → apply → save → verify."""
         from cad_dxf_agent.llm.agent_provider import AgentProvider
 
@@ -129,9 +125,7 @@ class TestFullPipelineLive:
             out_ctx = load_dxf(out_path)
             assert out_ctx.entity_count >= 1
 
-    def test_delete_full_pipeline(
-        self, gcp_project, gcp_location, structural_drawing, tmp_path
-    ):
+    def test_delete_full_pipeline(self, gcp_project, gcp_location, structural_drawing, tmp_path):
         """Delete prompt → agent → validate → apply → save → verify count decreased."""
         from cad_dxf_agent.llm.agent_provider import AgentProvider
 
@@ -156,9 +150,7 @@ class TestFullPipelineLive:
             # Delete should reduce entity count
             assert out_ctx.entity_count <= original_count
 
-    def test_multi_op_full_pipeline(
-        self, gcp_project, gcp_location, structural_drawing, tmp_path
-    ):
+    def test_multi_op_full_pipeline(self, gcp_project, gcp_location, structural_drawing, tmp_path):
         """Multi-op prompt → agent → validate → apply → save → verify."""
         from cad_dxf_agent.llm.agent_provider import AgentProvider
 
@@ -183,9 +175,7 @@ class TestFullPipelineLive:
             out_ctx = load_dxf(out_path)
             assert out_ctx.entity_count >= 1
 
-    def test_protected_layer_blocked(
-        self, gcp_project, gcp_location, structural_drawing
-    ):
+    def test_protected_layer_blocked(self, gcp_project, gcp_location, structural_drawing):
         """Protected layer prompt → agent respects protection or validator blocks."""
         from cad_dxf_agent.llm.agent_provider import AgentProvider
 
@@ -208,9 +198,7 @@ class TestFullPipelineLive:
                     if entity and entity.layer.upper() in protected:
                         assert result.blockers, "Validator should block ops on protected layers"
 
-    def test_ambiguous_prompt_completes(
-        self, gcp_project, gcp_location, structural_drawing
-    ):
+    def test_ambiguous_prompt_completes(self, gcp_project, gcp_location, structural_drawing):
         """Ambiguous/vague prompt → pipeline completes without crash."""
         from cad_dxf_agent.llm.agent_provider import AgentProvider
 

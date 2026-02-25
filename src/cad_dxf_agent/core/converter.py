@@ -331,10 +331,7 @@ def _extract_pdf_fitz(msp, source_path: Path) -> int:
                     # pymupdf <1.27:  ('qu', Point, Point, Point, Point)
                     if len(item) == 2:
                         quad = item[1]
-                        pts = [
-                            (float(quad[k].x), page_height - float(quad[k].y))
-                            for k in range(4)
-                        ]
+                        pts = [(float(quad[k].x), page_height - float(quad[k].y)) for k in range(4)]
                     else:
                         pts = [
                             (float(item[k].x), page_height - float(item[k].y))

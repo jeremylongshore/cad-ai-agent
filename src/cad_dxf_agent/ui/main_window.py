@@ -638,7 +638,8 @@ class MainWindow(QMainWindow):
                 lines.append("Deterministic Planner (no LLM call)")
                 lines.append("=" * 50)
                 ops_desc = ", ".join(
-                    op.op_type.value for op in self._changeset.operations  # type: ignore[union-attr]
+                    op.op_type.value
+                    for op in self._changeset.operations  # type: ignore[union-attr]
                 )
                 lines.append(f"Pattern matched: {ops_desc}")
                 lines.append("0 ms (no API call)")

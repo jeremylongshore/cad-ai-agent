@@ -86,9 +86,7 @@ def tiny_png() -> bytes:
     def _make_chunk(chunk_type: bytes, data: bytes) -> bytes:
         chunk = chunk_type + data
         return (
-            struct.pack(">I", len(data))
-            + chunk
-            + struct.pack(">I", zlib.crc32(chunk) & 0xFFFFFFFF)
+            struct.pack(">I", len(data)) + chunk + struct.pack(">I", zlib.crc32(chunk) & 0xFFFFFFFF)
         )
 
     sig = b"\x89PNG\r\n\x1a\n"

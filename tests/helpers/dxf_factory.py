@@ -253,9 +253,7 @@ def create_mixed_entity_drawing(
 
     # V1 types
     msp.add_line((0, 0), (10, 0), dxfattribs={"layer": "MIX"})
-    msp.add_lwpolyline(
-        [(0, 5), (5, 5), (5, 10), (0, 10)], close=True, dxfattribs={"layer": "MIX"}
-    )
+    msp.add_lwpolyline([(0, 5), (5, 5), (5, 10), (0, 10)], close=True, dxfattribs={"layer": "MIX"})
     msp.add_text("Sample Text", dxfattribs={"layer": "MIX", "height": 2, "insert": (15, 0)})
     msp.add_mtext(
         "Sample MText",

@@ -94,9 +94,7 @@ class TestValidationFeedbackLoop:
                 f"{[b.message for b in result.blockers]}"
             )
 
-    def test_valid_request_no_retry(
-        self, gcp_project, structural_context, planner_context
-    ):
+    def test_valid_request_no_retry(self, gcp_project, structural_context, planner_context):
         """A valid request should succeed on first attempt with no retries."""
         from cad_dxf_agent.llm.gemini_provider import GeminiProvider
 

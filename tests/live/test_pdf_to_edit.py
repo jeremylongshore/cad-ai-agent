@@ -84,7 +84,11 @@ class TestPdfToEditLive:
 
         # 5. Validate
         result = validate_changeset(changeset, ctx, RuleConfig())
-        logger.info("Validation: %d blockers, %d warnings", len(result.blockers), len(result.warnings))
+        logger.info(
+            "Validation: %d blockers, %d warnings",
+            len(result.blockers),
+            len(result.warnings),
+        )
 
         # 6. Apply & save (only if valid ops)
         if not result.blockers and changeset.op_count > 0:
@@ -194,6 +198,4 @@ class TestPdfToEditLive:
 
             out_ctx = load_dxf(out_path)
             assert out_ctx.entity_count <= original_count
-            logger.info(
-                "Delete: %d → %d entities", original_count, out_ctx.entity_count
-            )
+            logger.info("Delete: %d → %d entities", original_count, out_ctx.entity_count)

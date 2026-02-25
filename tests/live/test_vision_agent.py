@@ -37,9 +37,7 @@ class TestVisionAugmentedAgent:
         except ImportError:
             pytest.skip("Neither matplotlib nor Pillow available for PNG creation")
 
-    def test_vision_augmented_move(
-        self, gcp_project, gcp_location, planner_context, drawing_png
-    ):
+    def test_vision_augmented_move(self, gcp_project, gcp_location, planner_context, drawing_png):
         """Agent with vision produces a valid ChangeSet for a move command."""
         from cad_dxf_agent.llm.agent_provider import AgentProvider
 
@@ -54,9 +52,7 @@ class TestVisionAugmentedAgent:
         assert changeset.planner_trace is not None
         assert changeset.planner_trace.total_turns >= 1
 
-    def test_vision_augmented_delete(
-        self, gcp_project, gcp_location, planner_context, drawing_png
-    ):
+    def test_vision_augmented_delete(self, gcp_project, gcp_location, planner_context, drawing_png):
         """Agent with vision can delete an entity."""
         from cad_dxf_agent.llm.agent_provider import AgentProvider
 
@@ -88,9 +84,7 @@ class TestVisionAugmentedAgent:
         )
         assert changeset.op_count >= 1
 
-    def test_vision_description_improves_context(
-        self, gcp_project, drawing_png
-    ):
+    def test_vision_description_improves_context(self, gcp_project, drawing_png):
         """Vision description is non-empty and contains structural terms."""
         from cad_dxf_agent.llm.vision_describer import describe_drawing
 
@@ -102,10 +96,15 @@ class TestVisionAugmentedAgent:
         # At least some structural terms should appear
         desc_lower = description.lower()
         structural_terms = [
-            "grid", "column", "line", "structural", "plan",
-            "drawing", "foundation", "beam", "wall",
+            "grid",
+            "column",
+            "line",
+            "structural",
+            "plan",
+            "drawing",
+            "foundation",
+            "beam",
+            "wall",
         ]
         matches = [t for t in structural_terms if t in desc_lower]
-        assert len(matches) >= 1, (
-            f"Description lacks structural terms: {description[:200]}"
-        )
+        assert len(matches) >= 1, f"Description lacks structural terms: {description[:200]}"

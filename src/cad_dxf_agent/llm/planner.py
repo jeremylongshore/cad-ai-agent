@@ -210,9 +210,7 @@ def run_planner(
                             "; ".join(b.message for b in result.blockers),
                         )
                         if val_attempt >= max_val_retries:
-                            logger.warning(
-                                "Validation retries exhausted, returning last changeset"
-                            )
+                            logger.warning("Validation retries exhausted, returning last changeset")
                             break
                         corrective = _format_validation_feedback(prompt, result.blockers)
                         changeset = _call_with_timeout(
