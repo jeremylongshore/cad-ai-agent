@@ -33,7 +33,7 @@ class TestApply:
     def test_apply_selected_ops(self, client, planned_session):
         session_id, ops = planned_session
         if not ops:
-            pytest.skip("Mock planner returned no ops")
+            pytest.skip("Planner returned no ops")
         resp = client.post(
             "/api/apply",
             json={"session_id": session_id, "selected_ops": [0]},
