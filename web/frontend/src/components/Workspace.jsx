@@ -100,7 +100,7 @@ export default function Workspace({ user, onSignOut }) {
               operations={operations}
               selectedOps={selectedOps}
               onToggleOp={session.toggleOp}
-              onApply={async () => { await session.apply(); await session.download(); }}
+              onApply={() => session.apply()}
               onDownload={session.download}
               loading={loading}
             />

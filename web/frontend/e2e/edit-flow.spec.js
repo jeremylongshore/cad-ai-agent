@@ -71,19 +71,32 @@ test.describe('Full Edit Flow', () => {
     // AI message in chat
     await expect(page.locator('.message--ai').first()).toBeVisible();
 
-    // 4. Apply & Download
-    const applyBtn = page.locator('button').filter({ hasText: 'Apply' });
+    // 4. Apply Changes (no download yet)
+    const applyBtn = page.locator('button').filter({ hasText: 'Apply Changes' });
     await expect(applyBtn).toBeEnabled({ timeout: 5_000 });
-
-    const downloadPromise = page.waitForEvent('download', { timeout: APPLY_TIMEOUT });
     await applyBtn.click();
 
-    // 5. Verify download filename
+    // 5. Verify Edited tab is active + image visible
+    await expect(
+      page.locator('.preview__tab--active')
+    ).toHaveText('Edited', { timeout: APPLY_TIMEOUT });
+    await expect(
+      page.locator('.preview__image-wrap img[alt="edited drawing preview"]')
+    ).toBeVisible({ timeout: 10_000 });
+
+    // 6. Download via separate button
+    const downloadBtn = page.locator('button').filter({ hasText: 'Download Edited DXF' });
+    await expect(downloadBtn).toBeVisible({ timeout: 5_000 });
+
+    const downloadPromise = page.waitForEvent('download', { timeout: APPLY_TIMEOUT });
+    await downloadBtn.click();
+
+    // 7. Verify download filename
     const download = await downloadPromise;
     const filename = download.suggestedFilename();
     expect(filename).toMatch(/_edited\.dxf$/);
 
-    // 6. Save and validate the actual DXF content
+    // 8. Save and validate the actual DXF content
     const downloadDir = path.join(PROJECT_ROOT, 'web', 'frontend', 'test-results');
     fs.mkdirSync(downloadDir, { recursive: true });
     const savedPath = path.join(downloadDir, filename);
