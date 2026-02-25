@@ -137,6 +137,10 @@ markers = [
 
 [tool.coverage.run]
 source = ["cad_dxf_agent"]
+omit = [
+    "src/cad_dxf_agent/ui/*",
+    "src/cad_dxf_agent/app.py",
+]
 
 [tool.coverage.report]
 show_missing = true
