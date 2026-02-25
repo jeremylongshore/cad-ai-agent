@@ -51,7 +51,18 @@ def init_otel(service_name: str = "cad-dxf-agent") -> None:
     resource = Resource.create({"service.name": service_name})
     provider = TracerProvider(resource=resource)
 
-    if settings.otel_endpoint:
+    if settings.otel_exporter == "gcp-trace":
+        try:
+            from opentelemetry.exporter.cloud_trace import CloudTraceSpanExporter
+
+            exporter = CloudTraceSpanExporter()
+            logger.info("OTel: using Google Cloud Trace exporter")
+        except ImportError:
+            logger.warning(
+                "OTel: gcp-trace exporter not installed, falling back to console"
+            )
+            exporter = ConsoleSpanExporter()
+    elif settings.otel_endpoint:
         try:
             from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import (
                 OTLPSpanExporter,

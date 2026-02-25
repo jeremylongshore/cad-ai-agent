@@ -99,6 +99,56 @@ class TestBuildContextSpan:
         assert attrs["cad.entities.count"] == sample_context.entity_count
 
 
+class TestGcpTraceExporter:
+    def test_gcp_trace_exporter_selected(self, monkeypatch):
+        """When OTEL_EXPORTER=gcp-trace and package available, uses GCP exporter."""
+        import sys
+        import types
+        import unittest.mock
+
+        import cad_dxf_agent.otel as otel_mod
+
+        reset_otel()
+        monkeypatch.setenv("OTEL_ENABLED", "true")
+        monkeypatch.setenv("OTEL_EXPORTER", "gcp-trace")
+
+        # Mock the CloudTraceSpanExporter module
+        mock_exporter = unittest.mock.MagicMock()
+        mock_module = types.ModuleType("opentelemetry.exporter.cloud_trace")
+        mock_module.CloudTraceSpanExporter = lambda: mock_exporter  # type: ignore[attr-defined]
+        monkeypatch.setitem(sys.modules, "opentelemetry.exporter.cloud_trace", mock_module)
+
+        # Fresh settings with env vars applied
+        from cad_dxf_agent.settings import Settings
+
+        monkeypatch.setattr("cad_dxf_agent.settings.settings", Settings())
+
+        otel_mod.init_otel(service_name="test-gcp")
+        assert otel_mod._provider is not None
+        reset_otel()
+
+    def test_gcp_trace_fallback_when_not_installed(self, monkeypatch):
+        """When OTEL_EXPORTER=gcp-trace but package missing, falls back to console."""
+        import sys
+
+        import cad_dxf_agent.otel as otel_mod
+
+        reset_otel()
+        monkeypatch.setenv("OTEL_ENABLED", "true")
+        monkeypatch.setenv("OTEL_EXPORTER", "gcp-trace")
+
+        # Block the import so it raises ImportError
+        monkeypatch.setitem(sys.modules, "opentelemetry.exporter.cloud_trace", None)
+
+        from cad_dxf_agent.settings import Settings
+
+        monkeypatch.setattr("cad_dxf_agent.settings.settings", Settings())
+
+        otel_mod.init_otel(service_name="test-gcp-fallback")
+        assert otel_mod._provider is not None  # console fallback still initializes
+        reset_otel()
+
+
 class TestOtelDisabled:
     def test_no_spans_when_disabled(self, sample_dxf, otel_disabled):
         """When OTel is not initialized, no spans should be created."""
