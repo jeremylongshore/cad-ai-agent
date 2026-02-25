@@ -4,10 +4,8 @@ from __future__ import annotations
 
 import time
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
-
 from web.backend.session import Session, SessionManager
 
 

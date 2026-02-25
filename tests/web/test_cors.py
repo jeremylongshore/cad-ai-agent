@@ -2,11 +2,7 @@
 
 from __future__ import annotations
 
-import os
-from unittest.mock import patch
-
 import pytest
-from starlette.testclient import TestClient
 
 
 @pytest.mark.web
@@ -43,13 +39,10 @@ class TestCORS:
         acao = resp.headers.get("access-control-allow-origin")
         assert acao is None or "evil.com" not in acao
 
-    def test_cors_custom_origin_env_var(self):
-        """CAD_WEB_CORS_ORIGIN env var should add an allowed origin."""
-        # Need to reimport app after setting env var since CORS is configured at module level
-        with patch.dict(os.environ, {"CAD_WEB_CORS_ORIGIN": "https://custom.example.com"}):
-            # Check that the origin list includes the custom one
-            from web.backend.main import ALLOWED_ORIGINS
+    def test_cors_allowed_origins_list(self):
+        """Verify the hardcoded allowed origins include expected values."""
+        from web.backend.main import ALLOWED_ORIGINS
 
-            # The custom origin is added dynamically at module load time,
-            # so we verify the mechanism exists (the env var is checked)
-            assert "https://cad-dxf-agent.web.app" in ALLOWED_ORIGINS
+        assert "http://localhost:3000" in ALLOWED_ORIGINS
+        assert "https://cad-dxf-agent.web.app" in ALLOWED_ORIGINS
+        assert "https://cad-dxf-agent.firebaseapp.com" in ALLOWED_ORIGINS

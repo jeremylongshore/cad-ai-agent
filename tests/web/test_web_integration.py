@@ -25,7 +25,8 @@ class TestWebIntegration:
         )
         assert resp.status_code == 200
         plan_data = resp.json()
-        assert plan_data["validation"]["is_valid"] is True or len(plan_data["validation"]["blockers"]) == 0
+        validation = plan_data["validation"]
+        assert validation["is_valid"] is True or len(validation["blockers"]) == 0
 
         # Apply
         resp = client.post(
@@ -56,7 +57,7 @@ class TestWebIntegration:
         )
         ops = resp.json()["operations"]
         if not ops:
-            pytest.skip("Mock planner returned no ops")
+            pytest.skip("Planner returned no ops")
 
         resp = client.post(
             "/api/apply",

@@ -6,14 +6,17 @@ import Footer from './Footer';
 export default function Landing() {
   const navigate = useNavigate();
   const [trying, setTrying] = useState(false);
+  const [tryError, setTryError] = useState('');
 
   const handleTryNow = async () => {
     setTrying(true);
+    setTryError('');
     try {
       await signInAnonymously(auth);
       navigate('/app');
-    } catch {
-      navigate('/login');
+    } catch (err) {
+      console.error('Anonymous sign-in failed:', err);
+      setTryError('Anonymous sign-in is unavailable. Please sign in with an account.');
     } finally {
       setTrying(false);
     }
@@ -63,6 +66,11 @@ export default function Landing() {
                 Sign In
               </Link>
             </div>
+            {tryError && (
+              <p style={{ color: 'var(--error, #e53e3e)', marginTop: 'var(--space-3)', fontSize: 'var(--text-sm)' }}>
+                {tryError}
+              </p>
+            )}
           </div>
         </section>
 

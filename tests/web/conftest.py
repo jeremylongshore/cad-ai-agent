@@ -6,7 +6,6 @@ import os
 import struct
 import zlib
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 from starlette.testclient import TestClient
@@ -23,10 +22,10 @@ def client(auth_user):
     """TestClient with auth dependency overridden to return auth_user."""
     from web.backend.main import app, get_user
 
-    async def _mock_get_user():
+    async def _override_get_user():
         return auth_user
 
-    app.dependency_overrides[get_user] = _mock_get_user
+    app.dependency_overrides[get_user] = _override_get_user
     with TestClient(app, raise_server_exceptions=False) as c:
         yield c
     app.dependency_overrides.clear()
@@ -49,10 +48,17 @@ def dev_mode_client():
     from web.backend.main import app
 
     app.dependency_overrides.clear()
-    with patch.dict(os.environ, {"CAD_WEB_DEV_MODE": "1"}):
+    old = os.environ.get("CAD_WEB_DEV_MODE")
+    os.environ["CAD_WEB_DEV_MODE"] = "1"
+    try:
         with TestClient(app, raise_server_exceptions=False) as c:
             yield c
-    app.dependency_overrides.clear()
+    finally:
+        if old is None:
+            os.environ.pop("CAD_WEB_DEV_MODE", None)
+        else:
+            os.environ["CAD_WEB_DEV_MODE"] = old
+        app.dependency_overrides.clear()
 
 
 @pytest.fixture
@@ -79,12 +85,21 @@ def tiny_png() -> bytes:
 
     def _make_chunk(chunk_type: bytes, data: bytes) -> bytes:
         chunk = chunk_type + data
-        return struct.pack(">I", len(data)) + chunk + struct.pack(">I", zlib.crc32(chunk) & 0xFFFFFFFF)
+        return (
+            struct.pack(">I", len(data))
+            + chunk
+            + struct.pack(">I", zlib.crc32(chunk) & 0xFFFFFFFF)
+        )
 
     sig = b"\x89PNG\r\n\x1a\n"
     ihdr = struct.pack(">IIBBBBB", 1, 1, 8, 2, 0, 0, 0)
     raw_data = zlib.compress(b"\x00\xff\x00\x00")
-    return sig + _make_chunk(b"IHDR", ihdr) + _make_chunk(b"IDAT", raw_data) + _make_chunk(b"IEND", b"")
+    return (
+        sig
+        + _make_chunk(b"IHDR", ihdr)
+        + _make_chunk(b"IDAT", raw_data)
+        + _make_chunk(b"IEND", b"")
+    )
 
 
 @pytest.fixture(autouse=True)
@@ -98,12 +113,19 @@ def clean_sessions():
 
 
 @pytest.fixture
-def mock_renderer():
-    """Mock the renderer to avoid matplotlib dependency in tests."""
-    from unittest.mock import MagicMock
+def real_pdf_bytes() -> bytes:
+    """Create a real PDF with geometry for upload tests (uses fpdf2)."""
+    try:
+        from fpdf import FPDF
+    except ImportError:
+        pytest.skip("fpdf2 not installed")
 
-    mock_result = MagicMock()
-    mock_result.success = False
-
-    with patch("cad_dxf_agent.core.renderer.render_dxf_to_png", return_value=mock_result):
-        yield mock_result
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_line_width(0.5)
+    pdf.line(10, 10, 100, 10)
+    pdf.line(10, 10, 10, 100)
+    pdf.rect(20, 20, 60, 40)
+    pdf.set_font("Helvetica", size=12)
+    pdf.text(30, 50, "Test Label")
+    return bytes(pdf.output())

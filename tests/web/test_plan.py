@@ -86,13 +86,12 @@ class TestPlan:
         assert "No file loaded" in resp.json()["detail"]
 
     def test_plan_empty_prompt(self, client, upload_dxf):
-        """Empty prompt still goes through the mock planner."""
+        """Empty prompt still returns a valid response."""
         session_id, _ = upload_dxf
         resp = client.post(
             "/api/plan",
             json={"session_id": session_id, "prompt": ""},
         )
-        # Mock planner should still return a response (possibly empty ops)
         assert resp.status_code == 200
 
     def test_plan_requires_auth(self, unauth_client):
