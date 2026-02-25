@@ -9,3 +9,5 @@ numpy>=1.26
 httpx>=0.27
 google-cloud-aiplatform>=1.60.0
 matplotlib>=3.8
+opentelemetry-api>=1.21
+opentelemetry-sdk>=1.21
