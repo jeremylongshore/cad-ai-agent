@@ -8,7 +8,9 @@ import zlib
 from pathlib import Path
 
 import pytest
-from starlette.testclient import TestClient
+
+starlette = pytest.importorskip("starlette", reason="web backend tests require fastapi/starlette")
+from starlette.testclient import TestClient  # noqa: E402
 
 
 @pytest.fixture

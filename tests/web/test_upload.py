@@ -7,7 +7,6 @@ PDF tests require pymupdf + fpdf2 (installed in dev deps), skip otherwise.
 from __future__ import annotations
 
 import pytest
-
 from web.backend.main import _user_friendly_conversion_error
 
 
@@ -31,9 +30,7 @@ class TestUserFriendlyConversionError:
         assert "no pages" in msg.lower()
 
     def test_oda_converter_message(self):
-        msg = _user_friendly_conversion_error(
-            "ODA File Converter not found", ".dwg"
-        )
+        msg = _user_friendly_conversion_error("ODA File Converter not found", ".dwg")
         assert "not available on the web" in msg
 
     def test_none_error_gives_generic(self):
@@ -136,9 +133,6 @@ class TestUpload:
 
     def test_upload_pdf_importerror_message_is_friendly(self, client, monkeypatch):
         """If pymupdf is missing, the 500 message should be user-friendly."""
-        import web.backend.main as main_mod
-
-        original_upload = main_mod.upload
 
         # Force ImportError on the convert_to_dxf import inside upload
         async def _patched_upload(file, user):
