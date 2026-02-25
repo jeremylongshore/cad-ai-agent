@@ -84,6 +84,8 @@ dev = [
     "pyinstaller>=6.0",
     "fastapi>=0.115.0",
     "python-multipart>=0.0.12",
+    "firebase-admin>=6.6.0",
+    "pytest-asyncio>=0.23",
 ]
 
 [project.scripts]
