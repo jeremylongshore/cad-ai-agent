@@ -86,6 +86,9 @@ export default function FileUpload({ onUpload, loading }) {
           aria-hidden="true"
         />
       </div>
+      <p className="upload-zone__hint">
+        Accepts .dxf and .pdf files. For .dwg files, export as DXF from your CAD software.
+      </p>
       {error && <p className="input-group__error mt-2" role="alert">{error}</p>}
     </div>
   );

@@ -204,6 +204,13 @@
   margin-top: var(--space-1);
 }
 
+.upload-zone__hint {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  margin-top: var(--space-2);
+  text-align: center;
+}
+
 /* Chat */
 .chat {
   display: flex;
