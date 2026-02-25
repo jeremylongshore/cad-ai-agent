@@ -34,7 +34,7 @@ class Settings:
 
         # OpenTelemetry
         self.otel_enabled: bool = os.getenv("OTEL_ENABLED", "").lower() in ("1", "true", "yes")
-        self.otel_exporter: str = os.getenv("OTEL_EXPORTER", "console")
+        self.otel_exporter: str = os.getenv("OTEL_EXPORTER", "console")  # console|otlp|gcp-trace
         self.otel_endpoint: str | None = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
 
         # Logging

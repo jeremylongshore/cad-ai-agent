@@ -116,7 +116,7 @@ All settings via environment variables (`.env` file, `.gitignore`d):
 | `CAD_REVISION_NOTES_ENABLED` | `true` | Insert revision notes after edits |
 | `CAD_REVISION_NOTES_LAYER` | `AI_REV_NOTES` | Layer name for revision notes |
 | `OTEL_ENABLED` | _(unset)_ | Enable OpenTelemetry tracing (`1`, `true`, `yes`) |
-| `OTEL_EXPORTER` | `console` | Span exporter: `console` or `otlp` |
+| `OTEL_EXPORTER` | `console` | Span exporter: `console`, `otlp`, or `gcp-trace` |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | _(unset)_ | OTLP collector endpoint (e.g., `http://localhost:4317`) |
 
 ### Observability (OpenTelemetry)
