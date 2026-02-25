@@ -40,6 +40,9 @@ session_mgr = SessionManager()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    from cad_dxf_agent.otel import init_otel
+
+    init_otel(service_name="cad-dxf-web")
     logger.info("CAD DXF Web Backend starting")
     yield
     logger.info("CAD DXF Web Backend shutting down")
