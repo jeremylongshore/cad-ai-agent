@@ -82,6 +82,8 @@ dev = [
     "matplotlib>=3.8",
     "fpdf2>=2.7",
     "pyinstaller>=6.0",
+    "fastapi>=0.115.0",
+    "python-multipart>=0.0.12",
 ]
 
 [project.scripts]
