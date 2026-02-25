@@ -43,11 +43,14 @@ jobs:
             CAD_LLM_PROVIDER=gemini
             CAD_GCP_PROJECT=${{ env.GCP_PROJECT }}
             CAD_WEB_CORS_ORIGIN=https://cad-dxf-agent.web.app
+            OTEL_ENABLED=1
+            OTEL_EXPORTER=gcp-trace
           flags: |
             --allow-unauthenticated
             --memory=1Gi
             --cpu=1
             --timeout=300
+            --service-account=cad-dxf-web-run@${{ env.GCP_PROJECT }}.iam.gserviceaccount.com
 
       - name: Show backend URL
         run: echo "Backend deployed to ${{ steps.deploy.outputs.url }}"

@@ -40,6 +40,8 @@ session_mgr = SessionManager()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+
     from cad_dxf_agent.otel import init_otel
 
     init_otel(service_name="cad-dxf-web")

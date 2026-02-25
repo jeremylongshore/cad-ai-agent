@@ -31,6 +31,8 @@ steps:
       - '1'
       - '--timeout'
       - '300'
+      - '--service-account'
+      - 'cad-dxf-web-run@$PROJECT_ID.iam.gserviceaccount.com'
       - '--set-env-vars'
       - 'CAD_LLM_PROVIDER=gemini,CAD_GCP_PROJECT=$PROJECT_ID,OTEL_ENABLED=1,OTEL_EXPORTER=gcp-trace'
 
