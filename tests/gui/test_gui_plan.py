@@ -24,6 +24,7 @@ class TestGuiPlanWorkflow:
         worker.plan_failed.connect(lambda e: errors.append(e))
         worker.start()
         assert worker.wait(10000), "Worker timed out"
+        qapp.processEvents()  # flush queued cross-thread signals
 
         assert len(errors) == 0, f"Plan failed: {errors}"
         assert len(results) == 1
@@ -51,6 +52,7 @@ class TestGuiPlanWorkflow:
         plan_worker.plan_succeeded.connect(lambda r: plan_results.append(r))
         plan_worker.start()
         assert plan_worker.wait(10000)
+        qapp.processEvents()  # flush queued cross-thread signals
         assert len(plan_results) == 1
 
         changeset = plan_results[0].changeset
@@ -64,6 +66,7 @@ class TestGuiPlanWorkflow:
         apply_worker.apply_failed.connect(lambda e: apply_errors.append(e))
         apply_worker.start()
         assert apply_worker.wait(10000)
+        qapp.processEvents()  # flush queued cross-thread signals
 
         assert len(apply_errors) == 0, f"Apply failed: {apply_errors}"
         assert len(apply_results) == 1
