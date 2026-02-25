@@ -3,3 +3,8 @@ dist/
 .env
 .env.local
 .env.production
+
+# Playwright
+test-results/
+playwright-report/
+blob-report/

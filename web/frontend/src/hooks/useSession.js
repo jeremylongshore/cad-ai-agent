@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { uploadFile, planEdit, applyChanges, downloadFile, getRenderUrl } from '../lib/api';
+import { uploadFile, planEdit, applyChanges, downloadFile, getRenderBlob } from '../lib/api';
 
 export function useSession() {
   const [sessionId, setSessionId] = useState(null);
@@ -21,10 +21,13 @@ export function useSession() {
       const data = await uploadFile(file);
       setSessionId(data.session_id);
       setFileInfo(data.file_info);
-      setPreviewUrls((prev) => ({
-        ...prev,
-        original: getRenderUrl(data.session_id, 'original'),
-      }));
+      try {
+        const blob = await getRenderBlob(data.session_id, 'original');
+        const url = URL.createObjectURL(blob);
+        setPreviewUrls((prev) => ({ ...prev, original: url }));
+      } catch {
+        // Render not available yet — that's ok
+      }
       setMessages([{ role: 'system', text: `Loaded ${file.name} (${data.file_info.entity_count} entities, ${data.file_info.layer_count} layers)` }]);
       setOperations([]);
       setSelectedOps([]);
@@ -75,8 +78,12 @@ export function useSession() {
       const data = await applyChanges(sessionId, selectedOps);
       setMessages((prev) => [...prev, { role: 'system', text: data.message || 'Changes applied.' }]);
 
-      if (data.render_url) {
-        setPreviewUrls((prev) => ({ ...prev, edited: data.render_url }));
+      try {
+        const blob = await getRenderBlob(sessionId, 'edited');
+        const url = URL.createObjectURL(blob);
+        setPreviewUrls((prev) => ({ ...prev, edited: url }));
+      } catch {
+        // Edited render not available — that's ok
       }
     } catch (err) {
       setError(err.message);
@@ -99,6 +106,10 @@ export function useSession() {
   }, [sessionId]);
 
   const reset = useCallback(() => {
+    // Revoke blob URLs to free memory
+    Object.values(previewUrls).forEach((url) => {
+      if (url) URL.revokeObjectURL(url);
+    });
     setSessionId(null);
     setFileInfo(null);
     setMessages([]);
@@ -107,7 +118,7 @@ export function useSession() {
     setValidation(null);
     setPreviewUrls({ original: null, edited: null, diff: null });
     setError(null);
-  }, []);
+  }, [previewUrls]);
 
   return {
     sessionId,

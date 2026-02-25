@@ -6,6 +6,12 @@ ENV MPLBACKEND=Agg
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONPATH=/app/src
 
+# System deps for pymupdf fallback + matplotlib font rendering
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libglib2.0-0 \
+    libfontconfig1 \
+    && rm -rf /var/lib/apt/lists/*
+
 # Install Python deps (everything in one layer)
 COPY web/backend/requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt

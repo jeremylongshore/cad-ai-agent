@@ -6,7 +6,13 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "e2e": "playwright test",
+    "e2e:prod": "TARGET=production playwright test",
+    "e2e:prod:headed": "TARGET=production playwright test --headed",
+    "e2e:headed": "playwright test --headed",
+    "e2e:debug": "PWDEBUG=1 playwright test --headed",
+    "e2e:report": "playwright show-report"
   },
   "dependencies": {
     "firebase": "^11.0.0",
@@ -15,6 +21,7 @@
     "react-router-dom": "^6.28.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.49.0",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.4",

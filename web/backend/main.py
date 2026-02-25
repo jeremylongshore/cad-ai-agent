@@ -137,10 +137,14 @@ async def upload(
 
             result = convert_to_dxf(upload_path)
             if not result.success:
-                raise HTTPException(status_code=422, detail=f"Conversion failed: {result.error}")
+                detail = _user_friendly_conversion_error(result.error, ext)
+                raise HTTPException(status_code=422, detail=detail)
             shutil.copy2(str(result.output_path), str(dxf_path))
         except ImportError:
-            raise HTTPException(status_code=500, detail="PDF conversion not available")
+            raise HTTPException(
+                status_code=500,
+                detail="PDF conversion is temporarily unavailable. Please try a .dxf file.",
+            )
     else:
         shutil.copy2(str(upload_path), str(dxf_path))
 
@@ -368,6 +372,25 @@ async def download(
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+
+def _user_friendly_conversion_error(raw_error: str | None, ext: str) -> str:
+    """Map internal converter errors to user-facing messages."""
+    if not raw_error:
+        return f"Could not process your {ext} file. Please try a different file."
+    lower = raw_error.lower()
+    if "no pdf library" in lower or "pip install" in lower:
+        return "PDF processing is temporarily unavailable. Please try uploading a .dxf file instead."
+    if "no vector geometry" in lower or "raster" in lower:
+        return (
+            "This PDF appears to be a scanned image, not a vector drawing. "
+            "Please export as DXF from your CAD software."
+        )
+    if "no pages" in lower:
+        return "This PDF has no pages. Please check the file and try again."
+    if "oda file converter" in lower:
+        return "DWG conversion is not available on the web. Please export as DXF from your CAD software."
+    return f"Could not convert your {ext} file. Please try exporting as DXF from your CAD software."
 
 
 def _describe_op(op) -> str:
