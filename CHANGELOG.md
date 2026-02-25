@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-02-24
+
+### Added
+- **Web MVP**: Firebase Hosting frontend + Cloud Run backend with 65-test suite (#31)
+- Paper space / layout editing support (#15)
+- Windows packaging & installer infrastructure (#16)
+- Live Gemini API test infrastructure with WIF-based CI (#17, #19)
+- Responsive pipeline with QThread worker and progress UI (#23)
+- Planner hardening: drawing stats, deterministic execution, trace view (#24, #25)
+- Vision pipeline integration with PDF-to-edit conversion (#28)
+- Validation feedback loop for planner self-correction
+- Live PDF-to-edit full journey tests
+- v0.2.0 testing infrastructure: ScriptedAgentProvider, golden trajectories, syrupy snapshots (#14)
+- Max snapshots cap to EditHistory (default 50) (#26)
+- Validator micro-benchmarks in CI (#27)
+- Beta testing DevOps operations playbook
+
+### Fixed
+- Handle pymupdf 1.27 quad item API change in PDF converter (#29)
+- Web backend deps: google-cloud-aiplatform and matplotlib
+- Strip mocks from web test suite, fix anonymous auth error handling (#31)
+- Use ADC auto-detection for live API tests instead of env var (#18)
+- Broaden live test error expectations for GCP API responses (#20)
+- Resolve critical audit findings for v0.1.0 (#22)
+
+### Changed
+- Test count: 222 → 573 tests (coverage 68%)
+- Planner now uses compact summaries by default to reduce token usage
+
 ## [0.1.0] - 2026-02-20
 
 ### Added

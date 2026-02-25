@@ -14,17 +14,19 @@ Local-first DXF layout editor with LLM-assisted prompt-to-edit planning, validat
 - **Save-as workflow** — Original files are always preserved.
 - **Mock mode** — The full pipeline works without an API key for testing and development.
 
-## V1 Scope
+## Scope
 
-| Supported | Not in V1 |
-|-----------|-----------|
+| Supported | Not Yet |
+|-----------|---------|
 | DXF files | DWG native editing |
-| 2D model space | Paper space / layouts |
-| LINE, LWPOLYLINE, TEXT, MTEXT, INSERT | 3D entities |
-| move, edit_text, delete, add_block | Dimension regeneration |
-| Protected layers | Xrefs |
-| AI revision notes (safe layer) | Title block revision table |
-| Windows + Linux | Cloud deployment |
+| Model space + paper space layouts | 3D entities |
+| LINE, LWPOLYLINE, TEXT, MTEXT, INSERT, CIRCLE, ARC, etc. | Dimension regeneration |
+| move, edit_text, delete, add_block | Xrefs |
+| Protected layers | Title block revision table |
+| AI revision notes (safe layer) | |
+| Web app (Firebase + Cloud Run) | |
+| Desktop app (Windows + Linux) | |
+| Gemini vision pipeline (Vertex AI) | |
 
 For full details see:
 - [V1 Blueprint](000-docs/007-AT-ARCH-v1-blueprint.md) — engineering architecture and module map
@@ -51,11 +53,14 @@ pre-commit install
 ### Run Tests (Mock Mode — No API Key Needed)
 
 ```bash
-# All tests
+# All tests (~573 tests)
 make test
 
-# With coverage
+# With coverage (68%+)
 make test-cov
+
+# Web API tests only
+make test-web
 
 # Smoke test only
 make smoke
@@ -97,6 +102,29 @@ This opens the PySide6 desktop window. You can:
 3. Click **Plan & Preview** to see proposed changes
 4. Click **Apply & Save As** to save the edited DXF
 
+### Web App
+
+The web app is deployed at [cad-dxf-agent.web.app](https://cad-dxf-agent.web.app).
+
+For local development:
+
+```bash
+# Frontend (React + Vite)
+cd web/frontend && npm run dev    # http://localhost:3000
+
+# Backend (FastAPI)
+CAD_WEB_DEV_MODE=1 uvicorn web.backend.main:app --port 8322
+```
+
+Deploy:
+```bash
+# Frontend to Firebase Hosting
+cd web/frontend && npm run build && firebase deploy --only hosting
+
+# Backend to Cloud Run
+gcloud builds submit --config web/backend/cloudbuild.yaml .
+```
+
 ## Testing Without an API Key (Mock Mode)
 
 The default LLM provider is `mock`, which uses simple keyword matching to generate operations. This lets you test the entire pipeline offline:
@@ -111,22 +139,28 @@ python scripts/smoke_test.py
 
 The mock provider responds to keywords like "move", "delete", "text", "rename" in your prompt.
 
-## Testing With a Real LLM
+## Using Gemini (Vertex AI)
 
-To use a real LLM provider, set the appropriate environment variables:
+The production planner uses Gemini via Vertex AI:
 
 ```bash
-# Copy the example env file
-cp .env.example .env
+# Authenticate with GCP
+gcloud auth application-default login
 
-# Edit .env:
-CAD_LLM_PROVIDER=openai          # or: anthropic, google
-CAD_OPENAI_API_KEY=sk-...        # your API key
+# Set environment
+export CAD_LLM_PROVIDER=gemini
+export CAD_GCP_PROJECT=cad-dxf-agent
+
+# Run
+python -m cad_dxf_agent.app
 ```
 
-**Caveats:**
-- Real LLM providers are scaffolded but not fully implemented in V1. Only the mock provider is wired.
-- API keys are never logged or committed. The `.env` file is in `.gitignore`.
+The planner uses tool-use with vision capabilities — it can analyze DXF renders and plan operations based on visual inspection.
+
+**Notes:**
+- Requires `google-cloud-aiplatform` (included in `[gemini]` extras)
+- API credentials are handled via Application Default Credentials (ADC)
+- Mock provider (`CAD_LLM_PROVIDER=mock`) still works for offline testing
 
 ## AI Revision Notes
 
@@ -204,41 +238,24 @@ OTEL_ENABLED=1 OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317 python scripts/
 ```
 cad-dxf-agent/
   src/cad_dxf_agent/
-    app.py                  # Entry point
+    app.py                  # Desktop entry point
     settings.py             # Env-based configuration
     otel.py                 # OpenTelemetry bootstrap
-    core/
-      dxf_reader.py         # DXF → DrawingContext
-      dxf_writer.py         # Save-as new DXF
-      entity_index.py       # Fast entity lookups
-      semantic_model.py     # Planner context builder
-      validators.py         # Operation validation
-      edit_engine.py        # Apply operations
-      revision_notes.py     # AI revision note generation
-      preview_model.py      # Change preview
-    llm/
-      planner.py            # Planner orchestrator
-      providers.py          # Provider interface
-      mock_provider.py      # Offline mock planner
-      response_parser.py    # JSON → ChangeSet
-      prompt_templates.py   # LLM prompt templates
-    models/
-      cad_schema.py         # Entity, layer, drawing context
-      ops_schema.py         # Operations, changesets
-      config_schema.py      # Rule and revision config
-      changes_schema.py     # Validation results
-    ui/
-      main_window.py        # PySide6 desktop shell
-    api/
-      local_api.py          # Local HTTP API (scaffolded)
+    core/                   # DXF processing, validation, editing
+    llm/                    # Planner, providers, prompts
+    models/                 # Pydantic schemas
+    ui/                     # PySide6 desktop UI
+  web/
+    frontend/               # React + Vite SPA (Firebase Hosting)
+    backend/                # FastAPI (Cloud Run)
   tests/
-    unit/                   # Schema, validator, parser, reader tests
-    integration/            # Integration tests
-    smoke/                  # End-to-end pipeline tests
-    fixtures/               # Test fixture helpers
+    unit/                   # ~270 unit tests
+    integration/            # ~15 integration tests
+    web/                    # ~65 web API tests
+    live/                   # Live Gemini API tests
   scripts/
     smoke_test.py           # Standalone smoke test
-  000-docs/                  # All project docs (flat, sequenced, categorized)
+  000-docs/                 # All project docs
 ```
 
 ## Documentation
