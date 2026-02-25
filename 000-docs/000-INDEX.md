@@ -55,6 +55,7 @@
 | 022 | AACR | [022-AA-AACR-v0.2-testing-infrastructure-aar.md](022-AA-AACR-v0.2-testing-infrastructure-aar.md) |
 | 023 | AUDT | [023-AA-AUDT-appaudit-devops-playbook.md](023-AA-AUDT-appaudit-devops-playbook.md) |
 | 024 | AADR | [024-AA-AADR-perf-plan-audit.md](024-AA-AADR-perf-plan-audit.md) |
+| 026 | AUDT | [026-AA-AUDT-appaudit-devops-playbook.md](026-AA-AUDT-appaudit-devops-playbook.md) |
 
 ## Chronological Listing
 
@@ -85,6 +86,7 @@
 | 023 | AA | AUDT | DevOps operator playbook (appaudit) |
 | 024 | AA | AADR | Performance hardening plan audit |
 | 025 | AT | ARCH | Web MVP architecture |
+| 026 | AA | AUDT | Beta testing DevOps playbook (appaudit) |
 
 ## Quick Reference
 
