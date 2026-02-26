@@ -179,8 +179,10 @@ async def upload(
         render_result = render_dxf_to_png(dxf_path, session_dir / "original.png")
         if render_result.success:
             session.original_render = render_result.output_path
+        else:
+            logger.warning("Original render returned failure: %s", render_result.error)
     except Exception as e:
-        logger.warning("Original render failed (non-fatal): %s", e)
+        logger.warning("Original render failed (non-fatal): %s", e, exc_info=True)
 
     return {
         "session_id": session.session_id,
@@ -298,12 +300,18 @@ async def apply_changes(body: ApplyRequest, user: dict = Depends(get_user)):
             )
             if render_result.success:
                 session.edited_render = render_result.output_path
+            else:
+                logger.warning("Edited render returned failure: %s", render_result.error)
+                session.edited_render = None
         except Exception as e:
-            logger.warning("Edited render failed (non-fatal): %s", e)
+            logger.warning("Edited render failed (non-fatal): %s", e, exc_info=True)
+            session.edited_render = None
 
+        render_available = session.edited_render is not None and session.edited_render.exists()
         success_count = sum(1 for r in results if r.success)
         return {
             "message": f"Applied {success_count}/{len(results)} operations.",
+            "render_available": render_available,
             "results": [
                 {"success": r.success, "message": r.message if hasattr(r, "message") else ""}
                 for r in results

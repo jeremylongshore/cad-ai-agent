@@ -25,8 +25,8 @@ export function useSession() {
         const blob = await getRenderBlob(data.session_id, 'original');
         const url = URL.createObjectURL(blob);
         setPreviewUrls((prev) => ({ ...prev, original: url }));
-      } catch {
-        // Render not available yet — that's ok
+      } catch (renderErr) {
+        console.warn('[cad] Original render fetch failed:', renderErr.message);
       }
       setMessages([{ role: 'system', text: `Loaded ${file.name} (${data.file_info.entity_count} entities, ${data.file_info.layer_count} layers)` }]);
       setOperations([]);
@@ -82,8 +82,12 @@ export function useSession() {
         const blob = await getRenderBlob(sessionId, 'edited');
         const url = URL.createObjectURL(blob);
         setPreviewUrls((prev) => ({ ...prev, edited: url }));
-      } catch {
-        // Edited render not available — that's ok
+      } catch (renderErr) {
+        console.warn('[cad] Edited render fetch failed:', renderErr.message);
+        setMessages((prev) => [...prev, {
+          role: 'system',
+          text: 'Preview not available — download the edited DXF to view.',
+        }]);
       }
     } catch (err) {
       setError(err.message);
