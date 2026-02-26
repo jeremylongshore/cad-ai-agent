@@ -115,10 +115,10 @@ class ComparisonEngine:
 
             # Write change log files
             changelog_json_path = output_dir / "changelog.json"
-            changelog_json_path.write_text(changelog.to_json())
+            changelog_json_path.write_text(changelog.to_json(), encoding="utf-8")
 
             changelog_text_path = output_dir / "changelog.txt"
-            changelog_text_path.write_text(changelog.to_text())
+            changelog_text_path.write_text(changelog.to_text(), encoding="utf-8")
 
             # Generate diff overlay DXF
             overlay_target = output_dir / "diff_overlay.dxf"
