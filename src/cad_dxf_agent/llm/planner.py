@@ -71,6 +71,18 @@ def get_provider(
 
         return MockAgentProvider()
 
+    if name == "gemini-key":
+        try:
+            from .gemini_key_provider import GeminiKeyProvider
+
+            return GeminiKeyProvider()
+        except ImportError:
+            logger.warning(
+                "google-generativeai not installed, falling back to mock. "
+                "Install with: pip install google-generativeai"
+            )
+            return MockProvider()
+
     if name in ("proxy", "proxy-agent"):
         try:
             from .proxy_client import ProxyAgentProvider

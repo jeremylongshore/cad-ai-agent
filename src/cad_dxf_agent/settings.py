@@ -89,6 +89,7 @@ class Settings:
             "openai": "CAD_OPENAI_API_KEY",
             "anthropic": "CAD_ANTHROPIC_API_KEY",
             "google": "CAD_GOOGLE_API_KEY",
+            "gemini-key": "CAD_GEMINI_API_KEY",
         }
         env_var = key_map.get(provider)
         if env_var is None:

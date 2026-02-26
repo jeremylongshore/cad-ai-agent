@@ -72,6 +72,7 @@ hiddenimports = [
     "cad_dxf_agent.llm.gemini_provider",
     "cad_dxf_agent.llm.agent_provider",
     "cad_dxf_agent.llm.proxy_client",
+    "cad_dxf_agent.llm.gemini_key_provider",
     "cad_dxf_agent.otel",
 ]
 
@@ -84,6 +85,15 @@ try:
         "google.auth.transport.requests",
         "vertexai",
         "vertexai.generative_models",
+    ])
+except ImportError:
+    pass
+
+# Optional: google-generativeai (API key provider, no GCP needed)
+try:
+    import google.generativeai  # noqa: F401
+    hiddenimports.extend([
+        "google.generativeai",
     ])
 except ImportError:
     pass
