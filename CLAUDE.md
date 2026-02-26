@@ -35,10 +35,26 @@ make run           # python -m cad_dxf_agent.app
 cd web/frontend && npm run dev                         # Frontend on :3000
 CAD_WEB_DEV_MODE=1 uvicorn web.backend.main:app --port 8322  # Backend on :8322
 
-# Web app (deploy)
-cd web/frontend && npm run build && firebase deploy --only hosting  # Frontend
-gcloud builds submit --config web/backend/cloudbuild.yaml .        # Backend
+# Web app (deploy) — AUTOMATIC via GitHub Actions
+# Push to main touching web/** or src/** triggers .github/workflows/deploy-web.yml
+# which builds Docker image, pushes to Artifact Registry, deploys Cloud Run + Firebase Hosting.
+# Just merge to main and it deploys. Check: gh run list --workflow=deploy-web.yml
+
+# Manual deploy (only if GH Actions is broken):
+cd web/frontend && npm run build && firebase deploy --only hosting --project cad-dxf-agent
+gcloud run deploy cad-dxf-web \
+  --source . --dockerfile web/backend/Dockerfile \
+  --region us-central1 --project cad-dxf-agent \
+  --allow-unauthenticated --memory 1Gi --cpu 1 --timeout 300 \
+  --service-account cad-dxf-web-run@cad-dxf-agent.iam.gserviceaccount.com \
+  --set-env-vars CAD_LLM_PROVIDER=gemini,CAD_GCP_PROJECT=cad-dxf-agent,OTEL_ENABLED=1,OTEL_EXPORTER=gcp-trace
 ```
+
+**Deploy notes:**
+- **Normal path**: merge to main → GH Actions auto-deploys both frontend + backend via WIF
+- **Manual gotcha**: always use `--project cad-dxf-agent` (local gcloud may point to `hustleapp-production`)
+- **Do NOT** use `gcloud builds submit --config cloudbuild.yaml` — `$SHORT_SHA` is only set by triggers, not manual submits
+- Check deploy status: `gh run list --workflow=deploy-web.yml`
 
 Mock mode (`CAD_LLM_PROVIDER=mock`, the default) works without any API key. All tests and the smoke test use mock mode.
 
