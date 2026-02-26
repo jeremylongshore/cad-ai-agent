@@ -116,8 +116,9 @@ def _points_match(a: list[Point2D], b: list[Point2D], tolerance: float) -> bool:
     """Check if two point lists match within tolerance (same count, pairwise)."""
     if len(a) != len(b):
         return False
+    tol_sq = tolerance * tolerance
     for pa, pb in zip(a, b, strict=True):
-        if math.sqrt((pa.x - pb.x) ** 2 + (pa.y - pb.y) ** 2) > tolerance:
+        if (pa.x - pb.x) ** 2 + (pa.y - pb.y) ** 2 > tol_sq:
             return False
     return True
 
@@ -131,11 +132,11 @@ def _shape_matches_after_translation(
     """Check if revision points match master points translated by displacement."""
     if len(master_pts) != len(revision_pts):
         return False
+    tol_sq = tolerance * tolerance
     for mp, rp in zip(master_pts, revision_pts, strict=True):
         translated_x = mp.x + displacement.x
         translated_y = mp.y + displacement.y
-        dist = math.sqrt((translated_x - rp.x) ** 2 + (translated_y - rp.y) ** 2)
-        if dist > tolerance:
+        if (translated_x - rp.x) ** 2 + (translated_y - rp.y) ** 2 > tol_sq:
             return False
     return True
 
@@ -151,8 +152,8 @@ def _content_matches(a: GeometrySnapshot, b: GeometrySnapshot) -> bool:
         va = a.attributes.get(key)
         vb = b.attributes.get(key)
         if va != vb:
-            if isinstance(va, float) and isinstance(vb, float):
-                if abs(va - vb) > 1e-6:
+            if isinstance(va, (int, float)) and isinstance(vb, (int, float)):
+                if not math.isclose(va, vb, abs_tol=1e-6):
                     return False
             else:
                 return False

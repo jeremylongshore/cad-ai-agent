@@ -55,7 +55,7 @@ def write_diff_overlay(
         try:
             _draw_change(msp, change)
         except Exception:
-            logger.debug(
+            logger.warning(
                 "Failed to draw overlay for %s change",
                 change.category.value,
                 exc_info=True,
@@ -179,9 +179,10 @@ def _draw_snapshot(
 
     elif etype == "ELLIPSE" and snap.points:
         ratio = snap.attributes.get("ratio", 0.5)
+        major_axis = snap.attributes.get("major_axis", (5, 0, 0))
         msp.add_ellipse(
             center=(snap.points[0].x, snap.points[0].y),
-            major_axis=(5, 0, 0),
+            major_axis=major_axis,
             ratio=ratio,
             dxfattribs={"layer": layer},
         )

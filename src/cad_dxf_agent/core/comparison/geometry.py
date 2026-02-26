@@ -140,6 +140,8 @@ def _extract_one(
             center = entity.dxf.center
             points = [Point2D(x=center.x, y=center.y)]
             attributes["ratio"] = entity.dxf.ratio
+            major = entity.dxf.major_axis
+            attributes["major_axis"] = (major.x, major.y, major.z)
 
         elif dxf_type == "SPLINE":
             try:

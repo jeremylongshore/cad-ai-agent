@@ -79,13 +79,17 @@ def match_entities(
 def _fingerprint(snap: GeometrySnapshot) -> str:
     """Compute a deterministic fingerprint for exact matching.
 
-    Includes: entity_type, layer, rounded sorted points, text, block_name.
+    Includes: entity_type, layer, rounded points, text, block_name.
+    Points are kept in original order for order-dependent shapes (LWPOLYLINE,
+    SPLINE, POLYLINE, LEADER, HATCH) and sorted only for LINE where
+    start/end are interchangeable.
     """
     # Round points to avoid floating-point noise
-    rounded_pts = []
-    for p in snap.points:
-        rounded_pts.append((round(p.x, 4), round(p.y, 4)))
-    rounded_pts.sort()
+    rounded_pts = [(round(p.x, 4), round(p.y, 4)) for p in snap.points]
+    # Only sort for LINE — start/end order is arbitrary.
+    # For LWPOLYLINE, SPLINE, etc., vertex order defines the shape.
+    if snap.entity_type.value == "LINE":
+        rounded_pts = sorted(rounded_pts)
 
     parts = [
         snap.entity_type.value,
