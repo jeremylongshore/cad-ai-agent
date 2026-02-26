@@ -232,7 +232,8 @@ def run_planner(
                             break
                         corrective = _format_validation_feedback(prompt, result.blockers)
                         changeset = _call_with_timeout(
-                            provider, corrective, drawing_context, timeout
+                            provider, corrective, drawing_context, timeout,
+                            conversation_history,
                         )
 
                 span.set_attribute("cad.ops.count", changeset.op_count)

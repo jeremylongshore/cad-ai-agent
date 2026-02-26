@@ -82,7 +82,8 @@ class AgentProvider(PlannerProvider):
 
             # Run the agent loop
             model = self._get_model()
-            chat = model.start_chat()
+            chat_history = self._build_chat_history(conversation_history)
+            chat = model.start_chat(history=chat_history)
 
             # Per-turn timeout: total timeout / max turns
             per_turn_timeout = max(settings.planner_timeout // MAX_AGENT_TURNS, 5)
@@ -248,6 +249,21 @@ class AgentProvider(PlannerProvider):
                 ) from err
 
         return self._model
+
+    @staticmethod
+    def _build_chat_history(conversation_history: list[dict] | None) -> list:
+        """Convert conversation_history dicts to Vertex AI Content objects."""
+        if not conversation_history:
+            return []
+        from vertexai.generative_models import Content, Part
+
+        return [
+            Content(
+                role="user" if entry.get("role") == "user" else "model",
+                parts=[Part.from_text(entry.get("text", ""))],
+            )
+            for entry in conversation_history
+        ]
 
     def _build_initial_prompt(self, prompt: str, drawing_context: dict) -> str:
         """Build the initial message with compact context and optional vision.

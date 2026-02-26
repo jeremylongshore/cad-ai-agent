@@ -75,8 +75,15 @@ class ProxyAgentProvider(PlannerProvider):
             # Build initial prompt
             initial_prompt = self._build_initial_prompt(prompt, drawing_context)
 
-            # Conversation history for the proxy
-            contents: list[dict[str, Any]] = [{"role": "user", "parts": [{"text": initial_prompt}]}]
+            # Build conversation contents (prior history + current prompt)
+            contents: list[dict[str, Any]] = []
+            if conversation_history:
+                for entry in conversation_history:
+                    contents.append({
+                        "role": entry.get("role", "user"),
+                        "parts": [{"text": entry.get("text", "")}],
+                    })
+            contents.append({"role": "user", "parts": [{"text": initial_prompt}]})
 
             # Build tool declarations for the proxy
             tool_declarations = [

@@ -33,6 +33,11 @@ from .session import Session, SessionManager
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
+# Constants
+# ---------------------------------------------------------------------------
+MAX_CONVERSATION_HISTORY = 10  # Max user+model entries kept per session
+
+# ---------------------------------------------------------------------------
 # Session manager (singleton)
 # ---------------------------------------------------------------------------
 session_mgr = SessionManager()
@@ -246,8 +251,8 @@ async def plan(body: PlanRequest, user: dict = Depends(get_user)):
         history_text = llm_message if llm_message else summary
         session.conversation_history.append({"role": "user", "text": body.prompt})
         session.conversation_history.append({"role": "model", "text": history_text})
-        if len(session.conversation_history) > 10:
-            session.conversation_history = session.conversation_history[-10:]
+        if len(session.conversation_history) > MAX_CONVERSATION_HISTORY:
+            session.conversation_history = session.conversation_history[-MAX_CONVERSATION_HISTORY:]
 
         return {
             "operations": operations,

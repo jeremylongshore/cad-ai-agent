@@ -82,10 +82,13 @@ class GeminiKeyProvider(PlannerProvider):
 
     def _chat_generate(self, model, conversation_history: list[dict], text_prompt: str) -> str:
         """Send message via chat session with prior conversation history."""
-        history = []
-        for entry in conversation_history:
-            role = "user" if entry.get("role") == "user" else "model"
-            history.append({"role": role, "parts": [entry.get("text", "")]})
+        history = [
+            {
+                "role": "user" if e.get("role") == "user" else "model",
+                "parts": [e.get("text", "")],
+            }
+            for e in conversation_history
+        ]
 
         chat = model.start_chat(history=history)
         response = chat.send_message(text_prompt)

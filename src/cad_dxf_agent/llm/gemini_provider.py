@@ -194,12 +194,13 @@ class GeminiProvider(PlannerProvider):
         """
         from vertexai.generative_models import Content, Part  # type: ignore[import-untyped]
 
-        history = []
-        for entry in conversation_history:
-            role = "user" if entry.get("role") == "user" else "model"
-            history.append(
-                Content(role=role, parts=[Part.from_text(entry.get("text", ""))])
+        history = [
+            Content(
+                role="user" if e.get("role") == "user" else "model",
+                parts=[Part.from_text(e.get("text", ""))],
             )
+            for e in conversation_history
+        ]
 
         chat = model.start_chat(history=history)
         response = chat.send_message(current_contents)
