@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from ...models.comparison_schema import ComparisonConfig, ComparisonResult
+from ...otel import get_tracer
 from .changelog import ChangeLog, generate_changelog
 from .classifier import classify_changes
 from .diff_overlay import write_diff_overlay
@@ -14,6 +15,7 @@ from .geometry import extract_snapshots
 from .matcher import match_entities
 
 logger = logging.getLogger(__name__)
+tracer = get_tracer(__name__)
 
 
 @dataclass
@@ -53,31 +55,38 @@ class ComparisonEngine:
         Returns:
             ComparisonResult with all classified changes.
         """
-        config = config or ComparisonConfig()
+        with tracer.start_as_current_span("cad.compare.engine.compare") as span:
+            span.set_attribute("cad.compare.master_path", Path(master_path).name)
+            span.set_attribute("cad.compare.revision_path", Path(revision_path).name)
 
-        logger.info("Extracting geometry from master: %s", Path(master_path).name)
-        master_snaps = extract_snapshots(master_path, config)
+            config = config or ComparisonConfig()
 
-        logger.info("Extracting geometry from revision: %s", Path(revision_path).name)
-        revision_snaps = extract_snapshots(revision_path, config)
+            logger.info("Extracting geometry from master: %s", Path(master_path).name)
+            master_snaps = extract_snapshots(master_path, config)
 
-        logger.info(
-            "Matching entities: %d master, %d revision",
-            len(master_snaps),
-            len(revision_snaps),
-        )
-        match_result = match_entities(master_snaps, revision_snaps, config)
+            logger.info("Extracting geometry from revision: %s", Path(revision_path).name)
+            revision_snaps = extract_snapshots(revision_path, config)
 
-        logger.info(
-            "Matched %d pairs, %d master-only, %d revision-only",
-            len(match_result.pairs),
-            len(match_result.master_only),
-            len(match_result.revision_only),
-        )
-        result = classify_changes(match_result, config)
+            logger.info(
+                "Matching entities: %d master, %d revision",
+                len(master_snaps),
+                len(revision_snaps),
+            )
+            match_result = match_entities(master_snaps, revision_snaps, config)
 
-        logger.info("Classification: %s", result.summary)
-        return result
+            logger.info(
+                "Matched %d pairs, %d master-only, %d revision-only",
+                len(match_result.pairs),
+                len(match_result.master_only),
+                len(match_result.revision_only),
+            )
+            result = classify_changes(match_result, config)
+
+            logger.info("Classification: %s", result.summary)
+
+            span.set_attribute("cad.compare.total_changes", result.total_changes)
+
+            return result
 
     def generate_outputs(
         self,
@@ -97,32 +106,39 @@ class ComparisonEngine:
         Returns:
             ComparisonOutputs with paths to generated files.
         """
-        output_dir = Path(output_dir)
-        output_dir.mkdir(parents=True, exist_ok=True)
+        with tracer.start_as_current_span("cad.compare.engine.generate_outputs") as span:
+            output_dir = Path(output_dir)
+            output_dir.mkdir(parents=True, exist_ok=True)
 
-        # Generate change log
-        changelog = generate_changelog(result)
+            # Generate change log
+            changelog = generate_changelog(result)
 
-        # Write change log files
-        changelog_json_path = output_dir / "changelog.json"
-        changelog_json_path.write_text(changelog.to_json())
+            # Write change log files
+            changelog_json_path = output_dir / "changelog.json"
+            changelog_json_path.write_text(changelog.to_json())
 
-        changelog_text_path = output_dir / "changelog.txt"
-        changelog_text_path.write_text(changelog.to_text())
+            changelog_text_path = output_dir / "changelog.txt"
+            changelog_text_path.write_text(changelog.to_text())
 
-        # Generate diff overlay DXF
-        overlay_target = output_dir / "diff_overlay.dxf"
-        diff_overlay_path: Path | None = overlay_target
-        try:
-            write_diff_overlay(master_path, result, overlay_target)
-        except Exception:
-            logger.error("Failed to generate diff overlay", exc_info=True)
-            diff_overlay_path = None
+            # Generate diff overlay DXF
+            overlay_target = output_dir / "diff_overlay.dxf"
+            diff_overlay_path: Path | None = overlay_target
+            overlay_generated = False
+            try:
+                write_diff_overlay(master_path, result, overlay_target)
+                overlay_generated = True
+            except Exception as e:
+                span.record_exception(e)
+                logger.error("Failed to generate diff overlay", exc_info=True)
+                diff_overlay_path = None
 
-        return ComparisonOutputs(
-            result=result,
-            changelog=changelog,
-            diff_overlay_path=diff_overlay_path,
-            master_path=Path(master_path),
-            revision_path=Path(revision_path),
-        )
+            span.set_attribute("cad.compare.overlay_generated", overlay_generated)
+            span.set_attribute("cad.compare.changelog_entries", len(changelog.entries))
+
+            return ComparisonOutputs(
+                result=result,
+                changelog=changelog,
+                diff_overlay_path=diff_overlay_path,
+                master_path=Path(master_path),
+                revision_path=Path(revision_path),
+            )

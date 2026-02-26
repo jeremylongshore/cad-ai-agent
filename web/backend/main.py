@@ -28,6 +28,8 @@ from pydantic import BaseModel
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
+from cad_dxf_agent.otel import span as otel_span  # noqa: E402
+
 from .auth import verify_token
 from .session import Session, SessionManager
 
@@ -365,69 +367,74 @@ async def compare(
     user: dict = Depends(get_user),
 ):
     """Upload a revision DXF and compare against the session's master file."""
-    if not file.filename:
-        raise HTTPException(status_code=400, detail="No file provided")
+    with otel_span("cad.web.compare", {"cad.web.session_id": session_id}) as s:
+        if not file.filename:
+            raise HTTPException(status_code=400, detail="No file provided")
 
-    ext = Path(file.filename).suffix.lower()
-    if ext != ".dxf":
-        raise HTTPException(status_code=400, detail="Comparison requires a .dxf file")
+        ext = Path(file.filename).suffix.lower()
+        if ext != ".dxf":
+            raise HTTPException(status_code=400, detail="Comparison requires a .dxf file")
 
-    try:
-        session = session_mgr.get(session_id, user["uid"])
-    except (KeyError, PermissionError) as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        try:
+            session = session_mgr.get(session_id, user["uid"])
+        except (KeyError, PermissionError) as e:
+            raise HTTPException(status_code=404, detail=str(e))
 
-    if session.original_path is None or not session.original_path.exists():
-        raise HTTPException(status_code=400, detail="No master file loaded. Upload a file first.")
+        if session.original_path is None or not session.original_path.exists():
+            raise HTTPException(
+                status_code=400, detail="No master file loaded. Upload a file first."
+            )
 
-    # Save revision file
-    session_dir = Path("/tmp/cad-sessions") / session.session_id
-    revision_path = session_dir / "revision.dxf"
-    content = await file.read()
-    revision_path.write_bytes(content)
+        # Save revision file
+        session_dir = Path("/tmp/cad-sessions") / session.session_id
+        revision_path = session_dir / "revision.dxf"
+        content = await file.read()
+        revision_path.write_bytes(content)
 
-    try:
-        from cad_dxf_agent.core.comparison.engine import ComparisonEngine
+        try:
+            from cad_dxf_agent.core.comparison.engine import ComparisonEngine
 
-        engine = ComparisonEngine()
-        result = engine.compare(session.original_path, revision_path)
+            engine = ComparisonEngine()
+            result = engine.compare(session.original_path, revision_path)
 
-        # Generate outputs
-        output_dir = session_dir / "comparison"
-        outputs = engine.generate_outputs(
-            session.original_path, revision_path, result, output_dir
-        )
+            # Generate outputs
+            output_dir = session_dir / "comparison"
+            outputs = engine.generate_outputs(
+                session.original_path, revision_path, result, output_dir
+            )
 
-        # Store in session
-        session.comparison_result = result
-        session.comparison_changelog = outputs.changelog
-        session.diff_overlay_path = outputs.diff_overlay_path
+            # Store in session
+            session.comparison_result = result
+            session.comparison_changelog = outputs.changelog
+            session.diff_overlay_path = outputs.diff_overlay_path
 
-        # Render diff overlay preview
-        if outputs.diff_overlay_path and outputs.diff_overlay_path.exists():
-            try:
-                from cad_dxf_agent.core.renderer import render_dxf_to_png
+            # Render diff overlay preview
+            if outputs.diff_overlay_path and outputs.diff_overlay_path.exists():
+                try:
+                    from cad_dxf_agent.core.renderer import render_dxf_to_png
 
-                render_result = render_dxf_to_png(
-                    outputs.diff_overlay_path, session_dir / "comparison.png"
-                )
-                if render_result.success:
-                    session.diff_overlay_render = render_result.output_path
-            except Exception as e:
-                logger.warning("Comparison render failed (non-fatal): %s", e)
+                    render_result = render_dxf_to_png(
+                        outputs.diff_overlay_path, session_dir / "comparison.png"
+                    )
+                    if render_result.success:
+                        session.diff_overlay_render = render_result.output_path
+                except Exception as e:
+                    logger.warning("Comparison render failed (non-fatal): %s", e)
 
-        return {
-            "summary": result.summary,
-            "total_changes": result.total_changes,
-            "changelog": outputs.changelog.to_json(),
-            "render_available": session.diff_overlay_render is not None,
-        }
+            s.set_attribute("cad.compare.total_changes", result.total_changes)
 
-    except FileNotFoundError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        logger.error("Comparison failed: %s", e, exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Comparison failed: {e}")
+            return {
+                "summary": result.summary,
+                "total_changes": result.total_changes,
+                "changelog": outputs.changelog.to_json(),
+                "render_available": session.diff_overlay_render is not None,
+            }
+
+        except FileNotFoundError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        except Exception as e:
+            logger.error("Comparison failed: %s", e, exc_info=True)
+            raise HTTPException(status_code=500, detail=f"Comparison failed: {e}")
 
 
 @app.get("/api/render")

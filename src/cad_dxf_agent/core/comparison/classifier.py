@@ -13,6 +13,9 @@ from ...models.comparison_schema import (
     GeometrySnapshot,
     MatchResult,
 )
+from ...otel import get_tracer
+
+tracer = get_tracer(__name__)
 
 
 def classify_changes(
@@ -28,40 +31,47 @@ def classify_changes(
     Returns:
         ComparisonResult with all changes classified and summary counts.
     """
-    config = config or ComparisonConfig()
-    changes: list[EntityChange] = []
+    with tracer.start_as_current_span("cad.compare.classify_changes") as span:
+        config = config or ComparisonConfig()
+        changes: list[EntityChange] = []
 
-    # Classify matched pairs
-    for m_snap, r_snap in match_result.pairs:
-        change = _classify_pair(m_snap, r_snap, config)
-        changes.append(change)
+        # Classify matched pairs
+        for m_snap, r_snap in match_result.pairs:
+            change = _classify_pair(m_snap, r_snap, config)
+            changes.append(change)
 
-    # Unmatched master → REMOVED
-    for m_snap in match_result.master_only:
-        changes.append(
-            EntityChange(
-                category=ChangeCategory.REMOVED,
-                master_snapshot=m_snap,
-                revision_snapshot=None,
+        # Unmatched master → REMOVED
+        for m_snap in match_result.master_only:
+            changes.append(
+                EntityChange(
+                    category=ChangeCategory.REMOVED,
+                    master_snapshot=m_snap,
+                    revision_snapshot=None,
+                )
             )
-        )
 
-    # Unmatched revision → ADDED
-    for r_snap in match_result.revision_only:
-        changes.append(
-            EntityChange(
-                category=ChangeCategory.ADDED,
-                master_snapshot=None,
-                revision_snapshot=r_snap,
+        # Unmatched revision → ADDED
+        for r_snap in match_result.revision_only:
+            changes.append(
+                EntityChange(
+                    category=ChangeCategory.ADDED,
+                    master_snapshot=None,
+                    revision_snapshot=r_snap,
+                )
             )
-        )
 
-    # Build summary
-    summary = {cat.value: 0 for cat in ChangeCategory}
-    for change in changes:
-        summary[change.category.value] += 1
+        # Build summary
+        summary = {cat.value: 0 for cat in ChangeCategory}
+        for change in changes:
+            summary[change.category.value] += 1
 
-    return ComparisonResult(changes=changes, summary=summary, config=config)
+        span.set_attribute("cad.compare.added", summary.get(ChangeCategory.ADDED.value, 0))
+        span.set_attribute("cad.compare.removed", summary.get(ChangeCategory.REMOVED.value, 0))
+        span.set_attribute("cad.compare.modified", summary.get(ChangeCategory.MODIFIED.value, 0))
+        span.set_attribute("cad.compare.moved", summary.get(ChangeCategory.MOVED.value, 0))
+        span.set_attribute("cad.compare.unchanged", summary.get(ChangeCategory.UNCHANGED.value, 0))
+
+        return ComparisonResult(changes=changes, summary=summary, config=config)
 
 
 def _classify_pair(

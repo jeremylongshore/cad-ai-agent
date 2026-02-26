@@ -11,6 +11,9 @@ from ...models.comparison_schema import (
     ComparisonResult,
     EntityChange,
 )
+from ...otel import get_tracer
+
+tracer = get_tracer(__name__)
 
 
 class ChangeLogEntry(BaseModel):
@@ -79,18 +82,21 @@ def generate_changelog(result: ComparisonResult) -> ChangeLog:
     Returns:
         ChangeLog with entries for every non-unchanged change.
     """
-    entries: list[ChangeLogEntry] = []
+    with tracer.start_as_current_span("cad.compare.generate_changelog") as span:
+        entries: list[ChangeLogEntry] = []
 
-    for change in result.changes:
-        if change.category == ChangeCategory.UNCHANGED:
-            continue
-        entry = _build_entry(change)
-        entries.append(entry)
+        for change in result.changes:
+            if change.category == ChangeCategory.UNCHANGED:
+                continue
+            entry = _build_entry(change)
+            entries.append(entry)
 
-    return ChangeLog(
-        summary=result.summary,
-        entries=entries,
-    )
+        span.set_attribute("cad.compare.entries_count", len(entries))
+
+        return ChangeLog(
+            summary=result.summary,
+            entries=entries,
+        )
 
 
 def _build_entry(change: EntityChange) -> ChangeLogEntry:
