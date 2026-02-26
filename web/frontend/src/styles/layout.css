@@ -191,7 +191,8 @@
   .workspace__chat {
     border-left: none;
     border-top: 1px solid var(--border-default);
-    max-height: 280px;
+    min-height: 200px;
+    max-height: 40vh;
   }
 }
 

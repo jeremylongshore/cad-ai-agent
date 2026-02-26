@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 
 const SUGGESTIONS = [
   'Move column A1 24 feet east',
@@ -7,14 +7,128 @@ const SUGGESTIONS = [
   'Add a column mark at grid B3',
 ];
 
-export default function ChatPanel({ messages, onSend, onClear, loading, disabled }) {
-  const [input, setInput] = useState('');
-  const messagesEndRef = useRef(null);
-  const textareaRef = useRef(null);
+/** Phased text shown during LLM wait */
+const LOADING_PHASES = [
+  { after: 0, text: 'Analyzing drawing...' },
+  { after: 5, text: 'Planning operations...' },
+  { after: 15, text: 'Generating changeset...' },
+  { after: 30, text: 'Still working (complex edit)...' },
+  { after: 60, text: 'Almost there...' },
+];
+
+function getLoadingPhase(elapsedSec) {
+  let phase = LOADING_PHASES[0].text;
+  for (const p of LOADING_PHASES) {
+    if (elapsedSec >= p.after) phase = p.text;
+  }
+  return phase;
+}
+
+/** Context-aware follow-up suggestions based on last message state */
+function getFollowUps(messages, hasOperations, hasEdited) {
+  if (messages.length === 0) return [];
+  const last = messages[messages.length - 1];
+  if (!last) return [];
+
+  // After apply
+  if (last.role === 'system' && /applied/i.test(last.text)) {
+    const chips = ['Download edited DXF'];
+    if (hasEdited) chips.push('Make another edit');
+    return chips;
+  }
+
+  // After error
+  if (last.role === 'error') {
+    return ['Try a different edit', 'Be more specific'];
+  }
+
+  // After AI plan with operations
+  if (last.role === 'ai' && hasOperations) {
+    return ['Apply all changes', 'Modify the plan'];
+  }
+
+  // After AI response with no ops
+  if (last.role === 'ai' && !hasOperations) {
+    return ['Try being more specific', 'List available entities'];
+  }
+
+  return [];
+}
+
+function ProgressIndicator({ startTime }) {
+  const [elapsed, setElapsed] = useState(0);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+    const interval = setInterval(() => {
+      setElapsed(Math.floor((Date.now() - startTime) / 1000));
+    }, 500);
+    return () => clearInterval(interval);
+  }, [startTime]);
+
+  return (
+    <div className="loading-indicator">
+      <span className="spinner" aria-hidden="true" />
+      <div className="loading-indicator__text">
+        <span className="loading-indicator__phase">{getLoadingPhase(elapsed)}</span>
+        <span className="loading-indicator__elapsed">{elapsed}s</span>
+      </div>
+    </div>
+  );
+}
+
+function CopyButton({ text }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch { /* clipboard API may fail in insecure contexts */ }
+  }, [text]);
+
+  return (
+    <button
+      type="button"
+      className={`message-actions__btn${copied ? ' message-actions__btn--copied' : ''}`}
+      onClick={handleCopy}
+      aria-label="Copy message"
+    >
+      {copied ? 'Copied' : 'Copy'}
+    </button>
+  );
+}
+
+export default function ChatPanel({
+  messages,
+  onSend,
+  onClear,
+  onRetry,
+  loading,
+  loadingStartTime,
+  disabled,
+  hasOperations,
+  hasEdited,
+}) {
+  const [input, setInput] = useState('');
+  const messagesEndRef = useRef(null);
+  const messagesContainerRef = useRef(null);
+  const textareaRef = useRef(null);
+  const isNearBottomRef = useRef(true);
+
+  // Smart auto-scroll: only scroll if user is near bottom (L5)
+  const checkNearBottom = useCallback(() => {
+    const el = messagesContainerRef.current;
+    if (!el) return;
+    const threshold = 80;
+    isNearBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < threshold;
+  }, []);
+
+  useEffect(() => {
+    if (isNearBottomRef.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages, loading]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -26,9 +140,18 @@ export default function ChatPanel({ messages, onSend, onClear, loading, disabled
   };
 
   const handleKeyDown = (e) => {
+    // Enter sends, Shift+Enter newline
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSubmit(e);
+    }
+    // Escape clears input and blurs (M2)
+    if (e.key === 'Escape') {
+      setInput('');
+      if (textareaRef.current) {
+        textareaRef.current.style.height = 'auto';
+        textareaRef.current.blur();
+      }
     }
   };
 
@@ -39,10 +162,30 @@ export default function ChatPanel({ messages, onSend, onClear, loading, disabled
     el.style.height = Math.min(el.scrollHeight, 120) + 'px';
   };
 
+  const handleExport = useCallback(async () => {
+    const lines = messages.map((m) => {
+      const label = m.role === 'user' ? 'You' : m.role === 'ai' ? 'AI' : m.role.toUpperCase();
+      return `[${label}] ${m.text}`;
+    });
+    try {
+      await navigator.clipboard.writeText(lines.join('\n\n'));
+    } catch { /* clipboard may fail */ }
+  }, [messages]);
+
+  const followUps = !loading ? getFollowUps(messages, hasOperations, hasEdited) : [];
+
   return (
     <div className="chat">
       {messages.length > 0 && onClear && (
         <div className="chat__toolbar">
+          <button
+            type="button"
+            className="btn btn--ghost btn--sm"
+            onClick={handleExport}
+            disabled={loading}
+          >
+            Export
+          </button>
           <button
             type="button"
             className="btn btn--ghost btn--sm"
@@ -53,7 +196,13 @@ export default function ChatPanel({ messages, onSend, onClear, loading, disabled
           </button>
         </div>
       )}
-      <div className="chat__messages" role="log" aria-label="Chat messages">
+      <div
+        className="chat__messages"
+        role="log"
+        aria-label="Chat messages"
+        ref={messagesContainerRef}
+        onScroll={checkNearBottom}
+      >
         {messages.length === 0 ? (
           <div className="chat__empty">
             <p className="chat__empty-title">Describe your edit</p>
@@ -76,19 +225,61 @@ export default function ChatPanel({ messages, onSend, onClear, loading, disabled
             )}
           </div>
         ) : (
-          messages.map((msg, i) => (
-            <div key={i} className={`message message--${msg.role}`}>
-              {msg.text}
-            </div>
-          ))
+          messages.map((msg) => {
+            const roleClass = msg.role === 'error' ? 'error'
+              : msg.role === 'warning' ? 'warning'
+              : msg.role;
+
+            return (
+              <div key={msg.id} className={`message-wrapper message-wrapper--${roleClass}`}>
+                <div className={`message message--${roleClass}`}>
+                  {msg.text}
+                </div>
+                {/* Actions row for AI/error messages */}
+                {(msg.role === 'ai' || msg.role === 'error') && (
+                  <div className="message-actions">
+                    <CopyButton text={msg.text} />
+                    {msg.role === 'ai' && onRetry && (
+                      <button
+                        type="button"
+                        className="message-actions__btn"
+                        onClick={() => onRetry(msg.id)}
+                        disabled={loading}
+                        aria-label="Retry this message"
+                      >
+                        Retry
+                      </button>
+                    )}
+                    {msg.elapsed != null && (
+                      <span className="message-meta">{msg.elapsed}s</span>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })
         )}
         {loading && (
-          <div className="message message--ai">
-            <span className="spinner" aria-label="Thinking..." />
-          </div>
+          <ProgressIndicator startTime={loadingStartTime || Date.now()} />
         )}
         <div ref={messagesEndRef} />
       </div>
+
+      {/* Context-aware follow-up chips (H2) */}
+      {followUps.length > 0 && (
+        <div className="chat__followups">
+          {followUps.map((text) => (
+            <button
+              key={text}
+              type="button"
+              className="chat__suggestion"
+              onClick={() => setInput(text)}
+            >
+              {text}
+            </button>
+          ))}
+        </div>
+      )}
 
       <form className="chat__input-area" onSubmit={handleSubmit}>
         <div className="chat__input-row">
@@ -109,7 +300,7 @@ export default function ChatPanel({ messages, onSend, onClear, loading, disabled
             disabled={!input.trim() || loading || disabled}
             aria-label="Send"
           >
-            {loading ? <span className="spinner" aria-hidden="true" /> : 'Send'}
+            Send
           </button>
         </div>
       </form>

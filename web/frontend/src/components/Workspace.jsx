@@ -5,7 +5,7 @@ import PreviewPanel from './PreviewPanel';
 
 export default function Workspace({ user, onSignOut }) {
   const session = useSession();
-  const { fileInfo, sessionId, messages, operations, selectedOps, previewUrls, comparisonResult, loading, error } = session;
+  const { fileInfo, sessionId, messages, operations, selectedOps, previewUrls, comparisonResult, loading, loadingStartTime, error } = session;
 
   return (
     <div className="page" style={{ height: '100vh', overflow: 'hidden' }}>
@@ -104,8 +104,12 @@ export default function Workspace({ user, onSignOut }) {
               messages={messages}
               onSend={session.sendPrompt}
               onClear={session.clearConversation}
+              onRetry={session.retryLastAi}
               loading={loading}
+              loadingStartTime={loadingStartTime}
               disabled={!sessionId}
+              hasOperations={operations.length > 0}
+              hasEdited={!!previewUrls.edited}
             />
           </aside>
         </div>
