@@ -80,6 +80,17 @@ export async function getRenderBlob(sessionId, type = 'original') {
   return res.blob();
 }
 
+export async function compareFiles(sessionId, revisionFile) {
+  const formData = new FormData();
+  formData.append('file', revisionFile);
+
+  const res = await request(`/api/compare?session_id=${sessionId}`, {
+    method: 'POST',
+    body: formData,
+  });
+  return res.json();
+}
+
 export async function downloadFile(sessionId) {
   const res = await request(`/api/download?session_id=${sessionId}`);
   const blob = await res.blob();
