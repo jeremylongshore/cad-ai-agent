@@ -107,9 +107,7 @@ def _call_with_timeout(
 ) -> ChangeSet:
     """Call provider.plan() with a wall-clock timeout."""
     with ThreadPoolExecutor(max_workers=1) as pool:
-        future = pool.submit(
-            provider.plan, prompt, drawing_context, conversation_history
-        )
+        future = pool.submit(provider.plan, prompt, drawing_context, conversation_history)
         try:
             return future.result(timeout=timeout)
         except FuturesTimeoutError as exc:
@@ -232,7 +230,10 @@ def run_planner(
                             break
                         corrective = _format_validation_feedback(prompt, result.blockers)
                         changeset = _call_with_timeout(
-                            provider, corrective, drawing_context, timeout,
+                            provider,
+                            corrective,
+                            drawing_context,
+                            timeout,
                             conversation_history,
                         )
 

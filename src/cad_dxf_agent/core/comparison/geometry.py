@@ -10,8 +10,10 @@ import ezdxf
 
 from ...models.cad_schema import EntityType, Point2D
 from ...models.comparison_schema import ComparisonConfig, GeometrySnapshot
+from ...otel import get_tracer
 
 logger = logging.getLogger(__name__)
+tracer = get_tracer(__name__)
 
 # Entity types we know how to extract geometry from
 _EXTRACTABLE_TYPES = {t.value for t in EntityType}
@@ -30,40 +32,46 @@ def extract_snapshots(
     Returns:
         List of GeometrySnapshot with full point data per entity.
     """
-    config = config or ComparisonConfig()
-    dxf_path = Path(dxf_path)
+    with tracer.start_as_current_span("cad.compare.extract_snapshots") as span:
+        config = config or ComparisonConfig()
+        dxf_path = Path(dxf_path)
 
-    if not dxf_path.exists():
-        raise FileNotFoundError(f"DXF file not found: {dxf_path}")
+        span.set_attribute("cad.compare.file", dxf_path.name)
 
-    doc = ezdxf.readfile(str(dxf_path))
-    msp = doc.modelspace()
+        if not dxf_path.exists():
+            raise FileNotFoundError(f"DXF file not found: {dxf_path}")
 
-    ignored_upper = {layer.upper() for layer in config.ignored_layers}
-    focus_types = (
-        {t.value for t in config.focus_entity_types} if config.focus_entity_types else None
-    )
+        doc = ezdxf.readfile(str(dxf_path))
+        msp = doc.modelspace()
 
-    snapshots: list[GeometrySnapshot] = []
+        ignored_upper = {layer.upper() for layer in config.ignored_layers}
+        focus_types = (
+            {t.value for t in config.focus_entity_types} if config.focus_entity_types else None
+        )
 
-    for entity in msp:
-        dxf_type = entity.dxftype()
+        snapshots: list[GeometrySnapshot] = []
 
-        if dxf_type not in _EXTRACTABLE_TYPES:
-            continue
+        for entity in msp:
+            dxf_type = entity.dxftype()
 
-        if focus_types and dxf_type not in focus_types:
-            continue
+            if dxf_type not in _EXTRACTABLE_TYPES:
+                continue
 
-        layer = entity.dxf.layer
-        if layer.upper() in ignored_upper:
-            continue
+            if focus_types and dxf_type not in focus_types:
+                continue
 
-        snap = _extract_one(entity, dxf_type)
-        if snap is not None:
-            snapshots.append(snap)
+            layer = entity.dxf.layer
+            if layer.upper() in ignored_upper:
+                continue
 
-    return snapshots
+            snap = _extract_one(entity, dxf_type)
+            if snap is not None:
+                snapshots.append(snap)
+
+        span.set_attribute("cad.compare.entities_extracted", len(snapshots))
+        span.set_attribute("cad.compare.ignored_layers", len(config.ignored_layers))
+
+        return snapshots
 
 
 def _extract_one(

@@ -15,8 +15,10 @@ from ...models.comparison_schema import (
     EntityChange,
     GeometrySnapshot,
 )
+from ...otel import get_tracer
 
 logger = logging.getLogger(__name__)
+tracer = get_tracer(__name__)
 
 
 def write_diff_overlay(
@@ -37,32 +39,39 @@ def write_diff_overlay(
     Returns:
         Path to the saved overlay DXF.
     """
-    master_path = Path(master_path)
-    output_path = Path(output_path)
+    with tracer.start_as_current_span("cad.compare.write_diff_overlay") as span:
+        master_path = Path(master_path)
+        output_path = Path(output_path)
 
-    doc = ezdxf.readfile(str(master_path))
-    msp = doc.modelspace()
+        span.set_attribute("cad.compare.output_file", output_path.name)
 
-    # Create overlay layers
-    for layer_name, color_code in DiffOverlayLayers.ALL:
-        if layer_name not in doc.layers:
-            doc.layers.add(layer_name, color=color_code)
+        doc = ezdxf.readfile(str(master_path))
+        msp = doc.modelspace()
 
-    for change in comparison_result.changes:
-        if change.category == ChangeCategory.UNCHANGED:
-            continue
+        # Create overlay layers
+        for layer_name, color_code in DiffOverlayLayers.ALL:
+            if layer_name not in doc.layers:
+                doc.layers.add(layer_name, color=color_code)
 
-        try:
-            _draw_change(msp, change)
-        except Exception:
-            logger.warning(
-                "Failed to draw overlay for %s change",
-                change.category.value,
-                exc_info=True,
-            )
+        changes_drawn = 0
+        for change in comparison_result.changes:
+            if change.category == ChangeCategory.UNCHANGED:
+                continue
 
-    doc.saveas(str(output_path))
-    return output_path
+            try:
+                _draw_change(msp, change)
+                changes_drawn += 1
+            except Exception:
+                logger.warning(
+                    "Failed to draw overlay for %s change",
+                    change.category.value,
+                    exc_info=True,
+                )
+
+        span.set_attribute("cad.compare.changes_drawn", changes_drawn)
+
+        doc.saveas(str(output_path))
+        return output_path
 
 
 def _draw_change(

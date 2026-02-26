@@ -12,6 +12,9 @@ from ...models.comparison_schema import (
     GeometrySnapshot,
     MatchResult,
 )
+from ...otel import get_tracer
+
+tracer = get_tracer(__name__)
 
 
 def match_entities(
@@ -32,48 +35,56 @@ def match_entities(
     Returns:
         MatchResult with paired, master-only, and revision-only lists.
     """
-    config = config or ComparisonConfig()
+    with tracer.start_as_current_span("cad.compare.match_entities") as span:
+        span.set_attribute("cad.compare.master_count", len(master_snaps))
+        span.set_attribute("cad.compare.revision_count", len(revision_snaps))
 
-    pairs: list[tuple[GeometrySnapshot, GeometrySnapshot]] = []
+        config = config or ComparisonConfig()
 
-    # --- Step 1: Fingerprint hash matching ---
-    revision_by_fp: dict[str, list[GeometrySnapshot]] = defaultdict(list)
-    for snap in revision_snaps:
-        fp = _fingerprint(snap)
-        revision_by_fp[fp].append(snap)
+        pairs: list[tuple[GeometrySnapshot, GeometrySnapshot]] = []
 
-    unmatched_master: list[GeometrySnapshot] = []
+        # --- Step 1: Fingerprint hash matching ---
+        revision_by_fp: dict[str, list[GeometrySnapshot]] = defaultdict(list)
+        for snap in revision_snaps:
+            fp = _fingerprint(snap)
+            revision_by_fp[fp].append(snap)
 
-    for m_snap in master_snaps:
-        fp = _fingerprint(m_snap)
-        candidates = revision_by_fp.get(fp)
-        if candidates:
-            r_snap = candidates.pop(0)
-            if not candidates:
-                del revision_by_fp[fp]
-            pairs.append((m_snap, r_snap))
-        else:
-            unmatched_master.append(m_snap)
+        unmatched_master: list[GeometrySnapshot] = []
 
-    # Collect unmatched revision snapshots
-    unmatched_revision: list[GeometrySnapshot] = []
-    for remaining in revision_by_fp.values():
-        unmatched_revision.extend(remaining)
+        for m_snap in master_snaps:
+            fp = _fingerprint(m_snap)
+            candidates = revision_by_fp.get(fp)
+            if candidates:
+                r_snap = candidates.pop(0)
+                if not candidates:
+                    del revision_by_fp[fp]
+                pairs.append((m_snap, r_snap))
+            else:
+                unmatched_master.append(m_snap)
 
-    # --- Step 2: Greedy nearest-neighbor on unmatched ---
-    if unmatched_master and unmatched_revision:
-        nn_pairs, still_master, still_revision = _greedy_nearest_neighbor(
-            unmatched_master, unmatched_revision, config.tolerance
+        # Collect unmatched revision snapshots
+        unmatched_revision: list[GeometrySnapshot] = []
+        for remaining in revision_by_fp.values():
+            unmatched_revision.extend(remaining)
+
+        # --- Step 2: Greedy nearest-neighbor on unmatched ---
+        if unmatched_master and unmatched_revision:
+            nn_pairs, still_master, still_revision = _greedy_nearest_neighbor(
+                unmatched_master, unmatched_revision, config.tolerance
+            )
+            pairs.extend(nn_pairs)
+            unmatched_master = still_master
+            unmatched_revision = still_revision
+
+        span.set_attribute("cad.compare.pairs_matched", len(pairs))
+        span.set_attribute("cad.compare.master_unmatched", len(unmatched_master))
+        span.set_attribute("cad.compare.revision_unmatched", len(unmatched_revision))
+
+        return MatchResult(
+            pairs=pairs,
+            master_only=unmatched_master,
+            revision_only=unmatched_revision,
         )
-        pairs.extend(nn_pairs)
-        unmatched_master = still_master
-        unmatched_revision = still_revision
-
-    return MatchResult(
-        pairs=pairs,
-        master_only=unmatched_master,
-        revision_only=unmatched_revision,
-    )
 
 
 def _fingerprint(snap: GeometrySnapshot) -> str:

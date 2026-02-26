@@ -150,8 +150,11 @@ class TestGuiSemanticValidation:
         """Move preserves entity count but changes at least one INSERT position."""
         output_path = str(tmp_path / "move_output.dxf")
         _run_plan_apply(
-            qapp, sample_dxf, rule_config,
-            "Move the column at grid C-4 two feet east", output_path,
+            qapp,
+            sample_dxf,
+            rule_config,
+            "Move the column at grid C-4 two feet east",
+            output_path,
         )
 
         orig = _extract_dxf_summary(str(sample_dxf))
@@ -161,15 +164,19 @@ class TestGuiSemanticValidation:
         assert edited["count"] == orig["count"]
         assert edited["insert_count"] == orig["insert_count"]
         # At least one INSERT position must differ
-        assert set(edited["inserts"]) != set(orig["inserts"]), \
+        assert set(edited["inserts"]) != set(orig["inserts"]), (
             "Move should change at least one INSERT position"
+        )
 
     def test_delete_removes_entity(self, qapp, sample_dxf, rule_config, tmp_path):
         """Delete reduces total entity count."""
         output_path = str(tmp_path / "delete_output.dxf")
         _run_plan_apply(
-            qapp, sample_dxf, rule_config,
-            "Delete the first column mark", output_path,
+            qapp,
+            sample_dxf,
+            rule_config,
+            "Delete the first column mark",
+            output_path,
         )
 
         orig = _extract_dxf_summary(str(sample_dxf))
@@ -178,15 +185,17 @@ class TestGuiSemanticValidation:
         assert edited["count"] < orig["count"]
         fewer_inserts = edited["insert_count"] < orig["insert_count"]
         fewer_texts = edited["text_count"] < orig["text_count"]
-        assert fewer_inserts or fewer_texts, \
-            "Delete should remove at least one INSERT or TEXT"
+        assert fewer_inserts or fewer_texts, "Delete should remove at least one INSERT or TEXT"
 
     def test_edit_text_changes_content(self, qapp, sample_dxf, rule_config, tmp_path):
         """edit_text preserves entity count but changes text content."""
         output_path = str(tmp_path / "edittext_output.dxf")
         _run_plan_apply(
-            qapp, sample_dxf, rule_config,
-            "Rename the text label to UPDATED", output_path,
+            qapp,
+            sample_dxf,
+            rule_config,
+            "Rename the text label to UPDATED",
+            output_path,
         )
 
         orig = _extract_dxf_summary(str(sample_dxf))
@@ -195,8 +204,10 @@ class TestGuiSemanticValidation:
         # edit_text doesn't add or delete entities
         assert edited["count"] == orig["count"]
         # At least one TEXT value differs
-        assert set(edited["texts"]) != set(orig["texts"]), \
+        assert set(edited["texts"]) != set(orig["texts"]), (
             "edit_text should change at least one TEXT value"
+        )
         # The word "UPDATED" should appear somewhere
-        assert any("UPDATED" in t.upper() for t in edited["texts"]), \
+        assert any("UPDATED" in t.upper() for t in edited["texts"]), (
             'Edited text should contain "UPDATED"'
+        )

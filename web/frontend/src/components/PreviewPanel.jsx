@@ -3,7 +3,6 @@ import { useState, useEffect, useRef } from 'react';
 const TABS = [
   { key: 'original', label: 'Original' },
   { key: 'edited', label: 'Edited' },
-  { key: 'diff', label: 'Diff' },
   { key: 'comparison', label: 'Compare' },
 ];
 
