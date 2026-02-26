@@ -1,5 +1,12 @@
 import { useState, useRef, useEffect } from 'react';
 
+const SUGGESTIONS = [
+  'Move column A1 24 feet east',
+  'Delete the north elevation note',
+  'Rename label FOOTING F1 to FOOTING F2',
+  'Add a column mark at grid B3',
+];
+
 export default function ChatPanel({ messages, onSend, loading, disabled }) {
   const [input, setInput] = useState('');
   const messagesEndRef = useRef(null);
@@ -39,9 +46,22 @@ export default function ChatPanel({ messages, onSend, loading, disabled }) {
           <div className="chat__empty">
             <p className="chat__empty-title">Describe your edit</p>
             <p className="chat__empty-text">
-              Upload a file, then tell the AI what to change.
-              For example: &ldquo;Move the north wall 6 inches south&rdquo;
+              I can move entities, edit text, delete elements, and add blocks.
             </p>
+            {!disabled && (
+              <div className="chat__suggestions">
+                {SUGGESTIONS.map((text) => (
+                  <button
+                    key={text}
+                    type="button"
+                    className="chat__suggestion"
+                    onClick={() => setInput(text)}
+                  >
+                    {text}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         ) : (
           messages.map((msg, i) => (
@@ -66,7 +86,7 @@ export default function ChatPanel({ messages, onSend, loading, disabled }) {
             value={input}
             onChange={handleInput}
             onKeyDown={handleKeyDown}
-            placeholder={disabled ? 'Upload a file first...' : 'Describe the edit...'}
+            placeholder={disabled ? 'Upload a file first...' : 'e.g. Move the north wall 6 inches south'}
             disabled={disabled || loading}
             rows={1}
             aria-label="Edit description"
