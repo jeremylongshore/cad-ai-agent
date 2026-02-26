@@ -85,17 +85,7 @@ export default function Workspace({ user, onSignOut }) {
             )}
           </aside>
 
-          <section className="workspace__main" aria-label="Chat">
-            <ChatPanel
-              messages={messages}
-              onSend={session.sendPrompt}
-              onClear={session.clearConversation}
-              loading={loading}
-              disabled={!sessionId}
-            />
-          </section>
-
-          <aside className="workspace__preview" aria-label="Preview">
+          <section className="workspace__main" aria-label="Drawing preview">
             <PreviewPanel
               previewUrls={previewUrls}
               operations={operations}
@@ -104,6 +94,16 @@ export default function Workspace({ user, onSignOut }) {
               onApply={() => session.apply()}
               onDownload={session.download}
               loading={loading}
+            />
+          </section>
+
+          <aside className="workspace__chat" aria-label="Chat">
+            <ChatPanel
+              messages={messages}
+              onSend={session.sendPrompt}
+              onClear={session.clearConversation}
+              loading={loading}
+              disabled={!sessionId}
             />
           </aside>
         </div>

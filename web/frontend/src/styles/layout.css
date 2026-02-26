@@ -137,10 +137,10 @@
   color: var(--text-secondary);
 }
 
-/* Workspace layout */
+/* Workspace layout — drawing-first: preview dominates center */
 .workspace {
   display: grid;
-  grid-template-columns: 320px 1fr 400px;
+  grid-template-columns: 240px 1fr 340px;
   grid-template-rows: auto 1fr;
   height: calc(100vh - 57px);
   overflow: hidden;
@@ -163,14 +163,16 @@
 .workspace__main {
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow-y: auto;
+  padding: var(--space-4);
   background: var(--bg-primary);
 }
 
-.workspace__preview {
+.workspace__chat {
   border-left: 1px solid var(--border-default);
-  overflow-y: auto;
-  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   background: var(--bg-secondary);
 }
 
@@ -183,18 +185,18 @@
   .workspace__sidebar {
     border-right: none;
     border-bottom: 1px solid var(--border-default);
-    max-height: 200px;
+    max-height: 160px;
   }
 
-  .workspace__preview {
+  .workspace__chat {
     border-left: none;
     border-top: 1px solid var(--border-default);
-    max-height: 300px;
+    max-height: 280px;
   }
 }
 
 @media (min-width: 1025px) and (max-width: 1280px) {
   .workspace {
-    grid-template-columns: 260px 1fr 320px;
+    grid-template-columns: 200px 1fr 300px;
   }
 }

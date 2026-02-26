@@ -349,11 +349,12 @@
   border-radius: var(--radius-full);
 }
 
-/* Preview panel */
+/* Preview panel — drawing-first layout, fills center */
 .preview {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: var(--space-3);
+  height: 100%;
 }
 
 .preview__tabs {
@@ -362,6 +363,7 @@
   background: var(--bg-tertiary);
   padding: var(--space-1);
   border-radius: var(--radius-md);
+  flex-shrink: 0;
 }
 
 .preview__tab {
@@ -389,7 +391,8 @@
   border-radius: var(--radius-md);
   overflow: hidden;
   background: white;
-  aspect-ratio: 4/3;
+  flex: 1;
+  min-height: 0;
   display: grid;
   place-items: center;
 }
