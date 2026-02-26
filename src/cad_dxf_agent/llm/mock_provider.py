@@ -24,7 +24,12 @@ class MockProvider(PlannerProvider):
     def requires_api_key(self) -> bool:
         return False
 
-    def plan(self, prompt: str, drawing_context: dict) -> ChangeSet:
+    def plan(
+        self,
+        prompt: str,
+        drawing_context: dict,
+        conversation_history: list[dict] | None = None,
+    ) -> ChangeSet:
         """Return mock operations based on simple keyword matching in the prompt.
 
         This is NOT a real planner. It exists so the full pipeline can be tested

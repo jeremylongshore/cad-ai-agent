@@ -103,10 +103,13 @@ def _call_with_timeout(
     prompt: str,
     drawing_context: dict,
     timeout: int,
+    conversation_history: list[dict] | None = None,
 ) -> ChangeSet:
     """Call provider.plan() with a wall-clock timeout."""
     with ThreadPoolExecutor(max_workers=1) as pool:
-        future = pool.submit(provider.plan, prompt, drawing_context)
+        future = pool.submit(
+            provider.plan, prompt, drawing_context, conversation_history
+        )
         try:
             return future.result(timeout=timeout)
         except FuturesTimeoutError as exc:
@@ -138,6 +141,7 @@ def run_planner(
     image_path: Path | None = None,
     context: DrawingContext | None = None,
     rule_config: RuleConfig | None = None,
+    conversation_history: list[dict] | None = None,
 ) -> ChangeSet:
     """Run the planner to generate a changeset from a user prompt.
 
@@ -198,7 +202,9 @@ def run_planner(
 
         for attempt in range(1, max_retries + 1):
             try:
-                changeset = _call_with_timeout(provider, prompt, drawing_context, timeout)
+                changeset = _call_with_timeout(
+                    provider, prompt, drawing_context, timeout, conversation_history
+                )
                 span.set_attribute("cad.planner.attempt", attempt)
                 logger.info(
                     "Planner returned %d operation(s) on attempt %d for prompt: %s",
@@ -226,7 +232,8 @@ def run_planner(
                             break
                         corrective = _format_validation_feedback(prompt, result.blockers)
                         changeset = _call_with_timeout(
-                            provider, corrective, drawing_context, timeout
+                            provider, corrective, drawing_context, timeout,
+                            conversation_history,
                         )
 
                 span.set_attribute("cad.ops.count", changeset.op_count)

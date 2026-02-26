@@ -46,6 +46,10 @@ class ChangeSet(BaseModel):
     operations: list[EditOperation] = Field(default_factory=list)
     prompt: str = ""
     revision_label: str | None = None
+    message: str | None = Field(
+        default=None,
+        description="Optional message from the LLM (e.g. explanation when no ops are returned)",
+    )
     planner_trace: Any = Field(default=None, exclude=True)
 
     @property

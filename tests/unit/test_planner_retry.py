@@ -27,7 +27,12 @@ class FailNTimesProvider(PlannerProvider):
     def requires_api_key(self) -> bool:
         return False
 
-    def plan(self, prompt: str, drawing_context: dict) -> ChangeSet:
+    def plan(
+        self,
+        prompt: str,
+        drawing_context: dict,
+        conversation_history: list[dict] | None = None,
+    ) -> ChangeSet:
         self._attempts += 1
         if self._attempts <= self._fail_count:
             raise ValueError(f"Simulated failure #{self._attempts}")
@@ -45,7 +50,12 @@ class AlwaysFailProvider(PlannerProvider):
     def requires_api_key(self) -> bool:
         return False
 
-    def plan(self, prompt: str, drawing_context: dict) -> ChangeSet:
+    def plan(
+        self,
+        prompt: str,
+        drawing_context: dict,
+        conversation_history: list[dict] | None = None,
+    ) -> ChangeSet:
         raise RuntimeError("Permanent failure")
 
 

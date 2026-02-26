@@ -33,6 +33,11 @@ from .session import Session, SessionManager
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
+# Constants
+# ---------------------------------------------------------------------------
+MAX_CONVERSATION_HISTORY = 10  # Max user+model entries kept per session
+
+# ---------------------------------------------------------------------------
 # Session manager (singleton)
 # ---------------------------------------------------------------------------
 session_mgr = SessionManager()
@@ -215,6 +220,7 @@ async def plan(body: PlanRequest, user: dict = Depends(get_user)):
             drawing_context=planner_context,
             context=session.context,
             rule_config=rule_config,
+            conversation_history=session.conversation_history or None,
         )
         session.changeset = changeset
 
@@ -238,9 +244,20 @@ async def plan(body: PlanRequest, user: dict = Depends(get_user)):
             summary_parts.append(op_info["description"])
         summary = "; ".join(summary_parts) if summary_parts else "No operations planned."
 
+        # Use LLM message if available and no operations were planned
+        llm_message = getattr(changeset, "message", None)
+
+        # Track conversation history for multi-turn context (cap at 10 entries)
+        history_text = llm_message if llm_message else summary
+        session.conversation_history.append({"role": "user", "text": body.prompt})
+        session.conversation_history.append({"role": "model", "text": history_text})
+        if len(session.conversation_history) > MAX_CONVERSATION_HISTORY:
+            session.conversation_history = session.conversation_history[-MAX_CONVERSATION_HISTORY:]
+
         return {
             "operations": operations,
             "summary": summary,
+            "message": llm_message,
             "validation": {
                 "blockers": [{"message": b.message} for b in validation.blockers],
                 "warnings": [{"message": w.message} for w in validation.warnings],
