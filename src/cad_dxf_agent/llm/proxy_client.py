@@ -59,7 +59,12 @@ class ProxyAgentProvider(PlannerProvider):
     def requires_api_key(self) -> bool:
         return False  # Uses license key, not API key
 
-    def plan(self, prompt: str, drawing_context: dict) -> ChangeSet:
+    def plan(
+        self,
+        prompt: str,
+        drawing_context: dict,
+        conversation_history: list[dict] | None = None,
+    ) -> ChangeSet:
         """Run tool-use agent loop through the Cloud Run proxy."""
         with tracer.start_as_current_span("cad.proxy_agent_plan") as span:
             span.set_attribute("cad.agent.model", self._model_name)

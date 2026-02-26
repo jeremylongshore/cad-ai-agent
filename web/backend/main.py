@@ -215,6 +215,7 @@ async def plan(body: PlanRequest, user: dict = Depends(get_user)):
             drawing_context=planner_context,
             context=session.context,
             rule_config=rule_config,
+            conversation_history=session.conversation_history or None,
         )
         session.changeset = changeset
 
@@ -237,6 +238,12 @@ async def plan(body: PlanRequest, user: dict = Depends(get_user)):
         for op_info in operations:
             summary_parts.append(op_info["description"])
         summary = "; ".join(summary_parts) if summary_parts else "No operations planned."
+
+        # Track conversation history for multi-turn context (cap at 10 entries)
+        session.conversation_history.append({"role": "user", "text": body.prompt})
+        session.conversation_history.append({"role": "model", "text": summary})
+        if len(session.conversation_history) > 10:
+            session.conversation_history = session.conversation_history[-10:]
 
         return {
             "operations": operations,

@@ -11,12 +11,19 @@ class PlannerProvider(ABC):
     """Abstract base class for LLM planner providers."""
 
     @abstractmethod
-    def plan(self, prompt: str, drawing_context: dict) -> ChangeSet:
+    def plan(
+        self,
+        prompt: str,
+        drawing_context: dict,
+        conversation_history: list[dict] | None = None,
+    ) -> ChangeSet:
         """Generate a structured changeset from a user prompt and drawing context.
 
         Args:
             prompt: The user's natural-language edit request.
             drawing_context: JSON-serializable drawing context from semantic_model.
+            conversation_history: Optional prior conversation turns for multi-turn context.
+                Each entry: {"role": "user"|"model", "text": "..."}.
 
         Returns:
             A validated ChangeSet with structured operations.

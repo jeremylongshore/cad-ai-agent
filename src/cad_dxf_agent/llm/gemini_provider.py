@@ -59,6 +59,7 @@ class GeminiProvider(PlannerProvider):
         self,
         prompt: str,
         drawing_context: dict,
+        conversation_history: list[dict] | None = None,
         image_path: str | Path | None = None,
     ) -> ChangeSet:
         """Generate a ChangeSet from prompt + drawing context + optional image.
@@ -66,6 +67,7 @@ class GeminiProvider(PlannerProvider):
         Args:
             prompt: User's natural-language edit request.
             drawing_context: JSON-serializable drawing context.
+            conversation_history: Optional prior conversation turns for multi-turn context.
             image_path: Optional path to a PNG render of the drawing.
 
         Returns:
@@ -78,8 +80,11 @@ class GeminiProvider(PlannerProvider):
             model = self._get_model()
             contents = self._build_contents(prompt, drawing_context, image_path)
 
-            # First attempt
-            raw_response = self._call_gemini(model, contents)
+            # Use chat session for multi-turn, plain generate for single-turn
+            if conversation_history:
+                raw_response = self._call_gemini_chat(model, conversation_history, contents)
+            else:
+                raw_response = self._call_gemini(model, contents)
             span.set_attribute("cad.gemini.response_length", len(raw_response))
 
             try:
@@ -178,6 +183,34 @@ class GeminiProvider(PlannerProvider):
         parts.append(text_prompt)
 
         return parts
+
+    def _call_gemini_chat(
+        self, model, conversation_history: list[dict], current_contents: list
+    ) -> str:
+        """Call Gemini via chat session with prior conversation history.
+
+        Converts conversation_history entries to Gemini Content objects,
+        starts a chat with that history, then sends the current message.
+        """
+        from vertexai.generative_models import Content, Part  # type: ignore[import-untyped]
+
+        history = []
+        for entry in conversation_history:
+            role = "user" if entry.get("role") == "user" else "model"
+            history.append(
+                Content(role=role, parts=[Part.from_text(entry.get("text", ""))])
+            )
+
+        chat = model.start_chat(history=history)
+        response = chat.send_message(current_contents)
+
+        try:
+            text: str = response.text
+        except ValueError as e:
+            raise ValueError(f"Gemini response blocked: {e}") from e
+        if not text:
+            raise ValueError("Gemini returned empty response")
+        return text
 
     def _call_gemini(self, model, contents: list) -> str:
         """Call Gemini and return the text response.

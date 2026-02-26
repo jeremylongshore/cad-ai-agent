@@ -42,7 +42,12 @@ class ScriptedAgentProvider(PlannerProvider):
     def requires_api_key(self) -> bool:
         return False
 
-    def plan(self, prompt: str, drawing_context: dict) -> ChangeSet:
+    def plan(
+        self,
+        prompt: str,
+        drawing_context: dict,
+        conversation_history: list[dict] | None = None,
+    ) -> ChangeSet:
         """Execute scripted tool calls through the real ToolExecutor."""
         context = _reconstruct_context(drawing_context)
         executor = ToolExecutor(context, settings.protected_layers)

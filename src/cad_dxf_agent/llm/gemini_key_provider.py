@@ -37,7 +37,12 @@ class GeminiKeyProvider(PlannerProvider):
     def requires_api_key(self) -> bool:
         return True
 
-    def plan(self, prompt: str, drawing_context: dict) -> ChangeSet:
+    def plan(
+        self,
+        prompt: str,
+        drawing_context: dict,
+        conversation_history: list[dict] | None = None,
+    ) -> ChangeSet:
         with tracer.start_as_current_span("cad.gemini_key_plan") as span:
             span.set_attribute("cad.gemini.model", self._model_name)
 
@@ -45,7 +50,11 @@ class GeminiKeyProvider(PlannerProvider):
             context_json = json.dumps(drawing_context, indent=2, default=str)
             text_prompt = format_planner_prompt(prompt, context_json)
 
-            raw_response = model.generate_content(text_prompt).text
+            # Use chat session for multi-turn, plain generate for single-turn
+            if conversation_history:
+                raw_response = self._chat_generate(model, conversation_history, text_prompt)
+            else:
+                raw_response = model.generate_content(text_prompt).text
             span.set_attribute("cad.gemini.response_length", len(raw_response))
 
             try:
@@ -70,6 +79,18 @@ class GeminiKeyProvider(PlannerProvider):
                 span.set_attribute("cad.ops.count", changeset.op_count)
                 span.set_attribute("cad.gemini.retried", True)
                 return changeset
+
+    def _chat_generate(self, model, conversation_history: list[dict], text_prompt: str) -> str:
+        """Send message via chat session with prior conversation history."""
+        history = []
+        for entry in conversation_history:
+            role = "user" if entry.get("role") == "user" else "model"
+            history.append({"role": role, "parts": [entry.get("text", "")]})
+
+        chat = model.start_chat(history=history)
+        response = chat.send_message(text_prompt)
+        text: str = response.text
+        return text
 
     def _get_model(self):
         if self._model is not None:

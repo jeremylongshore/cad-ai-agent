@@ -32,6 +32,7 @@ class Session:
     changeset: object | None = None
     context: object | None = None
     file_info: dict = field(default_factory=dict)
+    conversation_history: list[dict] = field(default_factory=list)
 
 
 class SessionManager:

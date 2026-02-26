@@ -64,7 +64,12 @@ class AgentProvider(PlannerProvider):
     def requires_api_key(self) -> bool:
         return False  # Uses GCP credentials
 
-    def plan(self, prompt: str, drawing_context: dict) -> ChangeSet:
+    def plan(
+        self,
+        prompt: str,
+        drawing_context: dict,
+        conversation_history: list[dict] | None = None,
+    ) -> ChangeSet:
         """Run the tool-use agent loop to produce a ChangeSet."""
         with tracer.start_as_current_span("cad.agent_plan") as span:
             span.set_attribute("cad.agent.model", self._model_name)
@@ -402,7 +407,12 @@ class MockAgentProvider(PlannerProvider):
     def requires_api_key(self) -> bool:
         return False
 
-    def plan(self, prompt: str, drawing_context: dict) -> ChangeSet:
+    def plan(
+        self,
+        prompt: str,
+        drawing_context: dict,
+        conversation_history: list[dict] | None = None,
+    ) -> ChangeSet:
         """Simulate agent tool-use with deterministic tool calls."""
         from ..models.cad_schema import (
             DrawingContext,
