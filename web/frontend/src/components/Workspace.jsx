@@ -89,6 +89,7 @@ export default function Workspace({ user, onSignOut }) {
             <ChatPanel
               messages={messages}
               onSend={session.sendPrompt}
+              onClear={session.clearConversation}
               loading={loading}
               disabled={!sessionId}
             />

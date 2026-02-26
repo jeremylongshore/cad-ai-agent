@@ -218,6 +218,13 @@
   height: 100%;
 }
 
+.chat__toolbar {
+  display: flex;
+  justify-content: flex-end;
+  padding: var(--space-1) var(--space-4) 0;
+  border-bottom: 1px solid var(--border-default);
+}
+
 .chat__messages {
   flex: 1;
   overflow-y: auto;

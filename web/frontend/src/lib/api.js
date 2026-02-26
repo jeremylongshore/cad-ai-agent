@@ -62,6 +62,15 @@ export async function applyChanges(sessionId, selectedOps = null) {
   return res.json();
 }
 
+export async function clearHistory(sessionId) {
+  const res = await request('/api/clear-history', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ session_id: sessionId }),
+  });
+  return res.json();
+}
+
 export function getRenderUrl(sessionId, type = 'original') {
   return `${API_BASE}/api/render?session_id=${sessionId}&type=${type}`;
 }

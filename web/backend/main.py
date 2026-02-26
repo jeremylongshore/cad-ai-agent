@@ -96,6 +96,10 @@ class ApplyRequest(BaseModel):
     selected_ops: list[int] | None = None
 
 
+class ClearHistoryRequest(BaseModel):
+    session_id: str
+
+
 # ---------------------------------------------------------------------------
 # Dependency: get authenticated user
 # ---------------------------------------------------------------------------
@@ -338,6 +342,19 @@ async def apply_changes(body: ApplyRequest, user: dict = Depends(get_user)):
     except Exception as e:
         logger.error("Apply failed: %s", e, exc_info=True)
         raise HTTPException(status_code=500, detail=f"Apply failed: {e}")
+
+
+@app.post("/api/clear-history")
+async def clear_history(body: ClearHistoryRequest, user: dict = Depends(get_user)):
+    """Clear conversation history for a session (keep the file loaded)."""
+    try:
+        session = session_mgr.get(body.session_id, user["uid"])
+    except (KeyError, PermissionError) as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    session.conversation_history = []
+    session.changeset = None
+    return {"message": "Conversation cleared."}
 
 
 @app.get("/api/render")

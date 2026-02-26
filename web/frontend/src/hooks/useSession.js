@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { uploadFile, planEdit, applyChanges, downloadFile, getRenderBlob } from '../lib/api';
+import { uploadFile, planEdit, applyChanges, downloadFile, getRenderBlob, clearHistory } from '../lib/api';
 
 const NO_CHANGES_MESSAGE = "I couldn't plan any changes. Try being more specific about which element to edit.";
 
@@ -121,6 +121,19 @@ export function useSession() {
     }
   }, [sessionId]);
 
+  const clearConversation = useCallback(async () => {
+    if (!sessionId) return;
+    try {
+      await clearHistory(sessionId);
+    } catch (err) {
+      console.warn('[cad] Clear history API failed:', err.message);
+    }
+    setMessages([]);
+    setOperations([]);
+    setSelectedOps([]);
+    setValidation(null);
+  }, [sessionId]);
+
   const reset = useCallback(() => {
     // Revoke blob URLs to free memory
     Object.values(previewUrls).forEach((url) => {
@@ -152,6 +165,7 @@ export function useSession() {
     toggleOp,
     apply,
     download,
+    clearConversation,
     reset,
   };
 }

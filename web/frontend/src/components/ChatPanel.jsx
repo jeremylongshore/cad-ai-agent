@@ -7,7 +7,7 @@ const SUGGESTIONS = [
   'Add a column mark at grid B3',
 ];
 
-export default function ChatPanel({ messages, onSend, loading, disabled }) {
+export default function ChatPanel({ messages, onSend, onClear, loading, disabled }) {
   const [input, setInput] = useState('');
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
@@ -41,6 +41,18 @@ export default function ChatPanel({ messages, onSend, loading, disabled }) {
 
   return (
     <div className="chat">
+      {messages.length > 0 && onClear && (
+        <div className="chat__toolbar">
+          <button
+            type="button"
+            className="btn btn--ghost btn--sm"
+            onClick={onClear}
+            disabled={loading}
+          >
+            Clear chat
+          </button>
+        </div>
+      )}
       <div className="chat__messages" role="log" aria-label="Chat messages">
         {messages.length === 0 ? (
           <div className="chat__empty">
