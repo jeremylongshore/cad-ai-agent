@@ -51,7 +51,17 @@ export function useSession() {
       setOperations(ops);
       setSelectedOps(ops.map((_, i) => i));
       setValidation(data.validation || null);
-      setMessages((prev) => [...prev, { role: 'ai', text: data.summary || `${ops.length} operation(s) planned.` }]);
+
+      // Determine AI response text
+      let aiText;
+      if (ops.length === 0 && data.message) {
+        aiText = data.message;
+      } else if (ops.length === 0) {
+        aiText = "I couldn't plan any changes. Try being more specific about which element to edit.";
+      } else {
+        aiText = data.summary || `${ops.length} operation(s) planned.`;
+      }
+      setMessages((prev) => [...prev, { role: 'ai', text: aiText }]);
 
       if (data.preview_url) {
         setPreviewUrls((prev) => ({ ...prev, edited: data.preview_url }));

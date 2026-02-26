@@ -239,15 +239,20 @@ async def plan(body: PlanRequest, user: dict = Depends(get_user)):
             summary_parts.append(op_info["description"])
         summary = "; ".join(summary_parts) if summary_parts else "No operations planned."
 
+        # Use LLM message if available and no operations were planned
+        llm_message = getattr(changeset, "message", None)
+
         # Track conversation history for multi-turn context (cap at 10 entries)
+        history_text = llm_message if llm_message else summary
         session.conversation_history.append({"role": "user", "text": body.prompt})
-        session.conversation_history.append({"role": "model", "text": summary})
+        session.conversation_history.append({"role": "model", "text": history_text})
         if len(session.conversation_history) > 10:
             session.conversation_history = session.conversation_history[-10:]
 
         return {
             "operations": operations,
             "summary": summary,
+            "message": llm_message,
             "validation": {
                 "blockers": [{"message": b.message} for b in validation.blockers],
                 "warnings": [{"message": w.message} for w in validation.warnings],

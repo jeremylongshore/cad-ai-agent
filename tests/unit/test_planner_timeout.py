@@ -27,7 +27,12 @@ class SlowProvider(PlannerProvider):
     def requires_api_key(self) -> bool:
         return False
 
-    def plan(self, prompt: str, drawing_context: dict, conversation_history: list[dict] | None = None) -> ChangeSet:
+    def plan(
+        self,
+        prompt: str,
+        drawing_context: dict,
+        conversation_history: list[dict] | None = None,
+    ) -> ChangeSet:
         time.sleep(self._delay)
         return ChangeSet(prompt=prompt)
 
@@ -43,7 +48,12 @@ class FastProvider(PlannerProvider):
     def requires_api_key(self) -> bool:
         return False
 
-    def plan(self, prompt: str, drawing_context: dict, conversation_history: list[dict] | None = None) -> ChangeSet:
+    def plan(
+        self,
+        prompt: str,
+        drawing_context: dict,
+        conversation_history: list[dict] | None = None,
+    ) -> ChangeSet:
         return ChangeSet(prompt=prompt, operations=[])
 
 

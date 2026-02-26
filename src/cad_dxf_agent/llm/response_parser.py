@@ -50,4 +50,5 @@ def parse_planner_response(raw_response: str, prompt: str = "") -> ChangeSet:
         operations=ops,
         prompt=data.get("prompt", prompt),
         revision_label=data.get("revision_label"),
+        message=data.get("message"),
     )
