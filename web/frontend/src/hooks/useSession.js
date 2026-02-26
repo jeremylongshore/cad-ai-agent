@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { uploadFile, planEdit, applyChanges, downloadFile, getRenderBlob, clearHistory } from '../lib/api';
+import { uploadFile, planEdit, applyChanges, downloadFile, getRenderBlob, clearHistory, compareFiles } from '../lib/api';
 
 const NO_CHANGES_MESSAGE = "I couldn't plan any changes. Try being more specific about which element to edit.";
 
@@ -11,6 +11,7 @@ export function useSession() {
   const [selectedOps, setSelectedOps] = useState([]);
   const [validation, setValidation] = useState(null);
   const [previewUrls, setPreviewUrls] = useState({ original: null, edited: null, diff: null });
+  const [comparisonResult, setComparisonResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -134,6 +135,35 @@ export function useSession() {
     setValidation(null);
   }, [sessionId]);
 
+  const compareRevision = useCallback(async (file) => {
+    if (!sessionId) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await compareFiles(sessionId, file);
+      setComparisonResult(data);
+      setMessages((prev) => [...prev, {
+        role: 'system',
+        text: `Comparison complete: ${data.total_changes} change(s) found — ${data.summary.added || 0} added, ${data.summary.removed || 0} removed, ${data.summary.modified || 0} modified, ${data.summary.moved || 0} moved.`,
+      }]);
+
+      // Fetch comparison render
+      if (data.render_available) {
+        try {
+          const blob = await getRenderBlob(sessionId, 'comparison');
+          const url = URL.createObjectURL(blob);
+          setPreviewUrls((prev) => ({ ...prev, comparison: url }));
+        } catch (renderErr) {
+          console.warn('[cad] Comparison render fetch failed:', renderErr.message);
+        }
+      }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [sessionId]);
+
   const reset = useCallback(() => {
     // Revoke blob URLs to free memory
     Object.values(previewUrls).forEach((url) => {
@@ -145,7 +175,8 @@ export function useSession() {
     setOperations([]);
     setSelectedOps([]);
     setValidation(null);
-    setPreviewUrls({ original: null, edited: null, diff: null });
+    setPreviewUrls({ original: null, edited: null, diff: null, comparison: null });
+    setComparisonResult(null);
     setError(null);
   }, [previewUrls]);
 
@@ -157,6 +188,7 @@ export function useSession() {
     selectedOps,
     validation,
     previewUrls,
+    comparisonResult,
     loading,
     error,
     clearError,
@@ -165,6 +197,7 @@ export function useSession() {
     toggleOp,
     apply,
     download,
+    compareRevision,
     clearConversation,
     reset,
   };

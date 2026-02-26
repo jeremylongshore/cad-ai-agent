@@ -5,7 +5,8 @@ Routes:
     POST /api/upload     — Upload DXF/PDF, get session + file info
     POST /api/plan       — Send prompt, get planned operations + preview
     POST /api/apply      — Apply selected operations
-    GET  /api/render     — Get PNG render (original/edited/diff)
+    POST /api/compare    — Upload revision DXF, compare against master
+    GET  /api/render     — Get PNG render (original/edited/diff/comparison)
     GET  /api/download   — Download edited DXF
 """
 
@@ -357,6 +358,78 @@ async def clear_history(body: ClearHistoryRequest, user: dict = Depends(get_user
     return {"message": "Conversation cleared."}
 
 
+@app.post("/api/compare")
+async def compare(
+    file: UploadFile = File(...),
+    session_id: str = Query(...),
+    user: dict = Depends(get_user),
+):
+    """Upload a revision DXF and compare against the session's master file."""
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="No file provided")
+
+    ext = Path(file.filename).suffix.lower()
+    if ext != ".dxf":
+        raise HTTPException(status_code=400, detail="Comparison requires a .dxf file")
+
+    try:
+        session = session_mgr.get(session_id, user["uid"])
+    except (KeyError, PermissionError) as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    if session.original_path is None or not session.original_path.exists():
+        raise HTTPException(status_code=400, detail="No master file loaded. Upload a file first.")
+
+    # Save revision file
+    session_dir = Path("/tmp/cad-sessions") / session.session_id
+    revision_path = session_dir / "revision.dxf"
+    content = await file.read()
+    revision_path.write_bytes(content)
+
+    try:
+        from cad_dxf_agent.core.comparison.engine import ComparisonEngine
+
+        engine = ComparisonEngine()
+        result = engine.compare(session.original_path, revision_path)
+
+        # Generate outputs
+        output_dir = session_dir / "comparison"
+        outputs = engine.generate_outputs(
+            session.original_path, revision_path, result, output_dir
+        )
+
+        # Store in session
+        session.comparison_result = result
+        session.comparison_changelog = outputs.changelog
+        session.diff_overlay_path = outputs.diff_overlay_path
+
+        # Render diff overlay preview
+        if outputs.diff_overlay_path and outputs.diff_overlay_path.exists():
+            try:
+                from cad_dxf_agent.core.renderer import render_dxf_to_png
+
+                render_result = render_dxf_to_png(
+                    outputs.diff_overlay_path, session_dir / "comparison.png"
+                )
+                if render_result.success:
+                    session.diff_overlay_render = render_result.output_path
+            except Exception as e:
+                logger.warning("Comparison render failed (non-fatal): %s", e)
+
+        return {
+            "summary": result.summary,
+            "total_changes": result.total_changes,
+            "changelog": outputs.changelog.to_json(),
+            "render_available": session.diff_overlay_render is not None,
+        }
+
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error("Comparison failed: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Comparison failed: {e}")
+
+
 @app.get("/api/render")
 async def render(
     session_id: str = Query(...),
@@ -377,6 +450,7 @@ async def render(
         "original": session.original_render,
         "edited": session.edited_render,
         "diff": session.diff_render,
+        "comparison": session.diff_overlay_render,
     }
     path = render_map.get(type)
 

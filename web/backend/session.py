@@ -33,6 +33,11 @@ class Session:
     context: object | None = None
     file_info: dict = field(default_factory=dict)
     conversation_history: list[dict] = field(default_factory=list)
+    # Comparison state
+    comparison_result: object | None = None
+    comparison_changelog: object | None = None
+    diff_overlay_path: Path | None = None
+    diff_overlay_render: Path | None = None
 
 
 class SessionManager:

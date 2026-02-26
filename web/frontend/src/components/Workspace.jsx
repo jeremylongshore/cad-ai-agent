@@ -5,7 +5,7 @@ import PreviewPanel from './PreviewPanel';
 
 export default function Workspace({ user, onSignOut }) {
   const session = useSession();
-  const { fileInfo, sessionId, messages, operations, selectedOps, previewUrls, loading, error } = session;
+  const { fileInfo, sessionId, messages, operations, selectedOps, previewUrls, comparisonResult, loading, error } = session;
 
   return (
     <div className="page" style={{ height: '100vh', overflow: 'hidden' }}>
@@ -93,6 +93,8 @@ export default function Workspace({ user, onSignOut }) {
               onToggleOp={session.toggleOp}
               onApply={() => session.apply()}
               onDownload={session.download}
+              onCompare={session.compareRevision}
+              comparisonResult={comparisonResult}
               loading={loading}
             />
           </section>
