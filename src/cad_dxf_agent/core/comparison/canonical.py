@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from ...models.cad_schema import Point2D
+from ...models.cad_schema import EntityType, Point2D
 
 
 @dataclass(frozen=True)
@@ -96,3 +96,62 @@ def spatial_bin(point: Point2D, config: QuantizationConfig | None = None) -> tup
     bx = int(point.x // config.spatial_bin_size)
     by = int(point.y // config.spatial_bin_size)
     return (bx, by)
+
+
+# --- Geometry normalization ---
+
+# Entity types where start/end are interchangeable (undirected).
+_UNDIRECTED_TYPES = {EntityType.LINE}
+
+# Entity types where vertex order defines the shape (must preserve).
+_ORDERED_TYPES = {
+    EntityType.LWPOLYLINE,
+    EntityType.POLYLINE,
+    EntityType.SPLINE,
+    EntityType.LEADER,
+    EntityType.HATCH,
+}
+
+
+def canonical_points(
+    points: list[Point2D],
+    entity_type: EntityType,
+    config: QuantizationConfig | None = None,
+) -> list[Point2D]:
+    """Produce canonical (normalized + quantized) points for an entity.
+
+    Normalization rules by entity type:
+    - LINE: sort endpoints so lower-x (then lower-y) comes first.
+      This makes LINE(A→B) == LINE(B→A).
+    - LWPOLYLINE / POLYLINE / SPLINE / LEADER / HATCH: preserve vertex
+      order (defines shape), but quantize and remove near-duplicate vertices.
+    - Single-point entities (TEXT, MTEXT, INSERT, CIRCLE, ARC, etc.):
+      just quantize.
+    """
+    config = config or DEFAULT_QUANTIZATION
+
+    # Step 1: quantize all coordinates
+    quantized = quantize_points(points, config)
+
+    # Step 2: normalize direction for undirected types (LINE)
+    if entity_type in _UNDIRECTED_TYPES and len(quantized) == 2:
+        return _sort_line_endpoints(quantized)
+
+    # Step 3: remove near-duplicate consecutive vertices (polylines, hatches, etc.)
+    if entity_type in _ORDERED_TYPES:
+        return remove_near_duplicate_vertices(quantized, config)
+
+    # Single-point entities (TEXT, INSERT, CIRCLE, etc.): just return quantized
+    return quantized
+
+
+def _sort_line_endpoints(points: list[Point2D]) -> list[Point2D]:
+    """Sort LINE endpoints: lower-x first, then lower-y as tiebreaker.
+
+    This ensures LINE(0,0 → 10,5) and LINE(10,5 → 0,0) produce
+    identical canonical points.
+    """
+    a, b = points[0], points[1]
+    if (a.x, a.y) > (b.x, b.y):
+        return [b, a]
+    return [a, b]

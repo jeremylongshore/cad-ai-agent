@@ -7,13 +7,14 @@ import pytest
 from cad_dxf_agent.core.comparison.canonical import (
     DEFAULT_QUANTIZATION,
     QuantizationConfig,
+    canonical_points,
     quantize_point,
     quantize_points,
     quantize_value,
     remove_near_duplicate_vertices,
     spatial_bin,
 )
-from cad_dxf_agent.models.cad_schema import Point2D
+from cad_dxf_agent.models.cad_schema import EntityType, Point2D
 
 
 class TestQuantizePoint:
@@ -182,3 +183,111 @@ class TestDefaultConfig:
     def test_frozen(self):
         with pytest.raises(AttributeError):
             DEFAULT_QUANTIZATION.decimal_places = 3  # type: ignore[misc]
+
+
+class TestCanonicalPointsLine:
+    """LINE normalization: endpoints sorted so lower-x (then y) first."""
+
+    def test_already_sorted(self):
+        pts = [Point2D(x=0, y=0), Point2D(x=10, y=0)]
+        result = canonical_points(pts, EntityType.LINE)
+        assert result[0].x <= result[1].x
+
+    def test_reversed_line_normalized(self):
+        """LINE(10,0 → 0,0) should become LINE(0,0 → 10,0)."""
+        pts = [Point2D(x=10, y=0), Point2D(x=0, y=0)]
+        result = canonical_points(pts, EntityType.LINE)
+        assert result[0] == Point2D(x=0, y=0)
+        assert result[1] == Point2D(x=10, y=0)
+
+    def test_both_directions_produce_same_result(self):
+        forward = canonical_points(
+            [Point2D(x=0, y=0), Point2D(x=10, y=5)], EntityType.LINE
+        )
+        reverse = canonical_points(
+            [Point2D(x=10, y=5), Point2D(x=0, y=0)], EntityType.LINE
+        )
+        assert forward == reverse
+
+    def test_same_x_sorts_by_y(self):
+        pts = [Point2D(x=5, y=10), Point2D(x=5, y=0)]
+        result = canonical_points(pts, EntityType.LINE)
+        assert result[0] == Point2D(x=5, y=0)
+        assert result[1] == Point2D(x=5, y=10)
+
+    def test_quantization_applied(self):
+        pts = [Point2D(x=0.000049, y=0), Point2D(x=10.000051, y=0)]
+        result = canonical_points(pts, EntityType.LINE)
+        assert result[0] == Point2D(x=0.0, y=0.0)
+        assert result[1] == Point2D(x=10.0001, y=0.0)
+
+    def test_identical_endpoints_kept(self):
+        """Degenerate zero-length line — both points same after quantization."""
+        pts = [Point2D(x=5, y=5), Point2D(x=5, y=5)]
+        result = canonical_points(pts, EntityType.LINE)
+        assert len(result) == 2  # not deduplicated — LINE always has 2 points
+
+
+class TestCanonicalPointsPolyline:
+    """LWPOLYLINE normalization: preserves vertex order, quantizes, deduplicates."""
+
+    def test_order_preserved(self):
+        pts = [Point2D(x=0, y=0), Point2D(x=10, y=0), Point2D(x=10, y=10), Point2D(x=0, y=10)]
+        result = canonical_points(pts, EntityType.LWPOLYLINE)
+        assert result == [
+            Point2D(x=0, y=0),
+            Point2D(x=10, y=0),
+            Point2D(x=10, y=10),
+            Point2D(x=0, y=10),
+        ]
+
+    def test_near_duplicate_vertices_removed(self):
+        pts = [
+            Point2D(x=0, y=0),
+            Point2D(x=0.00001, y=0.00001),  # near-dup
+            Point2D(x=10, y=0),
+            Point2D(x=10, y=10),
+        ]
+        result = canonical_points(pts, EntityType.LWPOLYLINE)
+        assert len(result) == 3
+
+    def test_quantization_applied(self):
+        pts = [Point2D(x=0.00006, y=0.00004), Point2D(x=10.00006, y=0)]
+        result = canonical_points(pts, EntityType.LWPOLYLINE)
+        assert result[0] == Point2D(x=0.0001, y=0.0)
+        assert result[1] == Point2D(x=10.0001, y=0.0)
+
+
+class TestCanonicalPointsSinglePoint:
+    """Single-point entities (TEXT, INSERT, CIRCLE, etc.): just quantize."""
+
+    def test_text_quantized(self):
+        pts = [Point2D(x=5.00006, y=10.00004)]
+        result = canonical_points(pts, EntityType.TEXT)
+        assert result == [Point2D(x=5.0001, y=10.0)]
+
+    def test_insert_quantized(self):
+        pts = [Point2D(x=100.123456, y=200.654321)]
+        result = canonical_points(pts, EntityType.INSERT)
+        assert result == [Point2D(x=100.1235, y=200.6543)]
+
+    def test_circle_quantized(self):
+        pts = [Point2D(x=50.00009, y=50.00001)]
+        result = canonical_points(pts, EntityType.CIRCLE)
+        assert result == [Point2D(x=50.0001, y=50.0)]
+
+
+class TestCanonicalPointsIdempotent:
+    """Applying canonical_points twice gives same result as once."""
+
+    def test_line_idempotent(self):
+        pts = [Point2D(x=10.00006, y=5.00004), Point2D(x=0.00006, y=0.00004)]
+        once = canonical_points(pts, EntityType.LINE)
+        twice = canonical_points(once, EntityType.LINE)
+        assert once == twice
+
+    def test_polyline_idempotent(self):
+        pts = [Point2D(x=0.00006, y=0), Point2D(x=10.00006, y=0), Point2D(x=10, y=10)]
+        once = canonical_points(pts, EntityType.LWPOLYLINE)
+        twice = canonical_points(once, EntityType.LWPOLYLINE)
+        assert once == twice
