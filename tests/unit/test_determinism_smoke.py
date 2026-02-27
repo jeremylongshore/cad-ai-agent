@@ -16,6 +16,7 @@ Audit context (cad-ee2.1):
 
 from __future__ import annotations
 
+from cad_dxf_agent.core.comparison.canonical import assign_stable_ids
 from cad_dxf_agent.core.comparison.classifier import classify_changes
 from cad_dxf_agent.core.comparison.engine import ComparisonEngine
 from cad_dxf_agent.core.comparison.geometry import extract_snapshots
@@ -150,3 +151,61 @@ class TestCrossFileIdentity:
         # Field exists but is None until assign_stable_ids is called
         assert hasattr(snaps[0], "stable_id")
         assert snaps[0].stable_id is None
+
+    def test_stable_ids_assigned_after_canonicalization(self, tmp_path):
+        """assign_stable_ids() populates stable_id on all snapshots."""
+        master, _ = make_identical_pair(tmp_path)
+        snaps = extract_snapshots(master)
+        result = assign_stable_ids(snaps)
+        assert all(s.stable_id is not None for s in result)
+        # All IDs unique
+        ids = [s.stable_id for s in result]
+        assert len(set(ids)) == len(ids)
+
+    def test_stable_ids_match_across_identical_files(self, tmp_path):
+        """Same geometry in two independently-created DXFs → same stable IDs."""
+        master, revision = make_identical_pair(tmp_path)
+        m_snaps = assign_stable_ids(extract_snapshots(master))
+        r_snaps = assign_stable_ids(extract_snapshots(revision))
+        m_ids = sorted(s.stable_id for s in m_snaps)  # type: ignore[arg-type]
+        r_ids = sorted(s.stable_id for s in r_snaps)  # type: ignore[arg-type]
+        assert m_ids == r_ids
+
+
+class TestCanonicalEngineDeterminism:
+    """Engine with use_canonical=True produces stable, deterministic output."""
+
+    def test_canonical_compare_twice_identical(self, tmp_path):
+        master, revision = make_complex_pair(tmp_path)
+        config = ComparisonConfig(use_canonical=True)
+        engine = ComparisonEngine()
+        result_a = engine.compare(master, revision, config)
+        result_b = engine.compare(master, revision, config)
+        assert result_a.summary == result_b.summary
+        assert len(result_a.changes) == len(result_b.changes)
+        for a, b in zip(result_a.changes, result_b.changes, strict=True):
+            assert a.category == b.category
+
+    def test_canonical_changes_have_stable_ids(self, tmp_path):
+        """When use_canonical=True, matched entities have stable IDs."""
+        master, revision = make_identical_pair(tmp_path)
+        config = ComparisonConfig(use_canonical=True)
+        engine = ComparisonEngine()
+        result = engine.compare(master, revision, config)
+        for change in result.changes:
+            if change.master_snapshot:
+                assert change.master_snapshot.stable_id is not None
+            if change.revision_snapshot:
+                assert change.revision_snapshot.stable_id is not None
+
+    def test_canonical_backward_compat(self, tmp_path):
+        """Default config (use_canonical=False) works exactly as before."""
+        master, revision = make_complex_pair(tmp_path)
+        engine = ComparisonEngine()
+        # Default: no canonical model
+        result = engine.compare(master, revision)
+        assert result.summary is not None
+        # No stable IDs assigned
+        for change in result.changes:
+            if change.master_snapshot:
+                assert change.master_snapshot.stable_id is None

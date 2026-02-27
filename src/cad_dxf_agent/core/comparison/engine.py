@@ -8,6 +8,7 @@ from pathlib import Path
 
 from ...models.comparison_schema import ComparisonConfig, ComparisonResult
 from ...otel import get_tracer
+from .canonical import assign_stable_ids, sort_changes, sort_snapshots
 from .changelog import ChangeLog, generate_changelog
 from .classifier import classify_changes
 from .diff_overlay import write_diff_overlay
@@ -67,6 +68,15 @@ class ComparisonEngine:
             logger.info("Extracting geometry from revision: %s", Path(revision_path).name)
             revision_snaps = extract_snapshots(revision_path, config)
 
+            # Canonical model: assign stable IDs and sort deterministically
+            if config.use_canonical:
+                span.set_attribute("cad.compare.canonical", True)
+                logger.info("Applying canonical model (stable IDs + deterministic sort)")
+                master_snaps = assign_stable_ids(master_snaps)
+                revision_snaps = assign_stable_ids(revision_snaps)
+                master_snaps = sort_snapshots(master_snaps)
+                revision_snaps = sort_snapshots(revision_snaps)
+
             logger.info(
                 "Matching entities: %d master, %d revision",
                 len(master_snaps),
@@ -81,6 +91,14 @@ class ComparisonEngine:
                 len(match_result.revision_only),
             )
             result = classify_changes(match_result, config)
+
+            # Sort changes deterministically when using canonical model
+            if config.use_canonical:
+                result = ComparisonResult(
+                    changes=sort_changes(result.changes),
+                    summary=result.summary,
+                    config=result.config,
+                )
 
             logger.info("Classification: %s", result.summary)
 

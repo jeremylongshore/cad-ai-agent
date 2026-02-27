@@ -52,6 +52,10 @@ class ComparisonConfig(BaseModel):
         default=None,
         description="Restrict comparison to these types; None = all",
     )
+    use_canonical: bool = Field(
+        default=False,
+        description="Enable canonical model: stable IDs, deterministic ordering, quantized points",
+    )
 
 
 class ChangeCategory(StrEnum):
