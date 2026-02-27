@@ -8,8 +8,10 @@ from cad_dxf_agent.core.comparison.canonical import (
     DEFAULT_QUANTIZATION,
     GeometrySignature,
     QuantizationConfig,
+    assign_stable_ids,
     canonical_points,
     compute_signature,
+    compute_stable_id,
     quantize_point,
     quantize_points,
     quantize_value,
@@ -17,6 +19,7 @@ from cad_dxf_agent.core.comparison.canonical import (
     spatial_bin,
 )
 from cad_dxf_agent.models.cad_schema import EntityType, Point2D
+from cad_dxf_agent.models.comparison_schema import GeometrySnapshot
 
 
 class TestQuantizePoint:
@@ -529,3 +532,166 @@ class TestSignatureIdempotent:
         sig_a = compute_signature(EntityType.LWPOLYLINE, pts)
         sig_b = compute_signature(EntityType.LWPOLYLINE, pts)
         assert sig_a == sig_b
+
+
+# ============================================================
+# Stable ID tests
+# ============================================================
+
+
+def _make_snap(
+    entity_type: EntityType = EntityType.LINE,
+    layer: str = "0",
+    points: list[Point2D] | None = None,
+    handle: str = "FF",
+    **kwargs: object,
+) -> GeometrySnapshot:
+    """Helper to build a GeometrySnapshot for testing."""
+    return GeometrySnapshot(
+        handle=handle,
+        entity_type=entity_type,
+        layer=layer,
+        points=points or [Point2D(x=0, y=0), Point2D(x=10, y=0)],
+        **kwargs,  # type: ignore[arg-type]
+    )
+
+
+class TestComputeStableId:
+    """compute_stable_id produces deterministic base IDs."""
+
+    def test_deterministic(self):
+        snap = _make_snap()
+        id_a = compute_stable_id(snap)
+        id_b = compute_stable_id(snap)
+        assert id_a == id_b
+
+    def test_format(self):
+        snap = _make_snap(layer="STRUCTURAL")
+        sid = compute_stable_id(snap)
+        assert sid.startswith("LINE:STRUCTURAL:")
+        # 12 hex chars after the prefix
+        hex_part = sid.split(":")[-1]
+        assert len(hex_part) == 12
+
+    def test_different_geometry_different_id(self):
+        snap_a = _make_snap(points=[Point2D(x=0, y=0), Point2D(x=10, y=0)])
+        snap_b = _make_snap(points=[Point2D(x=0, y=0), Point2D(x=20, y=0)])
+        assert compute_stable_id(snap_a) != compute_stable_id(snap_b)
+
+    def test_different_layer_different_id(self):
+        snap_a = _make_snap(layer="A")
+        snap_b = _make_snap(layer="B")
+        assert compute_stable_id(snap_a) != compute_stable_id(snap_b)
+
+    def test_different_type_different_id(self):
+        pts = [Point2D(x=5, y=5)]
+        snap_a = _make_snap(entity_type=EntityType.TEXT, points=pts, text_content="X")
+        snap_b = _make_snap(entity_type=EntityType.MTEXT, points=pts, text_content="X")
+        assert compute_stable_id(snap_a) != compute_stable_id(snap_b)
+
+    def test_handle_irrelevant(self):
+        """Different DXF handles produce same stable ID."""
+        snap_a = _make_snap(handle="1A")
+        snap_b = _make_snap(handle="2B")
+        assert compute_stable_id(snap_a) == compute_stable_id(snap_b)
+
+    def test_small_noise_stable(self):
+        """±0.001" noise doesn't change stable ID."""
+        snap_clean = _make_snap(points=[Point2D(x=0, y=0), Point2D(x=10, y=0)])
+        snap_noisy = _make_snap(points=[Point2D(x=0.001, y=-0.001), Point2D(x=9.999, y=0.001)])
+        assert compute_stable_id(snap_clean) == compute_stable_id(snap_noisy)
+
+
+class TestAssignStableIds:
+    """assign_stable_ids handles collisions and ordering."""
+
+    def test_unique_entities_no_suffix(self):
+        snaps = [
+            _make_snap(points=[Point2D(x=0, y=0), Point2D(x=10, y=0)]),
+            _make_snap(points=[Point2D(x=0, y=0), Point2D(x=0, y=10)]),
+        ]
+        result = assign_stable_ids(snaps)
+        assert all(s.stable_id is not None for s in result)
+        assert result[0].stable_id != result[1].stable_id
+        # No suffix needed
+        assert "#" not in result[0].stable_id  # type: ignore[operator]
+        assert "#" not in result[1].stable_id  # type: ignore[operator]
+
+    def test_identical_entities_get_suffixes(self):
+        """10 identical LINEs on same layer → 10 unique IDs with #0..#9."""
+        snaps = [
+            _make_snap(
+                points=[Point2D(x=0, y=0), Point2D(x=10, y=0)],
+                handle=str(i),
+            )
+            for i in range(10)
+        ]
+        result = assign_stable_ids(snaps)
+        ids = [s.stable_id for s in result]
+        # All unique
+        assert len(set(ids)) == 10
+        # All have suffixes
+        assert all("#" in sid for sid in ids)  # type: ignore[operator]
+        # Suffixes are 0-9
+        suffixes = sorted(int(sid.split("#")[1]) for sid in ids)  # type: ignore[union-attr]
+        assert suffixes == list(range(10))
+
+    def test_collision_sorted_by_centroid(self):
+        """Collision suffixes assigned by centroid (x, y) ordering."""
+        # Three identical LINEs (same geometry) — only differ by handle
+        # All have same signature+midpoint_bin → collision → suffix by centroid
+        pts = [Point2D(x=0, y=0), Point2D(x=10, y=0)]
+        snaps = [
+            _make_snap(points=pts, handle="C"),
+            _make_snap(points=pts, handle="A"),
+            _make_snap(points=pts, handle="B"),
+        ]
+        result = assign_stable_ids(snaps)
+        # All same centroid → suffix order is #0, #1, #2 (stable because identical centroids)
+        ids = [s.stable_id for s in result]
+        assert all("#" in sid for sid in ids)  # type: ignore[operator]
+        # All unique
+        assert len(set(ids)) == 3
+
+    def test_preserves_original_order(self):
+        """Result list is in same order as input."""
+        snaps = [
+            _make_snap(points=[Point2D(x=50, y=0), Point2D(x=60, y=0)], handle="A"),
+            _make_snap(points=[Point2D(x=0, y=0), Point2D(x=10, y=0)], handle="B"),
+        ]
+        result = assign_stable_ids(snaps)
+        assert result[0].handle == "A"
+        assert result[1].handle == "B"
+
+    def test_idempotent(self):
+        """Assigning IDs twice produces same IDs."""
+        snaps = [
+            _make_snap(points=[Point2D(x=0, y=0), Point2D(x=10, y=0)]),
+            _make_snap(points=[Point2D(x=0, y=0), Point2D(x=0, y=10)]),
+        ]
+        result_a = assign_stable_ids(snaps)
+        result_b = assign_stable_ids(snaps)
+        for a, b in zip(result_a, result_b, strict=True):
+            assert a.stable_id == b.stable_id
+
+    def test_empty_list(self):
+        assert assign_stable_ids([]) == []
+
+    def test_single_entity(self):
+        snaps = [_make_snap()]
+        result = assign_stable_ids(snaps)
+        assert len(result) == 1
+        assert result[0].stable_id is not None
+        assert "#" not in result[0].stable_id  # type: ignore[operator]
+
+    def test_mixed_types_no_collision(self):
+        """Different entity types at same position don't collide."""
+        pts = [Point2D(x=5, y=5)]
+        snaps = [
+            _make_snap(entity_type=EntityType.TEXT, points=pts, text_content="X"),
+            _make_snap(entity_type=EntityType.CIRCLE, points=pts, attributes={"radius": 2.0}),
+        ]
+        result = assign_stable_ids(snaps)
+        assert result[0].stable_id != result[1].stable_id
+        assert "#" not in result[0].stable_id  # type: ignore[operator]
+        assert "#" not in result[1].stable_id  # type: ignore[operator]

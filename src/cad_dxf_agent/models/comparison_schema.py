@@ -20,6 +20,10 @@ class GeometrySnapshot(BaseModel):
     text_content: str | None = None
     block_name: str | None = None
     attributes: dict[str, Any] = Field(default_factory=dict)
+    stable_id: str | None = Field(
+        default=None,
+        description="Geometry-based stable ID (assigned by assign_stable_ids)",
+    )
 
     @computed_field  # type: ignore[prop-decorator]
     @property

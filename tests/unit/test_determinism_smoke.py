@@ -139,10 +139,14 @@ class TestCrossFileIdentity:
         r_fps = {(s.entity_type, s.layer, tuple((p.x, p.y) for p in s.points)) for s in r_snaps}
         assert m_fps == r_fps  # geometry IS stable; handles are irrelevant
 
-    def test_stable_id_not_yet_present(self, tmp_path):
-        """GeometrySnapshot does not yet have stable_id — E1.B5 will add it."""
+    def test_stable_id_field_exists_but_not_yet_assigned(self, tmp_path):
+        """GeometrySnapshot has stable_id field but extract_snapshots doesn't assign it.
+
+        assign_stable_ids() must be called separately to populate stable_id.
+        """
         master, _ = make_identical_pair(tmp_path)
         snaps = extract_snapshots(master)
         assert len(snaps) > 0
-        # stable_id field does not exist yet
-        assert not hasattr(snaps[0], "stable_id")
+        # Field exists but is None until assign_stable_ids is called
+        assert hasattr(snaps[0], "stable_id")
+        assert snaps[0].stable_id is None

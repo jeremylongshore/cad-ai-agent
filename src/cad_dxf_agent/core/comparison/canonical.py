@@ -9,11 +9,14 @@ that does NOT rely on DXF handles.
 
 from __future__ import annotations
 
+import hashlib
 import math
+from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any
 
 from ...models.cad_schema import EntityType, Point2D
+from ...models.comparison_schema import GeometrySnapshot
 
 
 @dataclass(frozen=True)
@@ -413,3 +416,98 @@ def _turn_angle_hash(points: list[Point2D]) -> int:
         buckets.append(round(angle / _TURN_BUCKET_SIZE))
 
     return hash(tuple(buckets))
+
+
+# --- Stable ID computation ---
+
+
+def compute_stable_id(
+    snap: GeometrySnapshot,
+    config: QuantizationConfig | None = None,
+) -> str:
+    """Compute a stable ID for a single entity based on its geometry.
+
+    The ID is a short hex hash of (entity_type, layer, signature, spatial_bin).
+    This produces the *base* ID before collision resolution.
+    """
+    config = config or DEFAULT_QUANTIZATION
+    sig = compute_signature(
+        snap.entity_type,
+        snap.points,
+        config,
+        text_content=snap.text_content,
+        block_name=snap.block_name,
+        attributes=snap.attributes,
+    )
+    mid_bin = _midpoint_bin(snap.points, config)
+
+    # Build a deterministic string from all signature fields
+    parts = [
+        snap.entity_type.value,
+        snap.layer,
+        str(sig.length),
+        str(sig.angle_bucket),
+        str(sig.vertex_count),
+        str(sig.perimeter),
+        str(sig.turn_hash),
+        str(sig.radius),
+        str(sig.start_angle_bucket),
+        str(sig.end_angle_bucket),
+        sig.block_name,
+        sig.text_content,
+        str(sig.attrib_keys),
+        str(mid_bin),
+    ]
+    raw = "|".join(parts)
+    digest = hashlib.sha256(raw.encode()).hexdigest()[:12]
+    return f"{snap.entity_type.value}:{snap.layer}:{digest}"
+
+
+def assign_stable_ids(
+    snapshots: list[GeometrySnapshot],
+    config: QuantizationConfig | None = None,
+) -> list[GeometrySnapshot]:
+    """Assign stable IDs to a list of snapshots, handling collisions.
+
+    Entities with the same base ID get disambiguation suffixes (#0, #1, ...)
+    sorted by centroid (x, y) for deterministic ordering.
+
+    Args:
+        snapshots: List of GeometrySnapshot to assign IDs to.
+        config: Quantization config.
+
+    Returns:
+        New list of snapshots with stable_id populated.
+    """
+    config = config or DEFAULT_QUANTIZATION
+
+    # Compute base IDs for all snapshots
+    base_ids: list[str] = [compute_stable_id(s, config) for s in snapshots]
+
+    # Group by base ID to detect collisions
+    groups: dict[str, list[int]] = defaultdict(list)
+    for idx, base_id in enumerate(base_ids):
+        groups[base_id].append(idx)
+
+    # Assign final IDs
+    result: list[GeometrySnapshot] = []
+    final_ids: dict[int, str] = {}
+
+    for base_id, indices in groups.items():
+        if len(indices) == 1:
+            # No collision — use base ID as-is
+            final_ids[indices[0]] = base_id
+        else:
+            # Collision — sort by centroid (x, y) for deterministic suffix
+            sorted_indices = sorted(
+                indices,
+                key=lambda i: (snapshots[i].centroid.x, snapshots[i].centroid.y),
+            )
+            for suffix, idx in enumerate(sorted_indices):
+                final_ids[idx] = f"{base_id}#{suffix}"
+
+    # Build result list preserving original order
+    for idx, snap in enumerate(snapshots):
+        result.append(snap.model_copy(update={"stable_id": final_ids[idx]}))
+
+    return result
