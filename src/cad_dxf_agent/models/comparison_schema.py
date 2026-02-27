@@ -46,6 +46,16 @@ class AlignmentConfig(BaseModel):
     )
 
 
+class AlignmentAttempt(BaseModel):
+    """Record of a single alignment ladder step."""
+
+    method: str = Field(description="Alignment method tried")
+    success: bool = Field(description="Whether the method met confidence threshold")
+    confidence: float = Field(
+        default=0.0, ge=0.0, le=1.0, description="Confidence achieved"
+    )
+
+
 class AlignmentDiagnostics(BaseModel):
     """Detailed diagnostics from an alignment attempt."""
 
@@ -59,10 +69,12 @@ class AlignmentDiagnostics(BaseModel):
     match_count: int = Field(
         default=0, description="Point pairs used to compute transform"
     )
-    inlier_count: int = Field(default=0, description="Number of inlier pairs (within tolerance)")
-    attempts: list[dict[str, Any]] = Field(
+    inlier_count: int = Field(
+        default=0, description="Number of inlier pairs (within tolerance)"
+    )
+    attempts: list[AlignmentAttempt] = Field(
         default_factory=list,
-        description="Log of each ladder step attempted: method, success, diagnostics",
+        description="Log of each ladder step: method, success, confidence",
     )
 
 

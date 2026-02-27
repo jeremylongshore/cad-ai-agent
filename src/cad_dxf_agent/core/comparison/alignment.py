@@ -12,12 +12,14 @@ from __future__ import annotations
 import fnmatch
 import logging
 import math
-from typing import Any
+from collections import defaultdict
+from collections.abc import Callable
 
 import numpy as np
 
 from ...models.cad_schema import EntityType, Point2D
 from ...models.comparison_schema import (
+    AlignmentAttempt,
     AlignmentConfig,
     AlignmentDiagnostics,
     AlignmentMethod,
@@ -28,6 +30,11 @@ from ...otel import get_tracer
 
 logger = logging.getLogger(__name__)
 tracer = get_tracer(__name__)
+
+# Confidence scoring weights
+_OVERLAP_WEIGHT = 0.4
+_RESIDUAL_WEIGHT = 0.3
+_INLIER_WEIGHT = 0.3
 
 
 # ---------------------------------------------------------------------------
@@ -83,7 +90,9 @@ def _rotation_to_degrees(R: np.ndarray) -> float:
     return float(math.degrees(math.atan2(R[1, 0], R[0, 0])))
 
 
-def _transform_point(point: Point2D, R: np.ndarray, t: np.ndarray) -> Point2D:
+def _transform_point(
+    point: Point2D, R: np.ndarray, t: np.ndarray
+) -> Point2D:
     """Apply rigid transform to a single point."""
     p = np.array([point.x, point.y])
     tp = R @ p + t
@@ -91,7 +100,9 @@ def _transform_point(point: Point2D, R: np.ndarray, t: np.ndarray) -> Point2D:
 
 
 def _transform_snapshots(
-    snapshots: list[GeometrySnapshot], R: np.ndarray, t: np.ndarray
+    snapshots: list[GeometrySnapshot],
+    R: np.ndarray,
+    t: np.ndarray,
 ) -> list[GeometrySnapshot]:
     """Apply rigid transform to all points in a list of snapshots."""
     result = []
@@ -138,20 +149,24 @@ def _overlap_ratio(
     t: np.ndarray,
     tolerance: float,
 ) -> float:
-    """Fraction of master centroids with a nearby revision centroid after alignment."""
+    """Fraction of master centroids with a nearby revision centroid.
+
+    Uses vectorized pairwise distance computation (O(M*N) memory but
+    fast via numpy broadcasting). For typical CAD drawings (<5K entities)
+    this is efficient without a k-d tree.
+    """
     if not master_snaps:
         return 0.0
-    master_centroids = np.array([[s.centroid.x, s.centroid.y] for s in master_snaps])
-    revision_centroids = np.array([[s.centroid.x, s.centroid.y] for s in revision_snaps])
-    if revision_centroids.size == 0:
+    m_c = np.array([[s.centroid.x, s.centroid.y] for s in master_snaps])
+    r_c = np.array([[s.centroid.x, s.centroid.y] for s in revision_snaps])
+    if r_c.size == 0:
         return 0.0
-    aligned_rev = (R @ revision_centroids.T).T + t
-    matched = 0
-    for mc in master_centroids:
-        dists = np.linalg.norm(aligned_rev - mc, axis=1)
-        if dists.min() <= tolerance:
-            matched += 1
-    return matched / len(master_centroids)
+    aligned_rev = (R @ r_c.T).T + t
+    # Vectorized: (M, 1, 2) - (1, N, 2) → (M, N) distances
+    diffs = m_c[:, np.newaxis, :] - aligned_rev[np.newaxis, :, :]
+    dists = np.linalg.norm(diffs, axis=2)  # (M, N)
+    matched = int(np.sum(dists.min(axis=1) <= tolerance))
+    return matched / len(m_c)
 
 
 def score_alignment(
@@ -175,19 +190,26 @@ def score_alignment(
     )
 
 
-def compute_confidence(diagnostics: AlignmentDiagnostics, max_residual: float) -> float:
+def compute_confidence(
+    diagnostics: AlignmentDiagnostics, max_residual: float
+) -> float:
     """Combine diagnostics into a single confidence score (0-1).
 
-    Heuristic: weighted average of overlap ratio and residual quality.
+    Heuristic: weighted average of overlap ratio, residual quality,
+    and inlier ratio.
     """
     if diagnostics.match_count == 0:
         return 0.0
     # Residual score: 1.0 when rms=0, 0.0 when rms >= max_residual
-    residual_score = max(0.0, 1.0 - diagnostics.rms_residual / max_residual)
-    # Inlier ratio
+    residual_score = max(
+        0.0, 1.0 - diagnostics.rms_residual / max_residual
+    )
     inlier_ratio = diagnostics.inlier_count / diagnostics.match_count
-    # Weighted combination: overlap 40%, residual 30%, inlier ratio 30%
-    confidence = 0.4 * diagnostics.overlap_ratio + 0.3 * residual_score + 0.3 * inlier_ratio
+    confidence = (
+        _OVERLAP_WEIGHT * diagnostics.overlap_ratio
+        + _RESIDUAL_WEIGHT * residual_score
+        + _INLIER_WEIGHT * inlier_ratio
+    )
     return round(min(1.0, max(0.0, confidence)), 4)
 
 
@@ -209,19 +231,21 @@ def _try_identity(
     if not master_snaps or not revision_snaps:
         return None
 
-    # Use centroids of all entities as test points
-    m_pts = np.array([[s.centroid.x, s.centroid.y] for s in master_snaps])
-    r_pts = np.array([[s.centroid.x, s.centroid.y] for s in revision_snaps])
+    m_pts = np.array(
+        [[s.centroid.x, s.centroid.y] for s in master_snaps]
+    )
 
     # Quick check: are centroid clouds roughly the same?
-    overlap = _overlap_ratio(master_snaps, revision_snaps, R, t, tolerance)
+    overlap = _overlap_ratio(
+        master_snaps, revision_snaps, R, t, tolerance
+    )
     if overlap < config.confidence_threshold:
         return None
 
     diag = AlignmentDiagnostics(
         rms_residual=0.0,
         overlap_ratio=round(overlap, 4),
-        match_count=min(len(m_pts), len(r_pts)),
+        match_count=min(len(m_pts), len(revision_snaps)),
         inlier_count=int(overlap * len(m_pts)),
     )
     confidence = compute_confidence(diag, config.max_residual)
@@ -262,7 +286,10 @@ def _find_anchor_pairs(
             return False
         if not patterns:
             return True
-        return any(fnmatch.fnmatch(snap.layer.upper(), p.upper()) for p in patterns)
+        return any(
+            fnmatch.fnmatch(snap.layer.upper(), p.upper())
+            for p in patterns
+        )
 
     master_inserts = [s for s in master_snaps if _is_anchor(s)]
     revision_inserts = [s for s in revision_snaps if _is_anchor(s)]
@@ -271,8 +298,6 @@ def _find_anchor_pairs(
         return []
 
     # Group by block_name
-    from collections import defaultdict
-
     m_by_block: dict[str, list[GeometrySnapshot]] = defaultdict(list)
     r_by_block: dict[str, list[GeometrySnapshot]] = defaultdict(list)
     for s in master_inserts:
@@ -323,14 +348,16 @@ def try_anchor_alignment(
     r_pts = np.array([[s.centroid.x, s.centroid.y] for _, s in pairs])
 
     R, t = _kabsch(m_pts, r_pts)
-    diag = score_alignment(m_pts, r_pts, R, t, master_snaps, revision_snaps, config.max_residual)
+    diag = score_alignment(
+        m_pts, r_pts, R, t,
+        master_snaps, revision_snaps, config.max_residual,
+    )
     confidence = compute_confidence(diag, config.max_residual)
 
     if confidence < config.confidence_threshold:
         return None
 
     rot_deg = _rotation_to_degrees(R)
-    # Rotation center: centroid of revision anchor points
     rc = r_pts.mean(axis=0)
 
     return AlignmentResult(
@@ -347,8 +374,13 @@ def try_anchor_alignment(
 # Step 3: Feature-based alignment (geometry endpoints/corners/centroids)
 # ---------------------------------------------------------------------------
 
+# Entity types whose individual vertices are used as feature points.
+_VERTEX_TYPES = {EntityType.LINE, EntityType.LWPOLYLINE, EntityType.POLYLINE}
 
-def _extract_feature_points(snaps: list[GeometrySnapshot]) -> np.ndarray:
+
+def _extract_feature_points(
+    snaps: list[GeometrySnapshot],
+) -> np.ndarray:
     """Extract distinctive feature points from entity geometry.
 
     Uses endpoints of LINE entities and vertices of polylines as features.
@@ -356,9 +388,8 @@ def _extract_feature_points(snaps: list[GeometrySnapshot]) -> np.ndarray:
     """
     pts: list[tuple[float, float]] = []
 
-    _vertex_types = {EntityType.LINE, EntityType.LWPOLYLINE, EntityType.POLYLINE}
     for snap in snaps:
-        if snap.entity_type in _vertex_types:
+        if snap.entity_type in _VERTEX_TYPES:
             for p in snap.points:
                 pts.append((p.x, p.y))
         else:
@@ -371,7 +402,9 @@ def _extract_feature_points(snaps: list[GeometrySnapshot]) -> np.ndarray:
 
 
 def _match_features_nn(
-    m_features: np.ndarray, r_features: np.ndarray, tolerance: float
+    m_features: np.ndarray,
+    r_features: np.ndarray,
+    tolerance: float,
 ) -> list[tuple[int, int]]:
     """Match feature points by nearest-neighbor within tolerance.
 
@@ -449,7 +482,8 @@ def _ransac_rigid(
     if best_count < max(2, int(min_inlier_ratio * n)):
         return None
 
-    assert best_R is not None and best_t is not None and best_inliers is not None
+    assert best_R is not None and best_t is not None
+    assert best_inliers is not None
 
     # Refit on all inliers
     inlier_idx = np.where(best_inliers)[0]
@@ -470,8 +504,7 @@ def try_feature_alignment(
     if len(m_features) < 2 or len(r_features) < 2:
         return None
 
-    # Initial feature matching: use a generous tolerance for finding correspondences
-    # (2x the max_residual to catch shifted features)
+    # Generous tolerance for initial feature correspondences
     search_radius = max(config.max_residual * 10, 50.0)
     matches = _match_features_nn(m_features, r_features, search_radius)
 
@@ -488,7 +521,8 @@ def try_feature_alignment(
 
     R, t, _inlier_mask = result
     diag = score_alignment(
-        m_matched, r_matched, R, t, master_snaps, revision_snaps, config.max_residual
+        m_matched, r_matched, R, t,
+        master_snaps, revision_snaps, config.max_residual,
     )
     confidence = compute_confidence(diag, config.max_residual)
 
@@ -512,6 +546,19 @@ def try_feature_alignment(
 # Ladder orchestrator
 # ---------------------------------------------------------------------------
 
+# Type alias for alignment method functions
+_AlignFn = Callable[
+    [list[GeometrySnapshot], list[GeometrySnapshot], AlignmentConfig],
+    AlignmentResult | None,
+]
+
+# Ordered list of (method_name, function) to try
+_LADDER_STEPS: list[tuple[str, _AlignFn]] = [
+    ("identity", _try_identity),
+    ("anchor", try_anchor_alignment),
+    ("feature", try_feature_alignment),
+]
+
 
 def align_drawings(
     master_snaps: list[GeometrySnapshot],
@@ -529,64 +576,36 @@ def align_drawings(
         config: Alignment configuration.
 
     Returns:
-        AlignmentResult (always — check confidence and guidance for failures).
+        AlignmentResult (always — check confidence and guidance
+        for failures).
     """
-    with tracer.start_as_current_span("cad.compare.align_drawings") as span:
-        attempts: list[dict[str, Any]] = []
+    with tracer.start_as_current_span(
+        "cad.compare.align_drawings"
+    ) as span:
+        attempts: list[AlignmentAttempt] = []
 
-        # Step 1: Identity check
-        logger.info("Alignment: trying identity check")
-        identity_result = _try_identity(master_snaps, revision_snaps, config)
-        attempts.append(
-            {
-                "method": "identity",
-                "success": identity_result is not None,
-                "confidence": identity_result.confidence if identity_result else 0.0,
-            }
-        )
-        if identity_result is not None:
-            identity_result.diagnostics.attempts = attempts
-            span.set_attribute("cad.align.method", "identity")
-            span.set_attribute("cad.align.confidence", identity_result.confidence)
-            logger.info(
-                "Alignment: identity accepted (confidence=%.4f)",
-                identity_result.confidence,
-            )
-            return identity_result
+        for method_name, method_fn in _LADDER_STEPS:
+            logger.info("Alignment: trying %s", method_name)
+            result = method_fn(master_snaps, revision_snaps, config)
 
-        # Step 2: Anchor-based
-        logger.info("Alignment: trying anchor-based alignment")
-        anchor_result = try_anchor_alignment(master_snaps, revision_snaps, config)
-        attempts.append(
-            {
-                "method": "anchor",
-                "success": anchor_result is not None,
-                "confidence": anchor_result.confidence if anchor_result else 0.0,
-            }
-        )
-        if anchor_result is not None:
-            anchor_result.diagnostics.attempts = attempts
-            span.set_attribute("cad.align.method", "anchor")
-            span.set_attribute("cad.align.confidence", anchor_result.confidence)
-            logger.info("Alignment: anchor accepted (confidence=%.4f)", anchor_result.confidence)
-            return anchor_result
+            attempts.append(AlignmentAttempt(
+                method=method_name,
+                success=result is not None,
+                confidence=result.confidence if result else 0.0,
+            ))
 
-        # Step 3: Feature-based
-        logger.info("Alignment: trying feature-based alignment")
-        feature_result = try_feature_alignment(master_snaps, revision_snaps, config)
-        attempts.append(
-            {
-                "method": "feature",
-                "success": feature_result is not None,
-                "confidence": feature_result.confidence if feature_result else 0.0,
-            }
-        )
-        if feature_result is not None:
-            feature_result.diagnostics.attempts = attempts
-            span.set_attribute("cad.align.method", "feature")
-            span.set_attribute("cad.align.confidence", feature_result.confidence)
-            logger.info("Alignment: feature accepted (confidence=%.4f)", feature_result.confidence)
-            return feature_result
+            if result is not None:
+                result.diagnostics.attempts = attempts
+                span.set_attribute("cad.align.method", method_name)
+                span.set_attribute(
+                    "cad.align.confidence", result.confidence
+                )
+                logger.info(
+                    "Alignment: %s accepted (confidence=%.4f)",
+                    method_name,
+                    result.confidence,
+                )
+                return result
 
         # All methods failed
         span.set_attribute("cad.align.method", "none")
@@ -601,9 +620,10 @@ def align_drawings(
             rotation_center=(0.0, 0.0),
             diagnostics=AlignmentDiagnostics(attempts=attempts),
             guidance=(
-                "Automatic alignment failed. The drawings may have significant differences "
-                "in coordinate systems. Try supplying 2-3 control point pairs (matching "
-                "features in both drawings) to enable manual alignment."
+                "Automatic alignment failed. The drawings may have "
+                "significant differences in coordinate systems. Try "
+                "supplying 2-3 control point pairs (matching features "
+                "in both drawings) to enable manual alignment."
             ),
         )
 
@@ -614,8 +634,8 @@ def apply_alignment(
 ) -> list[GeometrySnapshot]:
     """Apply alignment transform to revision snapshots.
 
-    If alignment confidence is 0 or method is identity with no transform,
-    returns the original snapshots unchanged.
+    If alignment confidence is 0 or method is identity with no
+    transform, returns the original snapshots unchanged.
     """
     # No-op for identity with no actual transform
     if (

@@ -561,7 +561,7 @@ class TestLadder:
         cfg = AlignmentConfig(enabled=True, confidence_threshold=0.5, max_residual=5.0)
         result = align_drawings(m, r, cfg)
         assert len(result.diagnostics.attempts) >= 1
-        assert result.diagnostics.attempts[0]["method"] == "identity"
+        assert result.diagnostics.attempts[0].method == "identity"
 
     def test_ladder_stops_at_first_success(self, tmp_path):
         """Ladder should stop at the first successful method."""
@@ -572,7 +572,7 @@ class TestLadder:
         result = align_drawings(m_snaps, r_snaps, cfg)
         # Identity should succeed, so only 1 attempt recorded
         assert len(result.diagnostics.attempts) == 1
-        assert result.diagnostics.attempts[0]["method"] == "identity"
+        assert result.diagnostics.attempts[0].method == "identity"
 
     def test_empty_master_fails_gracefully(self):
         """Empty master should fail without error."""

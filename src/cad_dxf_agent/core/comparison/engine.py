@@ -113,25 +113,19 @@ class ComparisonEngine:
                 len(match_result.master_only),
                 len(match_result.revision_only),
             )
-            result = classify_changes(match_result, config)
+            classified = classify_changes(match_result, config)
 
-            # Attach alignment result
-            if alignment_result is not None:
-                result = ComparisonResult(
-                    changes=result.changes,
-                    summary=result.summary,
-                    config=result.config,
-                    alignment_result=alignment_result,
-                )
-
-            # Sort changes deterministically when using canonical model
+            # Build final result: sort if canonical, attach alignment
+            final_changes = classified.changes
             if config.use_canonical:
-                result = ComparisonResult(
-                    changes=sort_changes(result.changes),
-                    summary=result.summary,
-                    config=result.config,
-                    alignment_result=result.alignment_result,
-                )
+                final_changes = sort_changes(final_changes)
+
+            result = ComparisonResult(
+                changes=final_changes,
+                summary=classified.summary,
+                config=classified.config,
+                alignment_result=alignment_result,
+            )
 
             logger.info("Classification: %s", result.summary)
 
