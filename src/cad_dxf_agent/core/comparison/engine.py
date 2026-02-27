@@ -8,6 +8,7 @@ from pathlib import Path
 
 from ...models.comparison_schema import ComparisonConfig, ComparisonResult
 from ...otel import get_tracer
+from .alignment import align_drawings, apply_alignment
 from .canonical import assign_stable_ids, sort_changes, sort_snapshots
 from .changelog import ChangeLog, generate_changelog
 from .classifier import classify_changes
@@ -77,6 +78,28 @@ class ComparisonEngine:
                 master_snaps = sort_snapshots(master_snaps)
                 revision_snaps = sort_snapshots(revision_snaps)
 
+            # Alignment: transform revision to master coordinate system
+            alignment_result = None
+            if config.alignment.enabled:
+                span.set_attribute("cad.compare.alignment", True)
+                logger.info("Running alignment ladder")
+                alignment_result = align_drawings(master_snaps, revision_snaps, config.alignment)
+                span.set_attribute("cad.align.method", alignment_result.method.value)
+                span.set_attribute("cad.align.confidence", alignment_result.confidence)
+
+                if alignment_result.confidence > 0:
+                    revision_snaps = apply_alignment(revision_snaps, alignment_result)
+                    logger.info(
+                        "Alignment applied: method=%s confidence=%.4f",
+                        alignment_result.method.value,
+                        alignment_result.confidence,
+                    )
+                else:
+                    logger.warning(
+                        "Alignment failed: %s",
+                        alignment_result.guidance or "no guidance",
+                    )
+
             logger.info(
                 "Matching entities: %d master, %d revision",
                 len(master_snaps),
@@ -92,12 +115,22 @@ class ComparisonEngine:
             )
             result = classify_changes(match_result, config)
 
+            # Attach alignment result
+            if alignment_result is not None:
+                result = ComparisonResult(
+                    changes=result.changes,
+                    summary=result.summary,
+                    config=result.config,
+                    alignment_result=alignment_result,
+                )
+
             # Sort changes deterministically when using canonical model
             if config.use_canonical:
                 result = ComparisonResult(
                     changes=sort_changes(result.changes),
                     summary=result.summary,
                     config=result.config,
+                    alignment_result=result.alignment_result,
                 )
 
             logger.info("Classification: %s", result.summary)

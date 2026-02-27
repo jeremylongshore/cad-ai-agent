@@ -9,7 +9,6 @@ from pydantic import BaseModel, Field, computed_field
 
 from .cad_schema import EntityType, Point2D
 
-
 # --- Alignment schemas ---
 
 
@@ -50,12 +49,16 @@ class AlignmentConfig(BaseModel):
 class AlignmentDiagnostics(BaseModel):
     """Detailed diagnostics from an alignment attempt."""
 
-    rms_residual: float = Field(default=0.0, description="Root-mean-square residual after alignment")
+    rms_residual: float = Field(
+        default=0.0, description="RMS residual after alignment"
+    )
     overlap_ratio: float = Field(
         default=0.0,
-        description="Fraction of master entities with a nearby revision entity after alignment (0-1)",
+        description="Fraction of master entities with nearby revision (0-1)",
     )
-    match_count: int = Field(default=0, description="Number of point pairs used to compute transform")
+    match_count: int = Field(
+        default=0, description="Point pairs used to compute transform"
+    )
     inlier_count: int = Field(default=0, description="Number of inlier pairs (within tolerance)")
     attempts: list[dict[str, Any]] = Field(
         default_factory=list,
