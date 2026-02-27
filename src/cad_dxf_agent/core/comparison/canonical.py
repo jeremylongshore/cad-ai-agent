@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from ...models.cad_schema import EntityType, Point2D
-from ...models.comparison_schema import GeometrySnapshot
+from ...models.comparison_schema import EntityChange, GeometrySnapshot
 
 
 @dataclass(frozen=True)
@@ -511,3 +511,48 @@ def assign_stable_ids(
         result.append(snap.model_copy(update={"stable_id": final_ids[idx]}))
 
     return result
+
+
+# --- Deterministic sorting ---
+
+
+def sort_snapshots(snapshots: list[GeometrySnapshot]) -> list[GeometrySnapshot]:
+    """Sort snapshots deterministically by (layer, entity_type, stable_id).
+
+    If stable_id is None, falls back to centroid (x, y) for ordering.
+    This ensures JSON output is byte-identical across runs.
+    """
+    return sorted(
+        snapshots,
+        key=lambda s: (
+            s.layer,
+            s.entity_type.value,
+            s.stable_id or "",
+            s.centroid.x,
+            s.centroid.y,
+        ),
+    )
+
+
+def _change_sort_key(change: EntityChange) -> tuple[str, str, str, str, float, float]:
+    """Sort key for EntityChange: (category, entity_type, layer, stable_id, cx, cy)."""
+    snap = change.master_snapshot or change.revision_snapshot
+    if snap:
+        return (
+            change.category.value,
+            snap.entity_type.value,
+            snap.layer,
+            snap.stable_id or "",
+            snap.centroid.x,
+            snap.centroid.y,
+        )
+    return (change.category.value, "", "", "", 0.0, 0.0)
+
+
+def sort_changes(changes: list[EntityChange]) -> list[EntityChange]:
+    """Sort EntityChange list deterministically.
+
+    Order: category (ADDED < MODIFIED < MOVED < REMOVED < UNCHANGED),
+    then entity_type, layer, stable_id, centroid.
+    """
+    return sorted(changes, key=_change_sort_key)

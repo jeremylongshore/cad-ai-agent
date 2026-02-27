@@ -16,10 +16,16 @@ from cad_dxf_agent.core.comparison.canonical import (
     quantize_points,
     quantize_value,
     remove_near_duplicate_vertices,
+    sort_changes,
+    sort_snapshots,
     spatial_bin,
 )
 from cad_dxf_agent.models.cad_schema import EntityType, Point2D
-from cad_dxf_agent.models.comparison_schema import GeometrySnapshot
+from cad_dxf_agent.models.comparison_schema import (
+    ChangeCategory,
+    EntityChange,
+    GeometrySnapshot,
+)
 
 
 class TestQuantizePoint:
@@ -695,3 +701,118 @@ class TestAssignStableIds:
         assert result[0].stable_id != result[1].stable_id
         assert "#" not in result[0].stable_id  # type: ignore[operator]
         assert "#" not in result[1].stable_id  # type: ignore[operator]
+
+
+# ============================================================
+# Deterministic sorting tests
+# ============================================================
+
+
+class TestSortSnapshots:
+    """sort_snapshots orders by (layer, type, stable_id, centroid)."""
+
+    def test_sorts_by_layer(self):
+        snaps = [
+            _make_snap(layer="Z", stable_id="Z:LINE:aaa"),
+            _make_snap(layer="A", stable_id="A:LINE:bbb"),
+        ]
+        result = sort_snapshots(snaps)
+        assert result[0].layer == "A"
+        assert result[1].layer == "Z"
+
+    def test_sorts_by_type_within_layer(self):
+        snaps = [
+            _make_snap(entity_type=EntityType.TEXT, layer="0", points=[Point2D(x=0, y=0)],
+                       text_content="X", stable_id="0:TEXT:aaa"),
+            _make_snap(entity_type=EntityType.LINE, layer="0", stable_id="0:LINE:bbb"),
+        ]
+        result = sort_snapshots(snaps)
+        assert result[0].entity_type == EntityType.LINE
+        assert result[1].entity_type == EntityType.TEXT
+
+    def test_sorts_by_stable_id_within_type(self):
+        snaps = [
+            _make_snap(stable_id="0:LINE:zzz"),
+            _make_snap(stable_id="0:LINE:aaa"),
+        ]
+        result = sort_snapshots(snaps)
+        assert result[0].stable_id == "0:LINE:aaa"
+        assert result[1].stable_id == "0:LINE:zzz"
+
+    def test_none_stable_id_sorts_first(self):
+        snaps = [
+            _make_snap(stable_id="0:LINE:aaa"),
+            _make_snap(stable_id=None),
+        ]
+        result = sort_snapshots(snaps)
+        assert result[0].stable_id is None  # "" sorts before "0:LINE:aaa"
+        assert result[1].stable_id == "0:LINE:aaa"
+
+    def test_empty_list(self):
+        assert sort_snapshots([]) == []
+
+    def test_idempotent(self):
+        snaps = [
+            _make_snap(layer="B", stable_id="B:LINE:bbb"),
+            _make_snap(layer="A", stable_id="A:LINE:aaa"),
+        ]
+        once = sort_snapshots(snaps)
+        twice = sort_snapshots(once)
+        assert [s.stable_id for s in once] == [s.stable_id for s in twice]
+
+
+class TestSortChanges:
+    """sort_changes orders by (category, type, layer, stable_id, centroid)."""
+
+    def _make_change(
+        self,
+        category: ChangeCategory,
+        layer: str = "0",
+        entity_type: EntityType = EntityType.LINE,
+        stable_id: str | None = None,
+    ) -> EntityChange:
+        snap = _make_snap(layer=layer, entity_type=entity_type, stable_id=stable_id)
+        if category == ChangeCategory.ADDED:
+            return EntityChange(category=category, revision_snapshot=snap)
+        if category == ChangeCategory.REMOVED:
+            return EntityChange(category=category, master_snapshot=snap)
+        return EntityChange(category=category, master_snapshot=snap, revision_snapshot=snap)
+
+    def test_sorts_by_category(self):
+        changes = [
+            self._make_change(ChangeCategory.UNCHANGED),
+            self._make_change(ChangeCategory.ADDED),
+            self._make_change(ChangeCategory.REMOVED),
+            self._make_change(ChangeCategory.MOVED),
+        ]
+        result = sort_changes(changes)
+        cats = [c.category for c in result]
+        assert cats == [
+            ChangeCategory.ADDED,
+            ChangeCategory.MOVED,
+            ChangeCategory.REMOVED,
+            ChangeCategory.UNCHANGED,
+        ]
+
+    def test_sorts_by_layer_within_category(self):
+        changes = [
+            self._make_change(ChangeCategory.ADDED, layer="Z"),
+            self._make_change(ChangeCategory.ADDED, layer="A"),
+        ]
+        result = sort_changes(changes)
+        snap_0 = result[0].revision_snapshot
+        snap_1 = result[1].revision_snapshot
+        assert snap_0 is not None and snap_0.layer == "A"
+        assert snap_1 is not None and snap_1.layer == "Z"
+
+    def test_empty_list(self):
+        assert sort_changes([]) == []
+
+    def test_idempotent(self):
+        changes = [
+            self._make_change(ChangeCategory.REMOVED, layer="B"),
+            self._make_change(ChangeCategory.ADDED, layer="A"),
+        ]
+        once = sort_changes(changes)
+        twice = sort_changes(once)
+        assert [c.category for c in once] == [c.category for c in twice]
