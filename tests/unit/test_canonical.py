@@ -6,8 +6,10 @@ import pytest
 
 from cad_dxf_agent.core.comparison.canonical import (
     DEFAULT_QUANTIZATION,
+    GeometrySignature,
     QuantizationConfig,
     canonical_points,
+    compute_signature,
     quantize_point,
     quantize_points,
     quantize_value,
@@ -291,3 +293,239 @@ class TestCanonicalPointsIdempotent:
         once = canonical_points(pts, EntityType.LWPOLYLINE)
         twice = canonical_points(once, EntityType.LWPOLYLINE)
         assert once == twice
+
+
+# ============================================================
+# Geometry Signature tests
+# ============================================================
+
+
+class TestSignatureLine:
+    """LINE signatures: length + angle bucket + midpoint bin."""
+
+    def test_basic_horizontal(self):
+        pts = [Point2D(x=0, y=0), Point2D(x=10, y=0)]
+        sig = compute_signature(EntityType.LINE, pts)
+        assert sig.entity_type == "LINE"
+        assert sig.length == 10.0
+        assert sig.angle_bucket == 0  # 0° = horizontal
+
+    def test_basic_vertical(self):
+        pts = [Point2D(x=0, y=0), Point2D(x=0, y=10)]
+        sig = compute_signature(EntityType.LINE, pts)
+        assert sig.length == 10.0
+        assert sig.angle_bucket == 18  # 90° / 5° = 18
+
+    def test_diagonal_45deg(self):
+        pts = [Point2D(x=0, y=0), Point2D(x=10, y=10)]
+        sig = compute_signature(EntityType.LINE, pts)
+        assert sig.angle_bucket == 9  # 45° / 5° = 9
+
+    def test_direction_independent(self):
+        """LINE(A→B) and LINE(B→A) produce same signature."""
+        pts_fwd = [Point2D(x=0, y=0), Point2D(x=10, y=5)]
+        pts_rev = [Point2D(x=10, y=5), Point2D(x=0, y=0)]
+        sig_fwd = compute_signature(EntityType.LINE, pts_fwd)
+        sig_rev = compute_signature(EntityType.LINE, pts_rev)
+        assert sig_fwd.length == sig_rev.length
+        assert sig_fwd.angle_bucket == sig_rev.angle_bucket
+
+    def test_small_noise_stable(self):
+        """±0.001" noise doesn't change LINE signature."""
+        pts_clean = [Point2D(x=0, y=0), Point2D(x=10, y=0)]
+        pts_noisy = [Point2D(x=0.001, y=-0.001), Point2D(x=9.999, y=0.001)]
+        sig_clean = compute_signature(EntityType.LINE, pts_clean)
+        sig_noisy = compute_signature(EntityType.LINE, pts_noisy)
+        assert sig_clean.length == sig_noisy.length  # Both round to 10.0
+        assert sig_clean.angle_bucket == sig_noisy.angle_bucket
+
+    def test_large_change_detected(self):
+        """Moving a LINE endpoint significantly changes its signature."""
+        pts_orig = [Point2D(x=0, y=0), Point2D(x=10, y=0)]
+        pts_moved = [Point2D(x=0, y=0), Point2D(x=20, y=0)]
+        sig_orig = compute_signature(EntityType.LINE, pts_orig)
+        sig_moved = compute_signature(EntityType.LINE, pts_moved)
+        assert sig_orig.length != sig_moved.length
+
+
+class TestSignaturePolyline:
+    """Polyline signatures: vertex count + perimeter + turn hash."""
+
+    def test_rectangle(self):
+        # Open polyline: 4 vertices = 3 segments (10+5+10 = 25)
+        pts = [
+            Point2D(x=0, y=0), Point2D(x=10, y=0),
+            Point2D(x=10, y=5), Point2D(x=0, y=5),
+        ]
+        sig = compute_signature(EntityType.LWPOLYLINE, pts)
+        assert sig.entity_type == "LWPOLYLINE"
+        assert sig.vertex_count == 4
+        assert sig.perimeter == 25.0  # 10+5+10 (open polyline, 3 segments)
+
+    def test_triangle(self):
+        pts = [
+            Point2D(x=0, y=0), Point2D(x=10, y=0), Point2D(x=5, y=5),
+        ]
+        sig = compute_signature(EntityType.LWPOLYLINE, pts)
+        assert sig.vertex_count == 3
+        assert sig.perimeter > 0
+
+    def test_different_vertex_count_differs(self):
+        """Different vertex counts produce different signatures."""
+        pts_3 = [Point2D(x=0, y=0), Point2D(x=10, y=0), Point2D(x=10, y=10)]
+        pts_4 = [
+            Point2D(x=0, y=0), Point2D(x=10, y=0),
+            Point2D(x=10, y=10), Point2D(x=0, y=10),
+        ]
+        sig_3 = compute_signature(EntityType.LWPOLYLINE, pts_3)
+        sig_4 = compute_signature(EntityType.LWPOLYLINE, pts_4)
+        assert sig_3.vertex_count != sig_4.vertex_count
+
+    def test_same_perimeter_different_shape(self):
+        """Shapes with same perimeter but different turns get different turn_hash."""
+        # L-shape: right turn
+        pts_l = [
+            Point2D(x=0, y=0), Point2D(x=10, y=0),
+            Point2D(x=10, y=10), Point2D(x=10, y=20),
+        ]
+        # Z-shape: right then left turn
+        pts_z = [
+            Point2D(x=0, y=0), Point2D(x=10, y=0),
+            Point2D(x=10, y=10), Point2D(x=20, y=10),
+        ]
+        sig_l = compute_signature(EntityType.LWPOLYLINE, pts_l)
+        sig_z = compute_signature(EntityType.LWPOLYLINE, pts_z)
+        assert sig_l.turn_hash != sig_z.turn_hash
+
+    def test_small_noise_stable(self):
+        """±0.001" noise doesn't change polyline signature."""
+        pts_clean = [
+            Point2D(x=0, y=0), Point2D(x=10, y=0),
+            Point2D(x=10, y=10), Point2D(x=0, y=10),
+        ]
+        pts_noisy = [
+            Point2D(x=0.001, y=-0.001), Point2D(x=9.999, y=0.001),
+            Point2D(x=10.001, y=9.999), Point2D(x=-0.001, y=10.001),
+        ]
+        sig_clean = compute_signature(EntityType.LWPOLYLINE, pts_clean)
+        sig_noisy = compute_signature(EntityType.LWPOLYLINE, pts_noisy)
+        assert sig_clean.vertex_count == sig_noisy.vertex_count
+        assert sig_clean.perimeter == sig_noisy.perimeter
+        assert sig_clean.turn_hash == sig_noisy.turn_hash
+
+
+class TestSignatureCircle:
+    """CIRCLE signatures: radius + center bin."""
+
+    def test_basic(self):
+        pts = [Point2D(x=5, y=5)]
+        sig = compute_signature(EntityType.CIRCLE, pts, attributes={"radius": 2.5})
+        assert sig.entity_type == "CIRCLE"
+        assert sig.radius == 2.5
+
+    def test_different_radius(self):
+        pts = [Point2D(x=5, y=5)]
+        sig_a = compute_signature(EntityType.CIRCLE, pts, attributes={"radius": 2.5})
+        sig_b = compute_signature(EntityType.CIRCLE, pts, attributes={"radius": 5.0})
+        assert sig_a.radius != sig_b.radius
+
+
+class TestSignatureArc:
+    """ARC signatures: radius + start/end angle buckets + center bin."""
+
+    def test_basic(self):
+        pts = [Point2D(x=5, y=5)]
+        sig = compute_signature(
+            EntityType.ARC, pts,
+            attributes={"radius": 3.0, "start_angle": 0.0, "end_angle": 90.0},
+        )
+        assert sig.entity_type == "ARC"
+        assert sig.radius == 3.0
+        assert sig.start_angle_bucket == 0  # 0° / 5° = 0
+        assert sig.end_angle_bucket == 18  # 90° / 5° = 18
+
+    def test_different_angles(self):
+        pts = [Point2D(x=5, y=5)]
+        sig_a = compute_signature(
+            EntityType.ARC, pts,
+            attributes={"radius": 3.0, "start_angle": 0.0, "end_angle": 90.0},
+        )
+        sig_b = compute_signature(
+            EntityType.ARC, pts,
+            attributes={"radius": 3.0, "start_angle": 0.0, "end_angle": 180.0},
+        )
+        assert sig_a.end_angle_bucket != sig_b.end_angle_bucket
+
+
+class TestSignatureInsert:
+    """INSERT signatures: block name + attrib keys + position bin."""
+
+    def test_basic(self):
+        pts = [Point2D(x=10, y=20)]
+        sig = compute_signature(EntityType.INSERT, pts, block_name="COLUMN_MARK")
+        assert sig.entity_type == "INSERT"
+        assert sig.block_name == "COLUMN_MARK"
+
+    def test_different_block_names(self):
+        pts = [Point2D(x=10, y=20)]
+        sig_a = compute_signature(EntityType.INSERT, pts, block_name="COLUMN_MARK")
+        sig_b = compute_signature(EntityType.INSERT, pts, block_name="BEAM_TAG")
+        assert sig_a.block_name != sig_b.block_name
+
+    def test_attrib_keys_captured(self):
+        pts = [Point2D(x=10, y=20)]
+        sig = compute_signature(
+            EntityType.INSERT, pts, block_name="TAG",
+            attributes={"mark": "A1", "size": "W12x26"},
+        )
+        assert sig.attrib_keys == ("mark", "size")
+
+
+class TestSignatureText:
+    """TEXT/MTEXT signatures: text content + position bin."""
+
+    def test_basic(self):
+        pts = [Point2D(x=5, y=10)]
+        sig = compute_signature(EntityType.TEXT, pts, text_content="NOTES:")
+        assert sig.entity_type == "TEXT"
+        assert sig.text_content == "NOTES:"
+
+    def test_different_content(self):
+        pts = [Point2D(x=5, y=10)]
+        sig_a = compute_signature(EntityType.TEXT, pts, text_content="A")
+        sig_b = compute_signature(EntityType.TEXT, pts, text_content="B")
+        assert sig_a.text_content != sig_b.text_content
+
+    def test_mtext(self):
+        pts = [Point2D(x=5, y=10)]
+        sig = compute_signature(EntityType.MTEXT, pts, text_content="Long note")
+        assert sig.entity_type == "MTEXT"
+        assert sig.text_content == "Long note"
+
+
+class TestSignatureFrozen:
+    """GeometrySignature is immutable."""
+
+    def test_frozen(self):
+        sig = compute_signature(EntityType.LINE, [Point2D(x=0, y=0), Point2D(x=10, y=0)])
+        with pytest.raises(AttributeError):
+            sig.length = 99.0  # type: ignore[misc]
+
+
+class TestSignatureIdempotent:
+    """Computing signature twice gives same result."""
+
+    def test_line_idempotent(self):
+        pts = [Point2D(x=1.23456, y=7.89012), Point2D(x=11.23456, y=7.89012)]
+        sig_a = compute_signature(EntityType.LINE, pts)
+        sig_b = compute_signature(EntityType.LINE, pts)
+        assert sig_a == sig_b
+
+    def test_polyline_idempotent(self):
+        pts = [
+            Point2D(x=0, y=0), Point2D(x=10.5, y=0),
+            Point2D(x=10.5, y=8.3), Point2D(x=0, y=8.3),
+        ]
+        sig_a = compute_signature(EntityType.LWPOLYLINE, pts)
+        sig_b = compute_signature(EntityType.LWPOLYLINE, pts)
+        assert sig_a == sig_b
