@@ -339,7 +339,7 @@ def _sig_insert(
 ) -> GeometrySignature:
     """INSERT: block name + attribute keys + position bin."""
     mid = _midpoint_bin(points, config)
-    attrib_keys = tuple(sorted(str(k) for k in attributes.keys())) if attributes else ()
+    attrib_keys = tuple(sorted(str(k) for k in attributes)) if attributes else ()
     return GeometrySignature(
         entity_type=etype,
         block_name=block_name or "",

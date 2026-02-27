@@ -6,7 +6,6 @@ import pytest
 
 from cad_dxf_agent.core.comparison.canonical import (
     DEFAULT_QUANTIZATION,
-    GeometrySignature,
     QuantizationConfig,
     assign_stable_ids,
     canonical_points,
