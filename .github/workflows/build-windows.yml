@@ -74,14 +74,14 @@ jobs:
           options: /DAppVersion=${{ steps.version.outputs.version }}
 
       - name: Upload bundle artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: cad-dxf-agent-windows
           path: dist/cad-dxf-agent/
 
       - name: Upload installer artifact
         if: hashFiles('dist/cad-dxf-agent-setup-*.exe') != ''
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: windows-installer
           path: dist/cad-dxf-agent-setup-*.exe

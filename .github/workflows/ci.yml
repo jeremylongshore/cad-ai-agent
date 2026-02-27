@@ -54,7 +54,7 @@ jobs:
         run: pytest --cov=cad_dxf_agent --cov-report=term-missing -v --ignore=tests/benchmark
       - name: Upload coverage
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-report
           path: .coverage
@@ -90,7 +90,7 @@ jobs:
       - name: Run benchmarks
         run: pytest tests/benchmark/ -v --benchmark-json=benchmark.json
       - name: Upload benchmark results
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: benchmark-results
           path: benchmark.json
@@ -123,7 +123,7 @@ jobs:
           CAD_GCP_LOCATION: us-central1
       - name: Upload live test logs
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: live-test-logs
           path: tests/live/reports/live-test-run.log
