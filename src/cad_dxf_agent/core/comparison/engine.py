@@ -107,9 +107,16 @@ class ComparisonEngine:
             )
             match_result = match_entities(master_snaps, revision_snaps, config)
 
+            # Log match statistics with confidence
+            confidences = [p.confidence for p in match_result.pairs]
+            ambiguous_count = sum(1 for p in match_result.pairs if p.ambiguous)
+            avg_conf = sum(confidences) / len(confidences) if confidences else 0.0
             logger.info(
-                "Matched %d pairs, %d master-only, %d revision-only",
+                "Matched %d pairs (avg confidence=%.3f, %d ambiguous), "
+                "%d master-only, %d revision-only",
                 len(match_result.pairs),
+                avg_conf,
+                ambiguous_count,
                 len(match_result.master_only),
                 len(match_result.revision_only),
             )

@@ -1,4 +1,4 @@
-"""Entity matching — fingerprint hash + greedy nearest-neighbor."""
+"""Entity matching — fingerprint hash + confidence-scored matching."""
 
 from __future__ import annotations
 
@@ -10,9 +10,12 @@ from ...models.cad_schema import Point2D
 from ...models.comparison_schema import (
     ComparisonConfig,
     GeometrySnapshot,
+    MatchMethod,
     MatchResult,
+    ScoredMatch,
 )
 from ...otel import get_tracer
+from .scorer import find_candidates, score_match
 
 tracer = get_tracer(__name__)
 
@@ -41,7 +44,7 @@ def match_entities(
 
         config = config or ComparisonConfig()
 
-        pairs: list[tuple[GeometrySnapshot, GeometrySnapshot]] = []
+        pairs: list[ScoredMatch] = []
 
         # --- Step 1: Fingerprint hash matching ---
         revision_by_fp: dict[str, list[GeometrySnapshot]] = defaultdict(list)
@@ -58,7 +61,14 @@ def match_entities(
                 r_snap = candidates.pop(0)
                 if not candidates:
                     del revision_by_fp[fp]
-                pairs.append((m_snap, r_snap))
+                pairs.append(
+                    ScoredMatch(
+                        master=m_snap,
+                        revision=r_snap,
+                        confidence=1.0,
+                        method=MatchMethod.fingerprint,
+                    )
+                )
             else:
                 unmatched_master.append(m_snap)
 
@@ -67,12 +77,12 @@ def match_entities(
         for remaining in revision_by_fp.values():
             unmatched_revision.extend(remaining)
 
-        # --- Step 2: Greedy nearest-neighbor on unmatched ---
+        # --- Step 2: Confidence-scored matching on unmatched ---
         if unmatched_master and unmatched_revision:
-            nn_pairs, still_master, still_revision = _greedy_nearest_neighbor(
+            scored_pairs, still_master, still_revision = _scored_matching(
                 unmatched_master, unmatched_revision, config.tolerance
             )
-            pairs.extend(nn_pairs)
+            pairs.extend(scored_pairs)
             unmatched_master = still_master
             unmatched_revision = still_revision
 
@@ -113,97 +123,88 @@ def _fingerprint(snap: GeometrySnapshot) -> str:
     return hashlib.sha256(raw.encode()).hexdigest()
 
 
-def _greedy_nearest_neighbor(
+def _scored_matching(
     master_snaps: list[GeometrySnapshot],
     revision_snaps: list[GeometrySnapshot],
     tolerance: float,
 ) -> tuple[
-    list[tuple[GeometrySnapshot, GeometrySnapshot]],
+    list[ScoredMatch],
     list[GeometrySnapshot],
     list[GeometrySnapshot],
 ]:
-    """Greedy nearest-neighbor matching on centroids within tolerance.
+    """Confidence-scored matching using per-type scoring functions.
 
-    Groups by (entity_type, layer) first, then matches within each group.
+    For each master entity:
+    1. find_candidates filters revision pool by (type, layer) + tolerance
+    2. score_match scores each candidate using type-specific logic
+    3. Global greedy assignment picks highest-score pairs first
+    4. Runner-up tracking flags ambiguous matches
 
     Returns:
         (pairs, remaining_master, remaining_revision)
     """
-    pairs: list[tuple[GeometrySnapshot, GeometrySnapshot]] = []
+    # Build scored candidates across all master entities
+    # Each entry: (score, master_idx, revision_idx)
+    scored_candidates: list[tuple[float, int, int]] = []
 
-    # Group by (entity_type, layer)
-    master_groups: dict[tuple[str, str], list[GeometrySnapshot]] = defaultdict(list)
-    revision_groups: dict[tuple[str, str], list[GeometrySnapshot]] = defaultdict(list)
+    # Index revision snaps for lookup by object identity
+    rev_index: dict[int, int] = {}
+    for ri, r_snap in enumerate(revision_snaps):
+        rev_index[id(r_snap)] = ri
 
-    for snap in master_snaps:
-        key = (snap.entity_type.value, snap.layer)
-        master_groups[key].append(snap)
+    for mi, m_snap in enumerate(master_snaps):
+        candidates = find_candidates(m_snap, revision_snaps, tolerance)
+        for r_snap, _dist in candidates:
+            ri = rev_index[id(r_snap)]
+            s = score_match(m_snap, r_snap, tolerance)
+            scored_candidates.append((s, mi, ri))
 
-    for snap in revision_snaps:
-        key = (snap.entity_type.value, snap.layer)
-        revision_groups[key].append(snap)
+    # Sort descending by score (highest confidence first)
+    scored_candidates.sort(key=lambda x: -x[0])
 
-    remaining_master: list[GeometrySnapshot] = []
-    remaining_revision: list[GeometrySnapshot] = []
-    matched_revision_keys: set[tuple[str, str]] = set()
+    # Track per-master scores for runner-up computation
+    scores_by_master: dict[int, list[float]] = defaultdict(list)
+    for s, mi, _ri in scored_candidates:
+        scores_by_master[mi].append(s)
 
-    for group_key, m_list in master_groups.items():
-        r_list = revision_groups.get(group_key)
-        if not r_list:
-            remaining_master.extend(m_list)
-            continue
-
-        matched_revision_keys.add(group_key)
-        g_pairs, g_m_left, g_r_left = _match_group(m_list, r_list, tolerance)
-        pairs.extend(g_pairs)
-        remaining_master.extend(g_m_left)
-        remaining_revision.extend(g_r_left)
-
-    # Revision groups with no master counterpart
-    for group_key, r_list in revision_groups.items():
-        if group_key not in matched_revision_keys:
-            remaining_revision.extend(r_list)
-
-    return pairs, remaining_master, remaining_revision
-
-
-def _match_group(
-    m_list: list[GeometrySnapshot],
-    r_list: list[GeometrySnapshot],
-    tolerance: float,
-) -> tuple[
-    list[tuple[GeometrySnapshot, GeometrySnapshot]],
-    list[GeometrySnapshot],
-    list[GeometrySnapshot],
-]:
-    """Match entities within a single (type, layer) group by centroid distance."""
-    pairs: list[tuple[GeometrySnapshot, GeometrySnapshot]] = []
-
-    # Build distance candidates
-    candidates: list[tuple[float, int, int]] = []
-    for mi, m_snap in enumerate(m_list):
-        for ri, r_snap in enumerate(r_list):
-            d = _centroid_distance(m_snap.centroid, r_snap.centroid)
-            if d <= tolerance:
-                candidates.append((d, mi, ri))
-
-    # Sort by distance (greedy: closest first)
-    candidates.sort(key=lambda x: x[0])
-
+    # Greedy assignment: highest score first, skip already-matched
     matched_m: set[int] = set()
     matched_r: set[int] = set()
+    pairs: list[ScoredMatch] = []
 
-    for _dist, mi, ri in candidates:
+    for s, mi, ri in scored_candidates:
         if mi in matched_m or ri in matched_r:
             continue
-        pairs.append((m_list[mi], r_list[ri]))
+
+        # Runner-up: second-best score for this master
+        master_scores = scores_by_master[mi]
+        runner_up_score: float | None = None
+        if len(master_scores) > 1:
+            # Scores are in insertion order; find the second-best
+            sorted_scores = sorted(master_scores, reverse=True)
+            runner_up_score = sorted_scores[1]
+
+        ambiguous = runner_up_score is not None and (s - runner_up_score) < 0.1
+
+        pairs.append(
+            ScoredMatch(
+                master=master_snaps[mi],
+                revision=revision_snaps[ri],
+                confidence=s,
+                method=MatchMethod.spatial,
+                runner_up_score=runner_up_score,
+                ambiguous=ambiguous,
+            )
+        )
         matched_m.add(mi)
         matched_r.add(ri)
 
-    m_left = [m_list[i] for i in range(len(m_list)) if i not in matched_m]
-    r_left = [r_list[i] for i in range(len(r_list)) if i not in matched_r]
+    remaining_master = [master_snaps[i] for i in range(len(master_snaps)) if i not in matched_m]
+    remaining_revision = [
+        revision_snaps[i] for i in range(len(revision_snaps)) if i not in matched_r
+    ]
 
-    return pairs, m_left, r_left
+    return pairs, remaining_master, remaining_revision
 
 
 def _centroid_distance(a: Point2D, b: Point2D) -> float:

@@ -141,6 +141,14 @@ class ComparisonConfig(BaseModel):
     )
 
 
+class MatchMethod(StrEnum):
+    """How a master-revision pair was matched."""
+
+    fingerprint = "fingerprint"
+    signature = "signature"
+    spatial = "spatial"
+
+
 class ChangeCategory(StrEnum):
     """Classification of a single entity change."""
 
@@ -165,14 +173,53 @@ class EntityChange(BaseModel):
     modifications: dict[str, Any] | None = Field(
         default=None, description="What changed for MODIFIED entities"
     )
+    confidence: float = Field(default=1.0, ge=0.0, le=1.0, description="Match confidence (0-1)")
+    match_method: MatchMethod | None = Field(
+        default=None, description="How master/revision were matched (None for ADDED/REMOVED)"
+    )
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def bbox(self) -> tuple[float, float, float, float]:
+        """Bounding box (min_x, min_y, max_x, max_y) covering both snapshots."""
+        all_pts: list[Point2D] = []
+        if self.master_snapshot:
+            all_pts.extend(self.master_snapshot.points)
+        if self.revision_snapshot:
+            all_pts.extend(self.revision_snapshot.points)
+        if not all_pts:
+            return (0.0, 0.0, 0.0, 0.0)
+        min_x, max_x = all_pts[0].x, all_pts[0].x
+        min_y, max_y = all_pts[0].y, all_pts[0].y
+        for p in all_pts[1:]:
+            min_x = min(min_x, p.x)
+            max_x = max(max_x, p.x)
+            min_y = min(min_y, p.y)
+            max_y = max(max_y, p.y)
+        return (min_x, min_y, max_x, max_y)
+
+
+class ScoredMatch(BaseModel):
+    """A matched pair with confidence scoring metadata."""
+
+    master: GeometrySnapshot
+    revision: GeometrySnapshot
+    confidence: float = Field(ge=0.0, le=1.0, description="Match confidence (0-1)")
+    method: MatchMethod
+    runner_up_score: float | None = Field(
+        default=None, description="Score of the next-best candidate (None if no runner-up)"
+    )
+    ambiguous: bool = Field(
+        default=False, description="True when confidence - runner_up_score < 0.1"
+    )
 
 
 class MatchResult(BaseModel):
     """Output of the entity matching step."""
 
-    pairs: list[tuple[GeometrySnapshot, GeometrySnapshot]] = Field(
+    pairs: list[ScoredMatch] = Field(
         default_factory=list,
-        description="Matched (master, revision) pairs",
+        description="Matched (master, revision) pairs with confidence scores",
     )
     master_only: list[GeometrySnapshot] = Field(
         default_factory=list,

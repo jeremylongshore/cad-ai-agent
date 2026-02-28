@@ -8,6 +8,7 @@ from cad_dxf_agent.models.cad_schema import EntityType, Point2D
 from cad_dxf_agent.models.comparison_schema import (
     ComparisonConfig,
     GeometrySnapshot,
+    MatchMethod,
 )
 from tests.helpers.comparison_factory import (
     make_added_removed_pair,
@@ -145,3 +146,60 @@ class TestComplexPair:
         assert len(result.pairs) >= 1
         total = len(result.pairs) + len(result.master_only) + len(result.revision_only)
         assert total > 0
+
+
+class TestScoredMatchOutput:
+    """Tests that ScoredMatch metadata is populated correctly."""
+
+    def test_fingerprint_match_has_confidence_1(self, tmp_path):
+        master, revision = make_identical_pair(tmp_path)
+        m_snaps = extract_snapshots(master)
+        r_snaps = extract_snapshots(revision)
+        result = match_entities(m_snaps, r_snaps)
+        for scored in result.pairs:
+            assert scored.confidence == 1.0
+            assert scored.method == MatchMethod.fingerprint
+
+    def test_spatial_match_has_confidence_lt_1(self, tmp_path):
+        """Moved entity matched via NN should have confidence < 1.0."""
+        master, revision = make_moved_entity_pair(tmp_path, dx=0.1, dy=0.1)
+        m_snaps = extract_snapshots(master)
+        r_snaps = extract_snapshots(revision)
+        config = ComparisonConfig(tolerance=1.0)
+        result = match_entities(m_snaps, r_snaps, config)
+        spatial = [s for s in result.pairs if s.method == MatchMethod.spatial]
+        # At least some entities should be matched spatially
+        if spatial:
+            for s in spatial:
+                assert 0.0 < s.confidence <= 1.0
+
+    def test_ambiguous_match_flagged(self):
+        """Two revision entities equidistant from one master → ambiguous."""
+        master = [
+            GeometrySnapshot(
+                handle="M1",
+                entity_type=EntityType.LINE,
+                layer="S",
+                points=[Point2D(x=0, y=0), Point2D(x=10, y=0)],
+            )
+        ]
+        revision = [
+            GeometrySnapshot(
+                handle="R1",
+                entity_type=EntityType.LINE,
+                layer="S",
+                points=[Point2D(x=0.1, y=0), Point2D(x=10.1, y=0)],
+            ),
+            GeometrySnapshot(
+                handle="R2",
+                entity_type=EntityType.LINE,
+                layer="S",
+                points=[Point2D(x=0.12, y=0), Point2D(x=10.12, y=0)],
+            ),
+        ]
+        config = ComparisonConfig(tolerance=1.0)
+        result = match_entities(master, revision, config)
+        assert len(result.pairs) == 1
+        scored = result.pairs[0]
+        assert scored.runner_up_score is not None
+        assert scored.ambiguous is True

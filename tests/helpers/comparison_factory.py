@@ -348,6 +348,31 @@ def make_anchor_pair(tmp_path: Path, dx: float = 10.0, dy: float = -5.0) -> tupl
     return master, revision
 
 
+def make_ambiguous_pair(tmp_path: Path) -> tuple[Path, Path]:
+    """Master has one line; revision has two nearly-identical lines nearby.
+
+    Tests ambiguous matching where the scorer can't confidently distinguish.
+    """
+    master = tmp_path / "master.dxf"
+    revision = tmp_path / "revision.dxf"
+
+    doc_m = ezdxf.new(dxfversion="R2018")
+    msp_m = doc_m.modelspace()
+    doc_m.layers.add("STRUCTURAL", color=1)
+    msp_m.add_line((0, 0), (10, 0), dxfattribs={"layer": "STRUCTURAL"})
+    doc_m.saveas(str(master))
+
+    doc_r = ezdxf.new(dxfversion="R2018")
+    msp_r = doc_r.modelspace()
+    doc_r.layers.add("STRUCTURAL", color=1)
+    # Two near-identical lines slightly offset from master
+    msp_r.add_line((0.1, 0), (10.1, 0), dxfattribs={"layer": "STRUCTURAL"})
+    msp_r.add_line((0.12, 0), (10.12, 0), dxfattribs={"layer": "STRUCTURAL"})
+    doc_r.saveas(str(revision))
+
+    return master, revision
+
+
 def _build_base(path: Path) -> Path:
     """Build a small DXF with reproducible entities."""
     doc = ezdxf.new(dxfversion="R2018")
