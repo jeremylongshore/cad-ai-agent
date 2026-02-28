@@ -269,3 +269,156 @@ class DiffOverlayLayers:
     MOVED = ("AI_MOVED", 4)  # cyan
 
     ALL = [ADDED, REMOVED, MODIFIED, MOVED]
+
+
+# --- Revision-apply schemas (E4) ---
+
+
+class RevisionOpType(StrEnum):
+    """Type of operation to apply from a comparison change."""
+
+    MOVE = "move"
+    DELETE = "delete"
+    ADD = "add"
+    MODIFY_GEOMETRY = "modify_geometry"
+    MODIFY_TEXT = "modify_text"
+    MODIFY_ATTRIBUTES = "modify_attributes"
+
+
+class RevisionOp(BaseModel):
+    """A single reversible operation derived from an EntityChange."""
+
+    op_id: str = Field(description="Unique identifier for this operation")
+    op_type: RevisionOpType
+    change_index: int = Field(description="Index into ComparisonResult.changes")
+    target_handle: str = Field(description="DXF entity handle in the master file")
+    target_layer: str = Field(description="Layer of the target entity")
+    forward: dict[str, Any] = Field(
+        default_factory=dict, description="Parameters for forward (apply) direction"
+    )
+    reverse: dict[str, Any] = Field(
+        default_factory=dict, description="Parameters for reverse (undo) direction"
+    )
+    confidence: float = Field(default=1.0, ge=0.0, le=1.0)
+    match_method: MatchMethod | None = None
+    description: str = Field(default="")
+
+
+class ApprovalStatus(StrEnum):
+    """Status of an approval decision for a revision op."""
+
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    DEFERRED = "deferred"
+    AUTO_APPROVED = "auto_approved"
+    FORCE_APPROVED = "force_approved"
+
+
+class ApprovalDecision(BaseModel):
+    """A user or system decision on a single RevisionOp."""
+
+    op_id: str
+    status: ApprovalStatus = ApprovalStatus.PENDING
+    reason: str = ""
+    decided_at: str | None = Field(default=None, description="ISO-8601 timestamp")
+
+
+class ApprovalConfig(BaseModel):
+    """Thresholds for automatic approval gating."""
+
+    auto_approve_threshold: float = Field(
+        default=0.85, ge=0.0, le=1.0, description="Confidence >= this → auto-approved"
+    )
+    force_required_threshold: float = Field(
+        default=0.6,
+        ge=0.0,
+        le=1.0,
+        description="Confidence < this → requires force_approve",
+    )
+    allow_force: bool = Field(
+        default=False, description="Whether force_approve is permitted for low-confidence ops"
+    )
+
+
+class ApprovalSet(BaseModel):
+    """Collection of approval decisions for a set of RevisionOps."""
+
+    decisions: list[ApprovalDecision] = Field(default_factory=list)
+    config: ApprovalConfig = Field(default_factory=ApprovalConfig)
+
+    @property
+    def approved_op_ids(self) -> set[str]:
+        return {
+            d.op_id
+            for d in self.decisions
+            if d.status
+            in (
+                ApprovalStatus.APPROVED,
+                ApprovalStatus.AUTO_APPROVED,
+                ApprovalStatus.FORCE_APPROVED,
+            )
+        }
+
+    @property
+    def rejected_op_ids(self) -> set[str]:
+        return {d.op_id for d in self.decisions if d.status == ApprovalStatus.REJECTED}
+
+    @property
+    def pending_op_ids(self) -> set[str]:
+        return {d.op_id for d in self.decisions if d.status == ApprovalStatus.PENDING}
+
+    def get_decision(self, op_id: str) -> ApprovalDecision | None:
+        for d in self.decisions:
+            if d.op_id == op_id:
+                return d
+        return None
+
+
+class AppliedRevisionOp(BaseModel):
+    """Record of a single revision op application attempt."""
+
+    op_id: str
+    op_type: RevisionOpType
+    success: bool
+    description: str = ""
+    entity_handle: str | None = None
+    error: str | None = None
+
+
+class ApplyResult(BaseModel):
+    """Result of applying a batch of revision ops to a master DXF."""
+
+    run_id: str = Field(description="Unique run identifier")
+    applied: list[AppliedRevisionOp] = Field(default_factory=list)
+    skipped_count: int = 0
+    rejected_count: int = 0
+    output_path: str | None = None
+
+    @property
+    def success_count(self) -> int:
+        return sum(1 for a in self.applied if a.success)
+
+    @property
+    def failure_count(self) -> int:
+        return sum(1 for a in self.applied if not a.success)
+
+    @property
+    def all_succeeded(self) -> bool:
+        return len(self.applied) > 0 and all(a.success for a in self.applied)
+
+
+class RunBundle(BaseModel):
+    """Manifest of all artifacts from a revision-apply run."""
+
+    run_id: str
+    created_at: str = Field(description="ISO-8601 timestamp")
+    master_path: str
+    revision_path: str
+    updated_master_path: str | None = None
+    overlay_path: str | None = None
+    changelog_json_path: str | None = None
+    changelog_text_path: str | None = None
+    apply_result_path: str | None = None
+    bundle_dir: str = ""
+    metadata: dict[str, Any] = Field(default_factory=dict)

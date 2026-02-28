@@ -1,14 +1,119 @@
 """Test DXF pair builders for comparison engine tests.
 
 Each function creates a pair of DXF files with known differences
-for deterministic testing.
+for deterministic testing.  Also includes in-memory model builders
+for EntityChange / ComparisonResult objects.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import ezdxf
+
+from cad_dxf_agent.models.cad_schema import EntityType, Point2D
+from cad_dxf_agent.models.comparison_schema import (
+    ChangeCategory,
+    ComparisonConfig,
+    ComparisonResult,
+    EntityChange,
+    GeometrySnapshot,
+    MatchMethod,
+)
+
+
+def make_geometry_snapshot(
+    *,
+    handle: str = "A0",
+    entity_type: EntityType = EntityType.LINE,
+    layer: str = "STRUCTURAL",
+    points: list[tuple[float, float]] | None = None,
+    text_content: str | None = None,
+    block_name: str | None = None,
+    attributes: dict[str, Any] | None = None,
+) -> GeometrySnapshot:
+    """Build a GeometrySnapshot with sensible defaults."""
+    pts = [Point2D(x=p[0], y=p[1]) for p in (points or [(0, 0), (10, 0)])]
+    return GeometrySnapshot(
+        handle=handle,
+        entity_type=entity_type,
+        layer=layer,
+        points=pts,
+        text_content=text_content,
+        block_name=block_name,
+        attributes=attributes or {},
+    )
+
+
+def make_entity_change(
+    category: ChangeCategory = ChangeCategory.UNCHANGED,
+    *,
+    master_handle: str = "A0",
+    revision_handle: str = "B0",
+    layer: str = "STRUCTURAL",
+    entity_type: EntityType = EntityType.LINE,
+    displacement: tuple[float, float] | None = None,
+    modifications: dict[str, Any] | None = None,
+    confidence: float = 1.0,
+    match_method: MatchMethod | None = MatchMethod.fingerprint,
+    master_points: list[tuple[float, float]] | None = None,
+    revision_points: list[tuple[float, float]] | None = None,
+    master_text: str | None = None,
+    revision_text: str | None = None,
+    master_block: str | None = None,
+    revision_block: str | None = None,
+    master_attributes: dict[str, Any] | None = None,
+    revision_attributes: dict[str, Any] | None = None,
+) -> EntityChange:
+    """Build an EntityChange with flexible defaults per category."""
+    m_snap = None
+    r_snap = None
+
+    if category != ChangeCategory.ADDED:
+        m_snap = make_geometry_snapshot(
+            handle=master_handle,
+            entity_type=entity_type,
+            layer=layer,
+            points=master_points,
+            text_content=master_text,
+            block_name=master_block,
+            attributes=master_attributes,
+        )
+
+    if category != ChangeCategory.REMOVED:
+        r_snap = make_geometry_snapshot(
+            handle=revision_handle,
+            entity_type=entity_type,
+            layer=layer,
+            points=revision_points or master_points,
+            text_content=revision_text or master_text,
+            block_name=revision_block or master_block,
+            attributes=revision_attributes or master_attributes,
+        )
+
+    disp = Point2D(x=displacement[0], y=displacement[1]) if displacement else None
+
+    return EntityChange(
+        category=category,
+        master_snapshot=m_snap,
+        revision_snapshot=r_snap,
+        displacement=disp,
+        modifications=modifications,
+        confidence=confidence,
+        match_method=match_method,
+    )
+
+
+def make_comparison_result(
+    changes: list[EntityChange] | None = None,
+) -> ComparisonResult:
+    """Build a ComparisonResult with auto-computed summary."""
+    changes = changes or []
+    summary = {"added": 0, "removed": 0, "modified": 0, "moved": 0, "unchanged": 0}
+    for c in changes:
+        summary[c.category.value] += 1
+    return ComparisonResult(changes=changes, summary=summary, config=ComparisonConfig())
 
 
 def make_identical_pair(tmp_path: Path) -> tuple[Path, Path]:
