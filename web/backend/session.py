@@ -38,6 +38,14 @@ class Session:
     comparison_changelog: object | None = None
     diff_overlay_path: Path | None = None
     diff_overlay_render: Path | None = None
+    # Revision pipeline state
+    revision_path: Path | None = None
+    alignment_result: object | None = None  # AlignmentResult
+    alignment_control_points: list | None = None  # parsed control points from align step
+    revision_ops: list | None = None  # list[RevisionOp]
+    approval_set: object | None = None  # ApprovalSet
+    apply_result: object | None = None  # ApplyResult
+    bundle_dir: Path | None = None
 
 
 class SessionManager:

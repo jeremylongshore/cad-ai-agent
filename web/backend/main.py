@@ -1,13 +1,19 @@
 """CAD DXF Agent — Web Backend (FastAPI on Cloud Run).
 
 Routes:
-    GET  /api/health     — Health check
-    POST /api/upload     — Upload DXF/PDF, get session + file info
-    POST /api/plan       — Send prompt, get planned operations + preview
-    POST /api/apply      — Apply selected operations
-    POST /api/compare    — Upload revision DXF, compare against master
-    GET  /api/render     — Get PNG render (original/edited/diff/comparison)
-    GET  /api/download   — Download edited DXF
+    GET  /api/health            — Health check
+    POST /api/upload            — Upload DXF/PDF, get session + file info
+    POST /api/plan              — Send prompt, get planned operations + preview
+    POST /api/apply             — Apply selected operations
+    POST /api/compare           — Upload revision DXF, compare against master
+    GET  /api/render            — Get PNG render (original/edited/diff/comparison)
+    GET  /api/download          — Download edited DXF
+    POST /api/revision/upload   — Upload revision DXF to existing session
+    POST /api/revision/align    — Run alignment (auto or manual control points)
+    POST /api/revision/diff     — Run comparison + generate revision ops
+    POST /api/revision/approve  — Approve/reject individual revision ops
+    POST /api/revision/apply    — Apply approved ops + export bundle
+    GET  /api/revision/download — Download bundle as zip
 """
 
 from __future__ import annotations
@@ -17,6 +23,7 @@ import os
 import shutil
 import sys
 from contextlib import asynccontextmanager
+from typing import Literal
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, File, HTTPException, Query, Request, UploadFile
@@ -100,6 +107,29 @@ class ApplyRequest(BaseModel):
 
 
 class ClearHistoryRequest(BaseModel):
+    session_id: str
+
+
+class RevisionAlignRequest(BaseModel):
+    session_id: str
+    control_points: list[str] | None = None
+
+
+class RevisionDiffRequest(BaseModel):
+    session_id: str
+
+
+class RevisionApproveItem(BaseModel):
+    op_id: str
+    action: Literal["approve", "reject"]
+
+
+class RevisionApproveRequest(BaseModel):
+    session_id: str
+    approvals: list[RevisionApproveItem]
+
+
+class RevisionApplyRequest(BaseModel):
     session_id: str
 
 
@@ -237,13 +267,17 @@ async def plan(body: PlanRequest, user: dict = Depends(get_user)):
         # Build operation summaries
         operations = []
         for op in changeset.operations:
-            operations.append({
-                "op_type": op.op_type.value if hasattr(op.op_type, "value") else str(op.op_type),
-                "target_handle": op.target_handle,
-                "target_layer": op.target_layer,
-                "description": _describe_op(op),
-                "params": op.params,
-            })
+            operations.append(
+                {
+                    "op_type": op.op_type.value
+                    if hasattr(op.op_type, "value")
+                    else str(op.op_type),
+                    "target_handle": op.target_handle,
+                    "target_layer": op.target_layer,
+                    "description": _describe_op(op),
+                    "params": op.params,
+                }
+            )
 
         # Build text summary
         summary_parts = []
@@ -319,9 +353,7 @@ async def apply_changes(body: ApplyRequest, user: dict = Depends(get_user)):
         try:
             from cad_dxf_agent.core.renderer import render_dxf_to_png
 
-            render_result = render_dxf_to_png(
-                session.edited_path, session_dir / "edited.png"
-            )
+            render_result = render_dxf_to_png(session.edited_path, session_dir / "edited.png")
             if render_result.success:
                 session.edited_render = render_result.output_path
             else:
@@ -486,7 +518,9 @@ async def download(
         raise HTTPException(status_code=404, detail=str(e))
 
     if session.edited_path is None or not session.edited_path.exists():
-        raise HTTPException(status_code=404, detail="No edited file available. Run /api/apply first.")
+        raise HTTPException(
+            status_code=404, detail="No edited file available. Run /api/apply first."
+        )
 
     # Build download filename from original
     original_name = session.file_info.get("filename", "drawing.dxf")
@@ -502,6 +536,323 @@ async def download(
 
 
 # ---------------------------------------------------------------------------
+# Revision pipeline endpoints
+# ---------------------------------------------------------------------------
+
+
+def _parse_control_points(
+    raw: list[str] | None,
+) -> list[tuple[tuple[float, float], tuple[float, float]]] | None:
+    """Parse control-point strings like '0,0:5,3' into typed tuples."""
+    if not raw:
+        return None
+    pairs: list[tuple[tuple[float, float], tuple[float, float]]] = []
+    for token in raw:
+        master_str, _, rev_str = token.partition(":")
+        if not rev_str:
+            raise ValueError(f"Invalid control point format (expected mx,my:rx,ry): {token!r}")
+        mx, my = (float(v) for v in master_str.split(","))
+        rx, ry = (float(v) for v in rev_str.split(","))
+        pairs.append(((mx, my), (rx, ry)))
+    return pairs
+
+
+@app.post("/api/revision/upload")
+async def revision_upload(
+    file: UploadFile = File(...),
+    user: dict = Depends(get_user),
+    session_id: str = Query(...),
+):
+    """Upload a revision DXF to an existing session."""
+    with otel_span("cad.web.revision.upload", {"cad.web.session_id": session_id}):
+        if not file.filename:
+            raise HTTPException(status_code=400, detail="No file provided")
+
+        ext = Path(file.filename).suffix.lower()
+        if ext != ".dxf":
+            raise HTTPException(status_code=400, detail="Revision upload requires a .dxf file")
+
+        try:
+            session = session_mgr.get(session_id, user["uid"])
+        except (KeyError, PermissionError) as e:
+            raise HTTPException(status_code=404, detail=str(e))
+
+        session_dir = Path("/tmp/cad-sessions") / session.session_id
+        revision_path = session_dir / "revision.dxf"
+        content = await file.read()
+        revision_path.write_bytes(content)
+        session.revision_path = revision_path
+
+        return {"session_id": session.session_id, "filename": file.filename}
+
+
+@app.post("/api/revision/align")
+async def revision_align(body: RevisionAlignRequest, user: dict = Depends(get_user)):
+    """Run alignment between master and revision with optional control points."""
+    with otel_span("cad.web.revision.align", {"cad.web.session_id": body.session_id}):
+        try:
+            session = session_mgr.get(body.session_id, user["uid"])
+        except (KeyError, PermissionError) as e:
+            raise HTTPException(status_code=404, detail=str(e))
+
+        if session.original_path is None or not session.original_path.exists():
+            raise HTTPException(
+                status_code=400, detail="No master file loaded. Upload a file first."
+            )
+        if session.revision_path is None or not session.revision_path.exists():
+            raise HTTPException(
+                status_code=400,
+                detail="No revision file uploaded. Use /api/revision/upload first.",
+            )
+
+        try:
+            from cad_dxf_agent.core.comparison.alignment import align_drawings
+            from cad_dxf_agent.core.comparison.geometry import extract_snapshots
+            from cad_dxf_agent.models.comparison_schema import AlignmentConfig
+
+            control_points = _parse_control_points(body.control_points)
+            config = AlignmentConfig(enabled=True, control_points=control_points)
+
+            master_snaps = extract_snapshots(session.original_path)
+            revision_snaps = extract_snapshots(session.revision_path)
+
+            result = align_drawings(master_snaps, revision_snaps, config)
+            session.alignment_result = result
+            session.alignment_control_points = control_points
+
+            return {
+                "method": result.method.value,
+                "confidence": result.confidence,
+                "translation": list(result.translation),
+                "rotation_deg": result.rotation_deg,
+                "guidance": result.guidance,
+                "diagnostics": {
+                    "rms_residual": result.diagnostics.rms_residual,
+                    "overlap_ratio": result.diagnostics.overlap_ratio,
+                    "match_count": result.diagnostics.match_count,
+                    "attempts": [
+                        {"method": a.method, "success": a.success, "confidence": a.confidence}
+                        for a in result.diagnostics.attempts
+                    ],
+                },
+            }
+
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        except Exception as e:
+            logger.error("Alignment failed: %s", e, exc_info=True)
+            raise HTTPException(status_code=500, detail=f"Alignment failed: {e}")
+
+
+@app.post("/api/revision/diff")
+async def revision_diff(body: RevisionDiffRequest, user: dict = Depends(get_user)):
+    """Run comparison and generate revision ops."""
+    with otel_span("cad.web.revision.diff", {"cad.web.session_id": body.session_id}):
+        try:
+            session = session_mgr.get(body.session_id, user["uid"])
+        except (KeyError, PermissionError) as e:
+            raise HTTPException(status_code=404, detail=str(e))
+
+        if session.original_path is None or not session.original_path.exists():
+            raise HTTPException(
+                status_code=400, detail="No master file loaded. Upload a file first."
+            )
+        if session.revision_path is None or not session.revision_path.exists():
+            raise HTTPException(
+                status_code=400,
+                detail="No revision file uploaded. Use /api/revision/upload first.",
+            )
+
+        try:
+            from cad_dxf_agent.core.comparison.approval import build_initial_approvals
+            from cad_dxf_agent.core.comparison.engine import ComparisonEngine
+            from cad_dxf_agent.core.comparison.revision_ops import comparison_result_to_ops
+            from cad_dxf_agent.models.comparison_schema import AlignmentConfig, ComparisonConfig
+
+            # Build config — reuse control points from prior align step if available
+            alignment_config = AlignmentConfig(
+                enabled=True,
+                control_points=session.alignment_control_points,
+            )
+            config = ComparisonConfig(alignment=alignment_config)
+
+            engine = ComparisonEngine()
+            result = engine.compare(session.original_path, session.revision_path, config)
+
+            ops = comparison_result_to_ops(result)
+            approval_set = build_initial_approvals(ops)
+
+            # Store in session
+            session.comparison_result = result
+            session.revision_ops = ops
+            session.approval_set = approval_set
+
+            # Generate outputs for changelog
+            session_dir = Path("/tmp/cad-sessions") / session.session_id
+            output_dir = session_dir / "comparison"
+            outputs = engine.generate_outputs(
+                session.original_path, session.revision_path, result, output_dir
+            )
+            session.comparison_changelog = outputs.changelog
+            session.diff_overlay_path = outputs.diff_overlay_path
+
+            return {
+                "summary": result.summary,
+                "total_changes": result.total_changes,
+                "changelog": outputs.changelog.to_json(),
+                "ops": [
+                    {
+                        "op_id": op.op_id,
+                        "op_type": op.op_type.value,
+                        "target_handle": op.target_handle,
+                        "target_layer": op.target_layer,
+                        "description": op.description,
+                        "confidence": op.confidence,
+                        "status": approval_set.get_decision(op.op_id).status.value
+                        if approval_set.get_decision(op.op_id)
+                        else "unknown",
+                    }
+                    for op in ops
+                ],
+            }
+
+        except Exception as e:
+            logger.error("Diff failed: %s", e, exc_info=True)
+            raise HTTPException(status_code=500, detail=f"Diff failed: {e}")
+
+
+@app.post("/api/revision/approve")
+async def revision_approve(body: RevisionApproveRequest, user: dict = Depends(get_user)):
+    """Approve or reject individual revision ops."""
+    with otel_span("cad.web.revision.approve", {"cad.web.session_id": body.session_id}):
+        try:
+            session = session_mgr.get(body.session_id, user["uid"])
+        except (KeyError, PermissionError) as e:
+            raise HTTPException(status_code=404, detail=str(e))
+
+        if session.approval_set is None:
+            raise HTTPException(
+                status_code=400,
+                detail="No ops to approve. Run /api/revision/diff first.",
+            )
+
+        try:
+            from cad_dxf_agent.core.comparison.approval import approve_op, reject_op
+
+            for item in body.approvals:
+                if item.action == "approve":
+                    approve_op(session.approval_set, item.op_id)
+                else:
+                    reject_op(session.approval_set, item.op_id)
+
+            approval_set = session.approval_set
+            return {
+                "ops": [
+                    {"op_id": d.op_id, "status": d.status.value} for d in approval_set.decisions
+                ],
+                "pending_count": len(approval_set.pending_op_ids),
+                "approved_count": len(approval_set.approved_op_ids),
+                "rejected_count": len(approval_set.rejected_op_ids),
+            }
+
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        except Exception as e:
+            logger.error("Approve failed: %s", e, exc_info=True)
+            raise HTTPException(status_code=500, detail=f"Approve failed: {e}")
+
+
+@app.post("/api/revision/apply")
+async def revision_apply(body: RevisionApplyRequest, user: dict = Depends(get_user)):
+    """Apply approved revision ops and generate a bundle."""
+    with otel_span("cad.web.revision.apply", {"cad.web.session_id": body.session_id}):
+        try:
+            session = session_mgr.get(body.session_id, user["uid"])
+        except (KeyError, PermissionError) as e:
+            raise HTTPException(status_code=404, detail=str(e))
+
+        if session.revision_ops is None or session.approval_set is None:
+            raise HTTPException(
+                status_code=400,
+                detail="No revision ops. Run /api/revision/diff first.",
+            )
+
+        try:
+            import ezdxf
+
+            from cad_dxf_agent.core.comparison.applier import RevisionApplier
+            from cad_dxf_agent.core.comparison.bundle import export_bundle
+
+            master_doc = ezdxf.readfile(str(session.original_path))
+            applier = RevisionApplier(master_doc)
+            apply_result = applier.apply(session.revision_ops, session.approval_set)
+            session.apply_result = apply_result
+
+            # Export bundle
+            session_dir = Path("/tmp/cad-sessions") / session.session_id
+            bundle_dir = session_dir / "bundle"
+            bundle = export_bundle(
+                master_path=session.original_path,
+                revision_path=session.revision_path,
+                comparison_result=session.comparison_result,
+                apply_result=apply_result,
+                ops=session.revision_ops,
+                approval_set=session.approval_set,
+                updated_doc=master_doc,
+                output_dir=bundle_dir,
+            )
+            session.bundle_dir = bundle_dir
+
+            return {
+                "run_id": apply_result.run_id,
+                "success_count": apply_result.success_count,
+                "failure_count": apply_result.failure_count,
+                "bundle_dir": str(bundle.bundle_dir),
+            }
+
+        except Exception as e:
+            logger.error("Apply failed: %s", e, exc_info=True)
+            raise HTTPException(status_code=500, detail=f"Apply failed: {e}")
+
+
+@app.get("/api/revision/download")
+async def revision_download(session_id: str = Query(...)):
+    """Download the revision bundle as a zip file.
+
+    No auth required — same rationale as /api/render (Firebase rewrites
+    strip Authorization headers on proxied GET requests).
+    """
+    import io
+    import zipfile
+
+    try:
+        session = session_mgr.get_by_id(session_id)
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    if session.bundle_dir is None or not session.bundle_dir.exists():
+        raise HTTPException(
+            status_code=404,
+            detail="No bundle available. Run /api/revision/apply first.",
+        )
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for file_path in session.bundle_dir.iterdir():
+            if file_path.is_file():
+                zf.write(file_path, arcname=file_path.name)
+    buf.seek(0)
+
+    from fastapi.responses import StreamingResponse
+
+    return StreamingResponse(
+        buf,
+        media_type="application/zip",
+        headers={"Content-Disposition": 'attachment; filename="revision_bundle.zip"'},
+    )
+
+
+# ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
@@ -512,7 +863,9 @@ def _user_friendly_conversion_error(raw_error: str | None, ext: str) -> str:
         return f"Could not process your {ext} file. Please try a different file."
     lower = raw_error.lower()
     if "no pdf library" in lower or "pip install" in lower:
-        return "PDF processing is temporarily unavailable. Please try uploading a .dxf file instead."
+        return (
+            "PDF processing is temporarily unavailable. Please try uploading a .dxf file instead."
+        )
     if "no vector geometry" in lower or "raster" in lower:
         return (
             "This PDF appears to be a scanned image, not a vector drawing. "
@@ -535,11 +888,11 @@ def _describe_op(op) -> str:
         return f"Move entity {op.target_handle} by ({dx}, {dy})"
     elif op_type == "edit_text":
         new_text = op.params.get("new_text", "")
-        return f"Change text on entity {op.target_handle} to \"{new_text}\""
+        return f'Change text on entity {op.target_handle} to "{new_text}"'
     elif op_type == "delete_entity":
         return f"Delete entity {op.target_handle} on layer {op.target_layer or '?'}"
     elif op_type == "add_block":
         block_name = op.params.get("block_name", "")
-        return f"Insert block \"{block_name}\" on layer {op.target_layer or '0'}"
+        return f'Insert block "{block_name}" on layer {op.target_layer or "0"}'
     else:
         return f"{op_type} on entity {op.target_handle}"
