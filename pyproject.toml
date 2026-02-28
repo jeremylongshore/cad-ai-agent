@@ -93,6 +93,7 @@ dev = [
 
 [project.scripts]
 cad-dxf-agent = "cad_dxf_agent.app:main"
+cad-revision = "cad_dxf_agent.cli.main:main"
 
 [tool.hatch.version]
 path = "src/cad_dxf_agent/__init__.py"
