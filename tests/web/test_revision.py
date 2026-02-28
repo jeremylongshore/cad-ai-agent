@@ -292,7 +292,7 @@ class TestRevisionApprove:
         assert resp.status_code == 400
 
     def test_revision_approve_invalid_action(self, client, session_with_ops):
-        """Invalid action should return 400."""
+        """Invalid action should be rejected by Pydantic validation (422)."""
         session_id, ops = session_with_ops
         if not ops:
             pytest.skip("No ops")
@@ -304,7 +304,7 @@ class TestRevisionApprove:
                 "approvals": [{"op_id": ops[0]["op_id"], "action": "maybe"}],
             },
         )
-        assert resp.status_code == 400
+        assert resp.status_code == 422
 
     def test_revision_approve_requires_auth(self, unauth_client):
         """Unauthenticated requests must be rejected with 401."""

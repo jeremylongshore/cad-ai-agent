@@ -23,6 +23,7 @@ import os
 import shutil
 import sys
 from contextlib import asynccontextmanager
+from typing import Literal
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, File, HTTPException, Query, Request, UploadFile
@@ -120,7 +121,7 @@ class RevisionDiffRequest(BaseModel):
 
 class RevisionApproveItem(BaseModel):
     op_id: str
-    action: str  # "approve" or "reject"
+    action: Literal["approve", "reject"]
 
 
 class RevisionApproveRequest(BaseModel):
@@ -617,6 +618,7 @@ async def revision_align(body: RevisionAlignRequest, user: dict = Depends(get_us
 
             result = align_drawings(master_snaps, revision_snaps, config)
             session.alignment_result = result
+            session.alignment_control_points = control_points
 
             return {
                 "method": result.method.value,
@@ -667,14 +669,11 @@ async def revision_diff(body: RevisionDiffRequest, user: dict = Depends(get_user
             from cad_dxf_agent.core.comparison.revision_ops import comparison_result_to_ops
             from cad_dxf_agent.models.comparison_schema import AlignmentConfig, ComparisonConfig
 
-            # Build config — use stored alignment if available, otherwise auto
-            alignment_config = AlignmentConfig(enabled=True)
-            if session.alignment_result is not None:
-                # Preserve control points if manual alignment was done
-                alignment_config = AlignmentConfig(
-                    enabled=True,
-                    control_points=getattr(session.alignment_result, "_control_points", None),
-                )
+            # Build config — reuse control points from prior align step if available
+            alignment_config = AlignmentConfig(
+                enabled=True,
+                control_points=session.alignment_control_points,
+            )
             config = ComparisonConfig(alignment=alignment_config)
 
             engine = ComparisonEngine()
@@ -743,13 +742,8 @@ async def revision_approve(body: RevisionApproveRequest, user: dict = Depends(ge
             for item in body.approvals:
                 if item.action == "approve":
                     approve_op(session.approval_set, item.op_id)
-                elif item.action == "reject":
-                    reject_op(session.approval_set, item.op_id)
                 else:
-                    raise HTTPException(
-                        status_code=400,
-                        detail=f"Invalid action: {item.action!r}. Must be 'approve' or 'reject'.",
-                    )
+                    reject_op(session.approval_set, item.op_id)
 
             approval_set = session.approval_set
             return {
@@ -761,8 +755,6 @@ async def revision_approve(body: RevisionApproveRequest, user: dict = Depends(ge
                 "rejected_count": len(approval_set.rejected_op_ids),
             }
 
-        except HTTPException:
-            raise
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
         except Exception as e:
