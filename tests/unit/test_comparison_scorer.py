@@ -224,9 +224,7 @@ class TestScoreText:
         r_close = _snap(
             entity_type=EntityType.TEXT, text_content="Hello", points=[Point2D(x=0.1, y=0)]
         )
-        r_far = _snap(
-            entity_type=EntityType.TEXT, text_content="Hello", points=[Point2D(x=5, y=0)]
-        )
+        r_far = _snap(entity_type=EntityType.TEXT, text_content="Hello", points=[Point2D(x=5, y=0)])
         close_score = score_text(m, r_close, tolerance=10.0)
         far_score = score_text(m, r_far, tolerance=10.0)
         assert close_score > far_score

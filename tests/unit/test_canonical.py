@@ -211,12 +211,8 @@ class TestCanonicalPointsLine:
         assert result[1] == Point2D(x=10, y=0)
 
     def test_both_directions_produce_same_result(self):
-        forward = canonical_points(
-            [Point2D(x=0, y=0), Point2D(x=10, y=5)], EntityType.LINE
-        )
-        reverse = canonical_points(
-            [Point2D(x=10, y=5), Point2D(x=0, y=0)], EntityType.LINE
-        )
+        forward = canonical_points([Point2D(x=0, y=0), Point2D(x=10, y=5)], EntityType.LINE)
+        reverse = canonical_points([Point2D(x=10, y=5), Point2D(x=0, y=0)], EntityType.LINE)
         assert forward == reverse
 
     def test_same_x_sorts_by_y(self):
@@ -362,8 +358,10 @@ class TestSignaturePolyline:
     def test_rectangle(self):
         # Open polyline: 4 vertices = 3 segments (10+5+10 = 25)
         pts = [
-            Point2D(x=0, y=0), Point2D(x=10, y=0),
-            Point2D(x=10, y=5), Point2D(x=0, y=5),
+            Point2D(x=0, y=0),
+            Point2D(x=10, y=0),
+            Point2D(x=10, y=5),
+            Point2D(x=0, y=5),
         ]
         sig = compute_signature(EntityType.LWPOLYLINE, pts)
         assert sig.entity_type == "LWPOLYLINE"
@@ -372,7 +370,9 @@ class TestSignaturePolyline:
 
     def test_triangle(self):
         pts = [
-            Point2D(x=0, y=0), Point2D(x=10, y=0), Point2D(x=5, y=5),
+            Point2D(x=0, y=0),
+            Point2D(x=10, y=0),
+            Point2D(x=5, y=5),
         ]
         sig = compute_signature(EntityType.LWPOLYLINE, pts)
         assert sig.vertex_count == 3
@@ -382,8 +382,10 @@ class TestSignaturePolyline:
         """Different vertex counts produce different signatures."""
         pts_3 = [Point2D(x=0, y=0), Point2D(x=10, y=0), Point2D(x=10, y=10)]
         pts_4 = [
-            Point2D(x=0, y=0), Point2D(x=10, y=0),
-            Point2D(x=10, y=10), Point2D(x=0, y=10),
+            Point2D(x=0, y=0),
+            Point2D(x=10, y=0),
+            Point2D(x=10, y=10),
+            Point2D(x=0, y=10),
         ]
         sig_3 = compute_signature(EntityType.LWPOLYLINE, pts_3)
         sig_4 = compute_signature(EntityType.LWPOLYLINE, pts_4)
@@ -393,13 +395,17 @@ class TestSignaturePolyline:
         """Shapes with same perimeter but different turns get different turn_hash."""
         # L-shape: right turn
         pts_l = [
-            Point2D(x=0, y=0), Point2D(x=10, y=0),
-            Point2D(x=10, y=10), Point2D(x=10, y=20),
+            Point2D(x=0, y=0),
+            Point2D(x=10, y=0),
+            Point2D(x=10, y=10),
+            Point2D(x=10, y=20),
         ]
         # Z-shape: right then left turn
         pts_z = [
-            Point2D(x=0, y=0), Point2D(x=10, y=0),
-            Point2D(x=10, y=10), Point2D(x=20, y=10),
+            Point2D(x=0, y=0),
+            Point2D(x=10, y=0),
+            Point2D(x=10, y=10),
+            Point2D(x=20, y=10),
         ]
         sig_l = compute_signature(EntityType.LWPOLYLINE, pts_l)
         sig_z = compute_signature(EntityType.LWPOLYLINE, pts_z)
@@ -408,12 +414,16 @@ class TestSignaturePolyline:
     def test_small_noise_stable(self):
         """±0.001" noise doesn't change polyline signature."""
         pts_clean = [
-            Point2D(x=0, y=0), Point2D(x=10, y=0),
-            Point2D(x=10, y=10), Point2D(x=0, y=10),
+            Point2D(x=0, y=0),
+            Point2D(x=10, y=0),
+            Point2D(x=10, y=10),
+            Point2D(x=0, y=10),
         ]
         pts_noisy = [
-            Point2D(x=0.001, y=-0.001), Point2D(x=9.999, y=0.001),
-            Point2D(x=10.001, y=9.999), Point2D(x=-0.001, y=10.001),
+            Point2D(x=0.001, y=-0.001),
+            Point2D(x=9.999, y=0.001),
+            Point2D(x=10.001, y=9.999),
+            Point2D(x=-0.001, y=10.001),
         ]
         sig_clean = compute_signature(EntityType.LWPOLYLINE, pts_clean)
         sig_noisy = compute_signature(EntityType.LWPOLYLINE, pts_noisy)
@@ -444,7 +454,8 @@ class TestSignatureArc:
     def test_basic(self):
         pts = [Point2D(x=5, y=5)]
         sig = compute_signature(
-            EntityType.ARC, pts,
+            EntityType.ARC,
+            pts,
             attributes={"radius": 3.0, "start_angle": 0.0, "end_angle": 90.0},
         )
         assert sig.entity_type == "ARC"
@@ -455,11 +466,13 @@ class TestSignatureArc:
     def test_different_angles(self):
         pts = [Point2D(x=5, y=5)]
         sig_a = compute_signature(
-            EntityType.ARC, pts,
+            EntityType.ARC,
+            pts,
             attributes={"radius": 3.0, "start_angle": 0.0, "end_angle": 90.0},
         )
         sig_b = compute_signature(
-            EntityType.ARC, pts,
+            EntityType.ARC,
+            pts,
             attributes={"radius": 3.0, "start_angle": 0.0, "end_angle": 180.0},
         )
         assert sig_a.end_angle_bucket != sig_b.end_angle_bucket
@@ -483,7 +496,9 @@ class TestSignatureInsert:
     def test_attrib_keys_captured(self):
         pts = [Point2D(x=10, y=20)]
         sig = compute_signature(
-            EntityType.INSERT, pts, block_name="TAG",
+            EntityType.INSERT,
+            pts,
+            block_name="TAG",
             attributes={"mark": "A1", "size": "W12x26"},
         )
         assert sig.attrib_keys == ("mark", "size")
@@ -531,8 +546,10 @@ class TestSignatureIdempotent:
 
     def test_polyline_idempotent(self):
         pts = [
-            Point2D(x=0, y=0), Point2D(x=10.5, y=0),
-            Point2D(x=10.5, y=8.3), Point2D(x=0, y=8.3),
+            Point2D(x=0, y=0),
+            Point2D(x=10.5, y=0),
+            Point2D(x=10.5, y=8.3),
+            Point2D(x=0, y=8.3),
         ]
         sig_a = compute_signature(EntityType.LWPOLYLINE, pts)
         sig_b = compute_signature(EntityType.LWPOLYLINE, pts)
@@ -721,8 +738,13 @@ class TestSortSnapshots:
 
     def test_sorts_by_type_within_layer(self):
         snaps = [
-            _make_snap(entity_type=EntityType.TEXT, layer="0", points=[Point2D(x=0, y=0)],
-                       text_content="X", stable_id="0:TEXT:aaa"),
+            _make_snap(
+                entity_type=EntityType.TEXT,
+                layer="0",
+                points=[Point2D(x=0, y=0)],
+                text_content="X",
+                stable_id="0:TEXT:aaa",
+            ),
             _make_snap(entity_type=EntityType.LINE, layer="0", stable_id="0:LINE:bbb"),
         ]
         result = sort_snapshots(snaps)

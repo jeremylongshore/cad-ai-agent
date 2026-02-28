@@ -243,9 +243,7 @@ def compute_signature(
     )
 
 
-def _sig_line(
-    etype: str, points: list[Point2D], config: QuantizationConfig
-) -> GeometrySignature:
+def _sig_line(etype: str, points: list[Point2D], config: QuantizationConfig) -> GeometrySignature:
     """LINE: length + angle bucket + midpoint bin."""
     if len(points) < 2:
         return GeometrySignature(entity_type=etype)
@@ -253,9 +251,7 @@ def _sig_line(
     length = round(_distance(a, b), _SIG_DECIMAL)
     angle = _angle_bucket(a, b)
     mid = _midpoint_bin(points, config)
-    return GeometrySignature(
-        entity_type=etype, length=length, angle_bucket=angle, midpoint_bin=mid
-    )
+    return GeometrySignature(entity_type=etype, length=length, angle_bucket=angle, midpoint_bin=mid)
 
 
 def _sig_polyline(
@@ -325,9 +321,7 @@ def _sig_ellipse(
     major = attributes.get("major_axis", (1, 0, 0))
     angle = int(math.degrees(math.atan2(float(major[1]), float(major[0]))) // _ANGLE_BUCKET_SIZE)
     mid = _midpoint_bin(points, config)
-    return GeometrySignature(
-        entity_type=etype, radius=ratio, angle_bucket=angle, midpoint_bin=mid
-    )
+    return GeometrySignature(entity_type=etype, radius=ratio, angle_bucket=angle, midpoint_bin=mid)
 
 
 def _sig_insert(
@@ -356,9 +350,7 @@ def _sig_text(
 ) -> GeometrySignature:
     """TEXT/MTEXT/MLEADER/DIMENSION: text content + position bin."""
     mid = _midpoint_bin(points, config)
-    return GeometrySignature(
-        entity_type=etype, text_content=text_content or "", midpoint_bin=mid
-    )
+    return GeometrySignature(entity_type=etype, text_content=text_content or "", midpoint_bin=mid)
 
 
 # --- Signature helpers ---

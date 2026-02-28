@@ -212,9 +212,7 @@ def score_text(
     score += _TEXT_SIMILARITY_WEIGHT * _levenshtein_similarity(m_text, r_text)
 
     # Position proximity
-    score += _TEXT_POSITION_WEIGHT * _proximity_score(
-        master.centroid, revision.centroid, tolerance
-    )
+    score += _TEXT_POSITION_WEIGHT * _proximity_score(master.centroid, revision.centroid, tolerance)
 
     return min(1.0, score)
 
