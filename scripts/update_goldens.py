@@ -37,16 +37,10 @@ def _result_to_comparable(result) -> dict:
     ):
         entry = {
             "category": c.category.value,
-            "entity_type": (
-                c.master_snapshot or c.revision_snapshot
-            ).entity_type.value,
+            "entity_type": (c.master_snapshot or c.revision_snapshot).entity_type.value,
             "layer": (c.master_snapshot or c.revision_snapshot).layer,
-            "confidence": (
-                round(c.confidence, 4) if c.confidence is not None else None
-            ),
-            "match_method": (
-                c.match_method.value if c.match_method else None
-            ),
+            "confidence": (round(c.confidence, 4) if c.confidence is not None else None),
+            "match_method": (c.match_method.value if c.match_method else None),
         }
         if c.displacement:
             entry["displacement"] = {
@@ -84,10 +78,7 @@ def main() -> None:
         result = engine.compare(master, revision)
         golden = fixture_dir / "expected.json"
         golden.write_text(
-            json.dumps(
-                _result_to_comparable(result), indent=2, ensure_ascii=False
-            )
-            + "\n"
+            json.dumps(_result_to_comparable(result), indent=2, ensure_ascii=False) + "\n"
         )
         updated += 1
         print(f"  Updated {rel}/expected.json")

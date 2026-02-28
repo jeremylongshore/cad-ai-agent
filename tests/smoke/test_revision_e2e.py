@@ -21,9 +21,7 @@ from cad_dxf_agent.core.comparison.bundle import dry_run, export_bundle
 from cad_dxf_agent.core.comparison.engine import ComparisonEngine
 from cad_dxf_agent.core.comparison.revision_ops import comparison_result_to_ops
 
-CLEAN_FIXTURE = (
-    Path(__file__).parent.parent / "fixtures" / "revision" / "clean"
-)
+CLEAN_FIXTURE = Path(__file__).parent.parent / "fixtures" / "revision" / "clean"
 
 
 @pytest.mark.smoke

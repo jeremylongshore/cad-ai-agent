@@ -115,8 +115,7 @@ def test_golden_revision(fixture_name, fixture_dir, engine):
         # Auto-generate on first run
         golden.write_text(json.dumps(actual, indent=2, ensure_ascii=False) + "\n")
         pytest.fail(
-            f"Golden file did not exist — auto-generated {golden}. "
-            f"Review and re-run to confirm."
+            f"Golden file did not exist — auto-generated {golden}. Review and re-run to confirm."
         )
 
     expected = json.loads(golden.read_text())
@@ -131,6 +130,5 @@ def test_golden_revision(fixture_name, fixture_dir, engine):
         f"{actual['change_count']} != {expected['change_count']}"
     )
     assert actual["changes"] == expected["changes"], (
-        f"Changes mismatch for {fixture_name}. "
-        f"Run UPDATE_GOLDENS=1 pytest to accept new behavior."
+        f"Changes mismatch for {fixture_name}. Run UPDATE_GOLDENS=1 pytest to accept new behavior."
     )

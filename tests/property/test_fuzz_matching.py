@@ -38,14 +38,16 @@ def _random_drawing(tmp_path: Path, name: str, n_entities: int = 15) -> Path:
             dx = RNG.uniform(5, 30)
             dy = RNG.uniform(-10, 10)
             msp.add_line(
-                (x, y), (x + dx, y + dy),
+                (x, y),
+                (x + dx, y + dy),
                 dxfattribs={"layer": "STRUCTURAL"},
             )
         elif kind == "polyline":
             n_pts = RNG.randint(3, 6)
             pts = [(x + j * RNG.uniform(3, 8), y + RNG.uniform(-5, 5)) for j in range(n_pts)]
             msp.add_lwpolyline(
-                pts, close=RNG.choice([True, False]),
+                pts,
+                close=RNG.choice([True, False]),
                 dxfattribs={"layer": "STRUCTURAL"},
             )
         else:
@@ -64,7 +66,8 @@ def _random_drawing(tmp_path: Path, name: str, n_entities: int = 15) -> Path:
 
 
 def _perturb_drawing(
-    src: Path, dst: Path,
+    src: Path,
+    dst: Path,
     *,
     translate: tuple[float, float] = (0, 0),
     noise: float = 0.0,
@@ -110,7 +113,8 @@ def _perturb_drawing(
             x = RNG.uniform(200, 300)
             y = RNG.uniform(200, 300)
             msp.add_line(
-                (x, y), (x + 10, y + 10),
+                (x, y),
+                (x + 10, y + 10),
                 dxfattribs={"layer": "STRUCTURAL"},
             )
 
@@ -127,9 +131,7 @@ class TestFuzzMatchingStability:
             RNG.seed(42 + i)
             drawing = _random_drawing(tmp_path, f"identical_{i}.dxf")
             result = ENGINE.compare(drawing, drawing)
-            non_unchanged = sum(
-                v for k, v in result.summary.items() if k != "unchanged"
-            )
+            non_unchanged = sum(v for k, v in result.summary.items() if k != "unchanged")
             assert non_unchanged == 0, (
                 f"Iteration {i}: self-comparison found {non_unchanged} changes"
             )
@@ -142,7 +144,8 @@ class TestFuzzMatchingStability:
             tx = RNG.uniform(-50, 50)
             ty = RNG.uniform(-50, 50)
             revision = _perturb_drawing(
-                master, tmp_path / f"trans_r_{i}.dxf",
+                master,
+                tmp_path / f"trans_r_{i}.dxf",
                 translate=(tx, ty),
             )
             result = ENGINE.compare(master, revision)
@@ -156,7 +159,8 @@ class TestFuzzMatchingStability:
             RNG.seed(42 + i)
             master = _random_drawing(tmp_path, f"noise_m_{i}.dxf")
             revision = _perturb_drawing(
-                master, tmp_path / f"noise_r_{i}.dxf",
+                master,
+                tmp_path / f"noise_r_{i}.dxf",
                 noise=0.01,  # sub-tolerance noise
             )
             result = ENGINE.compare(master, revision)
@@ -169,7 +173,8 @@ class TestFuzzMatchingStability:
             RNG.seed(42 + i)
             master = _random_drawing(tmp_path, f"del_m_{i}.dxf")
             revision = _perturb_drawing(
-                master, tmp_path / f"del_r_{i}.dxf",
+                master,
+                tmp_path / f"del_r_{i}.dxf",
                 delete_frac=0.3,
             )
             result = ENGINE.compare(master, revision)
@@ -183,7 +188,8 @@ class TestFuzzMatchingStability:
             RNG.seed(42 + i)
             master = _random_drawing(tmp_path, f"add_m_{i}.dxf")
             revision = _perturb_drawing(
-                master, tmp_path / f"add_r_{i}.dxf",
+                master,
+                tmp_path / f"add_r_{i}.dxf",
                 add_count=5,
             )
             result = ENGINE.compare(master, revision)
@@ -203,7 +209,8 @@ class TestFuzzMatchingStability:
             tx = 5 * math.sin(rad)
             ty = 5 * (1 - math.cos(rad))
             revision = _perturb_drawing(
-                master, tmp_path / f"rot_r_{i}.dxf",
+                master,
+                tmp_path / f"rot_r_{i}.dxf",
                 translate=(tx, ty),
                 noise=0.1,
             )
@@ -217,7 +224,8 @@ class TestFuzzMatchingStability:
             RNG.seed(42 + i)
             master = _random_drawing(tmp_path, f"combo_m_{i}.dxf")
             revision = _perturb_drawing(
-                master, tmp_path / f"combo_r_{i}.dxf",
+                master,
+                tmp_path / f"combo_r_{i}.dxf",
                 translate=(RNG.uniform(-20, 20), RNG.uniform(-20, 20)),
                 noise=0.05,
                 delete_frac=0.1,

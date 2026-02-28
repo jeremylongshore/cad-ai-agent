@@ -509,9 +509,7 @@ def make_clean_revision_pair(tmp_path: Path) -> tuple[Path, Path]:
         col_blk.add_line((-1, 1), (1, -1))
 
         equip_blk = doc.blocks.new("EQUIP_PAD")
-        equip_blk.add_lwpolyline(
-            [(-2, -2), (2, -2), (2, 2), (-2, 2)], close=True
-        )
+        equip_blk.add_lwpolyline([(-2, -2), (2, -2), (2, 2), (-2, 2)], close=True)
 
         outlet_blk = doc.blocks.new("OUTLET")
         outlet_blk.add_circle((0, 0), radius=0.8)
@@ -535,9 +533,7 @@ def make_clean_revision_pair(tmp_path: Path) -> tuple[Path, Path]:
     # Column marks at all 6 intersections
     for cl, x in cols.items():
         for rl, y in rows.items():
-            msp_m.add_blockref(
-                "COLUMN_MARK", insert=(x, y), dxfattribs={"layer": "STRUCTURAL"}
-            )
+            msp_m.add_blockref("COLUMN_MARK", insert=(x, y), dxfattribs={"layer": "STRUCTURAL"})
             msp_m.add_text(
                 f"{cl}-{rl}",
                 dxfattribs={"layer": "NOTES", "height": 1.5, "insert": (x + 2, y + 2)},
@@ -561,9 +557,7 @@ def make_clean_revision_pair(tmp_path: Path) -> tuple[Path, Path]:
     )
 
     # Existing embed near A-1
-    msp_m.add_blockref(
-        "EQUIP_PAD", insert=(5, 5), dxfattribs={"layer": "STRUCTURAL"}
-    )
+    msp_m.add_blockref("EQUIP_PAD", insert=(5, 5), dxfattribs={"layer": "STRUCTURAL"})
 
     # Title (protected)
     msp_m.add_text(
@@ -624,14 +618,10 @@ def make_clean_revision_pair(tmp_path: Path) -> tuple[Path, Path]:
     )
 
     # Existing embed (unchanged)
-    msp_r.add_blockref(
-        "EQUIP_PAD", insert=(5, 5), dxfattribs={"layer": "STRUCTURAL"}
-    )
+    msp_r.add_blockref("EQUIP_PAD", insert=(5, 5), dxfattribs={"layer": "STRUCTURAL"})
 
     # NEW: added OUTLET embed
-    msp_r.add_blockref(
-        "OUTLET", insert=(45, 15), dxfattribs={"layer": "STRUCTURAL"}
-    )
+    msp_r.add_blockref("OUTLET", insert=(45, 15), dxfattribs={"layer": "STRUCTURAL"})
 
     # Title (unchanged, protected)
     msp_r.add_text(
@@ -664,7 +654,7 @@ def make_partial_revision_pair(tmp_path: Path) -> tuple[Path, Path]:
     for i, (x, y) in enumerate(positions):
         msp_m.add_line((x, y), (x, 20), dxfattribs={"layer": "STRUCTURAL"})
         msp_m.add_text(
-            f"COL-{i+1}",
+            f"COL-{i + 1}",
             dxfattribs={"layer": "NOTES", "height": 1.5, "insert": (x + 2, y + 2)},
         )
     doc_m.saveas(str(master))
@@ -677,14 +667,10 @@ def make_partial_revision_pair(tmp_path: Path) -> tuple[Path, Path]:
 
     # COL-1 unchanged
     msp_r.add_line((0, 0), (0, 20), dxfattribs={"layer": "STRUCTURAL"})
-    msp_r.add_text(
-        "COL-1", dxfattribs={"layer": "NOTES", "height": 1.5, "insert": (2, 2)}
-    )
+    msp_r.add_text("COL-1", dxfattribs={"layer": "NOTES", "height": 1.5, "insert": (2, 2)})
     # COL-2 moved east
     msp_r.add_line((35, 0), (35, 20), dxfattribs={"layer": "STRUCTURAL"})
-    msp_r.add_text(
-        "COL-2", dxfattribs={"layer": "NOTES", "height": 1.5, "insert": (37, 2)}
-    )
+    msp_r.add_text("COL-2", dxfattribs={"layer": "NOTES", "height": 1.5, "insert": (37, 2)})
     # COL-3 and COL-4 intentionally absent (outside revision extents)
     doc_r.saveas(str(revision))
 
@@ -714,9 +700,7 @@ def make_unit_mismatch_pair(tmp_path: Path) -> tuple[Path, Path]:
         dxfattribs={"layer": "STRUCTURAL"},
     )
     msp_m.add_line((0, 0), (10, 8), dxfattribs={"layer": "STRUCTURAL"})
-    msp_m.add_text(
-        "Room A", dxfattribs={"layer": "NOTES", "height": 1.0, "insert": (3, 4)}
-    )
+    msp_m.add_text("Room A", dxfattribs={"layer": "NOTES", "height": 1.0, "insert": (3, 4)})
     doc_m.saveas(str(master))
 
     # Revision: millimeters (INSUNITS=4), same geometry scaled
@@ -854,12 +838,8 @@ def make_block_attrib_pair(tmp_path: Path) -> tuple[Path, Path]:
         {"pos": (50, 0), "TAG": "DOOR-3", "ROOM": "103", "SIZE": "30"},
     ]
     for d in doors_m:
-        ref = msp_m.add_blockref(
-            "DOOR", insert=d["pos"], dxfattribs={"layer": "STRUCTURAL"}
-        )
-        ref.add_auto_attribs(
-            {"TAG": d["TAG"], "ROOM": d["ROOM"], "SIZE": d["SIZE"]}
-        )
+        ref = msp_m.add_blockref("DOOR", insert=d["pos"], dxfattribs={"layer": "STRUCTURAL"})
+        ref.add_auto_attribs({"TAG": d["TAG"], "ROOM": d["ROOM"], "SIZE": d["SIZE"]})
     doc_m.saveas(str(master))
 
     # Revision: DOOR-2 room/size changed, DOOR-3 gets extra attrib
@@ -890,9 +870,7 @@ def make_block_attrib_pair(tmp_path: Path) -> tuple[Path, Path]:
         },
     ]
     for d in doors_r:
-        ref = msp_r.add_blockref(
-            "DOOR", insert=d["pos"], dxfattribs={"layer": "STRUCTURAL"}
-        )
+        ref = msp_r.add_blockref("DOOR", insert=d["pos"], dxfattribs={"layer": "STRUCTURAL"})
         ref.add_auto_attribs(d["attribs"])
     doc_r.saveas(str(revision))
 
