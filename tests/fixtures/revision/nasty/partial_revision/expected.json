@@ -1,0 +1,97 @@
+{
+  "summary": {
+    "added": 2,
+    "removed": 6,
+    "modified": 0,
+    "moved": 0,
+    "unchanged": 2
+  },
+  "change_count": 10,
+  "changes": [
+    {
+      "category": "added",
+      "entity_type": "TEXT",
+      "layer": "NOTES",
+      "confidence": 1.0,
+      "match_method": null,
+      "point_count": 1,
+      "text_content": "COL-2"
+    },
+    {
+      "category": "added",
+      "entity_type": "LINE",
+      "layer": "STRUCTURAL",
+      "confidence": 1.0,
+      "match_method": null,
+      "point_count": 2
+    },
+    {
+      "category": "removed",
+      "entity_type": "TEXT",
+      "layer": "NOTES",
+      "confidence": 1.0,
+      "match_method": null,
+      "point_count": 1,
+      "text_content": "COL-2"
+    },
+    {
+      "category": "removed",
+      "entity_type": "TEXT",
+      "layer": "NOTES",
+      "confidence": 1.0,
+      "match_method": null,
+      "point_count": 1,
+      "text_content": "COL-3"
+    },
+    {
+      "category": "removed",
+      "entity_type": "TEXT",
+      "layer": "NOTES",
+      "confidence": 1.0,
+      "match_method": null,
+      "point_count": 1,
+      "text_content": "COL-4"
+    },
+    {
+      "category": "removed",
+      "entity_type": "LINE",
+      "layer": "STRUCTURAL",
+      "confidence": 1.0,
+      "match_method": null,
+      "point_count": 2
+    },
+    {
+      "category": "removed",
+      "entity_type": "LINE",
+      "layer": "STRUCTURAL",
+      "confidence": 1.0,
+      "match_method": null,
+      "point_count": 2
+    },
+    {
+      "category": "removed",
+      "entity_type": "LINE",
+      "layer": "STRUCTURAL",
+      "confidence": 1.0,
+      "match_method": null,
+      "point_count": 2
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "TEXT",
+      "layer": "NOTES",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 1,
+      "text_content": "COL-1"
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "LINE",
+      "layer": "STRUCTURAL",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 2
+    }
+  ]
+}

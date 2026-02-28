@@ -1,0 +1,62 @@
+{
+  "summary": {
+    "added": 3,
+    "removed": 3,
+    "modified": 0,
+    "moved": 0,
+    "unchanged": 0
+  },
+  "change_count": 6,
+  "changes": [
+    {
+      "category": "added",
+      "entity_type": "TEXT",
+      "layer": "NOTES",
+      "confidence": 1.0,
+      "match_method": null,
+      "point_count": 1,
+      "text_content": "Room A"
+    },
+    {
+      "category": "added",
+      "entity_type": "LINE",
+      "layer": "STRUCTURAL",
+      "confidence": 1.0,
+      "match_method": null,
+      "point_count": 2
+    },
+    {
+      "category": "added",
+      "entity_type": "LWPOLYLINE",
+      "layer": "STRUCTURAL",
+      "confidence": 1.0,
+      "match_method": null,
+      "point_count": 4
+    },
+    {
+      "category": "removed",
+      "entity_type": "TEXT",
+      "layer": "NOTES",
+      "confidence": 1.0,
+      "match_method": null,
+      "point_count": 1,
+      "text_content": "Room A"
+    },
+    {
+      "category": "removed",
+      "entity_type": "LINE",
+      "layer": "STRUCTURAL",
+      "confidence": 1.0,
+      "match_method": null,
+      "point_count": 2
+    },
+    {
+      "category": "removed",
+      "entity_type": "LWPOLYLINE",
+      "layer": "STRUCTURAL",
+      "confidence": 1.0,
+      "match_method": null,
+      "point_count": 4
+    }
+  ]
+}

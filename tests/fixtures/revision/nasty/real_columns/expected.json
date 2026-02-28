@@ -1,0 +1,476 @@
+{
+  "summary": {
+    "added": 1,
+    "removed": 1,
+    "modified": 3,
+    "moved": 0,
+    "unchanged": 48
+  },
+  "change_count": 53,
+  "changes": [
+    {
+      "category": "added",
+      "entity_type": "LWPOLYLINE",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": null,
+      "point_count": 4
+    },
+    {
+      "category": "modified",
+      "entity_type": "MTEXT",
+      "layer": "0",
+      "confidence": 0.9318,
+      "match_method": "spatial",
+      "modifications": {
+        "text_content": {
+          "from": "Line 1\\PLine 2\\PLine 3\\PLine 4\\PLine 5",
+          "to": "Line 1\\PLine 2\\PLine 3\\PLine 4\\PLine 5 [mod]"
+        }
+      },
+      "point_count": 1,
+      "text_content": "Line 1\\PLine 2\\PLine 3\\PLine 4\\PLine 5"
+    },
+    {
+      "category": "modified",
+      "entity_type": "MTEXT",
+      "layer": "0",
+      "confidence": 0.9318,
+      "match_method": "spatial",
+      "modifications": {
+        "text_content": {
+          "from": "Line 1\\PLine 2\\PLine 3\\PLine 4\\PLine 5",
+          "to": "Line 1\\PLine 2\\PLine 3\\PLine 4\\PLine 5 [mod]"
+        }
+      },
+      "point_count": 1,
+      "text_content": "Line 1\\PLine 2\\PLine 3\\PLine 4\\PLine 5"
+    },
+    {
+      "category": "modified",
+      "entity_type": "MTEXT",
+      "layer": "0",
+      "confidence": 0.7692,
+      "match_method": "spatial",
+      "modifications": {
+        "text_content": {
+          "from": "DEFAULT",
+          "to": "DEFAULT [mod]"
+        }
+      },
+      "point_count": 1,
+      "text_content": "DEFAULT"
+    },
+    {
+      "category": "removed",
+      "entity_type": "LWPOLYLINE",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": null,
+      "point_count": 4
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "LWPOLYLINE",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 4
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "LWPOLYLINE",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 4
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "LWPOLYLINE",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 4
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "LWPOLYLINE",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 4
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "LWPOLYLINE",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 4
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "LWPOLYLINE",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 4
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "LWPOLYLINE",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 4
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "LWPOLYLINE",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 4
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "LWPOLYLINE",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 4
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "LWPOLYLINE",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 4
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "LWPOLYLINE",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 4
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "LWPOLYLINE",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 4
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "LWPOLYLINE",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 4
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "LWPOLYLINE",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 4
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "LWPOLYLINE",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 4
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "LWPOLYLINE",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 4
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "LWPOLYLINE",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 4
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "LWPOLYLINE",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 4
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "LWPOLYLINE",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 4
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "LWPOLYLINE",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 4
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "LWPOLYLINE",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 4
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "LWPOLYLINE",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 4
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "LWPOLYLINE",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 4
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "LWPOLYLINE",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 4
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "LWPOLYLINE",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 4
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "LWPOLYLINE",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 4
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "LWPOLYLINE",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 4
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "LWPOLYLINE",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 4
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "LWPOLYLINE",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 4
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "MTEXT",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 1,
+      "text_content": "DYNAMIC COLUMNS WITH MANUAL HEIGHT"
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "MTEXT",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 1,
+      "text_content": "Line 1\\PLine 2\\PLine 3\\PLine 4\\PLine 5"
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "MTEXT",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 1,
+      "text_content": "DYNAMIC COLUMNS WITH AUTO HEIGHT AND LARGER SPACE BETWEEN COLUMNS"
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "MTEXT",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 1,
+      "text_content": "LongestLineEver1\\PLongestLineEver2"
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "MTEXT",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 1,
+      "text_content": "DYNAMIC COLUMNS WITH AUTO HEIGHT AND OVERLAPPING TEXT"
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "MTEXT",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 1,
+      "text_content": "NO COLUMNS"
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "MTEXT",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 1,
+      "text_content": "Line 1\\PLine 2\\PLine 3\\PLine 4\\PLine 5"
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "MTEXT",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 1,
+      "text_content": "Line 1\\PLine 2\\PLine 3\\PLine 4\\PLine 5\\PLine 6\\PLine 7\\PLine 8\\PLine 9"
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "MTEXT",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 1,
+      "text_content": "DYNAMIC COLUMNS WITH AUTO HEIGHT"
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "MTEXT",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 1,
+      "text_content": "Line 1\\PLine 2\\PLine 3\\PLine 4"
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "MTEXT",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 1,
+      "text_content": "STATIC COLUMNS\\P(3 COLUMNS)"
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "MTEXT",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 1,
+      "text_content": "Line 1\\PLine 2\\PLine 3\\PLine 4\\PLine 5\\PLine 6"
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "MTEXT",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 1,
+      "text_content": "DYNAMIC COLUMNS WITH AUTO HEIGHT AND DIFFERENT COLUMN HEIGHTS"
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "MTEXT",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 1,
+      "text_content": "Line 1\\NLine 2\\PLine 3\\PLine 4"
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "MTEXT",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 1,
+      "text_content": "STATIC COLUMNS\\P(3 COLUMNS) with column breaks"
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "MTEXT",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 1,
+      "text_content": "Line 1\\PLine 2\\N\\PLine 3\\PLine 4"
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "MTEXT",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 1,
+      "text_content": "Line 1\\PLine 2\\N\\N\\N\\PLine 3\\N\\PLine 4"
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "MTEXT",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 1,
+      "text_content": "Line 1\\PLine 2\\NLine 3\\PLine 4\\PLine 5\\NLine 6"
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "MTEXT",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 1,
+      "text_content": "DYNAMIC COLUMNS WITH AUTO HEIGHT AND DIFFERENT COLUMN HEIGHTS with column breaks"
+    }
+  ]
+}

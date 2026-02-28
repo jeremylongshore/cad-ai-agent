@@ -1,0 +1,82 @@
+{
+  "summary": {
+    "added": 4,
+    "removed": 4,
+    "modified": 0,
+    "moved": 0,
+    "unchanged": 0
+  },
+  "change_count": 8,
+  "changes": [
+    {
+      "category": "added",
+      "entity_type": "INSERT",
+      "layer": "GRID",
+      "confidence": 1.0,
+      "match_method": null,
+      "point_count": 1,
+      "block_name": "COL"
+    },
+    {
+      "category": "added",
+      "entity_type": "INSERT",
+      "layer": "GRID",
+      "confidence": 1.0,
+      "match_method": null,
+      "point_count": 1,
+      "block_name": "COL"
+    },
+    {
+      "category": "added",
+      "entity_type": "INSERT",
+      "layer": "GRID",
+      "confidence": 1.0,
+      "match_method": null,
+      "point_count": 1,
+      "block_name": "COL"
+    },
+    {
+      "category": "added",
+      "entity_type": "LWPOLYLINE",
+      "layer": "STRUCTURAL",
+      "confidence": 1.0,
+      "match_method": null,
+      "point_count": 6
+    },
+    {
+      "category": "removed",
+      "entity_type": "INSERT",
+      "layer": "GRID",
+      "confidence": 1.0,
+      "match_method": null,
+      "point_count": 1,
+      "block_name": "COL"
+    },
+    {
+      "category": "removed",
+      "entity_type": "INSERT",
+      "layer": "GRID",
+      "confidence": 1.0,
+      "match_method": null,
+      "point_count": 1,
+      "block_name": "COL"
+    },
+    {
+      "category": "removed",
+      "entity_type": "INSERT",
+      "layer": "GRID",
+      "confidence": 1.0,
+      "match_method": null,
+      "point_count": 1,
+      "block_name": "COL"
+    },
+    {
+      "category": "removed",
+      "entity_type": "LWPOLYLINE",
+      "layer": "STRUCTURAL",
+      "confidence": 1.0,
+      "match_method": null,
+      "point_count": 6
+    }
+  ]
+}

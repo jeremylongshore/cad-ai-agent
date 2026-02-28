@@ -1,0 +1,245 @@
+{
+  "summary": {
+    "added": 2,
+    "removed": 1,
+    "modified": 1,
+    "moved": 0,
+    "unchanged": 22
+  },
+  "change_count": 26,
+  "changes": [
+    {
+      "category": "added",
+      "entity_type": "INSERT",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": null,
+      "point_count": 1,
+      "block_name": "arrows_lv1"
+    },
+    {
+      "category": "added",
+      "entity_type": "LINE",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": null,
+      "point_count": 2
+    },
+    {
+      "category": "modified",
+      "entity_type": "TEXT",
+      "layer": "0",
+      "confidence": 0.8696,
+      "match_method": "spatial",
+      "modifications": {
+        "text_content": {
+          "from": "scale = (1, 1, 1)",
+          "to": "scale = (1, 1, 1) (REV)"
+        }
+      },
+      "point_count": 1,
+      "text_content": "scale = (1, 1, 1)"
+    },
+    {
+      "category": "removed",
+      "entity_type": "INSERT",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": null,
+      "point_count": 1,
+      "block_name": "arrows_lv1"
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "INSERT",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 1,
+      "block_name": "arrows_lv1"
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "INSERT",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 1,
+      "block_name": "arrows_lv1"
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "INSERT",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 1,
+      "block_name": "arrows_lv1"
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "INSERT",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 1,
+      "block_name": "arrows_lv1"
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "INSERT",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 1,
+      "block_name": "arrows_lv1"
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "LWPOLYLINE",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 4
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "LWPOLYLINE",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 4
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "LWPOLYLINE",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 4
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "LWPOLYLINE",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 4
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "LWPOLYLINE",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 4
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "LWPOLYLINE",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 4
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "TEXT",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 1,
+      "text_content": "rotation = 0"
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "TEXT",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 1,
+      "text_content": "scale = (-1, 1, 1)"
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "TEXT",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 1,
+      "text_content": "rotation = 0"
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "TEXT",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 1,
+      "text_content": "scale = (1, -1, 1)"
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "TEXT",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 1,
+      "text_content": "rotation = 0"
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "TEXT",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 1,
+      "text_content": "scale = (1, 1, 1)"
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "TEXT",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 1,
+      "text_content": "rotation = 90"
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "TEXT",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 1,
+      "text_content": "scale = (-1, 1, 1)"
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "TEXT",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 1,
+      "text_content": "rotation = 90"
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "TEXT",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 1,
+      "text_content": "scale = (1, -1, 1)"
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "TEXT",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 1,
+      "text_content": "rotation = 90"
+    }
+  ]
+}
