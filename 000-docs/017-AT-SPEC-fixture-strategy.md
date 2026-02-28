@@ -10,18 +10,33 @@
 
 ## Purpose
 
-This document specifies how test fixtures are created, what they contain, where they live, and what determinism guarantees they provide. All DXF fixtures are generated programmatically at test time — no binary DXF files are committed to the repository.
+This document specifies how test fixtures are created, what they contain, where they live, and what determinism guarantees they provide.
+
+**Two fixture strategies coexist:**
+
+1. **Programmatic (unit/integration tests)** — DXF files generated in-process via `ezdxf.new()`, saved to `tmp_path`, never committed. Used for unit tests, integration tests, and property/fuzz tests.
+2. **Committed static (revision golden tests)** — Pre-generated DXF pairs committed to `tests/fixtures/revision/`. Required for golden-file regression testing where the comparison result must be deterministic across runs and diffable in review. See `tests/fixtures/revision/README.md` for the clean/nasty taxonomy.
 
 ---
 
 ## Fixture Creation Approach
 
-### Programmatic generation
+### Strategy 1: Programmatic generation (unit/integration)
 
-All DXF fixtures are created in-process using `ezdxf.new()`. This avoids:
+Most DXF fixtures are created in-process using `ezdxf.new()`. This avoids:
 - Binary files in version control (DXF files are opaque to git diff)
 - Stale fixtures that drift from the schema specification
 - Platform-specific line ending issues
+
+### Strategy 2: Committed static DXFs (revision golden tests)
+
+Revision pipeline golden tests require committed DXF pairs (`master.dxf` + `revision.dxf`) alongside `expected.json` golden files. These are committed because:
+- Golden files (`expected.json`) must diff cleanly in PRs
+- The master/revision pairs must be identical across CI runs (no regeneration variance)
+- Real-world DXF files (seeded from MIT-licensed sources) cannot be recreated programmatically
+- The `UPDATE_GOLDENS=1` workflow requires stable input files
+
+Static fixtures live in `tests/fixtures/revision/` with clean/nasty taxonomy. Factory functions in `tests/helpers/comparison_factory.py` generate the synthetic pairs; real-world-seeded pairs are created once and committed.
 
 ### DXF version
 
@@ -116,10 +131,13 @@ Returns a default `RuleConfig()` with factory defaults:
 | `sample_dxf` | `tests/conftest.py` | Session or function (currently function) |
 | `sample_context` | `tests/conftest.py` | Function (depends on `sample_dxf`) |
 | `rule_config` | `tests/conftest.py` | Function |
+| Revision pairs | `tests/fixtures/revision/` | Static, committed |
+| DXF factories | `tests/helpers/dxf_factory.py` | Imported by tests |
+| Comparison factories | `tests/helpers/comparison_factory.py` | Imported by fixture generators |
 
-All shared fixtures live in `tests/conftest.py`. If test-specific fixtures become necessary (e.g., a DXF with only protected-layer entities, or a DXF with unsupported entity types), they should be defined in the relevant test module, not in conftest.
+All shared programmatic fixtures live in `tests/conftest.py`. Static revision fixtures live in `tests/fixtures/revision/` organized by clean/nasty taxonomy (see that directory's `README.md`).
 
-Helper functions for DXF generation (if they grow complex) may be extracted to `tests/helpers.py`, imported by both conftest and individual test modules.
+Helper functions for DXF generation live in `tests/helpers/dxf_factory.py` (general drawings) and `tests/helpers/comparison_factory.py` (master/revision pairs for the comparison pipeline).
 
 ---
 

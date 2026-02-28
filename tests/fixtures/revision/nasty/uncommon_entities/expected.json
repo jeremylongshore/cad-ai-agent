@@ -1,0 +1,552 @@
+{
+  "summary": {
+    "added": 1,
+    "removed": 1,
+    "modified": 0,
+    "moved": 0,
+    "unchanged": 63
+  },
+  "change_count": 65,
+  "changes": [
+    {
+      "category": "added",
+      "entity_type": "LINE",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": null,
+      "point_count": 2
+    },
+    {
+      "category": "removed",
+      "entity_type": "LINE",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": null,
+      "point_count": 2
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "ARC",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 1
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "CIRCLE",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 1
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "DIMENSION",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 1
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "DIMENSION",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 1
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "DIMENSION",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 1
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "DIMENSION",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 1
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "DIMENSION",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 1
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "DIMENSION",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 1
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "DIMENSION",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 1
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "DIMENSION",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 1
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "DIMENSION",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 1
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "DIMENSION",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 1
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "DIMENSION",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 1
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "DIMENSION",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 1
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "DIMENSION",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 1
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "INSERT",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 1,
+      "block_name": "DATE_BLOCK"
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "LINE",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 2
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "LINE",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 2
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "LINE",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 2
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "LINE",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 2
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "LINE",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 2
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "LINE",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 2
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "LINE",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 2
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "LINE",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 2
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "LINE",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 2
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "LINE",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 2
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "LINE",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 2
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "LINE",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 2
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "LINE",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 2
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "LINE",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 2
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "LINE",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 2
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "LINE",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 2
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "LINE",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 2
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "LINE",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 2
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "LWPOLYLINE",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 4
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "LWPOLYLINE",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 3
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "LWPOLYLINE",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 4
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "LWPOLYLINE",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 4
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "LWPOLYLINE",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 4
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "LWPOLYLINE",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 9
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "MTEXT",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 1,
+      "text_content": "POINTS"
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "MTEXT",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 1,
+      "text_content": "SPLINE"
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "MTEXT",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 1,
+      "text_content": "DIMENSION"
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "MTEXT",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 1,
+      "text_content": "CIRCLE\\PDIMENSION"
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "MTEXT",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 1,
+      "text_content": "ANGLE\\PDIMENSION"
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "MTEXT",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 1,
+      "text_content": "ARC\\PDIMENSION"
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "MTEXT",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 1,
+      "text_content": "ORDINATE\\PDIMENSION"
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "MTEXT",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 1,
+      "text_content": "LEADER"
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "MTEXT",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 1,
+      "text_content": "RAY"
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "MTEXT",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 1,
+      "text_content": "MTEXT"
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "MTEXT",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 1,
+      "text_content": "LINE1\\PLINE2\\PLINE3"
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "MTEXT",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 1,
+      "text_content": "XLINE"
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "MTEXT",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 1,
+      "text_content": "MESH"
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "MTEXT",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 1,
+      "text_content": "POLYFACE"
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "MTEXT",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 1,
+      "text_content": "SOLID"
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "MTEXT",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 1,
+      "text_content": "POLYLINE"
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "MTEXT",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 1,
+      "text_content": "BLOCK WITH\\PATTRIBUTES"
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "MTEXT",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 1,
+      "text_content": "3D SOLID"
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "MTEXT",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 1,
+      "text_content": "POLYLINE WITH BULGE"
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "POLYLINE",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 8
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "POLYLINE",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 11
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "SOLID",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 4
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "SPLINE",
+      "layer": "0",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 14
+    }
+  ]
+}

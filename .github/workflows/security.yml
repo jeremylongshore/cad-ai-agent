@@ -36,9 +36,11 @@ jobs:
       - name: Run pip-audit
         run: pip-audit
 
-  dependency-review:
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-    steps:
-      - uses: actions/checkout@v6
-      - uses: actions/dependency-review-action@v4
+  # dependency-review requires GitHub Advanced Security (paid for private repos).
+  # Re-enable if repo goes public or plan is upgraded.
+  # dependency-review:
+  #   runs-on: ubuntu-latest
+  #   if: github.event_name == 'pull_request'
+  #   steps:
+  #     - uses: actions/checkout@v6
+  #     - uses: actions/dependency-review-action@v4

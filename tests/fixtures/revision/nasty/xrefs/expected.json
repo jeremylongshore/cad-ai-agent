@@ -1,0 +1,63 @@
+{
+  "summary": {
+    "added": 1,
+    "removed": 0,
+    "modified": 0,
+    "moved": 0,
+    "unchanged": 5
+  },
+  "change_count": 6,
+  "changes": [
+    {
+      "category": "added",
+      "entity_type": "INSERT",
+      "layer": "XREF",
+      "confidence": 1.0,
+      "match_method": null,
+      "point_count": 1,
+      "block_name": "MECH_REF"
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "TEXT",
+      "layer": "NOTES",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 1,
+      "text_content": "Main Floor"
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "LINE",
+      "layer": "STRUCTURAL",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 2
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "LINE",
+      "layer": "STRUCTURAL",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 2
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "LWPOLYLINE",
+      "layer": "STRUCTURAL",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 4
+    },
+    {
+      "category": "unchanged",
+      "entity_type": "INSERT",
+      "layer": "XREF",
+      "confidence": 1.0,
+      "match_method": "fingerprint",
+      "point_count": 1,
+      "block_name": "GRID_REF"
+    }
+  ]
+}
