@@ -84,6 +84,20 @@ class TestAlignCommand:
         assert args.confidence == 0.8
         assert args.max_residual == 2.0
 
+    def test_align_control_points_flag(self, parser):
+        args = parser.parse_args(
+            ["align", "m.dxf", "r.dxf", "--control-points", "0,0:5,3", "100,0:105,3"]
+        )
+        assert args.control_points == ["0,0:5,3", "100,0:105,3"]
+
+    def test_align_control_points_none_by_default(self, parser):
+        args = parser.parse_args(["align", "m.dxf", "r.dxf"])
+        assert args.control_points is None
+
+    def test_diff_control_points_flag(self, parser):
+        args = parser.parse_args(["diff", "m.dxf", "r.dxf", "--control-points", "0,0:5,3"])
+        assert args.control_points == ["0,0:5,3"]
+
 
 class TestDryRunCommand:
     def test_basic_dry_run(self, parser):

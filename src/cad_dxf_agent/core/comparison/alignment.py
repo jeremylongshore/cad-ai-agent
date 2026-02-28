@@ -538,6 +538,57 @@ def try_feature_alignment(
 
 
 # ---------------------------------------------------------------------------
+# Manual alignment from user-supplied control points
+# ---------------------------------------------------------------------------
+
+
+def try_manual_alignment(
+    master_snaps: list[GeometrySnapshot],
+    revision_snaps: list[GeometrySnapshot],
+    config: AlignmentConfig,
+) -> AlignmentResult:
+    """Compute alignment from user-supplied control point pairs.
+
+    Args:
+        master_snaps: Canonical snapshots from master DXF.
+        revision_snaps: Canonical snapshots from revision DXF.
+        config: Alignment configuration (must have control_points set).
+
+    Returns:
+        AlignmentResult with method=manual. Always returns a result
+        (user points are trusted); confidence reflects geometric quality.
+    """
+    assert config.control_points is not None
+    pairs = config.control_points
+
+    m_pts = np.array([mp for mp, _rp in pairs])
+    r_pts = np.array([rp for _mp, rp in pairs])
+
+    if len(pairs) == 1:
+        # Pure translation: t = master_pt - revision_pt, R = I
+        R = np.eye(2)
+        t = m_pts[0] - r_pts[0]
+    else:
+        # 2+ points: rigid transform via Kabsch
+        R, t = _kabsch(m_pts, r_pts)
+
+    rot_deg = _rotation_to_degrees(R)
+    rc = r_pts.mean(axis=0)
+
+    diag = score_alignment(m_pts, r_pts, R, t, master_snaps, revision_snaps, config.max_residual)
+    confidence = compute_confidence(diag, config.max_residual)
+
+    return AlignmentResult(
+        method=AlignmentMethod.manual,
+        confidence=confidence,
+        translation=(float(t[0]), float(t[1])),
+        rotation_deg=round(rot_deg, 6),
+        rotation_center=(float(rc[0]), float(rc[1])),
+        diagnostics=diag,
+    )
+
+
+# ---------------------------------------------------------------------------
 # Ladder orchestrator
 # ---------------------------------------------------------------------------
 
@@ -576,6 +627,22 @@ def align_drawings(
     """
     with tracer.start_as_current_span("cad.compare.align_drawings") as span:
         attempts: list[AlignmentAttempt] = []
+
+        # Manual control points take priority over the automatic ladder
+        if config.control_points:
+            logger.info("Alignment: using %d manual control points", len(config.control_points))
+            manual_result = try_manual_alignment(master_snaps, revision_snaps, config)
+            attempts.append(
+                AlignmentAttempt(
+                    method="manual",
+                    success=True,
+                    confidence=manual_result.confidence,
+                )
+            )
+            manual_result.diagnostics.attempts = attempts
+            span.set_attribute("cad.align.method", "manual")
+            span.set_attribute("cad.align.confidence", manual_result.confidence)
+            return manual_result
 
         for method_name, method_fn in _LADDER_STEPS:
             logger.info("Alignment: trying %s", method_name)

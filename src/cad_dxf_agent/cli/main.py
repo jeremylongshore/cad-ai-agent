@@ -28,6 +28,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_diff.add_argument(
         "--tolerance", type=float, default=1.0, help="Coordinate tolerance (default: 1.0)"
     )
+    _add_control_points_arg(p_diff)
 
     # hidden alias: compare
     p_compare = sub.add_parser("compare")
@@ -46,6 +47,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_align.add_argument(
         "--max-residual", type=float, default=5.0, help="Max RMS residual (default: 5.0)"
     )
+    _add_control_points_arg(p_align)
 
     # --- dry-run ---
     p_dryrun = sub.add_parser("dry-run", help="Show proposed ops without applying")
@@ -78,6 +80,16 @@ def _add_input_args(parser: argparse.ArgumentParser) -> None:
     """Add the shared master/revision positional arguments."""
     parser.add_argument("master", help="Path to master (original) DXF file")
     parser.add_argument("revision", help="Path to revision (modified) DXF file")
+
+
+def _add_control_points_arg(parser: argparse.ArgumentParser) -> None:
+    """Add the --control-points flag for manual alignment."""
+    parser.add_argument(
+        "--control-points",
+        nargs="*",
+        metavar="MX,MY:RX,RY",
+        help='Manual alignment control point pairs, format: "mx,my:rx,ry"',
+    )
 
 
 def main(argv: list[str] | None = None) -> int:

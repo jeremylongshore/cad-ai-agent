@@ -42,6 +42,14 @@ class AlignmentConfig(BaseModel):
         default_factory=lambda: ["GRID*", "COLUMN*", "AXIS*"],
         description="Layer name glob patterns to search for anchor blocks",
     )
+    control_points: list[tuple[tuple[float, float], tuple[float, float]]] | None = Field(
+        default=None,
+        description=(
+            "User-supplied control point pairs for manual alignment. "
+            "Each entry is (master_xy, revision_xy). "
+            "1 point = translation only, 2+ = rigid via Kabsch."
+        ),
+    )
 
 
 class AlignmentAttempt(BaseModel):
