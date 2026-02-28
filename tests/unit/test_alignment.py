@@ -206,7 +206,7 @@ class TestKabsch:
         R_true = np.array([[math.cos(angle), -math.sin(angle)], [math.sin(angle), math.cos(angle)]])
         t_true = np.array([10, -5])
         master = np.array([[0, 0], [20, 0], [0, 20], [20, 20]], dtype=float)
-        revision = ((np.linalg.inv(R_true) @ (master - t_true).T).T)
+        revision = (np.linalg.inv(R_true) @ (master - t_true).T).T
         R_found, t_found = _kabsch(master, revision)
         aligned = (R_found @ revision.T).T + t_found
         np.testing.assert_allclose(aligned, master, atol=1e-10)
@@ -419,9 +419,7 @@ class TestFeatureAlignment:
 
     def test_ransac_with_outliers(self):
         """RANSAC should be robust to outlier matches."""
-        master = np.array(
-            [[0, 0], [10, 0], [0, 10], [10, 10], [5, 5], [999, 999]], dtype=float
-        )
+        master = np.array([[0, 0], [10, 0], [0, 10], [10, 10], [5, 5], [999, 999]], dtype=float)
         offset = np.array([2, 3])
         revision = master.copy() - offset
         # Add outlier: last point is garbage

@@ -26,9 +26,7 @@ class AlignmentMethod(StrEnum):
 class AlignmentConfig(BaseModel):
     """Configuration for the alignment step."""
 
-    enabled: bool = Field(
-        default=False, description="Enable automatic alignment before matching"
-    )
+    enabled: bool = Field(default=False, description="Enable automatic alignment before matching")
     confidence_threshold: float = Field(
         default=0.7,
         ge=0.0,
@@ -51,27 +49,19 @@ class AlignmentAttempt(BaseModel):
 
     method: str = Field(description="Alignment method tried")
     success: bool = Field(description="Whether the method met confidence threshold")
-    confidence: float = Field(
-        default=0.0, ge=0.0, le=1.0, description="Confidence achieved"
-    )
+    confidence: float = Field(default=0.0, ge=0.0, le=1.0, description="Confidence achieved")
 
 
 class AlignmentDiagnostics(BaseModel):
     """Detailed diagnostics from an alignment attempt."""
 
-    rms_residual: float = Field(
-        default=0.0, description="RMS residual after alignment"
-    )
+    rms_residual: float = Field(default=0.0, description="RMS residual after alignment")
     overlap_ratio: float = Field(
         default=0.0,
         description="Fraction of master entities with nearby revision (0-1)",
     )
-    match_count: int = Field(
-        default=0, description="Point pairs used to compute transform"
-    )
-    inlier_count: int = Field(
-        default=0, description="Number of inlier pairs (within tolerance)"
-    )
+    match_count: int = Field(default=0, description="Point pairs used to compute transform")
+    inlier_count: int = Field(default=0, description="Number of inlier pairs (within tolerance)")
     attempts: list[AlignmentAttempt] = Field(
         default_factory=list,
         description="Log of each ladder step: method, success, confidence",

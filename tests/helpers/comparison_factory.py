@@ -181,9 +181,7 @@ def make_empty_vs_populated(tmp_path: Path) -> tuple[Path, Path]:
     return master, revision
 
 
-def make_offset_pair(
-    tmp_path: Path, dx: float = 5.0, dy: float = 3.0
-) -> tuple[Path, Path]:
+def make_offset_pair(tmp_path: Path, dx: float = 5.0, dy: float = 3.0) -> tuple[Path, Path]:
     """Revision is uniformly translated by (dx, dy) — all entities shifted.
 
     Tests translation-only alignment. Both files have the same entities
@@ -317,9 +315,7 @@ def make_rotated_pair(
     return master, revision
 
 
-def make_anchor_pair(
-    tmp_path: Path, dx: float = 10.0, dy: float = -5.0
-) -> tuple[Path, Path]:
+def make_anchor_pair(tmp_path: Path, dx: float = 10.0, dy: float = -5.0) -> tuple[Path, Path]:
     """Like make_offset_pair but ONLY has INSERT anchor blocks on GRID layer.
 
     Tests anchor alignment specifically with no structural geometry.

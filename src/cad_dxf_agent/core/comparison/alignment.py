@@ -42,9 +42,7 @@ _INLIER_WEIGHT = 0.3
 # ---------------------------------------------------------------------------
 
 
-def _kabsch(
-    master_pts: np.ndarray, revision_pts: np.ndarray
-) -> tuple[np.ndarray, np.ndarray]:
+def _kabsch(master_pts: np.ndarray, revision_pts: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """Compute optimal rigid transform (R, t) aligning revision to master.
 
     Minimizes sum of ||master[i] - (R @ revision[i] + t)||^2.
@@ -90,9 +88,7 @@ def _rotation_to_degrees(R: np.ndarray) -> float:
     return float(math.degrees(math.atan2(R[1, 0], R[0, 0])))
 
 
-def _transform_point(
-    point: Point2D, R: np.ndarray, t: np.ndarray
-) -> Point2D:
+def _transform_point(point: Point2D, R: np.ndarray, t: np.ndarray) -> Point2D:
     """Apply rigid transform to a single point."""
     p = np.array([point.x, point.y])
     tp = R @ p + t
@@ -190,9 +186,7 @@ def score_alignment(
     )
 
 
-def compute_confidence(
-    diagnostics: AlignmentDiagnostics, max_residual: float
-) -> float:
+def compute_confidence(diagnostics: AlignmentDiagnostics, max_residual: float) -> float:
     """Combine diagnostics into a single confidence score (0-1).
 
     Heuristic: weighted average of overlap ratio, residual quality,
@@ -201,9 +195,7 @@ def compute_confidence(
     if diagnostics.match_count == 0:
         return 0.0
     # Residual score: 1.0 when rms=0, 0.0 when rms >= max_residual
-    residual_score = max(
-        0.0, 1.0 - diagnostics.rms_residual / max_residual
-    )
+    residual_score = max(0.0, 1.0 - diagnostics.rms_residual / max_residual)
     inlier_ratio = diagnostics.inlier_count / diagnostics.match_count
     confidence = (
         _OVERLAP_WEIGHT * diagnostics.overlap_ratio
@@ -231,14 +223,10 @@ def _try_identity(
     if not master_snaps or not revision_snaps:
         return None
 
-    m_pts = np.array(
-        [[s.centroid.x, s.centroid.y] for s in master_snaps]
-    )
+    m_pts = np.array([[s.centroid.x, s.centroid.y] for s in master_snaps])
 
     # Quick check: are centroid clouds roughly the same?
-    overlap = _overlap_ratio(
-        master_snaps, revision_snaps, R, t, tolerance
-    )
+    overlap = _overlap_ratio(master_snaps, revision_snaps, R, t, tolerance)
     if overlap < config.confidence_threshold:
         return None
 
@@ -286,10 +274,7 @@ def _find_anchor_pairs(
             return False
         if not patterns:
             return True
-        return any(
-            fnmatch.fnmatch(snap.layer.upper(), p.upper())
-            for p in patterns
-        )
+        return any(fnmatch.fnmatch(snap.layer.upper(), p.upper()) for p in patterns)
 
     master_inserts = [s for s in master_snaps if _is_anchor(s)]
     revision_inserts = [s for s in revision_snaps if _is_anchor(s)]
@@ -349,8 +334,13 @@ def try_anchor_alignment(
 
     R, t = _kabsch(m_pts, r_pts)
     diag = score_alignment(
-        m_pts, r_pts, R, t,
-        master_snaps, revision_snaps, config.max_residual,
+        m_pts,
+        r_pts,
+        R,
+        t,
+        master_snaps,
+        revision_snaps,
+        config.max_residual,
     )
     confidence = compute_confidence(diag, config.max_residual)
 
@@ -521,8 +511,13 @@ def try_feature_alignment(
 
     R, t, _inlier_mask = result
     diag = score_alignment(
-        m_matched, r_matched, R, t,
-        master_snaps, revision_snaps, config.max_residual,
+        m_matched,
+        r_matched,
+        R,
+        t,
+        master_snaps,
+        revision_snaps,
+        config.max_residual,
     )
     confidence = compute_confidence(diag, config.max_residual)
 
@@ -579,27 +574,25 @@ def align_drawings(
         AlignmentResult (always — check confidence and guidance
         for failures).
     """
-    with tracer.start_as_current_span(
-        "cad.compare.align_drawings"
-    ) as span:
+    with tracer.start_as_current_span("cad.compare.align_drawings") as span:
         attempts: list[AlignmentAttempt] = []
 
         for method_name, method_fn in _LADDER_STEPS:
             logger.info("Alignment: trying %s", method_name)
             result = method_fn(master_snaps, revision_snaps, config)
 
-            attempts.append(AlignmentAttempt(
-                method=method_name,
-                success=result is not None,
-                confidence=result.confidence if result else 0.0,
-            ))
+            attempts.append(
+                AlignmentAttempt(
+                    method=method_name,
+                    success=result is not None,
+                    confidence=result.confidence if result else 0.0,
+                )
+            )
 
             if result is not None:
                 result.diagnostics.attempts = attempts
                 span.set_attribute("cad.align.method", method_name)
-                span.set_attribute(
-                    "cad.align.confidence", result.confidence
-                )
+                span.set_attribute("cad.align.confidence", result.confidence)
                 logger.info(
                     "Alignment: %s accepted (confidence=%.4f)",
                     method_name,
