@@ -14,6 +14,7 @@ from .diff_overlay import write_diff_overlay
 from .engine import ComparisonEngine
 from .geometry import extract_snapshots
 from .matcher import match_entities
+from .scorer import score_match
 
 __all__ = [
     "ChangeLog",
@@ -27,6 +28,7 @@ __all__ = [
     "extract_snapshots",
     "generate_changelog",
     "match_entities",
+    "score_match",
     "sort_changes",
     "sort_snapshots",
     "write_diff_overlay",
