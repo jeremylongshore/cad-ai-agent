@@ -70,9 +70,7 @@ def export_bundle(
     updated_doc.saveas(str(updated_path))
 
     # Delegate overlay + changelog to ComparisonEngine
-    outputs = _engine.generate_outputs(
-        master_path, revision_path, comparison_result, output_dir
-    )
+    outputs = _engine.generate_outputs(master_path, revision_path, comparison_result, output_dir)
     overlay_path_str = str(outputs.diff_overlay_path) if outputs.diff_overlay_path else None
 
     # Write apply result
