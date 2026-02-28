@@ -181,3 +181,81 @@ class TestComplexClassification:
         for cat in ChangeCategory:
             expected = sum(1 for c in result.changes if c.category == cat)
             assert result.summary[cat.value] == expected
+
+
+class TestConfidencePropagation:
+    """Tests that confidence and match_method flow from ScoredMatch to EntityChange."""
+
+    def test_fingerprint_match_propagates_confidence(self, tmp_path):
+        master, revision = make_identical_pair(tmp_path)
+        m_snaps = extract_snapshots(master)
+        r_snaps = extract_snapshots(revision)
+        mr = match_entities(m_snaps, r_snaps)
+        result = classify_changes(mr)
+        for change in result.changes:
+            assert change.confidence == 1.0
+            assert change.match_method == MatchMethod.fingerprint
+
+    def test_spatial_match_propagates_method(self, tmp_path):
+        master, revision = make_moved_entity_pair(tmp_path, dx=0.1, dy=0.1)
+        m_snaps = extract_snapshots(master)
+        r_snaps = extract_snapshots(revision)
+        config = ComparisonConfig(tolerance=1.0)
+        mr = match_entities(m_snaps, r_snaps, config)
+        result = classify_changes(mr, config)
+        spatial = [c for c in result.changes if c.match_method == MatchMethod.spatial]
+        if spatial:
+            for c in spatial:
+                assert 0.0 < c.confidence <= 1.0
+
+    def test_added_has_no_match_method(self, tmp_path):
+        master, revision = make_added_removed_pair(tmp_path)
+        m_snaps = extract_snapshots(master)
+        r_snaps = extract_snapshots(revision)
+        mr = match_entities(m_snaps, r_snaps)
+        result = classify_changes(mr)
+        added = [c for c in result.changes if c.category == ChangeCategory.ADDED]
+        for a in added:
+            assert a.match_method is None
+            assert a.confidence == 1.0
+
+    def test_removed_has_no_match_method(self, tmp_path):
+        master, revision = make_added_removed_pair(tmp_path)
+        m_snaps = extract_snapshots(master)
+        r_snaps = extract_snapshots(revision)
+        mr = match_entities(m_snaps, r_snaps)
+        result = classify_changes(mr)
+        removed = [c for c in result.changes if c.category == ChangeCategory.REMOVED]
+        for r in removed:
+            assert r.match_method is None
+            assert r.confidence == 1.0
+
+    def test_manual_scored_match_confidence_propagates(self):
+        """Directly constructed ScoredMatch confidence flows to EntityChange."""
+        m_snap = GeometrySnapshot(
+            handle="A",
+            entity_type=EntityType.LINE,
+            layer="S",
+            points=[Point2D(x=0, y=0), Point2D(x=10, y=0)],
+        )
+        r_snap = GeometrySnapshot(
+            handle="B",
+            entity_type=EntityType.LINE,
+            layer="S",
+            points=[Point2D(x=0, y=0), Point2D(x=10, y=0)],
+        )
+        mr = MatchResult(
+            pairs=[
+                ScoredMatch(
+                    master=m_snap,
+                    revision=r_snap,
+                    confidence=0.75,
+                    method=MatchMethod.spatial,
+                    runner_up_score=0.68,
+                    ambiguous=True,
+                )
+            ]
+        )
+        result = classify_changes(mr)
+        assert result.changes[0].confidence == 0.75
+        assert result.changes[0].match_method == MatchMethod.spatial

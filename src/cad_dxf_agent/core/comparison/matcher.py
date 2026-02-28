@@ -147,10 +147,9 @@ def _scored_matching(
     # Each entry: (score, master_idx, revision_idx)
     scored_candidates: list[tuple[float, int, int]] = []
 
-    # Index revision snaps for lookup
-    rev_index: dict[str, int] = {}
+    # Index revision snaps for lookup by object identity
+    rev_index: dict[int, int] = {}
     for ri, r_snap in enumerate(revision_snaps):
-        # Use handle as unique key within revision set
         rev_index[id(r_snap)] = ri
 
     for mi, m_snap in enumerate(master_snaps):

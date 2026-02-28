@@ -11,9 +11,7 @@ from ...models.comparison_schema import (
     ComparisonResult,
     EntityChange,
     GeometrySnapshot,
-    MatchMethod,
     MatchResult,
-    ScoredMatch,
 )
 from ...otel import get_tracer
 

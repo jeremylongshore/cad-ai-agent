@@ -278,9 +278,18 @@ class TestScoreMatch:
         """Every score function returns values in [0, 1]."""
         pts = [Point2D(x=0, y=0), Point2D(x=10, y=0)]
         cases = [
-            (_snap(entity_type=EntityType.LINE, points=pts), _snap(entity_type=EntityType.LINE, points=pts)),
-            (_snap(entity_type=EntityType.INSERT, block_name="A"), _snap(entity_type=EntityType.INSERT, block_name="B")),
-            (_snap(entity_type=EntityType.TEXT, text_content="X"), _snap(entity_type=EntityType.TEXT, text_content="Y")),
+            (
+                _snap(entity_type=EntityType.LINE, points=pts),
+                _snap(entity_type=EntityType.LINE, points=pts),
+            ),
+            (
+                _snap(entity_type=EntityType.INSERT, block_name="A"),
+                _snap(entity_type=EntityType.INSERT, block_name="B"),
+            ),
+            (
+                _snap(entity_type=EntityType.TEXT, text_content="X"),
+                _snap(entity_type=EntityType.TEXT, text_content="Y"),
+            ),
         ]
         for m, r in cases:
             score = score_match(m, r, tolerance=10.0)
