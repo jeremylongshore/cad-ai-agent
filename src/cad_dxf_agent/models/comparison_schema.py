@@ -9,6 +9,85 @@ from pydantic import BaseModel, Field, computed_field
 
 from .cad_schema import EntityType, Point2D
 
+# --- Alignment schemas ---
+
+
+class AlignmentMethod(StrEnum):
+    """How two drawings were aligned."""
+
+    identity = "identity"
+    translation = "translation"
+    rigid = "rigid"
+    anchor = "anchor"
+    feature = "feature"
+    manual = "manual"
+
+
+class AlignmentConfig(BaseModel):
+    """Configuration for the alignment step."""
+
+    enabled: bool = Field(default=False, description="Enable automatic alignment before matching")
+    confidence_threshold: float = Field(
+        default=0.7,
+        ge=0.0,
+        le=1.0,
+        description="Minimum confidence to accept an alignment (0-1)",
+    )
+    max_residual: float = Field(
+        default=1.0,
+        gt=0.0,
+        description="Maximum RMS residual to accept alignment (drawing units)",
+    )
+    anchor_layer_patterns: list[str] = Field(
+        default_factory=lambda: ["GRID*", "COLUMN*", "AXIS*"],
+        description="Layer name glob patterns to search for anchor blocks",
+    )
+
+
+class AlignmentAttempt(BaseModel):
+    """Record of a single alignment ladder step."""
+
+    method: str = Field(description="Alignment method tried")
+    success: bool = Field(description="Whether the method met confidence threshold")
+    confidence: float = Field(default=0.0, ge=0.0, le=1.0, description="Confidence achieved")
+
+
+class AlignmentDiagnostics(BaseModel):
+    """Detailed diagnostics from an alignment attempt."""
+
+    rms_residual: float = Field(default=0.0, description="RMS residual after alignment")
+    overlap_ratio: float = Field(
+        default=0.0,
+        description="Fraction of master entities with nearby revision (0-1)",
+    )
+    match_count: int = Field(default=0, description="Point pairs used to compute transform")
+    inlier_count: int = Field(default=0, description="Number of inlier pairs (within tolerance)")
+    attempts: list[AlignmentAttempt] = Field(
+        default_factory=list,
+        description="Log of each ladder step: method, success, confidence",
+    )
+
+
+class AlignmentResult(BaseModel):
+    """Output of the alignment step."""
+
+    method: AlignmentMethod = Field(description="Method that produced this alignment")
+    confidence: float = Field(ge=0.0, le=1.0, description="Overall alignment confidence (0-1)")
+    translation: tuple[float, float] = Field(
+        default=(0.0, 0.0), description="Translation (tx, ty) applied to revision"
+    )
+    rotation_deg: float = Field(
+        default=0.0, description="Rotation in degrees applied to revision (CCW positive)"
+    )
+    rotation_center: tuple[float, float] = Field(
+        default=(0.0, 0.0), description="Center of rotation"
+    )
+    diagnostics: AlignmentDiagnostics = Field(default_factory=AlignmentDiagnostics)
+    guidance: str | None = Field(
+        default=None,
+        description="Human-readable guidance when alignment fails or has low confidence",
+    )
+
 
 class GeometrySnapshot(BaseModel):
     """Full geometry capture of one entity from a DXF file."""
@@ -55,6 +134,10 @@ class ComparisonConfig(BaseModel):
     use_canonical: bool = Field(
         default=False,
         description="Enable canonical model: stable IDs, deterministic ordering, quantized points",
+    )
+    alignment: AlignmentConfig = Field(
+        default_factory=AlignmentConfig,
+        description="Alignment configuration (disabled by default)",
     )
 
 
@@ -115,6 +198,9 @@ class ComparisonResult(BaseModel):
         }
     )
     config: ComparisonConfig = Field(default_factory=ComparisonConfig)
+    alignment_result: AlignmentResult | None = Field(
+        default=None, description="Alignment result, if alignment was enabled"
+    )
 
     @property
     def total_changes(self) -> int:

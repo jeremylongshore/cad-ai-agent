@@ -1,5 +1,6 @@
 """DXF comparison engine — deterministic geometry diff between master and revision."""
 
+from .alignment import align_drawings, apply_alignment
 from .canonical import (
     assign_stable_ids,
     compute_signature,
@@ -17,6 +18,8 @@ from .matcher import match_entities
 __all__ = [
     "ChangeLog",
     "ComparisonEngine",
+    "align_drawings",
+    "apply_alignment",
     "assign_stable_ids",
     "classify_changes",
     "compute_signature",
