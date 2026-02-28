@@ -527,9 +527,9 @@ def make_clean_revision_pair(tmp_path: Path) -> tuple[Path, Path]:
     doc_m, msp_m = _setup_doc()
 
     # Grid lines
-    for label, x in cols.items():
+    for _label, x in cols.items():
         msp_m.add_line((x, -5), (x, rows["2"] + 5), dxfattribs={"layer": "GRID"})
-    for label, y in rows.items():
+    for _label, y in rows.items():
         msp_m.add_line((-5, y), (cols["C"] + 5, y), dxfattribs={"layer": "GRID"})
 
     # Column marks at all 6 intersections
@@ -577,9 +577,9 @@ def make_clean_revision_pair(tmp_path: Path) -> tuple[Path, Path]:
     doc_r, msp_r = _setup_doc()
 
     # Same grid lines
-    for label, x in cols.items():
+    for _label, x in cols.items():
         msp_r.add_line((x, -5), (x, rows["2"] + 5), dxfattribs={"layer": "GRID"})
-    for label, y in rows.items():
+    for _label, y in rows.items():
         msp_r.add_line((-5, y), (cols["C"] + 5, y), dxfattribs={"layer": "GRID"})
 
     # Column marks — C-2 moved 5 units east
