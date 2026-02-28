@@ -478,6 +478,172 @@ def make_ambiguous_pair(tmp_path: Path) -> tuple[Path, Path]:
     return master, revision
 
 
+def make_clean_revision_pair(tmp_path: Path) -> tuple[Path, Path]:
+    """Realistic structural revision: moved column, modified wall, added embed.
+
+    Master: 3x2 column grid with walls (polylines) and a COLUMN_MARK block
+    at each intersection.  One EQUIP_PAD embed near A-1.
+
+    Revision changes:
+      1. Column at C-2 moved 5 units east (INSERT repositioned)
+      2. Wall between A-1 → B-1 modified (bump-out added to polyline)
+      3. New OUTLET block inserted at (45, 15) — added embed
+    """
+    master = tmp_path / "master.dxf"
+    revision = tmp_path / "revision.dxf"
+    spacing = 30.0
+
+    # --- shared helpers ---
+    def _setup_doc() -> tuple[Any, Any]:
+        doc = ezdxf.new(dxfversion="R2018")
+        msp = doc.modelspace()
+        doc.layers.add("STRUCTURAL", color=1)
+        doc.layers.add("GRID", color=7)
+        doc.layers.add("NOTES", color=3)
+        doc.layers.add("TITLE", color=7)
+
+        # Block definitions
+        col_blk = doc.blocks.new("COLUMN_MARK")
+        col_blk.add_circle((0, 0), radius=1.5)
+        col_blk.add_line((-1, -1), (1, 1))
+        col_blk.add_line((-1, 1), (1, -1))
+
+        equip_blk = doc.blocks.new("EQUIP_PAD")
+        equip_blk.add_lwpolyline(
+            [(-2, -2), (2, -2), (2, 2), (-2, 2)], close=True
+        )
+
+        outlet_blk = doc.blocks.new("OUTLET")
+        outlet_blk.add_circle((0, 0), radius=0.8)
+        outlet_blk.add_line((0, -0.8), (0, 0.8))
+
+        return doc, msp
+
+    # Grid positions: A=0, B=30, C=60  x  1=0, 2=30
+    cols = {"A": 0.0, "B": spacing, "C": 2 * spacing}
+    rows = {"1": 0.0, "2": spacing}
+
+    # === MASTER ===
+    doc_m, msp_m = _setup_doc()
+
+    # Grid lines
+    for label, x in cols.items():
+        msp_m.add_line((x, -5), (x, rows["2"] + 5), dxfattribs={"layer": "GRID"})
+    for label, y in rows.items():
+        msp_m.add_line((-5, y), (cols["C"] + 5, y), dxfattribs={"layer": "GRID"})
+
+    # Column marks at all 6 intersections
+    for cl, x in cols.items():
+        for rl, y in rows.items():
+            msp_m.add_blockref(
+                "COLUMN_MARK", insert=(x, y), dxfattribs={"layer": "STRUCTURAL"}
+            )
+            msp_m.add_text(
+                f"{cl}-{rl}",
+                dxfattribs={"layer": "NOTES", "height": 1.5, "insert": (x + 2, y + 2)},
+            )
+
+    # Walls as polylines
+    # Wall A-1 → B-1 (bottom, straight)
+    msp_m.add_lwpolyline(
+        [(cols["A"], rows["1"]), (cols["B"], rows["1"])],
+        dxfattribs={"layer": "STRUCTURAL"},
+    )
+    # Wall B-1 → C-1 (bottom)
+    msp_m.add_lwpolyline(
+        [(cols["B"], rows["1"]), (cols["C"], rows["1"])],
+        dxfattribs={"layer": "STRUCTURAL"},
+    )
+    # Wall A-1 → A-2 (left)
+    msp_m.add_lwpolyline(
+        [(cols["A"], rows["1"]), (cols["A"], rows["2"])],
+        dxfattribs={"layer": "STRUCTURAL"},
+    )
+
+    # Existing embed near A-1
+    msp_m.add_blockref(
+        "EQUIP_PAD", insert=(5, 5), dxfattribs={"layer": "STRUCTURAL"}
+    )
+
+    # Title (protected)
+    msp_m.add_text(
+        "FLOOR PLAN - LEVEL 1",
+        dxfattribs={"layer": "TITLE", "height": 3.0, "insert": (0, -15)},
+    )
+
+    doc_m.saveas(str(master))
+
+    # === REVISION ===
+    doc_r, msp_r = _setup_doc()
+
+    # Same grid lines
+    for label, x in cols.items():
+        msp_r.add_line((x, -5), (x, rows["2"] + 5), dxfattribs={"layer": "GRID"})
+    for label, y in rows.items():
+        msp_r.add_line((-5, y), (cols["C"] + 5, y), dxfattribs={"layer": "GRID"})
+
+    # Column marks — C-2 moved 5 units east
+    for cl, x in cols.items():
+        for rl, y in rows.items():
+            insert_x = x + 5.0 if (cl == "C" and rl == "2") else x
+            msp_r.add_blockref(
+                "COLUMN_MARK",
+                insert=(insert_x, y),
+                dxfattribs={"layer": "STRUCTURAL"},
+            )
+            msp_r.add_text(
+                f"{cl}-{rl}",
+                dxfattribs={
+                    "layer": "NOTES",
+                    "height": 1.5,
+                    "insert": (insert_x + 2, y + 2),
+                },
+            )
+
+    # Wall A-1 → B-1 MODIFIED: bump-out (extra vertices)
+    msp_r.add_lwpolyline(
+        [
+            (cols["A"], rows["1"]),
+            (10, rows["1"]),
+            (10, rows["1"] + 5),  # bump out
+            (20, rows["1"] + 5),  # bump out
+            (20, rows["1"]),
+            (cols["B"], rows["1"]),
+        ],
+        dxfattribs={"layer": "STRUCTURAL"},
+    )
+    # Wall B-1 → C-1 (unchanged)
+    msp_r.add_lwpolyline(
+        [(cols["B"], rows["1"]), (cols["C"], rows["1"])],
+        dxfattribs={"layer": "STRUCTURAL"},
+    )
+    # Wall A-1 → A-2 (unchanged)
+    msp_r.add_lwpolyline(
+        [(cols["A"], rows["1"]), (cols["A"], rows["2"])],
+        dxfattribs={"layer": "STRUCTURAL"},
+    )
+
+    # Existing embed (unchanged)
+    msp_r.add_blockref(
+        "EQUIP_PAD", insert=(5, 5), dxfattribs={"layer": "STRUCTURAL"}
+    )
+
+    # NEW: added OUTLET embed
+    msp_r.add_blockref(
+        "OUTLET", insert=(45, 15), dxfattribs={"layer": "STRUCTURAL"}
+    )
+
+    # Title (unchanged, protected)
+    msp_r.add_text(
+        "FLOOR PLAN - LEVEL 1",
+        dxfattribs={"layer": "TITLE", "height": 3.0, "insert": (0, -15)},
+    )
+
+    doc_r.saveas(str(revision))
+
+    return master, revision
+
+
 def _build_base(path: Path) -> Path:
     """Build a small DXF with reproducible entities."""
     doc = ezdxf.new(dxfversion="R2018")
