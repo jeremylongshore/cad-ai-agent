@@ -11,7 +11,9 @@ from ...models.comparison_schema import (
     ComparisonResult,
     EntityChange,
     GeometrySnapshot,
+    MatchMethod,
     MatchResult,
+    ScoredMatch,
 )
 from ...otel import get_tracer
 
@@ -36,8 +38,14 @@ def classify_changes(
         changes: list[EntityChange] = []
 
         # Classify matched pairs
-        for m_snap, r_snap in match_result.pairs:
-            change = _classify_pair(m_snap, r_snap, config)
+        for scored in match_result.pairs:
+            change = _classify_pair(scored.master, scored.revision, config)
+            change = change.model_copy(
+                update={
+                    "confidence": scored.confidence,
+                    "match_method": scored.method,
+                }
+            )
             changes.append(change)
 
         # Unmatched master → REMOVED

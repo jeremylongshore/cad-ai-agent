@@ -10,7 +10,9 @@ from cad_dxf_agent.models.comparison_schema import (
     ChangeCategory,
     ComparisonConfig,
     GeometrySnapshot,
+    MatchMethod,
     MatchResult,
+    ScoredMatch,
 )
 from tests.helpers.comparison_factory import (
     make_added_removed_pair,
@@ -69,7 +71,16 @@ class TestMovedClassification:
             layer="S",
             points=[Point2D(x=0.01, y=0.01), Point2D(x=10.01, y=0.01)],
         )
-        mr = MatchResult(pairs=[(m_snap, r_snap)])
+        mr = MatchResult(
+            pairs=[
+                ScoredMatch(
+                    master=m_snap,
+                    revision=r_snap,
+                    confidence=1.0,
+                    method=MatchMethod.fingerprint,
+                )
+            ]
+        )
         config = ComparisonConfig(tolerance=0.25, move_threshold=0.25)
         result = classify_changes(mr, config)
         assert result.changes[0].category == ChangeCategory.UNCHANGED

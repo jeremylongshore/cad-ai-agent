@@ -10,7 +10,9 @@ from cad_dxf_agent.models.comparison_schema import (
     DiffOverlayLayers,
     EntityChange,
     GeometrySnapshot,
+    MatchMethod,
     MatchResult,
+    ScoredMatch,
 )
 
 
@@ -242,7 +244,16 @@ class TestMatchResult:
             layer="S",
             points=[Point2D(x=0, y=0)],
         )
-        mr = MatchResult(pairs=[(s1, s2)])
+        mr = MatchResult(
+            pairs=[
+                ScoredMatch(
+                    master=s1,
+                    revision=s2,
+                    confidence=1.0,
+                    method=MatchMethod.fingerprint,
+                )
+            ]
+        )
         assert len(mr.pairs) == 1
 
 

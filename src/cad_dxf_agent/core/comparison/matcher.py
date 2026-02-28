@@ -10,7 +10,9 @@ from ...models.cad_schema import Point2D
 from ...models.comparison_schema import (
     ComparisonConfig,
     GeometrySnapshot,
+    MatchMethod,
     MatchResult,
+    ScoredMatch,
 )
 from ...otel import get_tracer
 
@@ -41,7 +43,7 @@ def match_entities(
 
         config = config or ComparisonConfig()
 
-        pairs: list[tuple[GeometrySnapshot, GeometrySnapshot]] = []
+        pairs: list[ScoredMatch] = []
 
         # --- Step 1: Fingerprint hash matching ---
         revision_by_fp: dict[str, list[GeometrySnapshot]] = defaultdict(list)
@@ -58,7 +60,14 @@ def match_entities(
                 r_snap = candidates.pop(0)
                 if not candidates:
                     del revision_by_fp[fp]
-                pairs.append((m_snap, r_snap))
+                pairs.append(
+                    ScoredMatch(
+                        master=m_snap,
+                        revision=r_snap,
+                        confidence=1.0,
+                        method=MatchMethod.fingerprint,
+                    )
+                )
             else:
                 unmatched_master.append(m_snap)
 
@@ -118,7 +127,7 @@ def _greedy_nearest_neighbor(
     revision_snaps: list[GeometrySnapshot],
     tolerance: float,
 ) -> tuple[
-    list[tuple[GeometrySnapshot, GeometrySnapshot]],
+    list[ScoredMatch],
     list[GeometrySnapshot],
     list[GeometrySnapshot],
 ]:
@@ -129,7 +138,7 @@ def _greedy_nearest_neighbor(
     Returns:
         (pairs, remaining_master, remaining_revision)
     """
-    pairs: list[tuple[GeometrySnapshot, GeometrySnapshot]] = []
+    pairs: list[ScoredMatch] = []
 
     # Group by (entity_type, layer)
     master_groups: dict[tuple[str, str], list[GeometrySnapshot]] = defaultdict(list)
@@ -172,12 +181,12 @@ def _match_group(
     r_list: list[GeometrySnapshot],
     tolerance: float,
 ) -> tuple[
-    list[tuple[GeometrySnapshot, GeometrySnapshot]],
+    list[ScoredMatch],
     list[GeometrySnapshot],
     list[GeometrySnapshot],
 ]:
     """Match entities within a single (type, layer) group by centroid distance."""
-    pairs: list[tuple[GeometrySnapshot, GeometrySnapshot]] = []
+    pairs: list[ScoredMatch] = []
 
     # Build distance candidates
     candidates: list[tuple[float, int, int]] = []
@@ -193,10 +202,40 @@ def _match_group(
     matched_m: set[int] = set()
     matched_r: set[int] = set()
 
-    for _dist, mi, ri in candidates:
+    # Track best and runner-up distances per master index
+    best_by_master: dict[int, list[float]] = defaultdict(list)
+    for dist, mi, _ri in candidates:
+        best_by_master[mi].append(dist)
+
+    for dist, mi, ri in candidates:
         if mi in matched_m or ri in matched_r:
             continue
-        pairs.append((m_list[mi], r_list[ri]))
+
+        # Compute spatial confidence: 1 - dist/tolerance
+        confidence = max(0.0, 1.0 - dist / tolerance) if tolerance > 0 else 1.0
+
+        # Find runner-up score for this master
+        runner_up_score: float | None = None
+        dists = best_by_master[mi]
+        if len(dists) > 1:
+            # Runner-up is the second-best distance
+            runner_up_dist = dists[1] if dists[0] == dist else dists[0]
+            runner_up_score = max(0.0, 1.0 - runner_up_dist / tolerance) if tolerance > 0 else 1.0
+
+        ambiguous = False
+        if runner_up_score is not None:
+            ambiguous = (confidence - runner_up_score) < 0.1
+
+        pairs.append(
+            ScoredMatch(
+                master=m_list[mi],
+                revision=r_list[ri],
+                confidence=confidence,
+                method=MatchMethod.spatial,
+                runner_up_score=runner_up_score,
+                ambiguous=ambiguous,
+            )
+        )
         matched_m.add(mi)
         matched_r.add(ri)
 
