@@ -644,6 +644,320 @@ def make_clean_revision_pair(tmp_path: Path) -> tuple[Path, Path]:
     return master, revision
 
 
+def make_partial_revision_pair(tmp_path: Path) -> tuple[Path, Path]:
+    """Revision cloud covers only part of the drawing.
+
+    Master: 4 columns spread across a wide area (x=0..120).
+    Revision: only the left half (x=0..60) is re-drawn with one column moved.
+    Entities in the right half (x=90, x=120) are absent from the revision —
+    the pipeline must NOT classify them as removed.
+    """
+    master = tmp_path / "master.dxf"
+    revision = tmp_path / "revision.dxf"
+
+    doc_m = ezdxf.new(dxfversion="R2018")
+    msp_m = doc_m.modelspace()
+    doc_m.layers.add("STRUCTURAL", color=1)
+    doc_m.layers.add("NOTES", color=3)
+
+    positions = [(0, 0), (30, 0), (90, 0), (120, 0)]
+    for i, (x, y) in enumerate(positions):
+        msp_m.add_line((x, y), (x, 20), dxfattribs={"layer": "STRUCTURAL"})
+        msp_m.add_text(
+            f"COL-{i+1}",
+            dxfattribs={"layer": "NOTES", "height": 1.5, "insert": (x + 2, y + 2)},
+        )
+    doc_m.saveas(str(master))
+
+    # Revision: only left half present, COL-2 moved 5 east
+    doc_r = ezdxf.new(dxfversion="R2018")
+    msp_r = doc_r.modelspace()
+    doc_r.layers.add("STRUCTURAL", color=1)
+    doc_r.layers.add("NOTES", color=3)
+
+    # COL-1 unchanged
+    msp_r.add_line((0, 0), (0, 20), dxfattribs={"layer": "STRUCTURAL"})
+    msp_r.add_text(
+        "COL-1", dxfattribs={"layer": "NOTES", "height": 1.5, "insert": (2, 2)}
+    )
+    # COL-2 moved east
+    msp_r.add_line((35, 0), (35, 20), dxfattribs={"layer": "STRUCTURAL"})
+    msp_r.add_text(
+        "COL-2", dxfattribs={"layer": "NOTES", "height": 1.5, "insert": (37, 2)}
+    )
+    # COL-3 and COL-4 intentionally absent (outside revision extents)
+    doc_r.saveas(str(revision))
+
+    return master, revision
+
+
+def make_unit_mismatch_pair(tmp_path: Path) -> tuple[Path, Path]:
+    """Master in inches, revision in millimeters (25.4x scale factor).
+
+    Master: rectangle 10x8 inches at origin.
+    Revision: same rectangle but coordinates are in mm (254x203.2).
+    The pipeline should detect these are the same geometry at different scales.
+    """
+    master = tmp_path / "master.dxf"
+    revision = tmp_path / "revision.dxf"
+
+    # Master: inches (INSUNITS=1)
+    doc_m = ezdxf.new(dxfversion="R2018")
+    doc_m.header["$INSUNITS"] = 1  # inches
+    msp_m = doc_m.modelspace()
+    doc_m.layers.add("STRUCTURAL", color=1)
+    doc_m.layers.add("NOTES", color=3)
+
+    msp_m.add_lwpolyline(
+        [(0, 0), (10, 0), (10, 8), (0, 8)],
+        close=True,
+        dxfattribs={"layer": "STRUCTURAL"},
+    )
+    msp_m.add_line((0, 0), (10, 8), dxfattribs={"layer": "STRUCTURAL"})
+    msp_m.add_text(
+        "Room A", dxfattribs={"layer": "NOTES", "height": 1.0, "insert": (3, 4)}
+    )
+    doc_m.saveas(str(master))
+
+    # Revision: millimeters (INSUNITS=4), same geometry scaled
+    scale = 25.4
+    doc_r = ezdxf.new(dxfversion="R2018")
+    doc_r.header["$INSUNITS"] = 4  # millimeters
+    msp_r = doc_r.modelspace()
+    doc_r.layers.add("STRUCTURAL", color=1)
+    doc_r.layers.add("NOTES", color=3)
+
+    msp_r.add_lwpolyline(
+        [
+            (0 * scale, 0 * scale),
+            (10 * scale, 0 * scale),
+            (10 * scale, 8 * scale),
+            (0 * scale, 8 * scale),
+        ],
+        close=True,
+        dxfattribs={"layer": "STRUCTURAL"},
+    )
+    msp_r.add_line(
+        (0 * scale, 0 * scale),
+        (10 * scale, 8 * scale),
+        dxfattribs={"layer": "STRUCTURAL"},
+    )
+    msp_r.add_text(
+        "Room A",
+        dxfattribs={
+            "layer": "NOTES",
+            "height": 1.0 * scale,
+            "insert": (3 * scale, 4 * scale),
+        },
+    )
+    doc_r.saveas(str(revision))
+
+    return master, revision
+
+
+def make_rotation_shift_pair(
+    tmp_path: Path,
+    angle_deg: float = 12.0,
+    dx: float = 8.0,
+    dy: float = -3.0,
+) -> tuple[Path, Path]:
+    """Revision is rotated AND translated vs master.
+
+    Master: L-shaped wall + 3 columns.
+    Revision: same geometry rotated by angle_deg around centroid, then shifted
+    by (dx, dy).  One column is also genuinely moved 4 units south (real change).
+    """
+    import math as _math
+
+    master = tmp_path / "master.dxf"
+    revision = tmp_path / "revision.dxf"
+
+    cx, cy = 30.0, 15.0  # rotation center (approx centroid)
+
+    def _transform(x: float, y: float) -> tuple[float, float]:
+        rad = _math.radians(angle_deg)
+        lx, ly = x - cx, y - cy
+        rx = lx * _math.cos(rad) - ly * _math.sin(rad) + cx + dx
+        ry = lx * _math.sin(rad) + ly * _math.cos(rad) + cy + dy
+        return (round(rx, 4), round(ry, 4))
+
+    doc_m = ezdxf.new(dxfversion="R2018")
+    msp_m = doc_m.modelspace()
+    doc_m.layers.add("STRUCTURAL", color=1)
+    doc_m.layers.add("GRID", color=7)
+
+    blk = doc_m.blocks.new("COL")
+    blk.add_circle((0, 0), radius=1)
+
+    # L-shaped wall
+    wall_pts = [(0, 0), (60, 0), (60, 10), (30, 10), (30, 30), (0, 30)]
+    msp_m.add_lwpolyline(wall_pts, close=True, dxfattribs={"layer": "STRUCTURAL"})
+
+    # Columns
+    col_positions = [(10, 5), (50, 5), (15, 20)]
+    for pos in col_positions:
+        msp_m.add_blockref("COL", insert=pos, dxfattribs={"layer": "GRID"})
+    doc_m.saveas(str(master))
+
+    # Revision: transform everything, plus move one column
+    doc_r = ezdxf.new(dxfversion="R2018")
+    msp_r = doc_r.modelspace()
+    doc_r.layers.add("STRUCTURAL", color=1)
+    doc_r.layers.add("GRID", color=7)
+
+    blk_r = doc_r.blocks.new("COL")
+    blk_r.add_circle((0, 0), radius=1)
+
+    # Transformed L-wall
+    t_wall = [_transform(x, y) for x, y in wall_pts]
+    msp_r.add_lwpolyline(t_wall, close=True, dxfattribs={"layer": "STRUCTURAL"})
+
+    # Columns: first two just transformed, third moved 4 south then transformed
+    for i, (px, py) in enumerate(col_positions):
+        if i == 2:
+            # Real change: moved 4 units south before transform
+            px, py = px, py - 4
+        tx, ty = _transform(px, py)
+        msp_r.add_blockref("COL", insert=(tx, ty), dxfattribs={"layer": "GRID"})
+    doc_r.saveas(str(revision))
+
+    return master, revision
+
+
+def make_block_attrib_pair(tmp_path: Path) -> tuple[Path, Path]:
+    """Block INSERT attributes changed between master and revision.
+
+    Master: 3 door blocks with TAG/ROOM/SIZE attributes.
+    Revision: same blocks, but DOOR-2 has changed ROOM and SIZE values,
+    and DOOR-3 has a new attribute FIRE_RATING added.
+    """
+    master = tmp_path / "master.dxf"
+    revision = tmp_path / "revision.dxf"
+
+    def _make_door_block(doc: Any) -> None:
+        blk = doc.blocks.new("DOOR")
+        blk.add_line((-1, 0), (1, 0))
+        blk.add_arc((0, 0), radius=1, start_angle=0, end_angle=90)
+        blk.add_attdef("TAG", insert=(0, 1.5), dxfattribs={"height": 0.8})
+        blk.add_attdef("ROOM", insert=(0, 2.5), dxfattribs={"height": 0.6})
+        blk.add_attdef("SIZE", insert=(0, 3.5), dxfattribs={"height": 0.6})
+
+    # Master
+    doc_m = ezdxf.new(dxfversion="R2018")
+    msp_m = doc_m.modelspace()
+    doc_m.layers.add("STRUCTURAL", color=1)
+    _make_door_block(doc_m)
+
+    doors_m = [
+        {"pos": (10, 0), "TAG": "DOOR-1", "ROOM": "101", "SIZE": "36"},
+        {"pos": (30, 0), "TAG": "DOOR-2", "ROOM": "102", "SIZE": "36"},
+        {"pos": (50, 0), "TAG": "DOOR-3", "ROOM": "103", "SIZE": "30"},
+    ]
+    for d in doors_m:
+        ref = msp_m.add_blockref(
+            "DOOR", insert=d["pos"], dxfattribs={"layer": "STRUCTURAL"}
+        )
+        ref.add_auto_attribs(
+            {"TAG": d["TAG"], "ROOM": d["ROOM"], "SIZE": d["SIZE"]}
+        )
+    doc_m.saveas(str(master))
+
+    # Revision: DOOR-2 room/size changed, DOOR-3 gets extra attrib
+    doc_r = ezdxf.new(dxfversion="R2018")
+    msp_r = doc_r.modelspace()
+    doc_r.layers.add("STRUCTURAL", color=1)
+
+    # Need attdef with FIRE_RATING for DOOR-3
+    blk_r = doc_r.blocks.new("DOOR")
+    blk_r.add_line((-1, 0), (1, 0))
+    blk_r.add_arc((0, 0), radius=1, start_angle=0, end_angle=90)
+    blk_r.add_attdef("TAG", insert=(0, 1.5), dxfattribs={"height": 0.8})
+    blk_r.add_attdef("ROOM", insert=(0, 2.5), dxfattribs={"height": 0.6})
+    blk_r.add_attdef("SIZE", insert=(0, 3.5), dxfattribs={"height": 0.6})
+    blk_r.add_attdef("FIRE_RATING", insert=(0, 4.5), dxfattribs={"height": 0.6})
+
+    doors_r = [
+        {"pos": (10, 0), "attribs": {"TAG": "DOOR-1", "ROOM": "101", "SIZE": "36"}},
+        {"pos": (30, 0), "attribs": {"TAG": "DOOR-2", "ROOM": "105", "SIZE": "42"}},
+        {
+            "pos": (50, 0),
+            "attribs": {
+                "TAG": "DOOR-3",
+                "ROOM": "103",
+                "SIZE": "30",
+                "FIRE_RATING": "1HR",
+            },
+        },
+    ]
+    for d in doors_r:
+        ref = msp_r.add_blockref(
+            "DOOR", insert=d["pos"], dxfattribs={"layer": "STRUCTURAL"}
+        )
+        ref.add_auto_attribs(d["attribs"])
+    doc_r.saveas(str(revision))
+
+    return master, revision
+
+
+def make_xref_pair(tmp_path: Path) -> tuple[Path, Path]:
+    """External references present in one or both files.
+
+    Master: structural drawing that attaches an xref "GRID_REF" (simulated
+    as a block definition with XREF flag).
+    Revision: same structural content plus a second xref "MECH_REF".
+    The comparison pipeline must not confuse xref blocks with real inserts.
+    """
+    master = tmp_path / "master.dxf"
+    revision = tmp_path / "revision.dxf"
+
+    def _setup_structural(doc: Any, msp: Any) -> None:
+        doc.layers.add("STRUCTURAL", color=1)
+        doc.layers.add("NOTES", color=3)
+        doc.layers.add("XREF", color=8)
+        msp.add_line((0, 0), (50, 0), dxfattribs={"layer": "STRUCTURAL"})
+        msp.add_line((0, 0), (0, 40), dxfattribs={"layer": "STRUCTURAL"})
+        msp.add_lwpolyline(
+            [(10, 10), (40, 10), (40, 30), (10, 30)],
+            close=True,
+            dxfattribs={"layer": "STRUCTURAL"},
+        )
+        msp.add_text(
+            "Main Floor",
+            dxfattribs={"layer": "NOTES", "height": 2, "insert": (15, 20)},
+        )
+
+    # Master with one xref
+    doc_m = ezdxf.new(dxfversion="R2018")
+    msp_m = doc_m.modelspace()
+    _setup_structural(doc_m, msp_m)
+
+    # Simulate xref as a block with is_xref flag
+    xref_blk = doc_m.blocks.new("GRID_REF", base_point=(0, 0))
+    xref_blk.add_line((0, 0), (100, 0))  # placeholder geometry
+    # Mark as external reference via block flags
+    xref_blk.block.dxf.flags = 4  # BLK_XREF flag
+    msp_m.add_blockref("GRID_REF", insert=(0, 0), dxfattribs={"layer": "XREF"})
+    doc_m.saveas(str(master))
+
+    # Revision: same structural content + second xref
+    doc_r = ezdxf.new(dxfversion="R2018")
+    msp_r = doc_r.modelspace()
+    _setup_structural(doc_r, msp_r)
+
+    xref_blk1 = doc_r.blocks.new("GRID_REF", base_point=(0, 0))
+    xref_blk1.add_line((0, 0), (100, 0))
+    xref_blk1.block.dxf.flags = 4
+    msp_r.add_blockref("GRID_REF", insert=(0, 0), dxfattribs={"layer": "XREF"})
+
+    xref_blk2 = doc_r.blocks.new("MECH_REF", base_point=(0, 0))
+    xref_blk2.add_line((0, 0), (80, 0))
+    xref_blk2.block.dxf.flags = 4
+    msp_r.add_blockref("MECH_REF", insert=(0, 0), dxfattribs={"layer": "XREF"})
+    doc_r.saveas(str(revision))
+
+    return master, revision
+
+
 def _build_base(path: Path) -> Path:
     """Build a small DXF with reproducible entities."""
     doc = ezdxf.new(dxfversion="R2018")
