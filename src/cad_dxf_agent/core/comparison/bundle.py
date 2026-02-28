@@ -16,11 +16,12 @@ from ...models.comparison_schema import (
     RevisionOp,
     RunBundle,
 )
-from .changelog import generate_changelog
-from .diff_overlay import write_diff_overlay
-from .engine import ComparisonOutputs
+from .engine import ComparisonEngine, ComparisonOutputs
 
 logger = logging.getLogger(__name__)
+
+# Shared engine instance — stateless, safe to reuse.
+_engine = ComparisonEngine()
 
 
 def dry_run(
@@ -31,34 +32,9 @@ def dry_run(
 ) -> ComparisonOutputs:
     """Generate overlay + changelog without modifying the master.
 
-    Wraps ComparisonEngine.generate_outputs() logic directly.
+    Delegates to ComparisonEngine.generate_outputs() to avoid duplication.
     """
-    output_dir = Path(output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
-
-    changelog = generate_changelog(comparison_result)
-
-    changelog_json_path = output_dir / "changelog.json"
-    changelog_json_path.write_text(changelog.to_json(), encoding="utf-8")
-
-    changelog_text_path = output_dir / "changelog.txt"
-    changelog_text_path.write_text(changelog.to_text(), encoding="utf-8")
-
-    overlay_target = output_dir / "diff_overlay.dxf"
-    overlay_path: Path | None = overlay_target
-    try:
-        write_diff_overlay(master_path, comparison_result, overlay_target)
-    except Exception:
-        logger.error("Failed to generate diff overlay", exc_info=True)
-        overlay_path = None
-
-    return ComparisonOutputs(
-        result=comparison_result,
-        changelog=changelog,
-        diff_overlay_path=overlay_path,
-        master_path=Path(master_path),
-        revision_path=Path(revision_path),
-    )
+    return _engine.generate_outputs(master_path, revision_path, comparison_result, output_dir)
 
 
 def export_bundle(
@@ -93,21 +69,11 @@ def export_bundle(
     updated_path = output_dir / updated_name
     updated_doc.saveas(str(updated_path))
 
-    # Generate diff overlay
-    overlay_target = output_dir / "diff_overlay.dxf"
-    overlay_path_str: str | None = str(overlay_target)
-    try:
-        write_diff_overlay(master_path, comparison_result, overlay_target)
-    except Exception:
-        logger.error("Failed to generate diff overlay for bundle", exc_info=True)
-        overlay_path_str = None
-
-    # Generate changelog
-    changelog = generate_changelog(comparison_result)
-    changelog_json_path = output_dir / "changelog.json"
-    changelog_json_path.write_text(changelog.to_json(), encoding="utf-8")
-    changelog_text_path = output_dir / "changelog.txt"
-    changelog_text_path.write_text(changelog.to_text(), encoding="utf-8")
+    # Delegate overlay + changelog to ComparisonEngine
+    outputs = _engine.generate_outputs(
+        master_path, revision_path, comparison_result, output_dir
+    )
+    overlay_path_str = str(outputs.diff_overlay_path) if outputs.diff_overlay_path else None
 
     # Write apply result
     apply_result_path = output_dir / "apply_result.json"
@@ -127,6 +93,9 @@ def export_bundle(
     }
     metadata_path = output_dir / "run_metadata.json"
     metadata_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
+
+    changelog_json_path = output_dir / "changelog.json"
+    changelog_text_path = output_dir / "changelog.txt"
 
     return RunBundle(
         run_id=run_id,
