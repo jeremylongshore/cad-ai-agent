@@ -115,11 +115,8 @@ def score_insert(
     """
     score = 0.0
 
-    # Block name match
-    if master.block_name and revision.block_name:
-        if master.block_name == revision.block_name:
-            score += _BLOCK_NAME_WEIGHT
-    elif master.block_name is None and revision.block_name is None:
+    # Block name match (== handles None==None correctly)
+    if master.block_name == revision.block_name:
         score += _BLOCK_NAME_WEIGHT
 
     # Attribute key overlap (Jaccard similarity)
@@ -246,10 +243,10 @@ def _centroid_distance(a: Point2D, b: Point2D) -> float:
 
 def _proximity_score(a: Point2D, b: Point2D, tolerance: float) -> float:
     """1 - dist/tolerance, clamped to [0, 1]."""
-    if tolerance <= 0:
-        return 1.0
     d = _centroid_distance(a, b)
-    return max(0.0, min(1.0, 1.0 - d / tolerance))
+    if tolerance <= 1e-9:
+        return 1.0 if d < 1e-9 else 0.0
+    return max(0.0, 1.0 - d / tolerance)
 
 
 def _levenshtein_similarity(s1: str, s2: str) -> float:

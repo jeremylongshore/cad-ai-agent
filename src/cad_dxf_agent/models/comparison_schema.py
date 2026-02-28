@@ -189,9 +189,14 @@ class EntityChange(BaseModel):
             all_pts.extend(self.revision_snapshot.points)
         if not all_pts:
             return (0.0, 0.0, 0.0, 0.0)
-        xs = [p.x for p in all_pts]
-        ys = [p.y for p in all_pts]
-        return (min(xs), min(ys), max(xs), max(ys))
+        min_x, max_x = all_pts[0].x, all_pts[0].x
+        min_y, max_y = all_pts[0].y, all_pts[0].y
+        for p in all_pts[1:]:
+            min_x = min(min_x, p.x)
+            max_x = max(max_x, p.x)
+            min_y = min(min_y, p.y)
+            max_y = max(max_y, p.y)
+        return (min_x, min_y, max_x, max_y)
 
 
 class ScoredMatch(BaseModel):
