@@ -11,13 +11,17 @@ from pathlib import Path
 import pytest
 
 from cad_dxf_agent.core.comparison.engine import ComparisonEngine
+from cad_dxf_agent.models.comparison_schema import AlignmentConfig, ComparisonConfig
 from tests.helpers.comparison_factory import (
     make_added_removed_pair,
+    make_anchor_pair,
     make_circle_pair,
     make_complex_pair,
     make_identical_pair,
     make_modified_text_pair,
     make_moved_entity_pair,
+    make_offset_pair,
+    make_rotated_pair,
 )
 
 
@@ -185,6 +189,118 @@ class TestComparisonOutputs:
         assert not output_dir.exists()
         engine.generate_outputs(master, revision, result, output_dir)
         assert output_dir.exists()
+
+
+@pytest.mark.integration
+class TestAlignmentLadderIntegration:
+    """Integration tests for the alignment ladder through ComparisonEngine (cad-31i.6).
+
+    Exercises the full path: engine.compare() with alignment enabled,
+    verifying the ladder selects the right method and the alignment
+    result is attached to ComparisonResult.
+    """
+
+    def test_identical_pair_uses_identity(self, tmp_path: Path):
+        """Identical drawings → identity alignment, result attached."""
+        master, revision = make_identical_pair(tmp_path)
+        config = ComparisonConfig(
+            alignment=AlignmentConfig(enabled=True, confidence_threshold=0.5, max_residual=1.0)
+        )
+        engine = ComparisonEngine()
+        result = engine.compare(master, revision, config)
+
+        assert result.alignment_result is not None
+        assert result.alignment_result.method == "identity"
+        assert result.alignment_result.confidence > 0.5
+
+    def test_offset_pair_aligned_by_ladder(self, tmp_path: Path):
+        """Offset pair → anchor or feature alignment recovers the shift."""
+        master, revision = make_offset_pair(tmp_path, dx=15.0, dy=12.0)
+        config = ComparisonConfig(
+            alignment=AlignmentConfig(enabled=True, confidence_threshold=0.3, max_residual=5.0)
+        )
+        engine = ComparisonEngine()
+        result = engine.compare(master, revision, config)
+
+        assert result.alignment_result is not None
+        assert result.alignment_result.method in ("anchor", "feature")
+        assert result.alignment_result.confidence > 0.3
+
+    def test_anchor_pair_aligned(self, tmp_path: Path):
+        """Anchor pair with shared INSERTs → anchor alignment."""
+        master, revision = make_anchor_pair(tmp_path, dx=10.0, dy=-5.0)
+        config = ComparisonConfig(
+            alignment=AlignmentConfig(enabled=True, confidence_threshold=0.3, max_residual=20.0)
+        )
+        engine = ComparisonEngine()
+        result = engine.compare(master, revision, config)
+
+        assert result.alignment_result is not None
+        assert result.alignment_result.confidence > 0.3
+        assert len(result.alignment_result.diagnostics.attempts) >= 1
+
+    def test_rotated_pair_aligned(self, tmp_path: Path):
+        """Rotated pair → ladder finds alignment with rotation."""
+        master, revision = make_rotated_pair(tmp_path, angle_deg=10.0)
+        config = ComparisonConfig(
+            alignment=AlignmentConfig(enabled=True, confidence_threshold=0.3, max_residual=20.0)
+        )
+        engine = ComparisonEngine()
+        result = engine.compare(master, revision, config)
+
+        assert result.alignment_result is not None
+        assert result.alignment_result.confidence > 0.3
+
+    def test_manual_control_points_through_engine(self, tmp_path: Path):
+        """Control points supplied → manual alignment, ladder skipped."""
+        master, revision = make_offset_pair(tmp_path, dx=5.0, dy=3.0)
+        config = ComparisonConfig(
+            alignment=AlignmentConfig(
+                enabled=True,
+                confidence_threshold=0.3,
+                max_residual=20.0,
+                control_points=[
+                    ((0.0, 0.0), (5.0, 3.0)),
+                    ((100.0, 0.0), (105.0, 3.0)),
+                ],
+            )
+        )
+        engine = ComparisonEngine()
+        result = engine.compare(master, revision, config)
+
+        assert result.alignment_result is not None
+        assert result.alignment_result.method == "manual"
+        assert len(result.alignment_result.diagnostics.attempts) == 1
+
+    def test_ladder_failure_gives_guidance(self, tmp_path: Path):
+        """Impossible alignment → confidence 0, guidance text present."""
+        # moved_entity_pair has no anchor INSERTs, so only identity and
+        # feature steps run. A huge move with tiny max_residual ensures
+        # all ladder steps fail.
+        master, revision = make_moved_entity_pair(tmp_path, dx=9999.0, dy=9999.0)
+        config = ComparisonConfig(
+            alignment=AlignmentConfig(
+                enabled=True,
+                confidence_threshold=0.99,
+                max_residual=0.01,
+            )
+        )
+        engine = ComparisonEngine()
+        result = engine.compare(master, revision, config)
+
+        assert result.alignment_result is not None
+        assert result.alignment_result.confidence == 0.0
+        assert result.alignment_result.guidance is not None
+        assert "control point" in result.alignment_result.guidance.lower()
+
+    def test_alignment_disabled_skips_ladder(self, tmp_path: Path):
+        """alignment.enabled=False → no alignment result attached."""
+        master, revision = make_offset_pair(tmp_path, dx=5.0, dy=3.0)
+        config = ComparisonConfig(alignment=AlignmentConfig(enabled=False))
+        engine = ComparisonEngine()
+        result = engine.compare(master, revision, config)
+
+        assert result.alignment_result is None
 
 
 @pytest.mark.integration
