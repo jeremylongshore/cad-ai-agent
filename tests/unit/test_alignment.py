@@ -26,6 +26,7 @@ from cad_dxf_agent.core.comparison.alignment import (
     score_alignment,
     try_anchor_alignment,
     try_feature_alignment,
+    try_manual_alignment,
 )
 from cad_dxf_agent.core.comparison.geometry import extract_snapshots
 from cad_dxf_agent.models.cad_schema import EntityType, Point2D
@@ -668,3 +669,95 @@ class TestApplyAlignment:
         assert result[0].text_content == "Hello"
         assert result[0].stable_id == "TEXT:NOTES:abc123"
         assert result[0].entity_type == EntityType.TEXT
+
+
+# ---------------------------------------------------------------------------
+# cad-31i.5: Manual control-point alignment
+# ---------------------------------------------------------------------------
+
+
+class TestManualAlignment:
+    """Manual control-point alignment tests (cad-31i.5)."""
+
+    def test_manual_pure_translation(self):
+        """Single control point → pure translation, no rotation."""
+        m = [_make_snap(0, 0), _make_snap(10, 10)]
+        r = [_make_snap(5, 3), _make_snap(15, 13)]
+        cfg = AlignmentConfig(
+            enabled=True,
+            confidence_threshold=0.3,
+            max_residual=10.0,
+            control_points=[((0.0, 0.0), (5.0, 3.0))],
+        )
+        result = try_manual_alignment(m, r, cfg)
+        assert result.method == AlignmentMethod.manual
+        assert abs(result.translation[0] - (-5.0)) < 0.001
+        assert abs(result.translation[1] - (-3.0)) < 0.001
+        assert abs(result.rotation_deg) < 0.001
+
+    def test_manual_two_points(self):
+        """Two control points → rigid transform via Kabsch."""
+        cfg = AlignmentConfig(
+            enabled=True,
+            confidence_threshold=0.3,
+            max_residual=10.0,
+            control_points=[
+                ((0.0, 0.0), (5.0, 3.0)),
+                ((100.0, 0.0), (105.0, 3.0)),
+            ],
+        )
+        m = [_make_snap(0, 0), _make_snap(100, 0)]
+        r = [_make_snap(5, 3), _make_snap(105, 3)]
+        result = try_manual_alignment(m, r, cfg)
+        assert result.method == AlignmentMethod.manual
+        assert abs(result.translation[0] - (-5.0)) < 0.1
+        assert abs(result.translation[1] - (-3.0)) < 0.1
+
+    def test_manual_with_offset_pair(self, tmp_path):
+        """Offset DXF pair + correct control points → high confidence."""
+        master_path, rev_path = make_offset_pair(tmp_path, dx=5.0, dy=3.0)
+        m_snaps = extract_snapshots(master_path)
+        r_snaps = extract_snapshots(rev_path)
+        cfg = AlignmentConfig(
+            enabled=True,
+            confidence_threshold=0.3,
+            max_residual=20.0,
+            control_points=[
+                ((0.0, 0.0), (5.0, 3.0)),
+                ((100.0, 0.0), (105.0, 3.0)),
+            ],
+        )
+        result = try_manual_alignment(m_snaps, r_snaps, cfg)
+        assert result.method == AlignmentMethod.manual
+        assert result.confidence > 0.3
+
+    def test_manual_bypasses_ladder(self):
+        """Control points set → ladder skipped, manual method returned."""
+        m = [_make_snap(0, 0), _make_snap(10, 10)]
+        r = [_make_snap(0, 0), _make_snap(10, 10)]  # identical = identity would win
+        cfg = AlignmentConfig(
+            enabled=True,
+            confidence_threshold=0.3,
+            max_residual=10.0,
+            control_points=[((0.0, 0.0), (1.0, 1.0))],  # bogus offset
+        )
+        result = align_drawings(m, r, cfg)
+        assert result.method == AlignmentMethod.manual
+        # Only one attempt recorded (manual), not identity/anchor/feature
+        assert len(result.diagnostics.attempts) == 1
+        assert result.diagnostics.attempts[0].method == "manual"
+
+    def test_manual_bad_points_still_returns(self):
+        """Wrong control points → result still returned, low confidence."""
+        m = [_make_snap(0, 0), _make_snap(10, 10)]
+        r = [_make_snap(500, 500), _make_snap(600, 600)]
+        cfg = AlignmentConfig(
+            enabled=True,
+            confidence_threshold=0.3,
+            max_residual=1.0,
+            control_points=[((0.0, 0.0), (999.0, 999.0))],  # wrong
+        )
+        result = try_manual_alignment(m, r, cfg)
+        assert result.method == AlignmentMethod.manual
+        # Result is returned (not None) but overlap should be zero
+        assert result.diagnostics.overlap_ratio == 0.0

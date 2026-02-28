@@ -8,6 +8,7 @@ from argparse import Namespace
 import pytest
 
 from cad_dxf_agent.cli.commands import (
+    cmd_align,
     cmd_apply,
     cmd_bundle,
     cmd_diff,
@@ -17,6 +18,7 @@ from tests.helpers.comparison_factory import (
     make_complex_pair,
     make_identical_pair,
     make_moved_entity_pair,
+    make_offset_pair,
 )
 
 
@@ -107,6 +109,24 @@ class TestCmdDiff:
         )
         with pytest.raises(FileNotFoundError):
             cmd_diff(args)
+
+
+class TestCmdAlign:
+    def test_align_with_control_points(self, tmp_path, capsys):
+        master, revision = make_offset_pair(tmp_path, dx=5.0, dy=3.0)
+        args = Namespace(
+            master=str(master),
+            revision=str(revision),
+            confidence=0.3,
+            max_residual=20.0,
+            control_points=["0,0:5,3", "100,0:105,3"],
+            json=False,
+            verbose=False,
+        )
+        rc = cmd_align(args)
+        assert rc == 0
+        out = capsys.readouterr().out
+        assert "manual" in out.lower()
 
 
 class TestCmdApply:

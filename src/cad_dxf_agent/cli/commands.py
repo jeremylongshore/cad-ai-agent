@@ -19,6 +19,23 @@ from ..models.comparison_schema import AlignmentConfig, ComparisonConfig
 from . import formatters
 
 
+def _parse_control_points(
+    raw: list[str] | None,
+) -> list[tuple[tuple[float, float], tuple[float, float]]] | None:
+    """Parse --control-points strings like '0,0:5,3' into typed tuples."""
+    if not raw:
+        return None
+    pairs: list[tuple[tuple[float, float], tuple[float, float]]] = []
+    for token in raw:
+        master_str, _, rev_str = token.partition(":")
+        if not rev_str:
+            raise ValueError(f"Invalid control point format (expected mx,my:rx,ry): {token!r}")
+        mx, my = (float(v) for v in master_str.split(","))
+        rx, ry = (float(v) for v in rev_str.split(","))
+        pairs.append(((mx, my), (rx, ry)))
+    return pairs
+
+
 def _validate_inputs(master: str, revision: str) -> tuple[Path, Path]:
     """Validate that both input files exist, raising FileNotFoundError if not."""
     mp = Path(master)
@@ -37,7 +54,9 @@ def cmd_diff(args: Namespace) -> int:
     """
     master_path, revision_path = _validate_inputs(args.master, args.revision)
 
-    config = ComparisonConfig(tolerance=args.tolerance)
+    control_points = _parse_control_points(getattr(args, "control_points", None))
+    alignment = AlignmentConfig(enabled=bool(control_points), control_points=control_points)
+    config = ComparisonConfig(tolerance=args.tolerance, alignment=alignment)
     engine = ComparisonEngine()
     result = engine.compare(master_path, revision_path, config)
 
@@ -60,9 +79,12 @@ def cmd_align(args: Namespace) -> int:
     """
     master_path, revision_path = _validate_inputs(args.master, args.revision)
 
+    control_points = _parse_control_points(getattr(args, "control_points", None))
     config = AlignmentConfig(
+        enabled=True,
         confidence_threshold=args.confidence,
         max_residual=args.max_residual,
+        control_points=control_points,
     )
 
     master_snaps = extract_snapshots(master_path)
