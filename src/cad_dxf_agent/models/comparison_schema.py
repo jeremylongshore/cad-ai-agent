@@ -96,6 +96,7 @@ class ComparisonProfile(BaseModel):
             description="No filters, compare all entities on all layers",
         )
 
+
 # --- Alignment schemas ---
 
 
