@@ -4,7 +4,12 @@ from __future__ import annotations
 
 import pytest
 
-from cad_dxf_agent.core.comparison.geometry import apply_profile, extract_snapshots
+from cad_dxf_agent.core.comparison.geometry import (
+    apply_profile,
+    check_profile_warnings,
+    detect_titleblock_region,
+    extract_snapshots,
+)
 from cad_dxf_agent.models.cad_schema import EntityType
 from cad_dxf_agent.models.comparison_schema import BBoxRegion, ComparisonConfig, ComparisonProfile
 from tests.helpers.comparison_factory import (
@@ -240,3 +245,143 @@ class TestProfileViaExtraction:
         for s in snaps:
             assert s.entity_type in allowed_types, f"{s.entity_type} should be filtered"
             assert not s.layer.upper().startswith("NOTE"), f"Layer {s.layer} should be excluded"
+
+
+# --- Titleblock auto-detect tests ---
+
+
+class TestDetectTitleblockRegion:
+    def test_no_titleblock_layers_returns_none(self):
+        snaps = [
+            make_geometry_snapshot(handle="L1", layer="STRUCTURAL", points=[(0, 0), (10, 0)]),
+        ]
+        assert detect_titleblock_region(snaps) is None
+
+    def test_title_layer_detected(self):
+        snaps = [
+            make_geometry_snapshot(handle="T1", layer="TITLE", points=[(100, 0), (200, 10)]),
+            make_geometry_snapshot(handle="L1", layer="STRUCTURAL", points=[(0, 0), (10, 0)]),
+        ]
+        region = detect_titleblock_region(snaps)
+        assert region is not None
+        assert region.min_x == 95.0  # 100 - 5 padding
+        assert region.max_x == 205.0  # 200 + 5 padding
+
+    def test_titleblock_layer_detected(self):
+        snaps = [
+            make_geometry_snapshot(handle="TB1", layer="TITLEBLOCK", points=[(50, 50), (150, 80)]),
+        ]
+        region = detect_titleblock_region(snaps)
+        assert region is not None
+        assert region.min_x == 45.0
+        assert region.max_y == 85.0
+
+    def test_seal_and_revision_layers_detected(self):
+        snaps = [
+            make_geometry_snapshot(handle="S1", layer="SEAL", points=[(10, 10)]),
+            make_geometry_snapshot(handle="R1", layer="REVISION_TABLE", points=[(20, 20)]),
+        ]
+        region = detect_titleblock_region(snaps)
+        assert region is not None
+        assert region.contains(10, 10)
+        assert region.contains(20, 20)
+
+    def test_border_layer_not_detected(self):
+        """BORDER excluded from detection — can cover entire sheet."""
+        snaps = [
+            make_geometry_snapshot(
+                handle="B1",
+                entity_type=EntityType.LWPOLYLINE,
+                layer="BORDER",
+                points=[(0, 0), (100, 0), (100, 50), (0, 50)],
+            ),
+        ]
+        assert detect_titleblock_region(snaps) is None
+
+    def test_custom_padding(self):
+        snaps = [
+            make_geometry_snapshot(handle="T1", layer="TITLE", points=[(10, 10), (20, 20)]),
+        ]
+        region = detect_titleblock_region(snaps, padding=0)
+        assert region is not None
+        assert region.min_x == 10.0
+        assert region.max_x == 20.0
+
+    def test_empty_snapshots_returns_none(self):
+        assert detect_titleblock_region([]) is None
+
+    def test_case_insensitive_match(self):
+        snaps = [
+            make_geometry_snapshot(handle="T1", layer="Title_Block", points=[(5, 5)]),
+        ]
+        region = detect_titleblock_region(snaps)
+        assert region is not None
+
+
+# --- Profile warning tests ---
+
+
+class TestCheckProfileWarnings:
+    def test_under_threshold_no_warning(self):
+        """<80% excluded → no warning."""
+        mk = make_geometry_snapshot
+        remaining = [mk(handle=f"L{i}", layer="A", points=[(i, 0)]) for i in range(5)]
+        profile = ComparisonProfile(name="test")
+        warnings = check_profile_warnings(10, remaining, profile)
+        assert len(warnings) == 0
+
+    def test_over_threshold_warns(self):
+        """90% excluded → warning with percentage."""
+        mk = make_geometry_snapshot
+        remaining = [mk(handle="L1", layer="A", points=[(0, 0)])]
+        profile = ComparisonProfile(name="strict")
+        warnings = check_profile_warnings(10, remaining, profile)
+        assert len(warnings) == 1
+        assert "90%" in warnings[0]
+        assert "strict" in warnings[0]
+
+    def test_all_excluded_specific_warning(self):
+        """All excluded → 'no geometry remains' warning."""
+        profile = ComparisonProfile(name="nuke")
+        warnings = check_profile_warnings(10, [], profile)
+        assert len(warnings) == 1
+        assert "no geometry remains" in warnings[0]
+
+    def test_structural_missing_warning(self):
+        """Only TEXT remaining with include_entity_types → structural warning."""
+        mk = make_geometry_snapshot
+        remaining = [
+            mk(handle="T1", entity_type=EntityType.TEXT, layer="A", points=[(0, 0)]),
+        ]
+        profile = ComparisonProfile(
+            name="filtered",
+            include_entity_types=[EntityType.TEXT, EntityType.LINE],
+        )
+        warnings = check_profile_warnings(5, remaining, profile)
+        assert any("LINE/LWPOLYLINE" in w for w in warnings)
+
+    def test_line_present_no_structural_warning(self):
+        """LINE remaining → no structural warning."""
+        mk = make_geometry_snapshot
+        remaining = [
+            mk(handle="L1", entity_type=EntityType.LINE, layer="A", points=[(0, 0), (1, 1)]),
+        ]
+        profile = ComparisonProfile(
+            name="ok",
+            include_entity_types=[EntityType.LINE],
+        )
+        warnings = check_profile_warnings(5, remaining, profile)
+        assert not any("LINE/LWPOLYLINE" in w for w in warnings)
+
+    def test_zero_input_no_crash(self):
+        """Zero before_count → no crash, no warnings."""
+        profile = ComparisonProfile(name="empty")
+        warnings = check_profile_warnings(0, [], profile)
+        assert warnings == []
+
+    def test_source_prefix_in_warnings(self):
+        """source param prepends label to warning messages."""
+        profile = ComparisonProfile(name="strict")
+        warnings = check_profile_warnings(10, [], profile, source="master")
+        assert len(warnings) == 1
+        assert warnings[0].startswith("master: ")

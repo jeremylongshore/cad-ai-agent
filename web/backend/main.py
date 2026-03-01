@@ -472,12 +472,15 @@ async def compare(
 
             s.set_attribute("cad.compare.total_changes", result.total_changes)
 
-            return {
+            response: dict = {
                 "summary": result.summary,
                 "total_changes": result.total_changes,
                 "changelog": outputs.changelog.to_json(),
                 "render_available": session.diff_overlay_render is not None,
             }
+            if result.warnings:
+                response["warnings"] = result.warnings
+            return response
 
         except FileNotFoundError as e:
             raise HTTPException(status_code=400, detail=str(e)) from None
@@ -718,7 +721,7 @@ async def revision_diff(body: RevisionDiffRequest, user: dict = Depends(get_user
             session.comparison_changelog = outputs.changelog
             session.diff_overlay_path = outputs.diff_overlay_path
 
-            return {
+            diff_response: dict = {
                 "summary": result.summary,
                 "total_changes": result.total_changes,
                 "changelog": outputs.changelog.to_json(),
@@ -737,6 +740,9 @@ async def revision_diff(body: RevisionDiffRequest, user: dict = Depends(get_user
                     for op in ops
                 ],
             }
+            if result.warnings:
+                diff_response["warnings"] = result.warnings
+            return diff_response
 
         except Exception as e:
             logger.error("Diff failed: %s", e, exc_info=True)

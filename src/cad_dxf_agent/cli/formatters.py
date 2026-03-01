@@ -11,7 +11,12 @@ if TYPE_CHECKING:
 
 def format_summary(result: ComparisonResult) -> str:
     """Format category counts as a table."""
-    lines = ["Category       Count", "-" * 22]
+    lines: list[str] = []
+    if result.warnings:
+        for w in result.warnings:
+            lines.append(f"WARNING: {w}")
+        lines.append("")
+    lines.extend(["Category       Count", "-" * 22])
     for cat in ("added", "removed", "modified", "moved", "unchanged"):
         count = result.summary.get(cat, 0)
         lines.append(f"  {cat:<12s} {count:>5d}")
@@ -33,6 +38,8 @@ def format_summary_json(result: ComparisonResult) -> str:
             "method": result.alignment_result.method.value,
             "confidence": result.alignment_result.confidence,
         }
+    if result.warnings:
+        data["warnings"] = result.warnings
     return json.dumps(data, indent=2)
 
 

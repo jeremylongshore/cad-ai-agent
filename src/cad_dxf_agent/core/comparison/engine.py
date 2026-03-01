@@ -13,7 +13,7 @@ from .canonical import assign_stable_ids, sort_changes, sort_snapshots
 from .changelog import ChangeLog, generate_changelog
 from .classifier import classify_changes
 from .diff_overlay import write_diff_overlay
-from .geometry import extract_snapshots
+from .geometry import detect_titleblock_region, extract_snapshots
 from .matcher import match_entities
 
 logger = logging.getLogger(__name__)
@@ -63,11 +63,32 @@ class ComparisonEngine:
 
             config = config or ComparisonConfig()
 
+            profile_warnings: list[str] = []
+
+            # Auto-detect titleblock region once from master, apply to both
+            if config.profile and not config.profile.exclude_regions:
+                logger.info("Extracting raw master snapshots for titleblock detection")
+                raw_master = extract_snapshots(master_path)
+                detected = detect_titleblock_region(raw_master)
+                if detected is not None:
+                    logger.info("Auto-detected titleblock region: %s", detected)
+                    config = config.model_copy(
+                        update={
+                            "profile": config.profile.model_copy(
+                                update={"exclude_regions": [detected]}
+                            )
+                        }
+                    )
+
             logger.info("Extracting geometry from master: %s", Path(master_path).name)
-            master_snaps = extract_snapshots(master_path, config)
+            master_snaps = extract_snapshots(
+                master_path, config, _profile_warnings=profile_warnings, _source="master"
+            )
 
             logger.info("Extracting geometry from revision: %s", Path(revision_path).name)
-            revision_snaps = extract_snapshots(revision_path, config)
+            revision_snaps = extract_snapshots(
+                revision_path, config, _profile_warnings=profile_warnings, _source="revision"
+            )
 
             # Canonical model: assign stable IDs and sort deterministically
             if config.use_canonical:
@@ -132,6 +153,7 @@ class ComparisonEngine:
                 summary=classified.summary,
                 config=classified.config,
                 alignment_result=alignment_result,
+                warnings=profile_warnings,
             )
 
             logger.info("Classification: %s", result.summary)
