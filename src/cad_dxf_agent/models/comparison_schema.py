@@ -5,9 +5,97 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Any
 
-from pydantic import BaseModel, Field, computed_field
+from pydantic import BaseModel, Field, computed_field, model_validator
 
 from .cad_schema import EntityType, Point2D
+
+# --- Filter profile schemas ---
+
+
+class BBoxRegion(BaseModel):
+    """Rectangular exclusion zone (e.g., title block area)."""
+
+    min_x: float
+    min_y: float
+    max_x: float
+    max_y: float
+
+    @model_validator(mode="after")
+    def _check_bounds(self) -> BBoxRegion:
+        if self.min_x > self.max_x:
+            raise ValueError(f"min_x ({self.min_x}) must be <= max_x ({self.max_x})")
+        if self.min_y > self.max_y:
+            raise ValueError(f"min_y ({self.min_y}) must be <= max_y ({self.max_y})")
+        return self
+
+    def contains(self, x: float, y: float) -> bool:
+        """Check if point (x, y) falls within this region (inclusive)."""
+        return self.min_x <= x <= self.max_x and self.min_y <= y <= self.max_y
+
+
+class ComparisonProfile(BaseModel):
+    """Reusable filter profile for structural comparison."""
+
+    name: str = Field(default="default", description="Profile identifier")
+    description: str = Field(default="", description="Human-readable purpose")
+
+    # Layer filtering (regex patterns, case-insensitive)
+    include_layers: list[str] = Field(
+        default_factory=list,
+        description="Regex patterns for layers to include (empty = all layers)",
+    )
+    exclude_layers: list[str] = Field(
+        default_factory=list,
+        description="Regex patterns for layers to exclude (applied after include)",
+    )
+
+    # Entity type filtering
+    include_entity_types: list[EntityType] | None = Field(
+        default=None,
+        description="Entity types to include (None = all types)",
+    )
+
+    # Spatial exclusion zones (e.g., title block region)
+    exclude_regions: list[BBoxRegion] = Field(
+        default_factory=list,
+        description="Rectangular zones to exclude from comparison",
+    )
+
+    # Thresholds (override ComparisonConfig defaults when set)
+    tolerance: float | None = Field(default=None, description="Override match tolerance")
+    move_threshold: float | None = Field(default=None, description="Override move threshold")
+
+    @classmethod
+    def structural(cls) -> ComparisonProfile:
+        """Preset: structural entities only, exclude title/notes layers."""
+        return cls(
+            name="structural",
+            description="Structural entities only, excludes title blocks and notes",
+            exclude_layers=[
+                r"(?i)^title",
+                r"(?i)^seal",
+                r"(?i)^revision",
+                r"(?i)^note",
+                r"(?i)^border",
+                r"(?i)^defpoints$",
+            ],
+            include_entity_types=[
+                EntityType.LINE,
+                EntityType.LWPOLYLINE,
+                EntityType.CIRCLE,
+                EntityType.ARC,
+                EntityType.INSERT,
+            ],
+        )
+
+    @classmethod
+    def all_entities(cls) -> ComparisonProfile:
+        """Preset: no filters, compare everything."""
+        return cls(
+            name="all",
+            description="No filters, compare all entities on all layers",
+        )
+
 
 # --- Alignment schemas ---
 
@@ -146,6 +234,10 @@ class ComparisonConfig(BaseModel):
     alignment: AlignmentConfig = Field(
         default_factory=AlignmentConfig,
         description="Alignment configuration (disabled by default)",
+    )
+    profile: ComparisonProfile | None = Field(
+        default=None,
+        description="Optional filtering profile (layers, types, regions)",
     )
 
 
