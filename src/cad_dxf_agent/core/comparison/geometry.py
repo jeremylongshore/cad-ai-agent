@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import logging
+import re
 from pathlib import Path
 from typing import Any
 
 import ezdxf
 
 from ...models.cad_schema import EntityType, Point2D
-from ...models.comparison_schema import ComparisonConfig, GeometrySnapshot
+from ...models.comparison_schema import ComparisonConfig, ComparisonProfile, GeometrySnapshot
 from ...otel import get_tracer
 
 logger = logging.getLogger(__name__)
@@ -68,10 +69,53 @@ def extract_snapshots(
             if snap is not None:
                 snapshots.append(snap)
 
+        if config.profile:
+            snapshots = apply_profile(snapshots, config.profile)
+
         span.set_attribute("cad.compare.entities_extracted", len(snapshots))
         span.set_attribute("cad.compare.ignored_layers", len(config.ignored_layers))
 
         return snapshots
+
+
+def apply_profile(
+    snapshots: list[GeometrySnapshot],
+    profile: ComparisonProfile,
+) -> list[GeometrySnapshot]:
+    """Filter snapshots through a ComparisonProfile.
+
+    Filter order (each step reduces the list):
+    1. Entity type — keep only matching types if include_entity_types is set
+    2. Layer include — keep only layers matching at least one regex
+    3. Layer exclude — drop layers matching any regex
+    4. Region exclude — drop entities whose centroid falls inside any exclude_regions
+    """
+    result = snapshots
+
+    # 1. Entity type filter
+    if profile.include_entity_types:
+        allowed = {t for t in profile.include_entity_types}
+        result = [s for s in result if s.entity_type in allowed]
+
+    # 2. Layer include (keep only matching)
+    if profile.include_layers:
+        compiled = [re.compile(p, re.IGNORECASE) for p in profile.include_layers]
+        result = [s for s in result if any(r.search(s.layer) for r in compiled)]
+
+    # 3. Layer exclude (drop matching)
+    if profile.exclude_layers:
+        compiled = [re.compile(p, re.IGNORECASE) for p in profile.exclude_layers]
+        result = [s for s in result if not any(r.search(s.layer) for r in compiled)]
+
+    # 4. Region exclude (drop centroids inside any bbox)
+    if profile.exclude_regions:
+        result = [
+            s
+            for s in result
+            if not any(region.contains(s.centroid.x, s.centroid.y) for region in profile.exclude_regions)
+        ]
+
+    return result
 
 
 def _extract_one(

@@ -22,7 +22,7 @@ from .changelog import ChangeLog, generate_changelog
 from .classifier import classify_changes
 from .diff_overlay import write_diff_overlay
 from .engine import ComparisonEngine
-from .geometry import extract_snapshots
+from .geometry import apply_profile, extract_snapshots
 from .matcher import match_entities
 from .revision_ops import comparison_result_to_ops, entity_change_to_ops
 from .scorer import score_match
@@ -31,6 +31,7 @@ __all__ = [
     "ChangeLog",
     "ComparisonEngine",
     "RevisionApplier",
+    "apply_profile",
     "align_drawings",
     "apply_alignment",
     "approve_all_pending",
