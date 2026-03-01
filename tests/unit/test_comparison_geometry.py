@@ -286,7 +286,8 @@ class TestDetectTitleblockRegion:
         assert region.contains(10, 10)
         assert region.contains(20, 20)
 
-    def test_border_layer_detected(self):
+    def test_border_layer_not_detected(self):
+        """BORDER excluded from detection — can cover entire sheet."""
         snaps = [
             make_geometry_snapshot(
                 handle="B1",
@@ -295,11 +296,7 @@ class TestDetectTitleblockRegion:
                 points=[(0, 0), (100, 0), (100, 50), (0, 50)],
             ),
         ]
-        region = detect_titleblock_region(snaps)
-        assert region is not None
-        assert region.min_x == -5.0
-        assert region.max_x == 105.0
-        assert region.max_y == 55.0
+        assert detect_titleblock_region(snaps) is None
 
     def test_custom_padding(self):
         snaps = [
@@ -381,3 +378,10 @@ class TestCheckProfileWarnings:
         profile = ComparisonProfile(name="empty")
         warnings = check_profile_warnings(0, [], profile)
         assert warnings == []
+
+    def test_source_prefix_in_warnings(self):
+        """source param prepends label to warning messages."""
+        profile = ComparisonProfile(name="strict")
+        warnings = check_profile_warnings(10, [], profile, source="master")
+        assert len(warnings) == 1
+        assert warnings[0].startswith("master: ")

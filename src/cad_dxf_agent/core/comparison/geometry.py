@@ -29,6 +29,7 @@ def extract_snapshots(
     dxf_path: str | Path,
     config: ComparisonConfig | None = None,
     _profile_warnings: list[str] | None = None,
+    _source: str = "",
 ) -> list[GeometrySnapshot]:
     """Extract GeometrySnapshot objects from all model-space entities in a DXF.
 
@@ -36,6 +37,7 @@ def extract_snapshots(
         dxf_path: Path to the DXF file.
         config: Optional comparison config for layer/type filtering.
         _profile_warnings: If provided, profile warnings are appended to this list.
+        _source: Label (e.g. "master") prepended to profile warnings.
 
     Returns:
         List of GeometrySnapshot with full point data per entity.
@@ -78,19 +80,13 @@ def extract_snapshots(
 
         if config.profile:
             pre_profile_count = len(snapshots)
-            profile = config.profile
-
-            # Auto-detect titleblock region if no exclude_regions set
-            if not profile.exclude_regions:
-                detected = detect_titleblock_region(snapshots)
-                if detected is not None:
-                    profile = profile.model_copy(update={"exclude_regions": [detected]})
-
-            snapshots = apply_profile(snapshots, profile)
+            snapshots = apply_profile(snapshots, config.profile)
 
             if _profile_warnings is not None:
                 _profile_warnings.extend(
-                    check_profile_warnings(pre_profile_count, snapshots, profile)
+                    check_profile_warnings(
+                        pre_profile_count, snapshots, config.profile, source=_source
+                    )
                 )
 
         span.set_attribute("cad.compare.entities_extracted", len(snapshots))
@@ -138,12 +134,13 @@ def apply_profile(
     return result
 
 
-# Title-block layer patterns (case-insensitive) — mirrors structural() preset
+# Title-block layer patterns (case-insensitive).
+# Note: ^border is intentionally excluded — border layers often cover the entire
+# sheet perimeter and would produce an exclude region spanning the full drawing.
 _TITLEBLOCK_PATTERNS = [
     re.compile(r"^title", re.IGNORECASE),
     re.compile(r"^seal", re.IGNORECASE),
     re.compile(r"^revision", re.IGNORECASE),
-    re.compile(r"^border", re.IGNORECASE),
 ]
 
 
@@ -179,8 +176,15 @@ def check_profile_warnings(
     before_count: int,
     after_snapshots: list[GeometrySnapshot],
     profile: ComparisonProfile,
+    source: str = "",
 ) -> list[str]:
     """Check for suspicious profile filtering results.
+
+    Args:
+        before_count: Number of snapshots before profile filtering.
+        after_snapshots: Snapshots remaining after filtering.
+        profile: The profile that was applied.
+        source: Optional label (e.g. "master", "revision") prepended to warnings.
 
     Returns a list of warning strings (empty if everything looks fine).
     """
@@ -190,31 +194,30 @@ def check_profile_warnings(
     after_count = len(after_snapshots)
     excluded_count = before_count - after_count
     excluded_pct = excluded_count / before_count
+    prefix = f"{source}: " if source else ""
 
     warnings: list[str] = []
 
     if after_count == 0:
         warnings.append(
-            f"Profile '{profile.name}' excluded all {before_count} entities — "
+            f"{prefix}Profile '{profile.name}' excluded all {before_count} entities — "
             "no geometry remains for comparison."
         )
         return warnings
 
     if excluded_pct > 0.80:
         warnings.append(
-            f"Profile '{profile.name}' excluded {excluded_pct:.0%} of entities "
+            f"{prefix}Profile '{profile.name}' excluded {excluded_pct:.0%} of entities "
             f"({excluded_count}/{before_count})."
         )
 
     if profile.include_entity_types:
-        from ...models.cad_schema import EntityType
-
         structural_types = {EntityType.LINE, EntityType.LWPOLYLINE}
         remaining_types = {s.entity_type for s in after_snapshots}
         if not remaining_types & structural_types:
             warnings.append(
-                f"Profile '{profile.name}' filtered out all LINE/LWPOLYLINE entities — "
-                "structural geometry may be missing."
+                f"{prefix}Profile '{profile.name}' filtered out all "
+                "LINE/LWPOLYLINE entities — structural geometry may be missing."
             )
 
     return warnings
