@@ -109,10 +109,11 @@ def apply_profile(
 
     # 4. Region exclude (drop centroids inside any bbox)
     if profile.exclude_regions:
+        regions = profile.exclude_regions
         result = [
             s
             for s in result
-            if not any(region.contains(s.centroid.x, s.centroid.y) for region in profile.exclude_regions)
+            if not any(r.contains(s.centroid.x, s.centroid.y) for r in regions)
         ]
 
     return result
