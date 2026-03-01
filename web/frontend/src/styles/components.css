@@ -751,3 +751,47 @@
   background: var(--accent-primary-light);
   color: var(--accent-primary);
 }
+
+/* Revision apply section */
+.revision-apply {
+  padding: var(--space-3);
+  background: var(--bg-secondary);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-default);
+}
+
+.revision-apply__summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.revision-apply__counts {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Bundle download section */
+.bundle-download {
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border-default);
+}
+
+.bundle-download__status {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--accent-success);
+  margin-bottom: var(--space-2);
+}
+
+.bundle-download__link {
+  margin-bottom: var(--space-2);
+}
+
+.bundle-download__hint {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  text-align: center;
+}

@@ -16,6 +16,11 @@ export default function PreviewPanel({
   onCompare,
   comparisonResult,
   loading,
+  revisionOps,
+  revisionApplyResult,
+  bundleReady,
+  onRevisionApply,
+  onBundleDownload,
 }) {
   const [activeTab, setActiveTab] = useState('original');
   const hasEdited = !!previewUrls.edited;
@@ -124,6 +129,62 @@ export default function PreviewPanel({
           >
             {loading ? <span className="spinner" aria-hidden="true" /> : 'Upload Revision DXF'}
           </button>
+        </div>
+      )}
+
+      {/* Revision apply + download (step 4) */}
+      {activeTab === 'comparison' && revisionOps && (
+        <div className="revision-apply">
+          <h4 className="op-list__title">Revision Changes</h4>
+          <div className="revision-apply__counts">
+            {(() => {
+              const approved = revisionOps.filter((o) => o.status === 'approved').length;
+              const pending = revisionOps.filter((o) => o.status === 'pending').length;
+              const rejected = revisionOps.filter((o) => o.status === 'rejected').length;
+              const canApply = approved > 0 && pending === 0;
+              return (
+                <>
+                  <div className="revision-apply__summary">
+                    <span className="comparison-badge comparison-badge--added">{approved} approved</span>
+                    {pending > 0 && <span className="comparison-badge">{pending} pending</span>}
+                    {rejected > 0 && <span className="comparison-badge comparison-badge--removed">{rejected} rejected</span>}
+                  </div>
+                  {!bundleReady && (
+                    <button
+                      className="btn btn--primary btn--full"
+                      onClick={onRevisionApply}
+                      disabled={loading || !canApply}
+                      style={{ marginTop: 'var(--space-2)' }}
+                    >
+                      {loading ? <span className="spinner" aria-hidden="true" /> : canApply ? 'Apply Approved Changes' : 'Approve changes before applying'}
+                    </button>
+                  )}
+                </>
+              );
+            })()}
+          </div>
+
+          {bundleReady && revisionApplyResult && (
+            <div className="bundle-download">
+              <p className="bundle-download__status">
+                Applied {revisionApplyResult.success_count} change(s) successfully
+                {revisionApplyResult.failure_count > 0 && (
+                  <span className="comparison-badge comparison-badge--removed" style={{ marginLeft: 'var(--space-2)' }}>
+                    {revisionApplyResult.failure_count} failed
+                  </span>
+                )}
+              </p>
+              <button
+                className="btn btn--secondary btn--full bundle-download__link"
+                onClick={onBundleDownload}
+              >
+                Download Bundle (.zip)
+              </button>
+              <p className="bundle-download__hint">
+                Contains updated master DXF, diff overlay, changelog, and metadata
+              </p>
+            </div>
+          )}
         </div>
       )}
 

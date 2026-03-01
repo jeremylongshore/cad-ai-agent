@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
-import { uploadFile, planEdit, applyChanges, downloadFile, getRenderBlob, clearHistory, compareFiles } from '../lib/api';
+import { uploadFile, planEdit, applyChanges, downloadFile, getRenderBlob, clearHistory, compareFiles, revisionApply, revisionDownloadUrl } from '../lib/api';
 
 const NO_CHANGES_MESSAGE = "I couldn't plan any changes. Try being more specific about which element to edit.";
 
@@ -17,6 +17,9 @@ export function useSession() {
   const [validation, setValidation] = useState(null);
   const [previewUrls, setPreviewUrls] = useState({ original: null, edited: null });
   const [comparisonResult, setComparisonResult] = useState(null);
+  const [revisionOps, setRevisionOps] = useState(null);
+  const [revisionApplyResult, setRevisionApplyResult] = useState(null);
+  const [bundleReady, setBundleReady] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loadingStartTime, setLoadingStartTime] = useState(null);
   const [error, setError] = useState(null);
@@ -244,6 +247,37 @@ export function useSession() {
     }
   }, [sessionId]);
 
+  const handleRevisionApply = useCallback(async () => {
+    if (!sessionId) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await revisionApply(sessionId);
+      setRevisionApplyResult(data);
+      setBundleReady(true);
+      const failMsg = data.failure_count > 0 ? ` (${data.failure_count} failed)` : '';
+      setMessages((prev) => [...prev,
+        msg('system', `Applied ${data.success_count} revision change(s) successfully${failMsg}.`),
+      ]);
+    } catch (err) {
+      setError(err.message);
+      setMessages((prev) => [...prev, msg('error', `Apply failed: ${err.message}`)]);
+    } finally {
+      setLoading(false);
+    }
+  }, [sessionId]);
+
+  const handleBundleDownload = useCallback(() => {
+    if (!sessionId) return;
+    const url = revisionDownloadUrl(sessionId);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = '';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }, [sessionId]);
+
   const reset = useCallback(() => {
     // Revoke blob URLs to free memory
     Object.values(previewUrls).forEach((url) => {
@@ -257,6 +291,9 @@ export function useSession() {
     setValidation(null);
     setPreviewUrls({ original: null, edited: null, comparison: null });
     setComparisonResult(null);
+    setRevisionOps(null);
+    setRevisionApplyResult(null);
+    setBundleReady(false);
     setError(null);
     setLoadingStartTime(null);
     lastPromptRef.current = null;
@@ -283,6 +320,11 @@ export function useSession() {
     download,
     compareRevision,
     clearConversation,
+    revisionOps,
+    revisionApplyResult,
+    bundleReady,
+    handleRevisionApply,
+    handleBundleDownload,
     reset,
   };
 }

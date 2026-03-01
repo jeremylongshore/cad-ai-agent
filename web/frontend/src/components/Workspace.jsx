@@ -96,6 +96,11 @@ export default function Workspace({ user, onSignOut }) {
               onCompare={session.compareRevision}
               comparisonResult={comparisonResult}
               loading={loading}
+              revisionOps={session.revisionOps}
+              revisionApplyResult={session.revisionApplyResult}
+              bundleReady={session.bundleReady}
+              onRevisionApply={session.handleRevisionApply}
+              onBundleDownload={session.handleBundleDownload}
             />
           </section>
 

@@ -108,3 +108,16 @@ export async function downloadFile(sessionId) {
   a.remove();
   URL.revokeObjectURL(url);
 }
+
+export async function revisionApply(sessionId) {
+  const res = await request('/api/revision/apply', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ session_id: sessionId }),
+  });
+  return res.json();
+}
+
+export function revisionDownloadUrl(sessionId) {
+  return `${API_BASE}/api/revision/download?session_id=${sessionId}`;
+}
