@@ -4,8 +4,10 @@ from __future__ import annotations
 
 from cad_dxf_agent.models.cad_schema import EntityType, Point2D
 from cad_dxf_agent.models.comparison_schema import (
+    BBoxRegion,
     ChangeCategory,
     ComparisonConfig,
+    ComparisonProfile,
     ComparisonResult,
     DiffOverlayLayers,
     EntityChange,
@@ -120,6 +122,102 @@ class TestGeometrySnapshot:
         assert restored.centroid.y == 2.5
 
 
+class TestBBoxRegion:
+    def test_contains_inside(self):
+        region = BBoxRegion(min_x=0, min_y=0, max_x=10, max_y=10)
+        assert region.contains(5, 5)
+
+    def test_contains_outside(self):
+        region = BBoxRegion(min_x=0, min_y=0, max_x=10, max_y=10)
+        assert not region.contains(15, 5)
+        assert not region.contains(5, -1)
+
+    def test_contains_edge(self):
+        region = BBoxRegion(min_x=0, min_y=0, max_x=10, max_y=10)
+        assert region.contains(0, 0)
+        assert region.contains(10, 10)
+        assert region.contains(0, 10)
+        assert region.contains(10, 0)
+
+    def test_serialization_round_trip(self):
+        region = BBoxRegion(min_x=1.5, min_y=2.5, max_x=30.0, max_y=8.0)
+        data = region.model_dump()
+        restored = BBoxRegion(**data)
+        assert restored.min_x == 1.5
+        assert restored.max_y == 8.0
+        assert restored.contains(15, 5)
+
+
+class TestComparisonProfile:
+    def test_defaults(self):
+        profile = ComparisonProfile()
+        assert profile.name == "default"
+        assert profile.description == ""
+        assert profile.include_layers == []
+        assert profile.exclude_layers == []
+        assert profile.include_entity_types is None
+        assert profile.exclude_regions == []
+        assert profile.tolerance is None
+        assert profile.move_threshold is None
+
+    def test_structural_preset(self):
+        profile = ComparisonProfile.structural()
+        assert profile.name == "structural"
+        assert len(profile.exclude_layers) > 0
+        assert profile.include_entity_types is not None
+        assert EntityType.LINE in profile.include_entity_types
+        assert EntityType.TEXT not in profile.include_entity_types
+
+    def test_all_preset(self):
+        profile = ComparisonProfile.all_entities()
+        assert profile.name == "all"
+        assert profile.include_layers == []
+        assert profile.exclude_layers == []
+        assert profile.include_entity_types is None
+        assert profile.exclude_regions == []
+
+    def test_custom_layers(self):
+        profile = ComparisonProfile(
+            name="custom",
+            include_layers=[r"^S-.*"],
+            exclude_layers=[r".*DEMO$"],
+        )
+        assert len(profile.include_layers) == 1
+        assert len(profile.exclude_layers) == 1
+
+    def test_custom_regions(self):
+        region = BBoxRegion(min_x=0, min_y=0, max_x=5, max_y=2)
+        profile = ComparisonProfile(exclude_regions=[region])
+        assert len(profile.exclude_regions) == 1
+        assert profile.exclude_regions[0].contains(2.5, 1.0)
+
+    def test_threshold_overrides(self):
+        profile = ComparisonProfile(tolerance=0.5, move_threshold=1.0)
+        assert profile.tolerance == 0.5
+        assert profile.move_threshold == 1.0
+
+    def test_serialization_round_trip(self):
+        profile = ComparisonProfile(
+            name="test",
+            description="Test profile",
+            exclude_layers=[r"(?i)^title"],
+            include_entity_types=[EntityType.LINE, EntityType.LWPOLYLINE],
+            exclude_regions=[BBoxRegion(min_x=0, min_y=0, max_x=34, max_y=4)],
+            tolerance=0.1,
+            move_threshold=0.5,
+        )
+        data = profile.model_dump()
+        restored = ComparisonProfile(**data)
+        assert restored.name == "test"
+        assert restored.description == "Test profile"
+        assert len(restored.exclude_layers) == 1
+        assert restored.include_entity_types is not None
+        assert len(restored.include_entity_types) == 2
+        assert len(restored.exclude_regions) == 1
+        assert restored.tolerance == 0.1
+        assert restored.move_threshold == 0.5
+
+
 class TestComparisonConfig:
     def test_defaults(self):
         config = ComparisonConfig()
@@ -127,6 +225,7 @@ class TestComparisonConfig:
         assert config.move_threshold == 0.25
         assert config.ignored_layers == []
         assert config.focus_entity_types is None
+        assert config.profile is None
 
     def test_custom_values(self):
         config = ComparisonConfig(
@@ -138,6 +237,13 @@ class TestComparisonConfig:
         assert config.tolerance == 0.5
         assert config.focus_entity_types is not None
         assert len(config.focus_entity_types) == 2
+
+    def test_profile_populated(self):
+        config = ComparisonConfig(
+            profile=ComparisonProfile.structural(),
+        )
+        assert config.profile is not None
+        assert config.profile.name == "structural"
 
 
 class TestChangeCategory:
