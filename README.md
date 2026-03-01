@@ -24,6 +24,7 @@ Local-first DXF layout editor with LLM-assisted prompt-to-edit planning, validat
 | move, edit_text, delete, add_block | Xrefs |
 | Protected layers | Title block revision table |
 | AI revision notes (safe layer) | |
+| Revision comparison pipeline (CLI + web) | |
 | Web app (Firebase + Cloud Run) | |
 | Desktop app (Windows + Linux) | |
 | Gemini vision pipeline (Vertex AI) | |
@@ -178,6 +179,62 @@ CAD_REVISION_NOTES_LAYER=AI_REV_NOTES
 ```
 
 Protected layers (TITLE, TITLEBLOCK, SEAL, REVISION) are **never** modified. The real title block revision table is out of scope for V1.
+
+## Revision Workflow
+
+Compare two DXF versions, review structural changes, and apply approved edits to produce a new drawing.
+
+### CLI
+
+```bash
+cad-revision <command> [options]
+```
+
+| Command | What it does |
+|---------|-------------|
+| `cad-revision diff` | Compare two DXFs and output a changelog |
+| `cad-revision align` | Check/preview alignment transform only |
+| `cad-revision dry-run` | Full pipeline without writing any files |
+| `cad-revision apply` | Apply approved changes to a new DXF |
+| `cad-revision bundle` | Produce a zip with DXF + overlay + changelog |
+| `cad-revision explain` | Human-readable explanation of changes |
+
+Quick example:
+
+```bash
+# Compare and generate changelog
+cad-revision diff master.dxf revision.dxf --output-dir ./out
+
+# Full bundle with all changes auto-approved
+cad-revision bundle master.dxf revision.dxf --output-dir ./bundle --approve-all
+```
+
+**Global flags:** `--json`, `--verbose`, `--version`
+
+**Exit codes:** 0 = no changes, 1 = changes found, 2 = error
+
+**Manual control points** (for drawings with large coordinate offsets):
+
+```bash
+cad-revision diff master.dxf revision.dxf \
+  --control-points "100,200:105,205" "300,400:305,405"
+```
+
+### Web App
+
+The web revision workflow is a 5-step wizard in the **Compare** tab:
+
+1. **Upload** — Upload a revision DXF to compare against the current master
+2. **Align** — Automatic alignment (or manual control points if confidence is low)
+3. **Review** — Approve or reject each detected change
+4. **Apply** — Apply approved changes to produce a new DXF
+5. **Download** — Download a bundle (.zip) containing the updated master, diff overlay, changelog, and metadata
+
+### Troubleshooting
+
+- **Units mismatch** — Master in inches, revision in mm → low alignment confidence. Convert both files to matching units first.
+- **Partial revisions** — Revision contains only a subset of the drawing → alignment may fail. Use manual control points (`--control-points` in CLI, or the manual alignment UI in the web app).
+- **Xrefs and dynamic blocks** — Not yet supported. These are detected and skipped with a warning message.
 
 ## Protected Layers
 
