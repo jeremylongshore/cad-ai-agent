@@ -139,6 +139,22 @@ class TestBundleCommand:
         assert args.approve_all is False
 
 
+class TestProfileFlag:
+    def test_profile_structural_parses(self, parser):
+        args = parser.parse_args(["diff", "m.dxf", "r.dxf", "--profile", "structural"])
+        assert args.profile == "structural"
+
+    def test_profile_default_is_none(self, parser):
+        args = parser.parse_args(["diff", "m.dxf", "r.dxf"])
+        assert args.profile is None
+
+    def test_profile_on_bundle(self, parser):
+        args = parser.parse_args(
+            ["bundle", "m.dxf", "r.dxf", "--output-dir", "/out", "--profile", "all"]
+        )
+        assert args.profile == "all"
+
+
 class TestExplainCommand:
     def test_basic_explain(self, parser):
         args = parser.parse_args(["explain", "m.dxf", "r.dxf"])

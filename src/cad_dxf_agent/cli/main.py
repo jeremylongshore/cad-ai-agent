@@ -29,6 +29,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--tolerance", type=float, default=1.0, help="Coordinate tolerance (default: 1.0)"
     )
     _add_control_points_arg(p_diff)
+    _add_profile_arg(p_diff)
 
     # hidden alias: compare
     p_compare = sub.add_parser("compare")
@@ -37,6 +38,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_compare.add_argument(
         "--tolerance", type=float, default=1.0, help="Coordinate tolerance (default: 1.0)"
     )
+    _add_profile_arg(p_compare)
 
     # --- align ---
     p_align = sub.add_parser("align", help="Align two drawings and show transform")
@@ -56,22 +58,26 @@ def build_parser() -> argparse.ArgumentParser:
     p_dryrun.add_argument(
         "--confidence", type=float, default=0.3, help="Min confidence threshold (default: 0.3)"
     )
+    _add_profile_arg(p_dryrun)
 
     # --- apply ---
     p_apply = sub.add_parser("apply", help="Apply revision changes to master")
     _add_input_args(p_apply)
     p_apply.add_argument("--output", required=True, help="Output DXF path (required)")
     p_apply.add_argument("--approve-all", action="store_true", help="Auto-approve all pending ops")
+    _add_profile_arg(p_apply)
 
     # --- bundle ---
     p_bundle = sub.add_parser("bundle", help="Full pipeline: compare, apply, export bundle")
     _add_input_args(p_bundle)
     p_bundle.add_argument("--output-dir", required=True, help="Bundle output directory (required)")
     p_bundle.add_argument("--approve-all", action="store_true", help="Auto-approve all pending ops")
+    _add_profile_arg(p_bundle)
 
     # --- explain ---
     p_explain = sub.add_parser("explain", help="Generate human-readable changelog")
     _add_input_args(p_explain)
+    _add_profile_arg(p_explain)
 
     return parser
 
@@ -80,6 +86,14 @@ def _add_input_args(parser: argparse.ArgumentParser) -> None:
     """Add the shared master/revision positional arguments."""
     parser.add_argument("master", help="Path to master (original) DXF file")
     parser.add_argument("revision", help="Path to revision (modified) DXF file")
+
+
+def _add_profile_arg(parser: argparse.ArgumentParser) -> None:
+    """Add the --profile flag for comparison filtering."""
+    parser.add_argument(
+        "--profile",
+        help='Comparison profile name (e.g. "structural", "all", or a saved custom profile)',
+    )
 
 
 def _add_control_points_arg(parser: argparse.ArgumentParser) -> None:

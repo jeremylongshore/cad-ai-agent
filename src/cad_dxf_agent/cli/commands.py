@@ -15,7 +15,8 @@ from ..core.comparison.changelog import generate_changelog
 from ..core.comparison.engine import ComparisonEngine
 from ..core.comparison.geometry import extract_snapshots
 from ..core.comparison.revision_ops import comparison_result_to_ops
-from ..models.comparison_schema import AlignmentConfig, ComparisonConfig
+from ..core.profiles import load_profile
+from ..models.comparison_schema import AlignmentConfig, ComparisonConfig, ComparisonProfile
 from . import formatters
 
 
@@ -47,6 +48,14 @@ def _validate_inputs(master: str, revision: str) -> tuple[Path, Path]:
     return mp, rp
 
 
+def _load_profile_from_args(args: Namespace) -> ComparisonProfile | None:
+    """Load a ComparisonProfile if --profile was given, else return None."""
+    name = getattr(args, "profile", None)
+    if not name:
+        return None
+    return load_profile(name)
+
+
 def cmd_diff(args: Namespace) -> int:
     """Compare two DXF files and show changes.
 
@@ -56,7 +65,8 @@ def cmd_diff(args: Namespace) -> int:
 
     control_points = _parse_control_points(getattr(args, "control_points", None))
     alignment = AlignmentConfig(enabled=bool(control_points), control_points=control_points)
-    config = ComparisonConfig(tolerance=args.tolerance, alignment=alignment)
+    profile = _load_profile_from_args(args)
+    config = ComparisonConfig(tolerance=args.tolerance, alignment=alignment, profile=profile)
     engine = ComparisonEngine()
     result = engine.compare(master_path, revision_path, config)
 
@@ -108,8 +118,10 @@ def cmd_dry_run(args: Namespace) -> int:
     """
     master_path, revision_path = _validate_inputs(args.master, args.revision)
 
+    profile = _load_profile_from_args(args)
+    config = ComparisonConfig(profile=profile)
     engine = ComparisonEngine()
-    result = engine.compare(master_path, revision_path)
+    result = engine.compare(master_path, revision_path, config)
     ops = comparison_result_to_ops(result)
     approval_set = build_initial_approvals(ops)
 
@@ -133,8 +145,10 @@ def cmd_apply(args: Namespace) -> int:
     master_path, revision_path = _validate_inputs(args.master, args.revision)
     output_path = Path(args.output)
 
+    profile = _load_profile_from_args(args)
+    config = ComparisonConfig(profile=profile)
     engine = ComparisonEngine()
-    result = engine.compare(master_path, revision_path)
+    result = engine.compare(master_path, revision_path, config)
     ops = comparison_result_to_ops(result)
 
     if not ops:
@@ -165,8 +179,10 @@ def cmd_bundle(args: Namespace) -> int:
     """
     master_path, revision_path = _validate_inputs(args.master, args.revision)
 
+    profile = _load_profile_from_args(args)
+    config = ComparisonConfig(profile=profile)
     engine = ComparisonEngine()
-    result = engine.compare(master_path, revision_path)
+    result = engine.compare(master_path, revision_path, config)
     ops = comparison_result_to_ops(result)
 
     if not ops:
@@ -207,8 +223,10 @@ def cmd_explain(args: Namespace) -> int:
     """
     master_path, revision_path = _validate_inputs(args.master, args.revision)
 
+    profile = _load_profile_from_args(args)
+    config = ComparisonConfig(profile=profile)
     engine = ComparisonEngine()
-    result = engine.compare(master_path, revision_path)
+    result = engine.compare(master_path, revision_path, config)
     changelog = generate_changelog(result)
 
     if getattr(args, "json", False):

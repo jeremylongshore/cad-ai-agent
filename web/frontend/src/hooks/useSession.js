@@ -217,13 +217,13 @@ export function useSession() {
     lastPromptRef.current = null;
   }, [sessionId]);
 
-  const compareRevision = useCallback(async (file) => {
+  const compareRevision = useCallback(async (file, profile = null) => {
     if (!sessionId) return;
     setLoading(true);
     setLoadingStartTime(Date.now());
     setError(null);
     try {
-      const data = await compareFiles(sessionId, file);
+      const data = await compareFiles(sessionId, file, profile);
       setComparisonResult(data);
       setMessages((prev) => [...prev,
         msg('system', `Comparison complete: ${data.total_changes} change(s) found — ${data.summary.added || 0} added, ${data.summary.removed || 0} removed, ${data.summary.modified || 0} modified, ${data.summary.moved || 0} moved.`),

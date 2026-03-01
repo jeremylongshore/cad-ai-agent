@@ -117,6 +117,7 @@ class RevisionAlignRequest(BaseModel):
 
 class RevisionDiffRequest(BaseModel):
     session_id: str
+    profile: str | None = None
 
 
 class RevisionApproveItem(BaseModel):
@@ -150,6 +151,15 @@ async def get_user(request: Request) -> dict:
 @app.get("/api/health")
 async def health():
     return {"status": "ok", "service": "cad-dxf-web"}
+
+
+@app.get("/api/profiles")
+async def get_profiles():
+    """List available comparison profiles (builtin + user-saved)."""
+    from cad_dxf_agent.core.profiles import list_profiles
+
+    profiles = list_profiles()
+    return {name: p.model_dump() for name, p in profiles.items()}
 
 
 @app.post("/api/upload")
@@ -396,6 +406,7 @@ async def clear_history(body: ClearHistoryRequest, user: dict = Depends(get_user
 async def compare(
     file: UploadFile = File(...),
     session_id: str = Query(...),
+    profile: str | None = Query(default=None),
     user: dict = Depends(get_user),
 ):
     """Upload a revision DXF and compare against the session's master file."""
@@ -425,9 +436,16 @@ async def compare(
 
         try:
             from cad_dxf_agent.core.comparison.engine import ComparisonEngine
+            from cad_dxf_agent.models.comparison_schema import ComparisonConfig
+
+            config = ComparisonConfig()
+            if profile:
+                from cad_dxf_agent.core.profiles import load_profile
+
+                config = ComparisonConfig(profile=load_profile(profile))
 
             engine = ComparisonEngine()
-            result = engine.compare(session.original_path, revision_path)
+            result = engine.compare(session.original_path, revision_path, config)
 
             # Generate outputs
             output_dir = session_dir / "comparison"
@@ -674,7 +692,12 @@ async def revision_diff(body: RevisionDiffRequest, user: dict = Depends(get_user
                 enabled=True,
                 control_points=session.alignment_control_points,
             )
-            config = ComparisonConfig(alignment=alignment_config)
+            loaded_profile = None
+            if body.profile:
+                from cad_dxf_agent.core.profiles import load_profile
+
+                loaded_profile = load_profile(body.profile)
+            config = ComparisonConfig(alignment=alignment_config, profile=loaded_profile)
 
             engine = ComparisonEngine()
             result = engine.compare(session.original_path, session.revision_path, config)
