@@ -111,9 +111,7 @@ def apply_profile(
     if profile.exclude_regions:
         regions = profile.exclude_regions
         result = [
-            s
-            for s in result
-            if not any(r.contains(s.centroid.x, s.centroid.y) for r in regions)
+            s for s in result if not any(r.contains(s.centroid.x, s.centroid.y) for r in regions)
         ]
 
     return result

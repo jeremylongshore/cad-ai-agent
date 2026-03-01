@@ -77,8 +77,7 @@ def save_profile(profile: ComparisonProfile, user_dir: Path | None = None) -> Pa
     _validate_name(profile.name)
     if profile.name in _BUILTIN_NAMES:
         raise ValueError(
-            f"Cannot overwrite builtin profile {profile.name!r}. "
-            f"Choose a different name."
+            f"Cannot overwrite builtin profile {profile.name!r}. Choose a different name."
         )
 
     directory = user_dir if user_dir is not None else _default_user_dir()

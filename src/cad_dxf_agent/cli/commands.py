@@ -77,8 +77,11 @@ def cmd_diff(args: Namespace) -> int:
     control_points = _parse_control_points(getattr(args, "control_points", None))
     alignment = AlignmentConfig(enabled=bool(control_points), control_points=control_points)
     result = _compare_with_profile(
-        master_path, revision_path, args,
-        tolerance=args.tolerance, alignment=alignment,
+        master_path,
+        revision_path,
+        args,
+        tolerance=args.tolerance,
+        alignment=alignment,
     )
 
     if getattr(args, "json", False):
