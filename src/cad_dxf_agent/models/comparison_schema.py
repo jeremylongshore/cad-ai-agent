@@ -5,7 +5,7 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Any
 
-from pydantic import BaseModel, Field, computed_field
+from pydantic import BaseModel, Field, computed_field, model_validator
 
 from .cad_schema import EntityType, Point2D
 
@@ -19,6 +19,14 @@ class BBoxRegion(BaseModel):
     min_y: float
     max_x: float
     max_y: float
+
+    @model_validator(mode="after")
+    def _check_bounds(self) -> BBoxRegion:
+        if self.min_x > self.max_x:
+            raise ValueError(f"min_x ({self.min_x}) must be <= max_x ({self.max_x})")
+        if self.min_y > self.max_y:
+            raise ValueError(f"min_y ({self.min_y}) must be <= max_y ({self.max_y})")
+        return self
 
     def contains(self, x: float, y: float) -> bool:
         """Check if point (x, y) falls within this region (inclusive)."""

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from cad_dxf_agent.models.cad_schema import EntityType, Point2D
 from cad_dxf_agent.models.comparison_schema import (
     BBoxRegion,
@@ -138,6 +140,14 @@ class TestBBoxRegion:
         assert region.contains(10, 10)
         assert region.contains(0, 10)
         assert region.contains(10, 0)
+
+    def test_inverted_x_raises(self):
+        with pytest.raises(ValueError, match="min_x.*max_x"):
+            BBoxRegion(min_x=10, min_y=0, max_x=0, max_y=10)
+
+    def test_inverted_y_raises(self):
+        with pytest.raises(ValueError, match="min_y.*max_y"):
+            BBoxRegion(min_x=0, min_y=10, max_x=10, max_y=0)
 
     def test_serialization_round_trip(self):
         region = BBoxRegion(min_x=1.5, min_y=2.5, max_x=30.0, max_y=8.0)
