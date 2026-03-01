@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from argparse import Namespace
 from pathlib import Path
+from typing import Any
 
 import ezdxf
 
@@ -16,7 +17,11 @@ from ..core.comparison.engine import ComparisonEngine
 from ..core.comparison.geometry import extract_snapshots
 from ..core.comparison.revision_ops import comparison_result_to_ops
 from ..core.profiles import load_profile
-from ..models.comparison_schema import AlignmentConfig, ComparisonConfig, ComparisonProfile
+from ..models.comparison_schema import (
+    AlignmentConfig,
+    ComparisonConfig,
+    ComparisonResult,
+)
 from . import formatters
 
 
@@ -48,12 +53,18 @@ def _validate_inputs(master: str, revision: str) -> tuple[Path, Path]:
     return mp, rp
 
 
-def _load_profile_from_args(args: Namespace) -> ComparisonProfile | None:
-    """Load a ComparisonProfile if --profile was given, else return None."""
+def _compare_with_profile(
+    master_path: Path,
+    revision_path: Path,
+    args: Namespace,
+    **config_kwargs: Any,
+) -> ComparisonResult:
+    """Run comparison with profile loaded from CLI args."""
     name = getattr(args, "profile", None)
-    if not name:
-        return None
-    return load_profile(name)
+    profile = load_profile(name) if name else None
+    config = ComparisonConfig(profile=profile, **config_kwargs)
+    engine = ComparisonEngine()
+    return engine.compare(master_path, revision_path, config)
 
 
 def cmd_diff(args: Namespace) -> int:
@@ -65,10 +76,10 @@ def cmd_diff(args: Namespace) -> int:
 
     control_points = _parse_control_points(getattr(args, "control_points", None))
     alignment = AlignmentConfig(enabled=bool(control_points), control_points=control_points)
-    profile = _load_profile_from_args(args)
-    config = ComparisonConfig(tolerance=args.tolerance, alignment=alignment, profile=profile)
-    engine = ComparisonEngine()
-    result = engine.compare(master_path, revision_path, config)
+    result = _compare_with_profile(
+        master_path, revision_path, args,
+        tolerance=args.tolerance, alignment=alignment,
+    )
 
     if getattr(args, "json", False):
         print(formatters.format_summary_json(result))
@@ -76,7 +87,7 @@ def cmd_diff(args: Namespace) -> int:
         print(formatters.format_summary(result))
 
     if getattr(args, "output_dir", None):
-        engine.generate_outputs(master_path, revision_path, result, args.output_dir)
+        ComparisonEngine().generate_outputs(master_path, revision_path, result, args.output_dir)
         print(f"\nOutputs written to: {args.output_dir}")
 
     return 0 if result.total_changes == 0 else 1
@@ -118,10 +129,7 @@ def cmd_dry_run(args: Namespace) -> int:
     """
     master_path, revision_path = _validate_inputs(args.master, args.revision)
 
-    profile = _load_profile_from_args(args)
-    config = ComparisonConfig(profile=profile)
-    engine = ComparisonEngine()
-    result = engine.compare(master_path, revision_path, config)
+    result = _compare_with_profile(master_path, revision_path, args)
     ops = comparison_result_to_ops(result)
     approval_set = build_initial_approvals(ops)
 
@@ -131,7 +139,7 @@ def cmd_dry_run(args: Namespace) -> int:
         print(formatters.format_dry_run(result, ops, approval_set))
 
     if getattr(args, "output_dir", None):
-        engine.generate_outputs(master_path, revision_path, result, args.output_dir)
+        ComparisonEngine().generate_outputs(master_path, revision_path, result, args.output_dir)
         print(f"\nOutputs written to: {args.output_dir}")
 
     return 0 if result.total_changes == 0 else 1
@@ -145,10 +153,7 @@ def cmd_apply(args: Namespace) -> int:
     master_path, revision_path = _validate_inputs(args.master, args.revision)
     output_path = Path(args.output)
 
-    profile = _load_profile_from_args(args)
-    config = ComparisonConfig(profile=profile)
-    engine = ComparisonEngine()
-    result = engine.compare(master_path, revision_path, config)
+    result = _compare_with_profile(master_path, revision_path, args)
     ops = comparison_result_to_ops(result)
 
     if not ops:
@@ -179,10 +184,7 @@ def cmd_bundle(args: Namespace) -> int:
     """
     master_path, revision_path = _validate_inputs(args.master, args.revision)
 
-    profile = _load_profile_from_args(args)
-    config = ComparisonConfig(profile=profile)
-    engine = ComparisonEngine()
-    result = engine.compare(master_path, revision_path, config)
+    result = _compare_with_profile(master_path, revision_path, args)
     ops = comparison_result_to_ops(result)
 
     if not ops:
@@ -223,10 +225,7 @@ def cmd_explain(args: Namespace) -> int:
     """
     master_path, revision_path = _validate_inputs(args.master, args.revision)
 
-    profile = _load_profile_from_args(args)
-    config = ComparisonConfig(profile=profile)
-    engine = ComparisonEngine()
-    result = engine.compare(master_path, revision_path, config)
+    result = _compare_with_profile(master_path, revision_path, args)
     changelog = generate_changelog(result)
 
     if getattr(args, "json", False):

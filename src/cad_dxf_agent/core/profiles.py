@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from cad_dxf_agent.models.comparison_schema import ComparisonProfile
 from cad_dxf_agent.settings import settings
+
+_VALID_NAME = re.compile(r"^[A-Za-z0-9_-]+$")
 
 BUILTIN_PROFILES: dict[str, ComparisonProfile] = {
     "structural": ComparisonProfile.structural(),
@@ -34,17 +37,31 @@ def list_profiles(user_dir: Path | None = None) -> dict[str, ComparisonProfile]:
     return result
 
 
+def _validate_name(name: str) -> None:
+    """Reject profile names that could cause path traversal."""
+    if not _VALID_NAME.match(name):
+        raise ValueError(
+            f"Invalid profile name {name!r}: "
+            f"only letters, digits, hyphens, and underscores are allowed"
+        )
+
+
 def load_profile(name: str, user_dir: Path | None = None) -> ComparisonProfile:
     """Load a profile by name — builtins first, then user directory.
 
     Raises:
+        ValueError: If the name contains invalid characters.
         KeyError: If no profile with that name exists.
     """
+    _validate_name(name)
+
     if name in BUILTIN_PROFILES:
         return BUILTIN_PROFILES[name]
 
     directory = user_dir if user_dir is not None else _default_user_dir()
-    path = directory / f"{name}.json"
+    path = (directory / f"{name}.json").resolve()
+    if not path.is_relative_to(directory.resolve()):
+        raise ValueError(f"Invalid profile name: {name!r}")
     if path.is_file():
         return ComparisonProfile.model_validate_json(path.read_text())
 
@@ -55,8 +72,9 @@ def save_profile(profile: ComparisonProfile, user_dir: Path | None = None) -> Pa
     """Save a profile to the user directory as JSON.
 
     Raises:
-        ValueError: If the profile name collides with a builtin.
+        ValueError: If the profile name is invalid or collides with a builtin.
     """
+    _validate_name(profile.name)
     if profile.name in _BUILTIN_NAMES:
         raise ValueError(
             f"Cannot overwrite builtin profile {profile.name!r}. "

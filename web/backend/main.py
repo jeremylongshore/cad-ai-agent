@@ -155,11 +155,10 @@ async def health():
 
 @app.get("/api/profiles")
 async def get_profiles():
-    """List available comparison profiles (builtin + user-saved)."""
-    from cad_dxf_agent.core.profiles import list_profiles
+    """List available comparison profiles (builtins only)."""
+    from cad_dxf_agent.core.profiles import BUILTIN_PROFILES
 
-    profiles = list_profiles()
-    return {name: p.model_dump() for name, p in profiles.items()}
+    return {name: p.model_dump() for name, p in BUILTIN_PROFILES.items()}
 
 
 @app.post("/api/upload")

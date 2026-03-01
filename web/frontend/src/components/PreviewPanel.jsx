@@ -42,7 +42,7 @@ export default function PreviewPanel({
   useEffect(() => {
     fetchProfiles()
       .then((data) => setProfileNames(Object.keys(data)))
-      .catch(() => {});
+      .catch((err) => console.error('Failed to fetch profiles:', err));
   }, []);
 
   const handleRevisionUpload = (e) => {
