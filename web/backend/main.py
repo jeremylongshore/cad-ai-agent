@@ -23,12 +23,12 @@ import os
 import shutil
 import sys
 from contextlib import asynccontextmanager
-from typing import Literal
 from pathlib import Path
+from typing import Literal
 
 from fastapi import Depends, FastAPI, File, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 # Add src/ to path so we can import the existing pipeline
@@ -38,7 +38,7 @@ sys.path.insert(0, str(PROJECT_ROOT / "src"))
 from cad_dxf_agent.otel import span as otel_span  # noqa: E402
 
 from .auth import verify_token
-from .session import Session, SessionManager
+from .session import SessionManager
 
 logger = logging.getLogger(__name__)
 
@@ -117,6 +117,7 @@ class RevisionAlignRequest(BaseModel):
 
 class RevisionDiffRequest(BaseModel):
     session_id: str
+    profile: str | None = None
 
 
 class RevisionApproveItem(BaseModel):
@@ -150,6 +151,14 @@ async def get_user(request: Request) -> dict:
 @app.get("/api/health")
 async def health():
     return {"status": "ok", "service": "cad-dxf-web"}
+
+
+@app.get("/api/profiles")
+async def get_profiles():
+    """List available comparison profiles (builtins only)."""
+    from cad_dxf_agent.core.profiles import BUILTIN_PROFILES
+
+    return {name: p.model_dump() for name, p in BUILTIN_PROFILES.items()}
 
 
 @app.post("/api/upload")
@@ -188,7 +197,7 @@ async def upload(
             raise HTTPException(
                 status_code=500,
                 detail="PDF conversion is temporarily unavailable. Please try a .dxf file.",
-            )
+            ) from None
     else:
         shutil.copy2(str(upload_path), str(dxf_path))
 
@@ -212,7 +221,7 @@ async def upload(
         }
     except Exception as e:
         logger.error("Failed to load DXF: %s", e)
-        raise HTTPException(status_code=422, detail=f"Failed to read DXF: {e}")
+        raise HTTPException(status_code=422, detail=f"Failed to read DXF: {e}") from None
 
     # Render original preview
     try:
@@ -238,7 +247,7 @@ async def plan(body: PlanRequest, user: dict = Depends(get_user)):
     try:
         session = session_mgr.get(body.session_id, user["uid"])
     except (KeyError, PermissionError) as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=str(e)) from None
 
     if session.context is None:
         raise HTTPException(status_code=400, detail="No file loaded in session")
@@ -308,7 +317,7 @@ async def plan(body: PlanRequest, user: dict = Depends(get_user)):
 
     except Exception as e:
         logger.error("Plan failed: %s", e, exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Planning failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Planning failed: {e}") from None
 
 
 @app.post("/api/apply")
@@ -317,7 +326,7 @@ async def apply_changes(body: ApplyRequest, user: dict = Depends(get_user)):
     try:
         session = session_mgr.get(body.session_id, user["uid"])
     except (KeyError, PermissionError) as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=str(e)) from None
 
     if session.changeset is None:
         raise HTTPException(status_code=400, detail="No plan to apply. Run /api/plan first.")
@@ -376,7 +385,7 @@ async def apply_changes(body: ApplyRequest, user: dict = Depends(get_user)):
 
     except Exception as e:
         logger.error("Apply failed: %s", e, exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Apply failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Apply failed: {e}") from None
 
 
 @app.post("/api/clear-history")
@@ -385,7 +394,7 @@ async def clear_history(body: ClearHistoryRequest, user: dict = Depends(get_user
     try:
         session = session_mgr.get(body.session_id, user["uid"])
     except (KeyError, PermissionError) as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=str(e)) from None
 
     session.conversation_history = []
     session.changeset = None
@@ -396,6 +405,7 @@ async def clear_history(body: ClearHistoryRequest, user: dict = Depends(get_user
 async def compare(
     file: UploadFile = File(...),
     session_id: str = Query(...),
+    profile: str | None = Query(default=None),
     user: dict = Depends(get_user),
 ):
     """Upload a revision DXF and compare against the session's master file."""
@@ -410,7 +420,7 @@ async def compare(
         try:
             session = session_mgr.get(session_id, user["uid"])
         except (KeyError, PermissionError) as e:
-            raise HTTPException(status_code=404, detail=str(e))
+            raise HTTPException(status_code=404, detail=str(e)) from None
 
         if session.original_path is None or not session.original_path.exists():
             raise HTTPException(
@@ -425,9 +435,16 @@ async def compare(
 
         try:
             from cad_dxf_agent.core.comparison.engine import ComparisonEngine
+            from cad_dxf_agent.models.comparison_schema import ComparisonConfig
+
+            config = ComparisonConfig()
+            if profile:
+                from cad_dxf_agent.core.profiles import load_profile
+
+                config = ComparisonConfig(profile=load_profile(profile))
 
             engine = ComparisonEngine()
-            result = engine.compare(session.original_path, revision_path)
+            result = engine.compare(session.original_path, revision_path, config)
 
             # Generate outputs
             output_dir = session_dir / "comparison"
@@ -463,16 +480,16 @@ async def compare(
             }
 
         except FileNotFoundError as e:
-            raise HTTPException(status_code=400, detail=str(e))
+            raise HTTPException(status_code=400, detail=str(e)) from None
         except Exception as e:
             logger.error("Comparison failed: %s", e, exc_info=True)
-            raise HTTPException(status_code=500, detail=f"Comparison failed: {e}")
+            raise HTTPException(status_code=500, detail=f"Comparison failed: {e}") from None
 
 
 @app.get("/api/render")
 async def render(
     session_id: str = Query(...),
-    type: str = Query("original"),
+    render_type: str = Query("original", alias="type"),
 ):
     """Return a PNG render of the drawing.
 
@@ -483,7 +500,7 @@ async def render(
     try:
         session = session_mgr.get_by_id(session_id)
     except KeyError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=str(e)) from None
 
     render_map = {
         "original": session.original_render,
@@ -491,15 +508,15 @@ async def render(
         "diff": session.diff_render,
         "comparison": session.diff_overlay_render,
     }
-    path = render_map.get(type)
+    path = render_map.get(render_type)
 
     if path is None or not path.exists():
-        raise HTTPException(status_code=404, detail=f"No {type} render available")
+        raise HTTPException(status_code=404, detail=f"No {render_type} render available")
 
     return FileResponse(
         path=str(path),
         media_type="image/png",
-        filename=f"{type}.png",
+        filename=f"{render_type}.png",
     )
 
 
@@ -515,7 +532,7 @@ async def download(
     try:
         session = session_mgr.get_by_id(session_id)
     except KeyError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=str(e)) from None
 
     if session.edited_path is None or not session.edited_path.exists():
         raise HTTPException(
@@ -575,7 +592,7 @@ async def revision_upload(
         try:
             session = session_mgr.get(session_id, user["uid"])
         except (KeyError, PermissionError) as e:
-            raise HTTPException(status_code=404, detail=str(e))
+            raise HTTPException(status_code=404, detail=str(e)) from None
 
         session_dir = Path("/tmp/cad-sessions") / session.session_id
         revision_path = session_dir / "revision.dxf"
@@ -593,7 +610,7 @@ async def revision_align(body: RevisionAlignRequest, user: dict = Depends(get_us
         try:
             session = session_mgr.get(body.session_id, user["uid"])
         except (KeyError, PermissionError) as e:
-            raise HTTPException(status_code=404, detail=str(e))
+            raise HTTPException(status_code=404, detail=str(e)) from None
 
         if session.original_path is None or not session.original_path.exists():
             raise HTTPException(
@@ -638,10 +655,10 @@ async def revision_align(body: RevisionAlignRequest, user: dict = Depends(get_us
             }
 
         except ValueError as e:
-            raise HTTPException(status_code=400, detail=str(e))
+            raise HTTPException(status_code=400, detail=str(e)) from None
         except Exception as e:
             logger.error("Alignment failed: %s", e, exc_info=True)
-            raise HTTPException(status_code=500, detail=f"Alignment failed: {e}")
+            raise HTTPException(status_code=500, detail=f"Alignment failed: {e}") from None
 
 
 @app.post("/api/revision/diff")
@@ -651,7 +668,7 @@ async def revision_diff(body: RevisionDiffRequest, user: dict = Depends(get_user
         try:
             session = session_mgr.get(body.session_id, user["uid"])
         except (KeyError, PermissionError) as e:
-            raise HTTPException(status_code=404, detail=str(e))
+            raise HTTPException(status_code=404, detail=str(e)) from None
 
         if session.original_path is None or not session.original_path.exists():
             raise HTTPException(
@@ -674,7 +691,12 @@ async def revision_diff(body: RevisionDiffRequest, user: dict = Depends(get_user
                 enabled=True,
                 control_points=session.alignment_control_points,
             )
-            config = ComparisonConfig(alignment=alignment_config)
+            loaded_profile = None
+            if body.profile:
+                from cad_dxf_agent.core.profiles import load_profile
+
+                loaded_profile = load_profile(body.profile)
+            config = ComparisonConfig(alignment=alignment_config, profile=loaded_profile)
 
             engine = ComparisonEngine()
             result = engine.compare(session.original_path, session.revision_path, config)
@@ -718,7 +740,7 @@ async def revision_diff(body: RevisionDiffRequest, user: dict = Depends(get_user
 
         except Exception as e:
             logger.error("Diff failed: %s", e, exc_info=True)
-            raise HTTPException(status_code=500, detail=f"Diff failed: {e}")
+            raise HTTPException(status_code=500, detail=f"Diff failed: {e}") from None
 
 
 @app.post("/api/revision/approve")
@@ -728,7 +750,7 @@ async def revision_approve(body: RevisionApproveRequest, user: dict = Depends(ge
         try:
             session = session_mgr.get(body.session_id, user["uid"])
         except (KeyError, PermissionError) as e:
-            raise HTTPException(status_code=404, detail=str(e))
+            raise HTTPException(status_code=404, detail=str(e)) from None
 
         if session.approval_set is None:
             raise HTTPException(
@@ -756,10 +778,10 @@ async def revision_approve(body: RevisionApproveRequest, user: dict = Depends(ge
             }
 
         except ValueError as e:
-            raise HTTPException(status_code=400, detail=str(e))
+            raise HTTPException(status_code=400, detail=str(e)) from None
         except Exception as e:
             logger.error("Approve failed: %s", e, exc_info=True)
-            raise HTTPException(status_code=500, detail=f"Approve failed: {e}")
+            raise HTTPException(status_code=500, detail=f"Approve failed: {e}") from None
 
 
 @app.post("/api/revision/apply")
@@ -769,7 +791,7 @@ async def revision_apply(body: RevisionApplyRequest, user: dict = Depends(get_us
         try:
             session = session_mgr.get(body.session_id, user["uid"])
         except (KeyError, PermissionError) as e:
-            raise HTTPException(status_code=404, detail=str(e))
+            raise HTTPException(status_code=404, detail=str(e)) from None
 
         if session.revision_ops is None or session.approval_set is None:
             raise HTTPException(
@@ -812,7 +834,7 @@ async def revision_apply(body: RevisionApplyRequest, user: dict = Depends(get_us
 
         except Exception as e:
             logger.error("Apply failed: %s", e, exc_info=True)
-            raise HTTPException(status_code=500, detail=f"Apply failed: {e}")
+            raise HTTPException(status_code=500, detail=f"Apply failed: {e}") from None
 
 
 @app.get("/api/revision/download")
@@ -828,7 +850,7 @@ async def revision_download(session_id: str = Query(...)):
     try:
         session = session_mgr.get_by_id(session_id)
     except KeyError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=str(e)) from None
 
     if session.bundle_dir is None or not session.bundle_dir.exists():
         raise HTTPException(
@@ -874,7 +896,10 @@ def _user_friendly_conversion_error(raw_error: str | None, ext: str) -> str:
     if "no pages" in lower:
         return "This PDF has no pages. Please check the file and try again."
     if "oda file converter" in lower:
-        return "DWG conversion is not available on the web. Please export as DXF from your CAD software."
+        return (
+            "DWG conversion is not available on the web. "
+            "Please export as DXF from your CAD software."
+        )
     return f"Could not convert your {ext} file. Please try exporting as DXF from your CAD software."
 
 

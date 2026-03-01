@@ -94,6 +94,14 @@ class TestWebIntegration:
         # render/download are intentionally unauthed (session UUID = credential)
         # so we only check plan/apply isolation here
 
+    def test_get_profiles_returns_builtins(self, client):
+        """GET /api/profiles returns at least the builtin profiles."""
+        resp = client.get("/api/profiles")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "structural" in data
+        assert "all" in data
+
     def test_multiple_plans_overwrite_changeset(self, client, sample_dxf_bytes):
         """Running plan twice should use the latest changeset for apply."""
         resp = client.post(

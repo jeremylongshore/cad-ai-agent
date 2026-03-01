@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { fetchProfiles } from '../lib/api';
 
 const TABS = [
   { key: 'original', label: 'Original' },
@@ -27,6 +28,8 @@ export default function PreviewPanel({
   const hasOperations = operations.length > 0;
   const hasComparison = !!previewUrls.comparison;
   const revisionInputRef = useRef(null);
+  const [profileNames, setProfileNames] = useState([]);
+  const [selectedProfile, setSelectedProfile] = useState('');
 
   useEffect(() => {
     if (previewUrls.edited) setActiveTab('edited');
@@ -36,10 +39,16 @@ export default function PreviewPanel({
     if (previewUrls.comparison) setActiveTab('comparison');
   }, [previewUrls.comparison]);
 
+  useEffect(() => {
+    fetchProfiles()
+      .then((data) => setProfileNames(Object.keys(data)))
+      .catch((err) => console.error('Failed to fetch profiles:', err));
+  }, []);
+
   const handleRevisionUpload = (e) => {
     const file = e.target.files?.[0];
     if (file && onCompare) {
-      onCompare(file);
+      onCompare(file, selectedProfile || null);
     }
     // Reset input so re-uploading same file triggers change
     if (revisionInputRef.current) revisionInputRef.current.value = '';
@@ -111,9 +120,22 @@ export default function PreviewPanel({
         </div>
       )}
 
-      {/* Upload revision button (always visible when file loaded) */}
+      {/* Profile selector + upload revision button */}
       {activeTab === 'comparison' && onCompare && (
         <div style={{ marginTop: 'var(--space-2)' }}>
+          {profileNames.length > 0 && (
+            <select
+              className="profile-select"
+              value={selectedProfile}
+              onChange={(e) => setSelectedProfile(e.target.value)}
+              style={{ width: '100%', marginBottom: 'var(--space-2)', padding: 'var(--space-1)' }}
+            >
+              <option value="">All entities (no filter)</option>
+              {profileNames.map((name) => (
+                <option key={name} value={name}>{name}</option>
+              ))}
+            </select>
+          )}
           <input
             ref={revisionInputRef}
             type="file"

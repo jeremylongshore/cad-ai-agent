@@ -109,15 +109,40 @@ class TestExtractFromMixedDrawing:
 
 # --- Helper to build test snapshots quickly ---
 
+
 def _snaps() -> list:
     """Build a mix of snapshots for apply_profile tests."""
+    mk = make_geometry_snapshot
     return [
-        make_geometry_snapshot(handle="L1", entity_type=EntityType.LINE, layer="STRUCTURAL", points=[(0, 0), (10, 0)]),
-        make_geometry_snapshot(handle="L2", entity_type=EntityType.LINE, layer="GRID", points=[(0, 0), (0, 100)]),
-        make_geometry_snapshot(handle="T1", entity_type=EntityType.TEXT, layer="NOTES", points=[(50, 50)], text_content="Note A"),
-        make_geometry_snapshot(handle="T2", entity_type=EntityType.TEXT, layer="TITLEBLOCK", points=[(5, 5)], text_content="Title"),
-        make_geometry_snapshot(handle="P1", entity_type=EntityType.LWPOLYLINE, layer="STRUCTURAL", points=[(20, 20), (30, 20), (30, 30)]),
-        make_geometry_snapshot(handle="I1", entity_type=EntityType.INSERT, layer="STRUCTURAL", points=[(200, 200)], block_name="COL"),
+        mk(handle="L1", entity_type=EntityType.LINE, layer="STRUCTURAL", points=[(0, 0), (10, 0)]),
+        mk(handle="L2", entity_type=EntityType.LINE, layer="GRID", points=[(0, 0), (0, 100)]),
+        mk(
+            handle="T1",
+            entity_type=EntityType.TEXT,
+            layer="NOTES",
+            points=[(50, 50)],
+            text_content="Note A",
+        ),
+        mk(
+            handle="T2",
+            entity_type=EntityType.TEXT,
+            layer="TITLEBLOCK",
+            points=[(5, 5)],
+            text_content="Title",
+        ),
+        mk(
+            handle="P1",
+            entity_type=EntityType.LWPOLYLINE,
+            layer="STRUCTURAL",
+            points=[(20, 20), (30, 20), (30, 30)],
+        ),
+        mk(
+            handle="I1",
+            entity_type=EntityType.INSERT,
+            layer="STRUCTURAL",
+            points=[(200, 200)],
+            block_name="COL",
+        ),
     ]
 
 
@@ -177,7 +202,10 @@ class TestApplyProfile:
     def test_exclude_regions_edge(self):
         """Boundary is inclusive — entity exactly on edge is excluded."""
         snap = make_geometry_snapshot(
-            handle="EDGE", entity_type=EntityType.LINE, layer="X", points=[(10, 10), (10, 10)],
+            handle="EDGE",
+            entity_type=EntityType.LINE,
+            layer="X",
+            points=[(10, 10), (10, 10)],
         )
         profile = ComparisonProfile(
             exclude_regions=[BBoxRegion(min_x=10, min_y=10, max_x=20, max_y=20)],
@@ -201,8 +229,14 @@ class TestProfileViaExtraction:
         master, _ = make_complex_pair(tmp_path)
         config = ComparisonConfig(profile=ComparisonProfile.structural())
         snaps = extract_snapshots(master, config)
-        # structural() excludes NOTES layer and only includes LINE, LWPOLYLINE, CIRCLE, ARC, INSERT
-        allowed_types = {EntityType.LINE, EntityType.LWPOLYLINE, EntityType.CIRCLE, EntityType.ARC, EntityType.INSERT}
+        # structural() excludes NOTES and only includes structural types
+        allowed_types = {
+            EntityType.LINE,
+            EntityType.LWPOLYLINE,
+            EntityType.CIRCLE,
+            EntityType.ARC,
+            EntityType.INSERT,
+        }
         for s in snaps:
             assert s.entity_type in allowed_types, f"{s.entity_type} should be filtered"
             assert not s.layer.upper().startswith("NOTE"), f"Layer {s.layer} should be excluded"

@@ -114,6 +114,7 @@ ignore = ["S101"]  # Allow assert in tests
 "tests/**/*.py" = ["S101", "S106", "S108", "N806"]
 "scripts/**/*.py" = ["S603", "S607", "E402"]  # subprocess + sys.path before imports
 "src/**/alignment.py" = ["N803", "N806"]  # R, U, Vt, H are standard linear algebra names
+"web/backend/**/*.py" = ["B008", "S108", "E402"]  # FastAPI Depends/File, /tmp sessions, sys.path
 
 [tool.mypy]
 python_version = "3.11"

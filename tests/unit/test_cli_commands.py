@@ -84,6 +84,21 @@ class TestCmdDiff:
         assert "summary" in data
         assert "total_changes" in data
 
+    def test_diff_with_structural_profile(self, tmp_path, capsys):
+        master, revision = make_moved_entity_pair(tmp_path)
+        args = Namespace(
+            master=str(master),
+            revision=str(revision),
+            tolerance=1.0,
+            output_dir=None,
+            json=False,
+            verbose=False,
+            profile="structural",
+        )
+        rc = cmd_diff(args)
+        # structural profile filters to LINE/LWPOLYLINE — should still work
+        assert rc in (0, 1)
+
     def test_missing_master_raises(self, tmp_path):
         _, revision = make_identical_pair(tmp_path)
         args = Namespace(

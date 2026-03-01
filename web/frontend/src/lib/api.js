@@ -80,11 +80,24 @@ export async function getRenderBlob(sessionId, type = 'original') {
   return res.blob();
 }
 
-export async function compareFiles(sessionId, revisionFile) {
+export async function fetchProfiles() {
+  const res = await fetch(`${API_BASE}/api/profiles`);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch profiles: ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function compareFiles(sessionId, revisionFile, profile = null) {
   const formData = new FormData();
   formData.append('file', revisionFile);
 
-  const res = await request(`/api/compare?session_id=${sessionId}`, {
+  let url = `/api/compare?session_id=${sessionId}`;
+  if (profile) {
+    url += `&profile=${encodeURIComponent(profile)}`;
+  }
+
+  const res = await request(url, {
     method: 'POST',
     body: formData,
   });
