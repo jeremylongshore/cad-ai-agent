@@ -63,11 +63,17 @@ class ComparisonEngine:
 
             config = config or ComparisonConfig()
 
+            profile_warnings: list[str] = []
+
             logger.info("Extracting geometry from master: %s", Path(master_path).name)
-            master_snaps = extract_snapshots(master_path, config)
+            master_snaps = extract_snapshots(
+                master_path, config, _profile_warnings=profile_warnings
+            )
 
             logger.info("Extracting geometry from revision: %s", Path(revision_path).name)
-            revision_snaps = extract_snapshots(revision_path, config)
+            revision_snaps = extract_snapshots(
+                revision_path, config, _profile_warnings=profile_warnings
+            )
 
             # Canonical model: assign stable IDs and sort deterministically
             if config.use_canonical:
@@ -132,6 +138,7 @@ class ComparisonEngine:
                 summary=classified.summary,
                 config=classified.config,
                 alignment_result=alignment_result,
+                warnings=profile_warnings,
             )
 
             logger.info("Classification: %s", result.summary)

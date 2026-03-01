@@ -10,7 +10,12 @@ from typing import Any
 import ezdxf
 
 from ...models.cad_schema import EntityType, Point2D
-from ...models.comparison_schema import ComparisonConfig, ComparisonProfile, GeometrySnapshot
+from ...models.comparison_schema import (
+    BBoxRegion,
+    ComparisonConfig,
+    ComparisonProfile,
+    GeometrySnapshot,
+)
 from ...otel import get_tracer
 
 logger = logging.getLogger(__name__)
@@ -23,12 +28,14 @@ _EXTRACTABLE_TYPES = {t.value for t in EntityType}
 def extract_snapshots(
     dxf_path: str | Path,
     config: ComparisonConfig | None = None,
+    _profile_warnings: list[str] | None = None,
 ) -> list[GeometrySnapshot]:
     """Extract GeometrySnapshot objects from all model-space entities in a DXF.
 
     Args:
         dxf_path: Path to the DXF file.
         config: Optional comparison config for layer/type filtering.
+        _profile_warnings: If provided, profile warnings are appended to this list.
 
     Returns:
         List of GeometrySnapshot with full point data per entity.
@@ -70,7 +77,21 @@ def extract_snapshots(
                 snapshots.append(snap)
 
         if config.profile:
-            snapshots = apply_profile(snapshots, config.profile)
+            pre_profile_count = len(snapshots)
+            profile = config.profile
+
+            # Auto-detect titleblock region if no exclude_regions set
+            if not profile.exclude_regions:
+                detected = detect_titleblock_region(snapshots)
+                if detected is not None:
+                    profile = profile.model_copy(update={"exclude_regions": [detected]})
+
+            snapshots = apply_profile(snapshots, profile)
+
+            if _profile_warnings is not None:
+                _profile_warnings.extend(
+                    check_profile_warnings(pre_profile_count, snapshots, profile)
+                )
 
         span.set_attribute("cad.compare.entities_extracted", len(snapshots))
         span.set_attribute("cad.compare.ignored_layers", len(config.ignored_layers))
@@ -115,6 +136,88 @@ def apply_profile(
         ]
 
     return result
+
+
+# Title-block layer patterns (case-insensitive) — mirrors structural() preset
+_TITLEBLOCK_PATTERNS = [
+    re.compile(r"^title", re.IGNORECASE),
+    re.compile(r"^seal", re.IGNORECASE),
+    re.compile(r"^revision", re.IGNORECASE),
+    re.compile(r"^border", re.IGNORECASE),
+]
+
+
+def detect_titleblock_region(
+    snapshots: list[GeometrySnapshot],
+    padding: float = 5.0,
+) -> BBoxRegion | None:
+    """Auto-detect the title block region from entities on title-related layers.
+
+    Returns a BBoxRegion covering all points on matching layers (with padding),
+    or None if no title-block entities are found.
+    """
+    all_pts: list[tuple[float, float]] = []
+    for snap in snapshots:
+        if any(p.search(snap.layer) for p in _TITLEBLOCK_PATTERNS):
+            for pt in snap.points:
+                all_pts.append((pt.x, pt.y))
+
+    if not all_pts:
+        return None
+
+    xs = [p[0] for p in all_pts]
+    ys = [p[1] for p in all_pts]
+    return BBoxRegion(
+        min_x=min(xs) - padding,
+        min_y=min(ys) - padding,
+        max_x=max(xs) + padding,
+        max_y=max(ys) + padding,
+    )
+
+
+def check_profile_warnings(
+    before_count: int,
+    after_snapshots: list[GeometrySnapshot],
+    profile: ComparisonProfile,
+) -> list[str]:
+    """Check for suspicious profile filtering results.
+
+    Returns a list of warning strings (empty if everything looks fine).
+    """
+    if before_count == 0:
+        return []
+
+    after_count = len(after_snapshots)
+    excluded_count = before_count - after_count
+    excluded_pct = excluded_count / before_count
+
+    warnings: list[str] = []
+
+    if after_count == 0:
+        warnings.append(
+            f"Profile '{profile.name}' excluded all {before_count} entities — "
+            "no geometry remains for comparison."
+        )
+        return warnings
+
+    if excluded_pct > 0.80:
+        warnings.append(
+            f"Profile '{profile.name}' excluded {excluded_pct:.0%} of entities "
+            f"({excluded_count}/{before_count})."
+        )
+
+    if profile.include_entity_types:
+        from ...models.cad_schema import EntityType
+
+        structural_types = {EntityType.LINE, EntityType.LWPOLYLINE}
+        remaining_types = {s.entity_type for s in after_snapshots}
+        if not remaining_types & structural_types:
+            warnings.append(
+                f"Profile '{profile.name}' filtered out all LINE/LWPOLYLINE entities — "
+                "structural geometry may be missing."
+            )
+
+    return warnings
 
 
 def _extract_one(

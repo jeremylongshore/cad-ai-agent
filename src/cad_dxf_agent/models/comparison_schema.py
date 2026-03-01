@@ -348,6 +348,10 @@ class ComparisonResult(BaseModel):
     alignment_result: AlignmentResult | None = Field(
         default=None, description="Alignment result, if alignment was enabled"
     )
+    warnings: list[str] = Field(
+        default_factory=list,
+        description="Profile/filter warnings (e.g., too many entities excluded)",
+    )
 
     @property
     def total_changes(self) -> int:
