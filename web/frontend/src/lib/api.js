@@ -122,6 +122,44 @@ export async function downloadFile(sessionId) {
   URL.revokeObjectURL(url);
 }
 
+export async function revisionUpload(sessionId, file) {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const res = await request(`/api/revision/upload?session_id=${sessionId}`, {
+    method: 'POST',
+    body: formData,
+  });
+  return res.json();
+}
+
+export async function revisionAlign(sessionId, controlPoints = null) {
+  const res = await request('/api/revision/align', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ session_id: sessionId, control_points: controlPoints }),
+  });
+  return res.json();
+}
+
+export async function revisionDiff(sessionId, profile = null) {
+  const res = await request('/api/revision/diff', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ session_id: sessionId, profile }),
+  });
+  return res.json();
+}
+
+export async function revisionApprove(sessionId, approvals) {
+  const res = await request('/api/revision/approve', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ session_id: sessionId, approvals }),
+  });
+  return res.json();
+}
+
 export async function revisionApply(sessionId) {
   const res = await request('/api/revision/apply', {
     method: 'POST',

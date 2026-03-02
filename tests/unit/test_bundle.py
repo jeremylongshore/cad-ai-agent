@@ -113,6 +113,53 @@ class TestExportBundle:
         assert "approved_count" in meta
         assert "success_count" in meta
 
+    def test_metadata_has_hashes_and_versions(self, comparison_pair, tmp_path):
+        master, revision, result = comparison_pair
+        out = tmp_path / "bundle"
+        self._run_full_pipeline(master, revision, result, out)
+
+        meta = json.loads((out / "run_metadata.json").read_text())
+        assert "master_hash" in meta
+        assert "revision_hash" in meta
+        assert len(meta["master_hash"]) == 64  # SHA-256 hex digest
+        assert len(meta["revision_hash"]) == 64
+        assert "ezdxf_version" in meta
+        assert "pipeline_version" in meta
+
+    def test_alignment_result_in_bundle(self, comparison_pair, tmp_path):
+        """Bundle includes alignment_result.json when alignment is present."""
+        from cad_dxf_agent.models.comparison_schema import (
+            AlignmentMethod,
+            AlignmentResult,
+        )
+
+        master, revision, result = comparison_pair
+        result.alignment_result = AlignmentResult(
+            method=AlignmentMethod.translation,
+            confidence=0.95,
+            translation=(5.0, 3.0),
+        )
+
+        out = tmp_path / "bundle"
+        bundle = self._run_full_pipeline(master, revision, result, out)
+
+        assert bundle.alignment_result_path is not None
+        ar_path = Path(bundle.alignment_result_path)
+        assert ar_path.exists()
+
+        ar_data = json.loads(ar_path.read_text())
+        assert ar_data["method"] == "translation"
+        assert ar_data["confidence"] == 0.95
+
+    def test_no_alignment_result_when_absent(self, comparison_pair, tmp_path):
+        """No alignment_result.json when alignment was not used."""
+        master, revision, result = comparison_pair
+        out = tmp_path / "bundle"
+        bundle = self._run_full_pipeline(master, revision, result, out)
+
+        assert bundle.alignment_result_path is None
+        assert not (out / "alignment_result.json").exists()
+
     def test_empty_apply_result(self, tmp_path):
         """Bundle with no ops produces valid output."""
         master_path = tmp_path / "master.dxf"

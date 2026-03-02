@@ -1,5 +1,9 @@
 import { useState, useCallback, useRef } from 'react';
-import { uploadFile, planEdit, applyChanges, downloadFile, getRenderBlob, clearHistory, compareFiles, revisionApply, revisionDownloadUrl } from '../lib/api';
+import {
+  uploadFile, planEdit, applyChanges, downloadFile, getRenderBlob,
+  clearHistory, compareFiles, revisionUpload, revisionAlign, revisionDiff,
+  revisionApprove, revisionApply, revisionDownloadUrl,
+} from '../lib/api';
 
 const NO_CHANGES_MESSAGE = "I couldn't plan any changes. Try being more specific about which element to edit.";
 
@@ -23,6 +27,12 @@ export function useSession() {
   const [loading, setLoading] = useState(false);
   const [loadingStartTime, setLoadingStartTime] = useState(null);
   const [error, setError] = useState(null);
+
+  // Revision pipeline state
+  const [revisionFile, setRevisionFile] = useState(null);
+  const [alignmentResult, setAlignmentResult] = useState(null);
+  const [diffSummary, setDiffSummary] = useState(null);
+  const [wizardStep, setWizardStep] = useState(1);
 
   // Track last user prompt for retry
   const lastPromptRef = useRef(null);
@@ -247,6 +257,95 @@ export function useSession() {
     }
   }, [sessionId]);
 
+  // --- Revision pipeline handlers (wizard flow) ---
+
+  const handleRevisionUpload = useCallback(async (file, profile = null) => {
+    if (!sessionId) return;
+    setLoading(true);
+    setLoadingStartTime(Date.now());
+    setError(null);
+    setRevisionFile(file.name);
+    try {
+      await revisionUpload(sessionId, file);
+      setMessages((prev) => [...prev,
+        msg('system', `Revision file uploaded: ${file.name}`),
+      ]);
+
+      // Auto-run alignment
+      const alignData = await revisionAlign(sessionId);
+      setAlignmentResult(alignData);
+      setWizardStep(2);
+      setMessages((prev) => [...prev,
+        msg('system', `Alignment: ${alignData.method} (${(alignData.confidence * 100).toFixed(0)}% confidence)`),
+      ]);
+
+      // Auto-run diff with profile
+      const diffData = await revisionDiff(sessionId, profile);
+      setComparisonResult(diffData);
+      setRevisionOps(diffData.ops || []);
+      setDiffSummary(diffData.diff_summary || null);
+      setWizardStep(3);
+      setMessages((prev) => [...prev,
+        msg('system', diffData.diff_summary?.headline || `${diffData.total_changes} change(s) found`),
+      ]);
+
+      // Show warnings
+      if (diffData.warnings && diffData.warnings.length > 0) {
+        setMessages((prev) => [...prev,
+          msg('warning', diffData.warnings.join('\n')),
+        ]);
+      }
+      if (diffData.diff_summary?.warnings?.length > 0) {
+        setMessages((prev) => [...prev,
+          msg('warning', diffData.diff_summary.warnings.join('\n')),
+        ]);
+      }
+    } catch (err) {
+      setError(err.message);
+      setMessages((prev) => [...prev, msg('error', `Revision failed: ${err.message}`)]);
+    } finally {
+      setLoading(false);
+      setLoadingStartTime(null);
+    }
+  }, [sessionId]);
+
+  const handleRevisionApproveOp = useCallback(async (opId, action) => {
+    if (!sessionId) return;
+    setError(null);
+    try {
+      const data = await revisionApprove(sessionId, [{ op_id: opId, action }]);
+      // Update local ops state
+      setRevisionOps((prev) =>
+        prev.map((op) => {
+          const updated = data.ops.find((d) => d.op_id === op.op_id);
+          return updated ? { ...op, status: updated.status } : op;
+        })
+      );
+    } catch (err) {
+      setError(err.message);
+    }
+  }, [sessionId]);
+
+  const handleRevisionBulkApprove = useCallback(async (action) => {
+    if (!sessionId || !revisionOps) return;
+    setError(null);
+    try {
+      const approvals = revisionOps
+        .filter((op) => op.status === 'pending' || op.status === 'auto_approved' || (action === 'reject' && op.status !== 'rejected'))
+        .map((op) => ({ op_id: op.op_id, action }));
+      if (approvals.length === 0) return;
+      const data = await revisionApprove(sessionId, approvals);
+      setRevisionOps((prev) =>
+        prev.map((op) => {
+          const updated = data.ops.find((d) => d.op_id === op.op_id);
+          return updated ? { ...op, status: updated.status } : op;
+        })
+      );
+    } catch (err) {
+      setError(err.message);
+    }
+  }, [sessionId, revisionOps]);
+
   const handleRevisionApply = useCallback(async () => {
     if (!sessionId) return;
     setLoading(true);
@@ -296,6 +395,10 @@ export function useSession() {
     setBundleReady(false);
     setError(null);
     setLoadingStartTime(null);
+    setRevisionFile(null);
+    setAlignmentResult(null);
+    setDiffSummary(null);
+    setWizardStep(1);
     lastPromptRef.current = null;
   }, [previewUrls]);
 
@@ -321,8 +424,15 @@ export function useSession() {
     compareRevision,
     clearConversation,
     revisionOps,
+    revisionFile,
+    alignmentResult,
+    diffSummary,
+    wizardStep,
     revisionApplyResult,
     bundleReady,
+    handleRevisionUpload,
+    handleRevisionApproveOp,
+    handleRevisionBulkApprove,
     handleRevisionApply,
     handleBundleDownload,
     reset,

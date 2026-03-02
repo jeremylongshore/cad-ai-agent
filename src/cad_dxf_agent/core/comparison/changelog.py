@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from datetime import UTC, datetime
 
 from pydantic import BaseModel, Field
@@ -202,3 +203,83 @@ def _describe_modified(change: EntityChange) -> str:
             r = change.modifications["radius"]
             parts.append(f"radius: {r['from']} → {r['to']}")
     return " — ".join(parts)
+
+
+class DiffSummary(BaseModel):
+    """Human-readable summary of a comparison result with warnings."""
+
+    headline: str = Field(description="e.g. '12 changes: 3 added, 2 removed, 4 modified, 3 moved'")
+    warnings: list[str] = Field(default_factory=list)
+    by_layer: dict[str, dict[str, int]] = Field(
+        default_factory=dict,
+        description="Change counts grouped by layer, e.g. {'STRUCT': {'added': 2, 'moved': 1}}",
+    )
+
+
+def generate_summary(result: ComparisonResult) -> DiffSummary:
+    """Build a human-readable summary with warnings from a ComparisonResult."""
+    # Build headline
+    parts = []
+    for cat in ("added", "removed", "modified", "moved"):
+        count = result.summary.get(cat, 0)
+        if count > 0:
+            parts.append(f"{count} {cat}")
+
+    total = result.total_changes
+    headline = (
+        f"{total} change{'s' if total != 1 else ''}: {', '.join(parts)}"
+        if parts
+        else "No changes detected"
+    )
+
+    # Build by_layer
+    by_layer: dict[str, dict[str, int]] = {}
+    for change in result.changes:
+        if change.category.value == "unchanged":
+            continue
+        snap = change.revision_snapshot or change.master_snapshot
+        if snap is None:
+            continue
+        layer = snap.layer
+        cat = change.category.value
+        if layer not in by_layer:
+            by_layer[layer] = {}
+        by_layer[layer][cat] = by_layer[layer].get(cat, 0) + 1
+
+    # Generate warnings
+    warnings: list[str] = []
+
+    # Large moves (displacement > 10 units)
+    large_moves = 0
+    for change in result.changes:
+        if change.displacement is not None:
+            dist = math.sqrt(change.displacement.x**2 + change.displacement.y**2)
+            if dist > 10.0:
+                large_moves += 1
+    if large_moves > 0:
+        warnings.append(f"{large_moves} entit{'ies' if large_moves != 1 else 'y'} moved >10 units")
+
+    # Low-confidence matches
+    low_conf = sum(
+        1
+        for c in result.changes
+        if c.confidence < 0.6 and c.category.value not in ("added", "removed", "unchanged")
+    )
+    if low_conf > 0:
+        warnings.append(f"{low_conf} low-confidence match{'es' if low_conf != 1 else ''} (<0.6)")
+
+    # High remove count
+    master_total = (
+        result.summary.get("removed", 0)
+        + result.summary.get("moved", 0)
+        + result.summary.get("modified", 0)
+        + result.summary.get("unchanged", 0)
+    )
+    if master_total > 0:
+        remove_pct = result.summary.get("removed", 0) / master_total
+        if remove_pct > 0.5:
+            warnings.append(
+                f"{result.summary['removed']} entities removed (>{remove_pct:.0%} of master)"
+            )
+
+    return DiffSummary(headline=headline, warnings=warnings, by_layer=by_layer)

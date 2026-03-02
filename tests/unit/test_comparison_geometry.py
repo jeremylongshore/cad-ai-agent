@@ -385,3 +385,63 @@ class TestCheckProfileWarnings:
         warnings = check_profile_warnings(10, [], profile, source="master")
         assert len(warnings) == 1
         assert warnings[0].startswith("master: ")
+
+
+# --- Xref and dynamic block detection tests ---
+
+
+class TestXrefDetection:
+    def test_xref_warning_emitted(self, tmp_path):
+        """Files with xref blocks produce a warning."""
+        from tests.helpers.comparison_factory import make_xref_pair
+
+        master, _revision = make_xref_pair(tmp_path)
+        warnings: list[str] = []
+        extract_snapshots(master, _profile_warnings=warnings, _source="master")
+
+        assert any("external reference" in w.lower() for w in warnings)
+
+    def test_xref_entities_still_extracted(self, tmp_path):
+        """Xref INSERTs are not excluded — they're still in the snapshot list."""
+        from tests.helpers.comparison_factory import make_xref_pair
+
+        master, _revision = make_xref_pair(tmp_path)
+        snaps = extract_snapshots(master)
+
+        # Should include the xref INSERT along with structural entities
+        insert_snaps = [s for s in snaps if s.entity_type.value == "INSERT"]
+        assert len(insert_snaps) > 0
+
+    def test_no_warning_without_xrefs(self, tmp_path):
+        """Normal files produce no xref warnings."""
+        from tests.helpers.comparison_factory import make_identical_pair
+
+        master, _revision = make_identical_pair(tmp_path)
+        warnings: list[str] = []
+        extract_snapshots(master, _profile_warnings=warnings, _source="master")
+
+        assert not any("external reference" in w.lower() for w in warnings)
+
+    def test_xref_warning_includes_source_prefix(self, tmp_path):
+        """Xref warning respects the _source label."""
+        from tests.helpers.comparison_factory import make_xref_pair
+
+        master, _revision = make_xref_pair(tmp_path)
+        warnings: list[str] = []
+        extract_snapshots(master, _profile_warnings=warnings, _source="master")
+
+        xref_warnings = [w for w in warnings if "external reference" in w.lower()]
+        assert len(xref_warnings) == 1
+        assert xref_warnings[0].startswith("master: ")
+
+    def test_xref_warning_names_the_block(self, tmp_path):
+        """Xref warning includes the block name(s) involved."""
+        from tests.helpers.comparison_factory import make_xref_pair
+
+        master, _revision = make_xref_pair(tmp_path)
+        warnings: list[str] = []
+        extract_snapshots(master, _profile_warnings=warnings)
+
+        xref_warnings = [w for w in warnings if "external reference" in w.lower()]
+        assert len(xref_warnings) == 1
+        assert "GRID_REF" in xref_warnings[0]

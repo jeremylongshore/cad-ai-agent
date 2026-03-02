@@ -788,6 +788,14 @@ async def revision_diff(body: RevisionDiffRequest, user: dict = Depends(get_user
             }
             if result.warnings:
                 diff_response["warnings"] = result.warnings
+            from cad_dxf_agent.core.comparison.changelog import generate_summary
+
+            diff_summary = generate_summary(result)
+            diff_response["diff_summary"] = {
+                "headline": diff_summary.headline,
+                "warnings": diff_summary.warnings,
+                "by_layer": diff_summary.by_layer,
+            }
             return diff_response
 
         except Exception as e:
