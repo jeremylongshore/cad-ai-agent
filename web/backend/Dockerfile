@@ -12,6 +12,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libfontconfig1 \
     && rm -rf /var/lib/apt/lists/*
 
+# Install ODA File Converter for DWG support
+RUN apt-get update && apt-get install -y --no-install-recommends wget \
+    && wget -q "https://download.opendesign.com/guestfiles/ODAFileConverter/ODAFileConverter_QT6_lnxX64_8.3dll_25.12.deb" \
+       -O /tmp/oda.deb \
+    && echo "15facc7301b905a1b1aa742f7eeb936f96a1ad3f1828e8db7a444f4b572c7395  /tmp/oda.deb" | sha256sum -c - \
+    && (dpkg -i /tmp/oda.deb || apt-get install -f -y) \
+    && rm /tmp/oda.deb \
+    && apt-get purge -y wget \
+    && rm -rf /var/lib/apt/lists/*
+
 # Install Python deps (everything in one layer)
 COPY web/backend/requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt

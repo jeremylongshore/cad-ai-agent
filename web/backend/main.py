@@ -37,7 +37,7 @@ sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from cad_dxf_agent.otel import span as otel_span  # noqa: E402
 
-from .auth import verify_token
+from .auth import get_licensed_user
 from .session import SessionManager
 
 logger = logging.getLogger(__name__)
@@ -140,7 +140,7 @@ class RevisionApplyRequest(BaseModel):
 
 
 async def get_user(request: Request) -> dict:
-    return await verify_token(request)
+    return await get_licensed_user(request)
 
 
 # ---------------------------------------------------------------------------
@@ -171,7 +171,7 @@ async def upload(
         raise HTTPException(status_code=400, detail="No file provided")
 
     ext = Path(file.filename).suffix.lower()
-    if ext not in (".dxf", ".pdf"):
+    if ext not in (".dxf", ".pdf", ".dwg"):
         raise HTTPException(status_code=400, detail=f"Unsupported file type: {ext}")
 
     session = session_mgr.create(user_id=user["uid"])
@@ -198,6 +198,8 @@ async def upload(
                 status_code=500,
                 detail="PDF conversion is temporarily unavailable. Please try a .dxf file.",
             ) from None
+    elif ext == ".dwg":
+        _convert_dwg_to_dxf(upload_path, output_dir=session_dir, dest_path=dxf_path)
     else:
         shutil.copy2(str(upload_path), str(dxf_path))
 
@@ -414,8 +416,8 @@ async def compare(
             raise HTTPException(status_code=400, detail="No file provided")
 
         ext = Path(file.filename).suffix.lower()
-        if ext != ".dxf":
-            raise HTTPException(status_code=400, detail="Comparison requires a .dxf file")
+        if ext not in (".dxf", ".dwg"):
+            raise HTTPException(status_code=400, detail="Comparison requires a .dxf or .dwg file")
 
         try:
             session = session_mgr.get(session_id, user["uid"])
@@ -427,11 +429,18 @@ async def compare(
                 status_code=400, detail="No master file loaded. Upload a file first."
             )
 
-        # Save revision file
+        # Save uploaded file
         session_dir = Path("/tmp/cad-sessions") / session.session_id
         revision_path = session_dir / "revision.dxf"
-        content = await file.read()
-        revision_path.write_bytes(content)
+
+        if ext == ".dwg":
+            dwg_path = session_dir / "revision_upload.dwg"
+            content = await file.read()
+            dwg_path.write_bytes(content)
+            _convert_dwg_to_dxf(dwg_path, output_dir=session_dir, dest_path=revision_path)
+        else:
+            content = await file.read()
+            revision_path.write_bytes(content)
 
         try:
             from cad_dxf_agent.core.comparison.engine import ComparisonEngine
@@ -526,11 +535,15 @@ async def render(
 @app.get("/api/download")
 async def download(
     session_id: str = Query(...),
+    output_format: str = Query("dxf", alias="format"),
 ):
-    """Download the edited DXF file.
+    """Download the edited file as DXF or DWG.
 
     No auth required — same rationale as /api/render (Firebase rewrites
     strip Authorization headers on proxied GET requests).
+
+    Query params:
+        format: "dxf" (default) or "dwg" (converts via ODA before download).
     """
     try:
         session = session_mgr.get_by_id(session_id)
@@ -542,11 +555,35 @@ async def download(
             status_code=404, detail="No edited file available. Run /api/apply first."
         )
 
-    # Build download filename from original
     original_name = session.file_info.get("filename", "drawing.dxf")
     stem = Path(original_name).stem
-    download_name = f"{stem}_edited.dxf"
 
+    if output_format == "dwg":
+        # ODA converts both ways — ezdxf odafc.export_dwg writes DWG from DXF
+        try:
+            import ezdxf
+            from ezdxf.addons import odafc
+
+            session_dir = Path("/tmp/cad-sessions") / session.session_id
+            dwg_path = session_dir / f"{stem}_edited.dwg"
+            doc = ezdxf.readfile(str(session.edited_path))
+            odafc.export_dwg(doc, str(dwg_path))  # type: ignore[attr-defined]
+
+            download_name = f"{stem}_edited.dwg"
+            return FileResponse(
+                path=str(dwg_path),
+                media_type="application/octet-stream",
+                filename=download_name,
+                headers={"Content-Disposition": f'attachment; filename="{download_name}"'},
+            )
+        except Exception as e:
+            raise HTTPException(
+                status_code=422,
+                detail=f"DWG export failed: {e}. Try downloading as DXF instead.",
+            ) from None
+
+    # Default: DXF download
+    download_name = f"{stem}_edited.dxf"
     return FileResponse(
         path=str(session.edited_path),
         media_type="application/dxf",
@@ -589,8 +626,10 @@ async def revision_upload(
             raise HTTPException(status_code=400, detail="No file provided")
 
         ext = Path(file.filename).suffix.lower()
-        if ext != ".dxf":
-            raise HTTPException(status_code=400, detail="Revision upload requires a .dxf file")
+        if ext not in (".dxf", ".dwg"):
+            raise HTTPException(
+                status_code=400, detail="Revision upload requires a .dxf or .dwg file"
+            )
 
         try:
             session = session_mgr.get(session_id, user["uid"])
@@ -599,8 +638,15 @@ async def revision_upload(
 
         session_dir = Path("/tmp/cad-sessions") / session.session_id
         revision_path = session_dir / "revision.dxf"
-        content = await file.read()
-        revision_path.write_bytes(content)
+
+        if ext == ".dwg":
+            dwg_path = session_dir / "revision_upload.dwg"
+            content = await file.read()
+            dwg_path.write_bytes(content)
+            _convert_dwg_to_dxf(dwg_path, output_dir=session_dir, dest_path=revision_path)
+        else:
+            content = await file.read()
+            revision_path.write_bytes(content)
         session.revision_path = revision_path
 
         return {"session_id": session.session_id, "filename": file.filename}
@@ -883,6 +929,22 @@ async def revision_download(session_id: str = Query(...)):
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+
+def _convert_dwg_to_dxf(dwg_path: Path, output_dir: Path, dest_path: Path) -> list[str]:
+    """Convert a DWG file to DXF via ODA, copy to dest_path.
+
+    Returns any conversion warnings.
+    Raises HTTPException on failure.
+    """
+    from cad_dxf_agent.core.converter import convert_to_dxf
+
+    result = convert_to_dxf(dwg_path, output_dir=output_dir)
+    if not result.success:
+        detail = _user_friendly_conversion_error(result.error, ".dwg")
+        raise HTTPException(status_code=422, detail=detail)
+    shutil.copy2(str(result.output_path), str(dest_path))
+    return result.warnings
 
 
 def _user_friendly_conversion_error(raw_error: str | None, ext: str) -> str:

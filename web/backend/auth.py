@@ -1,13 +1,18 @@
-"""Firebase Auth token validation for the web backend."""
+"""Firebase Auth token validation and license gating for the web backend."""
 
 from __future__ import annotations
 
 import logging
 import os
+import time
 
 from fastapi import HTTPException, Request
 
 logger = logging.getLogger(__name__)
+
+# License cache: {uid: (active: bool, timestamp: float)}
+_license_cache: dict[str, tuple[bool, float]] = {}
+_LICENSE_CACHE_TTL = 300  # 5 minutes
 
 # Lazy-init firebase admin
 _firebase_app = None
@@ -57,3 +62,68 @@ async def verify_token(request: Request) -> dict:
     except Exception as e:
         logger.warning("Token verification failed: %s", e)
         raise HTTPException(status_code=401, detail="Invalid or expired token") from e
+
+
+async def check_license(user: dict) -> None:
+    """Verify the user holds an active license in Firestore.
+
+    Checks the ``licenses`` collection for a document whose ID matches the
+    user's Firebase UID.  The document must exist and have ``active: true``.
+    Results are cached for 5 minutes to avoid hitting Firestore on every request.
+
+    Raises HTTPException 403 if the license is missing or inactive.
+    """
+    # Skip in dev mode (same as auth skip)
+    if os.getenv("CAD_WEB_DEV_MODE", "").lower() in ("1", "true"):
+        return
+
+    uid = user.get("uid")
+    if not uid:
+        logger.warning("License check called for user with no UID")
+        raise HTTPException(status_code=403, detail="License check unavailable")
+
+    now = time.monotonic()
+
+    # Check cache
+    cached = _license_cache.get(uid)
+    if cached is not None:
+        active, ts = cached
+        if now - ts < _LICENSE_CACHE_TTL:
+            if not active:
+                raise HTTPException(status_code=403, detail="License inactive")
+            return
+
+    # Query Firestore (sync client wrapped for async safety)
+    try:
+        from starlette.concurrency import run_in_threadpool
+
+        active = await run_in_threadpool(_fetch_license, uid)
+        _license_cache[uid] = (active, now)
+
+        if not active:
+            raise HTTPException(status_code=403, detail="License inactive")
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("License check failed: %s", e)
+        # Fail open would be risky — fail closed instead
+        raise HTTPException(status_code=403, detail="License check unavailable") from e
+
+
+def _fetch_license(uid: str) -> bool:
+    """Synchronous Firestore lookup — called via run_in_threadpool."""
+    from google.cloud import firestore
+
+    db = firestore.Client()
+    doc = db.collection("licenses").document(uid).get()
+    if not doc.exists:
+        return False
+    return doc.to_dict().get("active", False)
+
+
+async def get_licensed_user(request: Request) -> dict:
+    """Combined dependency: authenticate then check license."""
+    user = await verify_token(request)
+    await check_license(user)
+    return user
