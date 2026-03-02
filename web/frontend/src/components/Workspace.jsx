@@ -97,8 +97,15 @@ export default function Workspace({ user, onSignOut }) {
               comparisonResult={comparisonResult}
               loading={loading}
               revisionOps={session.revisionOps}
+              revisionFile={session.revisionFile}
+              alignmentResult={session.alignmentResult}
+              diffSummary={session.diffSummary}
+              wizardStep={session.wizardStep}
               revisionApplyResult={session.revisionApplyResult}
               bundleReady={session.bundleReady}
+              onRevisionUpload={session.handleRevisionUpload}
+              onRevisionApproveOp={session.handleRevisionApproveOp}
+              onRevisionBulkApprove={session.handleRevisionBulkApprove}
               onRevisionApply={session.handleRevisionApply}
               onBundleDownload={session.handleBundleDownload}
             />

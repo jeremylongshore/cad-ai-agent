@@ -10,6 +10,7 @@ from ...models.cad_schema import Point2D
 from ...models.comparison_schema import (
     ComparisonConfig,
     GeometrySnapshot,
+    MatchExplanation,
     MatchMethod,
     MatchResult,
     ScoredMatch,
@@ -144,8 +145,8 @@ def _scored_matching(
         (pairs, remaining_master, remaining_revision)
     """
     # Build scored candidates across all master entities
-    # Each entry: (score, master_idx, revision_idx)
-    scored_candidates: list[tuple[float, int, int]] = []
+    # Each entry: (score, master_idx, revision_idx, explanation)
+    scored_candidates: list[tuple[float, int, int, MatchExplanation]] = []
 
     # Index revision snaps for lookup by object identity
     rev_index: dict[int, int] = {}
@@ -156,15 +157,15 @@ def _scored_matching(
         candidates = find_candidates(m_snap, revision_snaps, tolerance)
         for r_snap, _dist in candidates:
             ri = rev_index[id(r_snap)]
-            s = score_match(m_snap, r_snap, tolerance)
-            scored_candidates.append((s, mi, ri))
+            s, explanation = score_match(m_snap, r_snap, tolerance)
+            scored_candidates.append((s, mi, ri, explanation))
 
     # Sort descending by score (highest confidence first)
     scored_candidates.sort(key=lambda x: -x[0])
 
     # Track per-master scores for runner-up computation
     scores_by_master: dict[int, list[float]] = defaultdict(list)
-    for s, mi, _ri in scored_candidates:
+    for s, mi, _ri, _expl in scored_candidates:
         scores_by_master[mi].append(s)
 
     # Greedy assignment: highest score first, skip already-matched
@@ -172,7 +173,7 @@ def _scored_matching(
     matched_r: set[int] = set()
     pairs: list[ScoredMatch] = []
 
-    for s, mi, ri in scored_candidates:
+    for s, mi, ri, explanation in scored_candidates:
         if mi in matched_m or ri in matched_r:
             continue
 
@@ -194,6 +195,7 @@ def _scored_matching(
                 method=MatchMethod.spatial,
                 runner_up_score=runner_up_score,
                 ambiguous=ambiguous,
+                explanation=explanation,
             )
         )
         matched_m.add(mi)

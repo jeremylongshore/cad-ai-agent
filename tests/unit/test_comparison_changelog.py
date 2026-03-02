@@ -4,14 +4,21 @@ from __future__ import annotations
 
 import json
 
-from cad_dxf_agent.core.comparison.changelog import ChangeLog, generate_changelog
+from cad_dxf_agent.core.comparison.changelog import (
+    ChangeLog,
+    DiffSummary,
+    generate_changelog,
+    generate_summary,
+)
 from cad_dxf_agent.core.comparison.classifier import classify_changes
 from cad_dxf_agent.core.comparison.geometry import extract_snapshots
 from cad_dxf_agent.core.comparison.matcher import match_entities
-from cad_dxf_agent.models.comparison_schema import ComparisonConfig
+from cad_dxf_agent.models.comparison_schema import ChangeCategory, ComparisonConfig
 from tests.helpers.comparison_factory import (
     make_added_removed_pair,
+    make_comparison_result,
     make_complex_pair,
+    make_entity_change,
     make_identical_pair,
     make_modified_text_pair,
     make_moved_entity_pair,
@@ -108,3 +115,107 @@ class TestGenerateChangelog:
         data = json.loads(log.to_json())
         assert isinstance(data["entries"], list)
         assert isinstance(data["summary"], dict)
+
+
+class TestDiffSummary:
+    def test_headline_format(self):
+        result = make_comparison_result(
+            [
+                make_entity_change(ChangeCategory.ADDED),
+                make_entity_change(ChangeCategory.REMOVED),
+                make_entity_change(ChangeCategory.MOVED, displacement=(5.0, 0.0)),
+            ]
+        )
+        summary = generate_summary(result)
+        assert "3 changes" in summary.headline
+        assert "1 added" in summary.headline
+        assert "1 removed" in summary.headline
+        assert "1 moved" in summary.headline
+
+    def test_no_changes(self):
+        result = make_comparison_result([])
+        summary = generate_summary(result)
+        assert summary.headline == "No changes detected"
+
+    def test_large_move_warning(self):
+        result = make_comparison_result(
+            [
+                make_entity_change(ChangeCategory.MOVED, displacement=(15.0, 0.0)),
+            ]
+        )
+        summary = generate_summary(result)
+        assert any("moved >10 units" in w for w in summary.warnings)
+
+    def test_low_confidence_warning(self):
+        result = make_comparison_result(
+            [
+                make_entity_change(ChangeCategory.MODIFIED, confidence=0.4),
+            ]
+        )
+        summary = generate_summary(result)
+        assert any("low-confidence" in w for w in summary.warnings)
+
+    def test_by_layer_grouping(self):
+        result = make_comparison_result(
+            [
+                make_entity_change(ChangeCategory.ADDED, layer="STRUCT"),
+                make_entity_change(ChangeCategory.ADDED, layer="STRUCT"),
+                make_entity_change(ChangeCategory.REMOVED, layer="NOTES"),
+            ]
+        )
+        summary = generate_summary(result)
+        assert "STRUCT" in summary.by_layer
+        assert summary.by_layer["STRUCT"]["added"] == 2
+        assert "NOTES" in summary.by_layer
+        assert summary.by_layer["NOTES"]["removed"] == 1
+
+    def test_single_change_headline_singular(self):
+        result = make_comparison_result(
+            [
+                make_entity_change(ChangeCategory.ADDED),
+            ]
+        )
+        summary = generate_summary(result)
+        assert "1 change:" in summary.headline
+        assert "changes" not in summary.headline
+
+    def test_no_large_move_warning_below_threshold(self):
+        result = make_comparison_result(
+            [
+                make_entity_change(ChangeCategory.MOVED, displacement=(5.0, 0.0)),
+            ]
+        )
+        summary = generate_summary(result)
+        assert not any("moved >10 units" in w for w in summary.warnings)
+
+    def test_no_low_confidence_warning_at_threshold(self):
+        result = make_comparison_result(
+            [
+                make_entity_change(ChangeCategory.MODIFIED, confidence=0.6),
+            ]
+        )
+        summary = generate_summary(result)
+        assert not any("low-confidence" in w for w in summary.warnings)
+
+    def test_diff_summary_is_pydantic_model(self):
+        result = make_comparison_result(
+            [
+                make_entity_change(ChangeCategory.ADDED),
+            ]
+        )
+        summary = generate_summary(result)
+        assert isinstance(summary, DiffSummary)
+        assert isinstance(summary.headline, str)
+        assert isinstance(summary.warnings, list)
+        assert isinstance(summary.by_layer, dict)
+
+    def test_unchanged_excluded_from_by_layer(self):
+        result = make_comparison_result(
+            [
+                make_entity_change(ChangeCategory.UNCHANGED, layer="STRUCT"),
+                make_entity_change(ChangeCategory.ADDED, layer="NOTES"),
+            ]
+        )
+        summary = generate_summary(result)
+        assert "STRUCT" not in summary.by_layer
+        assert "NOTES" in summary.by_layer

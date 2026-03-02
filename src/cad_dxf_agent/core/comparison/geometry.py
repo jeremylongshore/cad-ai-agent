@@ -78,6 +78,11 @@ def extract_snapshots(
             if snap is not None:
                 snapshots.append(snap)
 
+        # Detect xrefs and dynamic blocks in INSERT entities
+        xref_warnings = _detect_xrefs_and_dynblocks(doc, snapshots, _source)
+        if _profile_warnings is not None:
+            _profile_warnings.extend(xref_warnings)
+
         if config.profile:
             pre_profile_count = len(snapshots)
             snapshots = apply_profile(snapshots, config.profile)
@@ -219,6 +224,61 @@ def check_profile_warnings(
                 f"{prefix}Profile '{profile.name}' filtered out all "
                 "LINE/LWPOLYLINE entities — structural geometry may be missing."
             )
+
+    return warnings
+
+
+def _detect_xrefs_and_dynblocks(
+    doc: ezdxf.document.Drawing,
+    snapshots: list[GeometrySnapshot],
+    source: str = "",
+) -> list[str]:
+    """Detect xref references and dynamic blocks among INSERT entities.
+
+    Returns warning strings for each detected issue.
+    Does not fail — entities are still included in comparison.
+    """
+    warnings: list[str] = []
+    prefix = f"{source}: " if source else ""
+
+    xref_blocks: set[str] = set()
+    dynblock_names: set[str] = set()
+
+    for block_layout in doc.blocks:
+        block_record = block_layout.block
+        if block_record is None:
+            continue
+
+        # Check xref flag (bit 4 = 0x04 in block flags)
+        flags = block_record.dxf.get("flags", 0)
+        if flags & 4:  # BLK_XREF
+            xref_blocks.add(block_layout.name)
+
+        # Check for dynamic block (ACAD_ENHANCEDBLOCK in extension dict)
+        try:
+            xdict = block_record.extension_dict
+            if xdict is not None and "ACAD_ENHANCEDBLOCK" in xdict:
+                dynblock_names.add(block_layout.name)
+        except Exception:
+            logger.debug("Block %s: extension dict read failed", block_layout.name)
+
+    # Count INSERT snapshots referencing xref/dynblock
+    xref_count = sum(1 for s in snapshots if s.block_name in xref_blocks)
+    dynblock_count = sum(1 for s in snapshots if s.block_name in dynblock_names)
+
+    if xref_count > 0:
+        names = ", ".join(sorted(xref_blocks))
+        warnings.append(
+            f"{prefix}File contains {xref_count} external reference(s) ({names}). "
+            "Xref content is not resolved — comparison covers host-file entities only."
+        )
+
+    if dynblock_count > 0:
+        names = ", ".join(sorted(dynblock_names))
+        warnings.append(
+            f"{prefix}File contains {dynblock_count} dynamic block(s) ({names}). "
+            "Dynamic properties may affect comparison accuracy."
+        )
 
     return warnings
 

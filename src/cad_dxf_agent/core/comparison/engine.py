@@ -6,6 +6,8 @@ import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import ezdxf
+
 from ...models.comparison_schema import ComparisonConfig, ComparisonResult
 from ...otel import get_tracer
 from .alignment import align_drawings, apply_alignment
@@ -60,6 +62,7 @@ class ComparisonEngine:
         with tracer.start_as_current_span("cad.compare.engine.compare") as span:
             span.set_attribute("cad.compare.master_path", Path(master_path).name)
             span.set_attribute("cad.compare.revision_path", Path(revision_path).name)
+            span.set_attribute("cad.compare.ezdxf_version", ezdxf.version)
 
             config = config or ComparisonConfig()
 

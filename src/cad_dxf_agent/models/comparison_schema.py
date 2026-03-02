@@ -299,6 +299,21 @@ class EntityChange(BaseModel):
         return (min_x, min_y, max_x, max_y)
 
 
+class MatchExplanation(BaseModel):
+    """Breakdown of how a match score was computed."""
+
+    method: MatchMethod
+    features: dict[str, float] = Field(
+        default_factory=dict,
+        description="Feature name → weighted contribution (e.g. {'block_name': 0.5})",
+    )
+    distance: float = Field(default=0.0, description="Centroid distance between entities")
+    notes: list[str] = Field(
+        default_factory=list,
+        description="Human-readable notes (e.g. 'same block name', 'within 2.3 units')",
+    )
+
+
 class ScoredMatch(BaseModel):
     """A matched pair with confidence scoring metadata."""
 
@@ -311,6 +326,9 @@ class ScoredMatch(BaseModel):
     )
     ambiguous: bool = Field(
         default=False, description="True when confidence - runner_up_score < 0.1"
+    )
+    explanation: MatchExplanation | None = Field(
+        default=None, description="Score breakdown (None for fingerprint matches)"
     )
 
 
@@ -524,5 +542,6 @@ class RunBundle(BaseModel):
     changelog_json_path: str | None = None
     changelog_text_path: str | None = None
     apply_result_path: str | None = None
+    alignment_result_path: str | None = None
     bundle_dir: str = ""
     metadata: dict[str, Any] = Field(default_factory=dict)

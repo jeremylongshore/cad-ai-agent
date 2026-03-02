@@ -5,7 +5,7 @@ from __future__ import annotations
 import math
 
 from ...models.cad_schema import EntityType, Point2D
-from ...models.comparison_schema import GeometrySnapshot
+from ...models.comparison_schema import GeometrySnapshot, MatchExplanation, MatchMethod
 from .canonical import GeometrySignature, QuantizationConfig, compute_signature
 
 # --- Weight constants (alignment.py pattern) ---
@@ -66,7 +66,7 @@ def score_match(
     revision: GeometrySnapshot,
     tolerance: float,
     config: QuantizationConfig | None = None,
-) -> float:
+) -> tuple[float, MatchExplanation]:
     """Compute match confidence between two entities.
 
     Routes to type-specific scorers:
@@ -76,7 +76,7 @@ def score_match(
     - Fallback → centroid proximity only
 
     Returns:
-        Confidence score in [0.0, 1.0].
+        Tuple of (confidence score in [0.0, 1.0], MatchExplanation).
     """
     etype = master.entity_type
 
@@ -95,14 +95,22 @@ def score_match(
     ):
         return score_geometry(master, revision, config)
     # Fallback: centroid proximity
-    return _proximity_score(master.centroid, revision.centroid, tolerance)
+    prox = _proximity_score(master.centroid, revision.centroid, tolerance)
+    dist = _centroid_distance(master.centroid, revision.centroid)
+    explanation = MatchExplanation(
+        method=MatchMethod.spatial,
+        features={"proximity": round(prox, 6)},
+        distance=round(dist, 6),
+        notes=[f"proximity score: {prox:.4f}"],
+    )
+    return prox, explanation
 
 
 def score_insert(
     master: GeometrySnapshot,
     revision: GeometrySnapshot,
     tolerance: float,
-) -> float:
+) -> tuple[float, MatchExplanation]:
     """Score INSERT (block reference) match confidence.
 
     Weighted components:
@@ -111,37 +119,60 @@ def score_insert(
     - Position proximity (1 - dist/tolerance): 0.3
 
     Returns:
-        Score in [0.0, 1.0].
+        Tuple of (score in [0.0, 1.0], MatchExplanation).
     """
     score = 0.0
+    features: dict[str, float] = {}
+    notes: list[str] = []
 
     # Block name match (== handles None==None correctly)
     if master.block_name == revision.block_name:
+        features["block_name"] = _BLOCK_NAME_WEIGHT
         score += _BLOCK_NAME_WEIGHT
+        notes.append("same block name")
+    else:
+        features["block_name"] = 0.0
 
     # Attribute key overlap (Jaccard similarity)
     m_keys = set(master.attributes.keys())
     r_keys = set(revision.attributes.keys())
     if m_keys or r_keys:
         jaccard = len(m_keys & r_keys) / len(m_keys | r_keys)
-        score += _ATTRIB_OVERLAP_WEIGHT * jaccard
+        attrib_contribution = _ATTRIB_OVERLAP_WEIGHT * jaccard
+        features["attrib_overlap"] = round(attrib_contribution, 6)
+        score += attrib_contribution
+        intersection = len(m_keys & r_keys)
+        union = len(m_keys | r_keys)
+        notes.append(f"attribute overlap: {jaccard:.2f} ({intersection}/{union} keys)")
     else:
         # Both empty — perfect match on this dimension
+        features["attrib_overlap"] = _ATTRIB_OVERLAP_WEIGHT
         score += _ATTRIB_OVERLAP_WEIGHT
+        notes.append("no attributes (perfect overlap)")
 
     # Position proximity
-    score += _INSERT_POSITION_WEIGHT * _proximity_score(
-        master.centroid, revision.centroid, tolerance
-    )
+    prox = _proximity_score(master.centroid, revision.centroid, tolerance)
+    pos_contribution = _INSERT_POSITION_WEIGHT * prox
+    features["position"] = round(pos_contribution, 6)
+    score += pos_contribution
+    dist = _centroid_distance(master.centroid, revision.centroid)
+    notes.append(f"within {dist:.4f} units")
 
-    return min(1.0, score)
+    final_score = min(1.0, score)
+    explanation = MatchExplanation(
+        method=MatchMethod.spatial,
+        features=features,
+        distance=round(dist, 6),
+        notes=notes,
+    )
+    return final_score, explanation
 
 
 def score_geometry(
     master: GeometrySnapshot,
     revision: GeometrySnapshot,
     config: QuantizationConfig | None = None,
-) -> float:
+) -> tuple[float, MatchExplanation]:
     """Score LINE/POLYLINE/etc match confidence using geometry signatures.
 
     Compares:
@@ -152,49 +183,83 @@ def score_geometry(
     - Turn hash match: 0.15
 
     Returns:
-        Score in [0.0, 1.0].
+        Tuple of (score in [0.0, 1.0], MatchExplanation).
     """
     m_sig = _get_signature(master, config)
     r_sig = _get_signature(revision, config)
 
     score = 0.0
+    features: dict[str, float] = {}
+    notes: list[str] = []
 
     # Length ratio (0-1, where 1 = identical length)
     if m_sig.length > 0 or r_sig.length > 0:
         max_len = max(m_sig.length, r_sig.length)
         min_len = min(m_sig.length, r_sig.length)
-        score += _LENGTH_RATIO_WEIGHT * (min_len / max_len if max_len > 0 else 1.0)
+        length_ratio = min_len / max_len if max_len > 0 else 1.0
+        length_contribution = _LENGTH_RATIO_WEIGHT * length_ratio
+        features["length_ratio"] = round(length_contribution, 6)
+        score += length_contribution
+        notes.append(f"length ratio: {length_ratio:.4f}")
     else:
+        features["length_ratio"] = _LENGTH_RATIO_WEIGHT
         score += _LENGTH_RATIO_WEIGHT
+        notes.append("length ratio: 1.0 (both zero)")
 
     # Angle bucket match
     if m_sig.angle_bucket == r_sig.angle_bucket:
+        features["angle_bucket"] = _ANGLE_BUCKET_WEIGHT
         score += _ANGLE_BUCKET_WEIGHT
+        notes.append(f"same angle bucket ({m_sig.angle_bucket})")
+    else:
+        features["angle_bucket"] = 0.0
 
     # Vertex count match
     if m_sig.vertex_count == r_sig.vertex_count:
+        features["vertex_count"] = _VERTEX_COUNT_WEIGHT
         score += _VERTEX_COUNT_WEIGHT
+        notes.append(f"same vertex count ({m_sig.vertex_count})")
+    else:
+        features["vertex_count"] = 0.0
 
     # Perimeter ratio
     if m_sig.perimeter > 0 or r_sig.perimeter > 0:
         max_p = max(m_sig.perimeter, r_sig.perimeter)
         min_p = min(m_sig.perimeter, r_sig.perimeter)
-        score += _PERIMETER_RATIO_WEIGHT * (min_p / max_p if max_p > 0 else 1.0)
+        perim_ratio = min_p / max_p if max_p > 0 else 1.0
+        perim_contribution = _PERIMETER_RATIO_WEIGHT * perim_ratio
+        features["perimeter_ratio"] = round(perim_contribution, 6)
+        score += perim_contribution
+        notes.append(f"perimeter ratio: {perim_ratio:.4f}")
     else:
+        features["perimeter_ratio"] = _PERIMETER_RATIO_WEIGHT
         score += _PERIMETER_RATIO_WEIGHT
+        notes.append("perimeter ratio: 1.0 (both zero)")
 
     # Turn hash match
     if m_sig.turn_hash == r_sig.turn_hash:
+        features["turn_hash"] = _TURN_HASH_WEIGHT
         score += _TURN_HASH_WEIGHT
+        notes.append("turn hash matches")
+    else:
+        features["turn_hash"] = 0.0
 
-    return min(1.0, score)
+    dist = _centroid_distance(master.centroid, revision.centroid)
+    final_score = min(1.0, score)
+    explanation = MatchExplanation(
+        method=MatchMethod.spatial,
+        features=features,
+        distance=round(dist, 6),
+        notes=notes,
+    )
+    return final_score, explanation
 
 
 def score_text(
     master: GeometrySnapshot,
     revision: GeometrySnapshot,
     tolerance: float,
-) -> float:
+) -> tuple[float, MatchExplanation]:
     """Score TEXT/MTEXT match confidence.
 
     Weighted components:
@@ -202,19 +267,37 @@ def score_text(
     - Position proximity: 0.5
 
     Returns:
-        Score in [0.0, 1.0].
+        Tuple of (score in [0.0, 1.0], MatchExplanation).
     """
     score = 0.0
+    features: dict[str, float] = {}
+    notes: list[str] = []
 
     # Text similarity
     m_text = master.text_content or ""
     r_text = revision.text_content or ""
-    score += _TEXT_SIMILARITY_WEIGHT * _levenshtein_similarity(m_text, r_text)
+    sim = _levenshtein_similarity(m_text, r_text)
+    text_contribution = _TEXT_SIMILARITY_WEIGHT * sim
+    features["text_similarity"] = round(text_contribution, 6)
+    score += text_contribution
+    notes.append(f"text similarity: {sim:.4f}")
 
     # Position proximity
-    score += _TEXT_POSITION_WEIGHT * _proximity_score(master.centroid, revision.centroid, tolerance)
+    prox = _proximity_score(master.centroid, revision.centroid, tolerance)
+    pos_contribution = _TEXT_POSITION_WEIGHT * prox
+    features["position"] = round(pos_contribution, 6)
+    score += pos_contribution
+    dist = _centroid_distance(master.centroid, revision.centroid)
+    notes.append(f"within {dist:.4f} units")
 
-    return min(1.0, score)
+    final_score = min(1.0, score)
+    explanation = MatchExplanation(
+        method=MatchMethod.spatial,
+        features=features,
+        distance=round(dist, 6),
+        notes=notes,
+    )
+    return final_score, explanation
 
 
 # --- Internal helpers ---

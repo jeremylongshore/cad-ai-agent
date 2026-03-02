@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import importlib.metadata
 import json
 import logging
 from datetime import UTC, datetime
@@ -10,6 +12,7 @@ from pathlib import Path
 import ezdxf
 
 from ...models.comparison_schema import (
+    AlignmentResult,
     ApplyResult,
     ApprovalSet,
     ComparisonResult,
@@ -22,6 +25,15 @@ logger = logging.getLogger(__name__)
 
 # Shared engine instance — stateless, safe to reuse.
 _engine = ComparisonEngine()
+
+
+def _file_hash(path: str | Path) -> str:
+    """Compute SHA-256 hex digest of a file."""
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(65536), b""):
+            h.update(chunk)
+    return h.hexdigest()
 
 
 def dry_run(
@@ -46,6 +58,7 @@ def export_bundle(
     approval_set: ApprovalSet,
     updated_doc: ezdxf.document.Drawing,
     output_dir: str | Path,
+    alignment_result: AlignmentResult | None = None,
 ) -> RunBundle:
     """Export a complete revision-apply bundle.
 
@@ -77,6 +90,11 @@ def export_bundle(
     apply_result_path = output_dir / "apply_result.json"
     apply_result_path.write_text(apply_result.model_dump_json(indent=2), encoding="utf-8")
 
+    try:
+        pipeline_version = importlib.metadata.version("cad-dxf-agent")
+    except importlib.metadata.PackageNotFoundError:
+        pipeline_version = "unknown"
+
     # Write metadata
     metadata = {
         "run_id": run_id,
@@ -88,9 +106,20 @@ def export_bundle(
         "rejected_count": len(approval_set.rejected_op_ids),
         "success_count": apply_result.success_count,
         "failure_count": apply_result.failure_count,
+        "master_hash": _file_hash(master_path),
+        "revision_hash": _file_hash(revision_path),
+        "ezdxf_version": ezdxf.version,
+        "pipeline_version": pipeline_version,
     }
     metadata_path = output_dir / "run_metadata.json"
     metadata_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
+
+    alignment_result_path_str: str | None = None
+    ar = alignment_result or comparison_result.alignment_result
+    if ar is not None:
+        ar_path = output_dir / "alignment_result.json"
+        ar_path.write_text(ar.model_dump_json(indent=2), encoding="utf-8")
+        alignment_result_path_str = str(ar_path)
 
     changelog_json_path = output_dir / "changelog.json"
     changelog_text_path = output_dir / "changelog.txt"
@@ -105,6 +134,7 @@ def export_bundle(
         changelog_json_path=str(changelog_json_path),
         changelog_text_path=str(changelog_text_path),
         apply_result_path=str(apply_result_path),
+        alignment_result_path=alignment_result_path_str,
         bundle_dir=str(output_dir),
         metadata=metadata,
     )
