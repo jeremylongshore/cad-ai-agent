@@ -92,3 +92,78 @@ class TestRenderResult:
         )
         assert result.success is False
         assert result.error == "Render failed"
+
+
+# ---------------------------------------------------------------------------
+# Edge-path tests — error paths not covered by the classes above
+# ---------------------------------------------------------------------------
+
+
+class TestRenderLayoutNotFound:
+    """Lines 132-141: layout_name branch — DXFKeyError caught and returned as failure.
+
+    In practice ezdxf raises a plain KeyError from doc.layouts.get(), which is
+    NOT caught by the inner `except ezdxf.DXFKeyError:` and falls through to
+    the outer `except Exception:`. We cover the inner branch explicitly via
+    patching, and cover the outer exception path via the real ezdxf call.
+    """
+
+    def test_render_png_nonexistent_layout_returns_failure(self, sample_dxf: Path, tmp_path: Path):
+        """Real call with a missing layout — falls into generic exception path."""
+        output = tmp_path / "bad_layout.png"
+        result = render_dxf_to_png(sample_dxf, output_path=output, layout_name="NONEXISTENT_LAYOUT")
+
+        assert result.success is False
+        assert result.error is not None
+        # ezdxf raises plain KeyError, caught by outer except Exception
+        assert "Render failed" in result.error
+
+    def test_render_dxf_key_error_inner_branch(self, sample_dxf: Path, tmp_path: Path):
+        """Lines 132-141: DXFKeyError from layouts.get → inner branch returns failure.
+
+        Patches ezdxf.readfile so that the returned doc's layouts.get raises
+        DXFKeyError, which is caught by the inner except clause.
+        """
+        from unittest.mock import patch
+
+        import ezdxf as _ezdxf
+
+        output = tmp_path / "dxf_key_err.png"
+
+        original_readfile = _ezdxf.readfile
+
+        class _FakeLayouts:
+            def get(self, name: str):
+                raise _ezdxf.DXFKeyError(name)
+
+        def _patched_readfile(path, *args, **kwargs):
+            doc = original_readfile(path, *args, **kwargs)
+            doc.layouts = _FakeLayouts()
+            return doc
+
+        with patch("cad_dxf_agent.core.renderer.ezdxf.readfile", side_effect=_patched_readfile):
+            result = render_dxf_to_png(sample_dxf, output_path=output, layout_name="ANY_LAYOUT")
+
+        assert result.success is False
+        assert result.error is not None
+        assert "Layout not found" in result.error
+
+
+class TestRenderExceptionPath:
+    """Lines 164-166: generic exception handler in _render."""
+
+    def test_render_exception_returns_failed_result(self, sample_dxf: Path, tmp_path: Path):
+        """Patch qsave to raise so the outer except branch is exercised."""
+        from unittest.mock import patch
+
+        output = tmp_path / "broken.png"
+
+        with patch(
+            "ezdxf.addons.drawing.matplotlib.qsave",
+            side_effect=RuntimeError("qsave explosion"),
+        ):
+            result = render_dxf_to_png(sample_dxf, output_path=output)
+
+        assert result.success is False
+        assert result.error is not None
+        assert "Render failed" in result.error

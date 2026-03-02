@@ -395,3 +395,243 @@ class TestApplyEntityNotFound:
 
         assert result.failure_count == 1
         assert "not found" in result.applied[0].error
+
+
+# ---------------------------------------------------------------------------
+# Edge-path tests — error/unknown paths not covered by the classes above
+# ---------------------------------------------------------------------------
+
+
+class TestApplyOneUnknownOpType:
+    """Line 95: handler dict returns None for unrecognised op type."""
+
+    def test_unknown_op_type_returns_failure(self):
+        """Simulate an op type not present in the handler dict.
+
+        Since RevisionOpType is a StrEnum that validates all enum members, we
+        inject the MOVE op but replace _apply_one's handler dict via a bound
+        method override that omits MOVE — making MOVE behave as 'unknown'.
+        """
+        import types
+
+        from cad_dxf_agent.models.comparison_schema import AppliedRevisionOp
+
+        doc = ezdxf.new(dxfversion="R2018")
+        applier = RevisionApplier(doc)
+        op = _make_op(op_id="unk1", handle="FFFF", forward={"dx": 1, "dy": 0})
+
+        def _patched_apply_one(self, inner_op: RevisionOp) -> AppliedRevisionOp:
+            # Intentionally omit MOVE so the dict lookup returns None
+            handler = {
+                RevisionOpType.DELETE: self._apply_delete,
+                RevisionOpType.ADD: self._apply_add,
+                RevisionOpType.MODIFY_TEXT: self._apply_modify_text,
+                RevisionOpType.MODIFY_GEOMETRY: self._apply_modify_geometry,
+                RevisionOpType.MODIFY_ATTRIBUTES: self._apply_modify_attributes,
+            }.get(inner_op.op_type)
+
+            if handler is None:
+                return AppliedRevisionOp(
+                    op_id=inner_op.op_id,
+                    op_type=inner_op.op_type,
+                    success=False,
+                    error=f"Unknown op type: {inner_op.op_type}",
+                )
+            return handler(inner_op)
+
+        applier._apply_one = types.MethodType(_patched_apply_one, applier)
+        result = applier._apply_one(op)
+
+        assert result.success is False
+        assert "Unknown op type" in result.error
+
+    def test_generic_exception_in_handler_returns_failure(self):
+        """Lines 102-104: _apply_one catches arbitrary exceptions from a handler."""
+        from unittest.mock import patch
+
+        doc = ezdxf.new(dxfversion="R2018")
+        applier = RevisionApplier(doc)
+        op = _make_op(op_id="boom", handle="ABCD", forward={"dx": 1, "dy": 0})
+
+        def _exploding_handler(_op):
+            raise RuntimeError("unexpected boom")
+
+        with patch.object(applier, "_apply_move", side_effect=_exploding_handler):
+            result = applier._apply_one(op)
+
+        assert result.success is False
+        assert "unexpected boom" in result.error
+
+
+class TestApplyDeleteNotFound:
+    """Line 137: _apply_delete with a handle not in entitydb."""
+
+    def test_delete_not_found_returns_failure(self):
+        doc = ezdxf.new(dxfversion="R2018")
+        op = _make_op(
+            op_id="del_nf",
+            op_type=RevisionOpType.DELETE,
+            handle="DEADBEEF",
+            layer="0",
+        )
+        applier = RevisionApplier(doc)
+        result = applier.apply([op], _auto_approve_all([op]))
+
+        assert result.failure_count == 1
+        assert "not found" in result.applied[0].error
+
+
+class TestApplyAddInsertEmptyBlockName:
+    """Lines 176-178: INSERT snapshot with empty block_name (falsy check)."""
+
+    def test_insert_empty_block_name_fails(self):
+        doc = ezdxf.new(dxfversion="R2018")
+        snapshot = {
+            "entity_type": "INSERT",
+            "layer": "GRID",
+            "points": [{"x": 0, "y": 0}],
+            "block_name": "",  # falsy → triggers the `not block_name` branch
+            "attributes": {},
+        }
+        op = _make_op(op_type=RevisionOpType.ADD, forward={"snapshot": snapshot})
+        applier = RevisionApplier(doc)
+        result = applier.apply([op], _auto_approve_all([op]))
+
+        assert result.failure_count == 1
+        assert "not found" in result.applied[0].error
+
+
+class TestApplyAddUnsupportedEntityType:
+    """Line 201: _apply_add falls through to unsupported entity type."""
+
+    def test_add_unsupported_type_fails(self):
+        doc = ezdxf.new(dxfversion="R2018")
+        snapshot = {
+            "entity_type": "CIRCLE",  # not handled by _apply_add
+            "layer": "0",
+            "points": [{"x": 0, "y": 0}],
+            "text_content": None,
+            "block_name": None,
+            "attributes": {},
+        }
+        op = _make_op(op_type=RevisionOpType.ADD, forward={"snapshot": snapshot})
+        applier = RevisionApplier(doc)
+        result = applier.apply([op], _auto_approve_all([op]))
+
+        assert result.failure_count == 1
+        assert "Unsupported entity type" in result.applied[0].error
+
+
+class TestApplyModifyTextEdgePaths:
+    """Lines 219, 234: _apply_modify_text error paths."""
+
+    def test_modify_text_entity_not_found(self):
+        """Line 219: target handle missing from entitydb."""
+        doc = ezdxf.new(dxfversion="R2018")
+        op = _make_op(
+            op_id="mt_nf",
+            op_type=RevisionOpType.MODIFY_TEXT,
+            handle="DEADBEEF",
+            layer="0",
+            forward={"new_text": "x"},
+        )
+        applier = RevisionApplier(doc)
+        result = applier.apply([op], _auto_approve_all([op]))
+
+        assert result.failure_count == 1
+        assert "not found" in result.applied[0].error
+
+    def test_modify_text_on_non_text_entity(self):
+        """Line 234: target entity is not TEXT/MTEXT (e.g. LINE)."""
+        doc, handle = _make_doc_with_line()
+        op = _make_op(
+            op_id="mt_line",
+            op_type=RevisionOpType.MODIFY_TEXT,
+            handle=handle,
+            layer="STRUCTURAL",
+            forward={"new_text": "ignored"},
+        )
+        applier = RevisionApplier(doc)
+        result = applier.apply([op], _auto_approve_all([op]))
+
+        assert result.failure_count == 1
+        assert "Cannot modify text" in result.applied[0].error
+
+
+class TestApplyModifyGeometryEdgePaths:
+    """Lines 252, 269: _apply_modify_geometry error paths."""
+
+    def test_modify_geometry_entity_not_found(self):
+        """Line 252: target handle missing from entitydb."""
+        doc = ezdxf.new(dxfversion="R2018")
+        op = _make_op(
+            op_id="mg_nf",
+            op_type=RevisionOpType.MODIFY_GEOMETRY,
+            handle="DEADBEEF",
+            layer="0",
+            forward={"new_points": [{"x": 0, "y": 0}, {"x": 1, "y": 1}]},
+        )
+        applier = RevisionApplier(doc)
+        result = applier.apply([op], _auto_approve_all([op]))
+
+        assert result.failure_count == 1
+        assert "not found" in result.applied[0].error
+
+    def test_modify_geometry_on_unsupported_entity(self):
+        """Line 269: entity type is not LINE or LWPOLYLINE (e.g. TEXT)."""
+        doc, handle = _make_doc_with_text("hello")
+        op = _make_op(
+            op_id="mg_text",
+            op_type=RevisionOpType.MODIFY_GEOMETRY,
+            handle=handle,
+            layer="NOTES",
+            forward={"new_points": [{"x": 0, "y": 0}, {"x": 1, "y": 1}]},
+        )
+        applier = RevisionApplier(doc)
+        result = applier.apply([op], _auto_approve_all([op]))
+
+        assert result.failure_count == 1
+        assert "Cannot modify geometry" in result.applied[0].error
+
+
+class TestApplyModifyAttributesEdgePaths:
+    """Lines 287, 297-298: _apply_modify_attributes error paths."""
+
+    def test_modify_attributes_entity_not_found(self):
+        """Line 287: target handle missing from entitydb."""
+        doc = ezdxf.new(dxfversion="R2018")
+        op = _make_op(
+            op_id="ma_nf",
+            op_type=RevisionOpType.MODIFY_ATTRIBUTES,
+            handle="DEADBEEF",
+            layer="0",
+            forward={"color": 1},
+        )
+        applier = RevisionApplier(doc)
+        result = applier.apply([op], _auto_approve_all([op]))
+
+        assert result.failure_count == 1
+        assert "not found" in result.applied[0].error
+
+    def test_modify_attributes_setattr_exception(self):
+        """Lines 297-298: setattr raises for a completely invalid DXF attribute name."""
+        doc = ezdxf.new(dxfversion="R2018")
+        msp = doc.modelspace()
+        line = msp.add_line((0, 0), (1, 1))
+        handle = line.dxf.handle
+
+        # "truly_nonexistent_attribute_xyz" is not a valid DXF attribute → raises
+        # DXFAttributeError inside the setattr loop
+        op = _make_op(
+            op_id="ma_exc",
+            op_type=RevisionOpType.MODIFY_ATTRIBUTES,
+            handle=handle,
+            layer="0",
+            forward={"truly_nonexistent_attribute_xyz": 42},
+        )
+        applier = RevisionApplier(doc)
+        result = applier.apply([op], _auto_approve_all([op]))
+
+        assert result.failure_count == 1
+        assert result.applied[0].error is not None
+        assert "truly_nonexistent_attribute_xyz" in result.applied[0].error

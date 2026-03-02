@@ -194,6 +194,537 @@ class TestArcFitting:
         assert result is None
 
 
+class TestFitzExtraction:
+    """Direct tests for _extract_pdf_fitz() branches via mocked PyMuPDF."""
+
+    def _make_fitz_module(self, pages):
+        """Build a minimal fitz mock that yields ``pages`` from fitz.open()."""
+        import types
+
+        fitz_mod = types.ModuleType("fitz")
+        fitz_mod.TEXT_PRESERVE_WHITESPACE = 1
+
+        class MockDoc:
+            def __init__(self):
+                self._pages = pages
+
+            def __iter__(self):
+                return iter(self._pages)
+
+            def close(self):
+                pass
+
+        fitz_mod.open = lambda path: MockDoc()
+        return fitz_mod
+
+    def _make_point(self, x, y):
+        class Pt:
+            def __init__(self, x, y):
+                self.x = x
+                self.y = y
+
+        return Pt(x, y)
+
+    def _make_rect(self, x0, y0, x1, y1):
+        class R:
+            def __init__(self, x0, y0, x1, y1):
+                self.x0, self.y0, self.x1, self.y1 = x0, y0, x1, y1
+
+        return R(x0, y0, x1, y1)
+
+    def _make_page(self, height=792, drawings=None, text_dict=None):
+        class MockPage:
+            def __init__(self, h, d, t):
+                class Rect:
+                    def __init__(self, h):
+                        self.height = h
+
+                self.rect = Rect(h)
+                self._drawings = d or []
+                self._text = t or {"blocks": []}
+
+            def get_drawings(self):
+                return self._drawings
+
+            def get_text(self, mode, flags=0):
+                return self._text
+
+        return MockPage(height, drawings, text_dict)
+
+    def test_rectangle_extracted(self, tmp_path, monkeypatch):
+        """'re' items produce a closed LWPOLYLINE."""
+        import sys
+
+        import ezdxf
+
+        rect = self._make_rect(10, 20, 50, 60)
+        page = self._make_page(
+            drawings=[{"items": [("re", rect)]}],
+        )
+        fitz_mod = self._make_fitz_module([page])
+        monkeypatch.setitem(sys.modules, "fitz", fitz_mod)
+
+        from cad_dxf_agent.core.converter import _extract_pdf_fitz
+
+        doc = ezdxf.new()
+        msp = doc.modelspace()
+        count = _extract_pdf_fitz(msp, tmp_path / "dummy.pdf")
+        assert count == 1
+        entities = list(msp)
+        assert len(entities) == 1
+        assert entities[0].dxftype() == "LWPOLYLINE"
+
+    def test_bezier_arc_fit_success(self, tmp_path, monkeypatch):
+        """'c' item where arc fitting succeeds produces an ARC entity."""
+        import sys
+
+        import ezdxf
+
+        k = 0.5522847498
+        # Quarter-circle in PDF coords: center (100, 100), radius 100
+        p1 = self._make_point(200, 100)
+        p2 = self._make_point(200, 100 - 100 * k)
+        p3 = self._make_point(100 + 100 * k, 0)
+        p4 = self._make_point(100, 0)
+
+        page = self._make_page(drawings=[{"items": [("c", p1, p2, p3, p4)]}])
+        fitz_mod = self._make_fitz_module([page])
+        monkeypatch.setitem(sys.modules, "fitz", fitz_mod)
+
+        from cad_dxf_agent.core.converter import _extract_pdf_fitz
+
+        doc = ezdxf.new()
+        msp = doc.modelspace()
+        count = _extract_pdf_fitz(msp, tmp_path / "dummy.pdf")
+        assert count == 1
+        entities = list(msp)
+        assert len(entities) == 1
+        assert entities[0].dxftype() == "ARC"
+
+    def test_bezier_arc_fit_failure_polyline_fallback(self, tmp_path, monkeypatch):
+        """'c' item where arc fitting fails produces a LWPOLYLINE fallback."""
+        import sys
+
+        import ezdxf
+
+        # Collinear points — arc fit will return None
+        p1 = self._make_point(0, 0)
+        p2 = self._make_point(1, 0)
+        p3 = self._make_point(2, 0)
+        p4 = self._make_point(3, 0)
+
+        page = self._make_page(drawings=[{"items": [("c", p1, p2, p3, p4)]}])
+        fitz_mod = self._make_fitz_module([page])
+        monkeypatch.setitem(sys.modules, "fitz", fitz_mod)
+
+        from cad_dxf_agent.core.converter import _extract_pdf_fitz
+
+        doc = ezdxf.new()
+        msp = doc.modelspace()
+        count = _extract_pdf_fitz(msp, tmp_path / "dummy.pdf")
+        assert count == 1
+        entities = list(msp)
+        assert len(entities) == 1
+        assert entities[0].dxftype() == "LWPOLYLINE"
+
+    def test_quad_new_style_extracted(self, tmp_path, monkeypatch):
+        """'qu' with len==2 (pymupdf >=1.27 Quad object) produces LWPOLYLINE."""
+        import sys
+
+        import ezdxf
+
+        # Simulate pymupdf >=1.27 Quad: item = ('qu', quad_obj)
+        class MockPt:
+            def __init__(self, xy):
+                self.x, self.y = xy
+
+        class MockQuad:
+            def __init__(self, pts):
+                self._pts = [MockPt(p) for p in pts]
+
+            def __getitem__(self, k):
+                return self._pts[k]
+
+        quad = MockQuad([(0, 0), (10, 0), (10, 10), (0, 10)])
+        page = self._make_page(drawings=[{"items": [("qu", quad)]}])
+        fitz_mod = self._make_fitz_module([page])
+        monkeypatch.setitem(sys.modules, "fitz", fitz_mod)
+
+        from cad_dxf_agent.core.converter import _extract_pdf_fitz
+
+        doc = ezdxf.new()
+        msp = doc.modelspace()
+        count = _extract_pdf_fitz(msp, tmp_path / "dummy.pdf")
+        assert count == 1
+        entities = list(msp)
+        assert len(entities) == 1
+        assert entities[0].dxftype() == "LWPOLYLINE"
+
+    def test_quad_old_style_extracted(self, tmp_path, monkeypatch):
+        """'qu' with len>2 (pymupdf <1.27 Points tuple) produces LWPOLYLINE."""
+        import sys
+
+        import ezdxf
+
+        p0 = self._make_point(0, 0)
+        p1 = self._make_point(10, 0)
+        p2 = self._make_point(10, 10)
+        p3 = self._make_point(0, 10)
+        # Old-style: ('qu', pt0, pt1, pt2, pt3)
+        page = self._make_page(drawings=[{"items": [("qu", p0, p1, p2, p3)]}])
+        fitz_mod = self._make_fitz_module([page])
+        monkeypatch.setitem(sys.modules, "fitz", fitz_mod)
+
+        from cad_dxf_agent.core.converter import _extract_pdf_fitz
+
+        doc = ezdxf.new()
+        msp = doc.modelspace()
+        count = _extract_pdf_fitz(msp, tmp_path / "dummy.pdf")
+        assert count == 1
+        entities = list(msp)
+        assert len(entities) == 1
+        assert entities[0].dxftype() == "LWPOLYLINE"
+
+    def test_text_block_extracted(self, tmp_path, monkeypatch):
+        """Text spans in type-0 blocks produce TEXT entities."""
+        import sys
+
+        import ezdxf
+
+        text_dict = {
+            "blocks": [
+                {
+                    "type": 0,  # text block
+                    "lines": [
+                        {
+                            "spans": [
+                                {
+                                    "text": "Hello CAD",
+                                    "bbox": (10.0, 20.0, 80.0, 32.0),
+                                }
+                            ]
+                        }
+                    ],
+                }
+            ]
+        }
+        page = self._make_page(text_dict=text_dict)
+        fitz_mod = self._make_fitz_module([page])
+        monkeypatch.setitem(sys.modules, "fitz", fitz_mod)
+
+        from cad_dxf_agent.core.converter import _extract_pdf_fitz
+
+        doc = ezdxf.new()
+        msp = doc.modelspace()
+        count = _extract_pdf_fitz(msp, tmp_path / "dummy.pdf")
+        assert count == 1
+        entities = list(msp)
+        assert len(entities) == 1
+        assert entities[0].dxftype() == "TEXT"
+
+    def test_non_text_block_skipped(self, tmp_path, monkeypatch):
+        """Blocks with type != 0 (image blocks, etc.) are skipped."""
+        import sys
+
+        import ezdxf
+
+        text_dict = {
+            "blocks": [
+                {"type": 1, "lines": []},  # image block — should be skipped
+            ]
+        }
+        page = self._make_page(text_dict=text_dict)
+        fitz_mod = self._make_fitz_module([page])
+        monkeypatch.setitem(sys.modules, "fitz", fitz_mod)
+
+        from cad_dxf_agent.core.converter import _extract_pdf_fitz
+
+        doc = ezdxf.new()
+        msp = doc.modelspace()
+        count = _extract_pdf_fitz(msp, tmp_path / "dummy.pdf")
+        assert count == 0
+
+    def test_empty_text_span_skipped(self, tmp_path, monkeypatch):
+        """Spans with empty/whitespace text are skipped."""
+        import sys
+
+        import ezdxf
+
+        text_dict = {
+            "blocks": [
+                {
+                    "type": 0,
+                    "lines": [
+                        {
+                            "spans": [
+                                {"text": "   ", "bbox": (10.0, 20.0, 80.0, 32.0)},
+                            ]
+                        }
+                    ],
+                }
+            ]
+        }
+        page = self._make_page(text_dict=text_dict)
+        fitz_mod = self._make_fitz_module([page])
+        monkeypatch.setitem(sys.modules, "fitz", fitz_mod)
+
+        from cad_dxf_agent.core.converter import _extract_pdf_fitz
+
+        doc = ezdxf.new()
+        msp = doc.modelspace()
+        count = _extract_pdf_fitz(msp, tmp_path / "dummy.pdf")
+        assert count == 0
+
+
+class TestArcFittingEdgeCases:
+    """Edge cases in _fit_arc_from_bezier not covered by TestArcFitting."""
+
+    def _pt(self, x, y):
+        class Pt:
+            def __init__(self, x, y):
+                self.x = x
+                self.y = y
+
+        return Pt(x, y)
+
+    def test_fit_arc_returns_none_when_avg_radius_too_small(self):
+        """Points very close together → avg_r < 0.1 → None."""
+        from cad_dxf_agent.core.converter import _fit_arc_from_bezier
+
+        # All points at nearly the same location — radius approaches zero
+        result = _fit_arc_from_bezier(
+            self._pt(0.00, 0.00),
+            self._pt(0.001, 0.0001),
+            self._pt(0.002, 0.0001),
+            self._pt(0.003, 0.00),
+            page_height=10.0,
+        )
+        assert result is None
+
+    def test_fit_arc_returns_none_when_not_circular_enough(self):
+        """A curve with large radius variance is rejected."""
+        from cad_dxf_agent.core.converter import _fit_arc_from_bezier
+
+        # Sharply asymmetric control points → radii won't match
+        result = _fit_arc_from_bezier(
+            self._pt(0, 0),
+            self._pt(0, 500),  # extreme control point
+            self._pt(100, -500),
+            self._pt(100, 0),
+            page_height=1000.0,
+        )
+        assert result is None
+
+
+class TestPdfplumberFallback:
+    """Tests for the pdfplumber extraction path."""
+
+    def test_pdfplumber_page_extraction(self, tmp_path, monkeypatch):
+        """pdfplumber path extracts lines, rects, and text."""
+        import sys
+        import types
+
+        import ezdxf
+
+        # Build a minimal pdfplumber mock
+        class MockWord:
+            x0, top, bottom = 5.0, 10.0, 20.0
+            text = "Label"
+
+        class MockPage:
+            height = 792.0
+            lines = [{"x0": 0.0, "top": 0.0, "x1": 100.0, "bottom": 10.0}]
+            rects = [{"x0": 10.0, "top": 20.0, "x1": 50.0, "bottom": 60.0}]
+
+            def extract_words(self):
+                return [{"x0": 5.0, "top": 10.0, "bottom": 20.0, "text": "Label"}]
+
+        class MockPdf:
+            pages = [MockPage()]
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                pass
+
+        plumber_mod = types.ModuleType("pdfplumber")
+        plumber_mod.open = lambda path: MockPdf()
+
+        # Block fitz so pdfplumber branch is taken
+        monkeypatch.setitem(sys.modules, "fitz", None)
+        monkeypatch.setitem(sys.modules, "pdfplumber", plumber_mod)
+
+        # Re-import just the function to pick up the patched modules
+        from cad_dxf_agent.core.converter import _extract_pdf_page_plumber
+
+        doc = ezdxf.new()
+        msp = doc.modelspace()
+        count = _extract_pdf_page_plumber(msp, MockPage(), 0)
+        # 1 line + 1 rect + 1 word = 3
+        assert count == 3
+
+    def test_pdfplumber_empty_page_no_entities(self, tmp_path):
+        """A pdfplumber page with no lines/rects/words returns 0."""
+        import ezdxf
+
+        from cad_dxf_agent.core.converter import _extract_pdf_page_plumber
+
+        class EmptyPage:
+            height = 792.0
+            lines = []
+            rects = []
+
+            def extract_words(self):
+                return []
+
+        doc = ezdxf.new()
+        msp = doc.modelspace()
+        count = _extract_pdf_page_plumber(msp, EmptyPage(), 0)
+        assert count == 0
+
+    def test_pdfplumber_second_page_uses_named_layer(self, tmp_path):
+        """Second page (page_num=1) uses a 'PDF_PAGE_2' layer name."""
+        import ezdxf
+
+        from cad_dxf_agent.core.converter import _extract_pdf_page_plumber
+
+        class SingleLinePage:
+            height = 792.0
+            lines = [{"x0": 0.0, "top": 0.0, "x1": 50.0, "bottom": 0.0}]
+            rects = []
+
+            def extract_words(self):
+                return []
+
+        doc = ezdxf.new()
+        msp = doc.modelspace()
+        count = _extract_pdf_page_plumber(msp, SingleLinePage(), 1)
+        assert count == 1
+        line = list(msp)[0]
+        assert line.dxf.layer == "PDF_PAGE_2"
+
+
+class TestNoLibraryInstalled:
+    """When neither fitz nor pdfplumber is importable, convert_to_dxf returns error."""
+
+    def test_pdf_no_library_returns_error(self, tmp_path, monkeypatch):
+        """Verify the no-PDF-library error path is reachable."""
+        import sys
+
+        pdf_path = tmp_path / "drawing.pdf"
+        _create_minimal_pdf(pdf_path)
+
+        monkeypatch.setitem(sys.modules, "fitz", None)
+        monkeypatch.setitem(sys.modules, "pdfplumber", None)
+
+        # Force re-evaluation by calling _convert_pdf directly (it re-checks imports each call)
+        from cad_dxf_agent.core.converter import _convert_pdf
+
+        result = _convert_pdf(pdf_path, tmp_path)
+        assert result.success is False
+        assert "No PDF library installed" in (result.error or "")
+
+
+class TestDwgConversionWithOda:
+    """DWG conversion when ODA is mocked as installed."""
+
+    def test_dwg_with_oda_installed_and_saveas_mocked(self, tmp_path, monkeypatch):
+        """When ODA is mocked as installed and saveas is mocked, conversion succeeds."""
+        import ezdxf as _ezdxf
+        from ezdxf.addons import odafc
+
+        fake_dwg = tmp_path / "drawing.dwg"
+        fake_dwg.write_bytes(b"\x00" * 100)
+
+        # Create a real DXF doc; mock saveas to avoid format-string issues
+        fake_doc = _ezdxf.new(dxfversion="R2018")
+        fake_doc.modelspace().add_line((0, 0), (10, 0))
+        saved_paths = []
+
+        def _mock_saveas(path, fmt="asc", encoding=None):
+            # Actually save as a valid DXF so the result path exists
+            fake_doc_inner = _ezdxf.new(dxfversion="R2018")
+            fake_doc_inner.saveas(path)
+            saved_paths.append(path)
+
+        monkeypatch.setattr(odafc, "is_installed", lambda: True)
+        monkeypatch.setattr(odafc, "readfile", lambda path: fake_doc)
+        monkeypatch.setattr(fake_doc, "saveas", _mock_saveas)
+
+        from cad_dxf_agent.core.converter import convert_to_dxf
+
+        result = convert_to_dxf(fake_dwg, output_dir=tmp_path)
+        assert result.success is True
+        assert result.source_format == "dwg"
+
+    def test_dwg_with_oda_installed_exception(self, tmp_path, monkeypatch):
+        """When ODA is installed but readfile raises, returns failure result."""
+        from ezdxf.addons import odafc
+
+        fake_dwg = tmp_path / "bad.dwg"
+        fake_dwg.write_bytes(b"\x00" * 100)
+
+        def _raise_oda(*_):
+            raise RuntimeError("ODA crash")
+
+        monkeypatch.setattr(odafc, "is_installed", lambda: True)
+        monkeypatch.setattr(odafc, "readfile", _raise_oda)
+
+        from cad_dxf_agent.core.converter import convert_to_dxf
+
+        result = convert_to_dxf(fake_dwg, output_dir=tmp_path)
+        assert result.success is False
+        assert "DWG conversion failed" in (result.error or "")
+
+
+class TestVersionHelpers:
+    """Version mapping helpers."""
+
+    def test_version_to_odafc_known(self):
+        from cad_dxf_agent.core.converter import _version_to_odafc
+
+        assert _version_to_odafc("R2018") == "ACAD2018"
+        assert _version_to_odafc("R2010") == "ACAD2010"
+
+    def test_version_to_odafc_unknown_fallback(self):
+        from cad_dxf_agent.core.converter import _version_to_odafc
+
+        assert _version_to_odafc("R9999") == "ACAD2010"
+
+    def test_version_to_acdb_known(self):
+        from cad_dxf_agent.core.converter import _version_to_acdb
+
+        assert _version_to_acdb("R2018") == "AC1032"
+
+    def test_version_to_acdb_unknown_fallback(self):
+        from cad_dxf_agent.core.converter import _version_to_acdb
+
+        assert _version_to_acdb("R9999") == "AC1024"
+
+
+class TestPdfConversionException:
+    """PDF conversion failure path."""
+
+    def test_pdf_conversion_exception_returns_failure(self, tmp_path, monkeypatch):
+        """When ezdxf.new() raises, conversion returns a failure result."""
+        import ezdxf as _ezdxf
+
+        pdf_path = tmp_path / "drawing.pdf"
+        _create_minimal_pdf(pdf_path)
+
+        def _raise_new(**kw):
+            raise RuntimeError("DXF init failed")
+
+        monkeypatch.setattr(_ezdxf, "new", _raise_new)
+
+        from cad_dxf_agent.core.converter import _convert_pdf
+
+        result = _convert_pdf(pdf_path, tmp_path)
+        assert result.success is False
+        assert "PDF conversion failed" in (result.error or "")
+
+
 def _create_minimal_pdf(path: Path, *, empty: bool = False) -> None:
     """Create a minimal PDF for testing using fpdf2 or raw PDF."""
     try:
