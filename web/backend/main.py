@@ -199,13 +199,7 @@ async def upload(
                 detail="PDF conversion is temporarily unavailable. Please try a .dxf file.",
             ) from None
     elif ext == ".dwg":
-        from cad_dxf_agent.core.converter import convert_to_dxf
-
-        result = convert_to_dxf(upload_path, output_dir=session_dir)
-        if not result.success:
-            detail = _user_friendly_conversion_error(result.error, ext)
-            raise HTTPException(status_code=422, detail=detail)
-        shutil.copy2(str(result.output_path), str(dxf_path))
+        _convert_dwg_to_dxf(upload_path, output_dir=session_dir, dest_path=dxf_path)
     else:
         shutil.copy2(str(upload_path), str(dxf_path))
 
@@ -440,18 +434,10 @@ async def compare(
         revision_path = session_dir / "revision.dxf"
 
         if ext == ".dwg":
-            # Save DWG then convert
             dwg_path = session_dir / "revision_upload.dwg"
             content = await file.read()
             dwg_path.write_bytes(content)
-
-            from cad_dxf_agent.core.converter import convert_to_dxf
-
-            result = convert_to_dxf(dwg_path, output_dir=session_dir)
-            if not result.success:
-                detail = _user_friendly_conversion_error(result.error, ext)
-                raise HTTPException(status_code=422, detail=detail)
-            shutil.copy2(str(result.output_path), str(revision_path))
+            _convert_dwg_to_dxf(dwg_path, output_dir=session_dir, dest_path=revision_path)
         else:
             content = await file.read()
             revision_path.write_bytes(content)
@@ -575,11 +561,12 @@ async def download(
     if output_format == "dwg":
         # ODA converts both ways — ezdxf odafc.export_dwg writes DWG from DXF
         try:
+            import ezdxf
             from ezdxf.addons import odafc
 
             session_dir = Path("/tmp/cad-sessions") / session.session_id
             dwg_path = session_dir / f"{stem}_edited.dwg"
-            doc = __import__("ezdxf").readfile(str(session.edited_path))
+            doc = ezdxf.readfile(str(session.edited_path))
             odafc.export_dwg(doc, str(dwg_path))  # type: ignore[attr-defined]
 
             download_name = f"{stem}_edited.dwg"
@@ -656,14 +643,7 @@ async def revision_upload(
             dwg_path = session_dir / "revision_upload.dwg"
             content = await file.read()
             dwg_path.write_bytes(content)
-
-            from cad_dxf_agent.core.converter import convert_to_dxf
-
-            result = convert_to_dxf(dwg_path, output_dir=session_dir)
-            if not result.success:
-                detail = _user_friendly_conversion_error(result.error, ext)
-                raise HTTPException(status_code=422, detail=detail)
-            shutil.copy2(str(result.output_path), str(revision_path))
+            _convert_dwg_to_dxf(dwg_path, output_dir=session_dir, dest_path=revision_path)
         else:
             content = await file.read()
             revision_path.write_bytes(content)
@@ -949,6 +929,22 @@ async def revision_download(session_id: str = Query(...)):
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+
+def _convert_dwg_to_dxf(dwg_path: Path, output_dir: Path, dest_path: Path) -> list[str]:
+    """Convert a DWG file to DXF via ODA, copy to dest_path.
+
+    Returns any conversion warnings.
+    Raises HTTPException on failure.
+    """
+    from cad_dxf_agent.core.converter import convert_to_dxf
+
+    result = convert_to_dxf(dwg_path, output_dir=output_dir)
+    if not result.success:
+        detail = _user_friendly_conversion_error(result.error, ".dwg")
+        raise HTTPException(status_code=422, detail=detail)
+    shutil.copy2(str(result.output_path), str(dest_path))
+    return result.warnings
 
 
 def _user_friendly_conversion_error(raw_error: str | None, ext: str) -> str:

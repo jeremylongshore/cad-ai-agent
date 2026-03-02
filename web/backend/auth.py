@@ -77,7 +77,11 @@ async def check_license(user: dict) -> None:
     if os.getenv("CAD_WEB_DEV_MODE", "").lower() in ("1", "true"):
         return
 
-    uid = user.get("uid", "")
+    uid = user.get("uid")
+    if not uid:
+        logger.warning("License check called for user with no UID")
+        raise HTTPException(status_code=403, detail="License check unavailable")
+
     now = time.monotonic()
 
     # Check cache
@@ -89,18 +93,11 @@ async def check_license(user: dict) -> None:
                 raise HTTPException(status_code=403, detail="License inactive")
             return
 
-    # Query Firestore
+    # Query Firestore (sync client wrapped for async safety)
     try:
-        from google.cloud import firestore
+        from starlette.concurrency import run_in_threadpool
 
-        db = firestore.Client()
-        doc = db.collection("licenses").document(uid).get()
-
-        if not doc.exists:
-            _license_cache[uid] = (False, now)
-            raise HTTPException(status_code=403, detail="License inactive")
-
-        active = doc.to_dict().get("active", False)
+        active = await run_in_threadpool(_fetch_license, uid)
         _license_cache[uid] = (active, now)
 
         if not active:
@@ -112,6 +109,17 @@ async def check_license(user: dict) -> None:
         logger.error("License check failed: %s", e)
         # Fail open would be risky — fail closed instead
         raise HTTPException(status_code=403, detail="License check unavailable") from e
+
+
+def _fetch_license(uid: str) -> bool:
+    """Synchronous Firestore lookup — called via run_in_threadpool."""
+    from google.cloud import firestore
+
+    db = firestore.Client()
+    doc = db.collection("licenses").document(uid).get()
+    if not doc.exists:
+        return False
+    return doc.to_dict().get("active", False)
 
 
 async def get_licensed_user(request: Request) -> dict:
