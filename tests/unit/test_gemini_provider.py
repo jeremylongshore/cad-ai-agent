@@ -244,3 +244,158 @@ class TestGeminiProvider:
 
         with pytest.raises(ValueError, match="blocked"):
             provider.plan("Move column", sample_drawing_context)
+
+    def test_plan_with_conversation_history(self, valid_changeset_json, sample_drawing_context):
+        """conversation_history triggers _call_gemini_chat branch (line 85)."""
+        provider = _make_provider()
+
+        # Patch _call_gemini_chat so we never touch the real SDK import
+        with patch.object(
+            provider, "_call_gemini_chat", return_value=valid_changeset_json
+        ) as mock_chat:
+            changeset = provider.plan(
+                "Move column east",
+                sample_drawing_context,
+                conversation_history=[{"role": "user", "text": "prior turn"}],
+            )
+
+        mock_chat.assert_called_once()
+        assert changeset.op_count == 1
+        assert changeset.operations[0].op_type == OpType.MOVE_ENTITY
+
+    def test_plan_no_retry_when_max_retries_zero(self, sample_drawing_context):
+        """When _max_retries < 1, invalid response raises immediately (line 98)."""
+        provider = _make_provider()
+        provider._max_retries = 0
+
+        bad_response = MagicMock()
+        bad_response.text = "not valid json {"
+        provider._model.generate_content.return_value = bad_response
+
+        with pytest.raises(ValueError):
+            provider.plan("Move column", sample_drawing_context)
+
+        # Only one call — no retry attempted
+        assert provider._model.generate_content.call_count == 1
+
+    def test_get_model_import_error(self, monkeypatch):
+        """ImportError when vertexai is missing (lines 143-147)."""
+        import sys
+
+        provider = GeminiProvider(project="p", location="l")
+        # provider._model is None so _get_model() will try to import
+
+        # Setting sys.modules entry to None makes import raise ImportError
+        monkeypatch.setitem(sys.modules, "vertexai", None)
+
+        with pytest.raises(ImportError, match="google-cloud-aiplatform"):
+            provider._get_model()
+
+    def test_get_model_init_error(self, monkeypatch):
+        """Generic Exception during init is wrapped in RuntimeError (lines 148-149)."""
+        import sys
+        import types
+
+        provider = GeminiProvider(project="p", location="l")
+
+        # Build a minimal fake vertexai module tree
+        mock_vertexai = types.ModuleType("vertexai")
+        mock_generative_models = types.ModuleType("vertexai.generative_models")
+
+        # vertexai.init succeeds; GenerativeModel raises
+        mock_vertexai.init = MagicMock()
+        mock_generative_models.GenerationConfig = MagicMock()
+        mock_generative_models.GenerativeModel = MagicMock(side_effect=RuntimeError("GPU OOM"))
+
+        monkeypatch.setitem(sys.modules, "vertexai", mock_vertexai)
+        monkeypatch.setitem(sys.modules, "vertexai.generative_models", mock_generative_models)
+
+        with pytest.raises(RuntimeError, match="Failed to initialize"):
+            provider._get_model()
+
+    def test_call_gemini_chat_returns_text(self, monkeypatch):
+        """_call_gemini_chat sends history and returns response text (lines 195-214)."""
+        import sys
+        import types
+
+        provider = _make_provider()
+
+        # Build mock Content/Part that _call_gemini_chat will import from
+        mock_gen_models = types.ModuleType("vertexai.generative_models")
+        mock_gen_models.Content = MagicMock(return_value=MagicMock())
+        mock_gen_models.Part = MagicMock()
+        mock_gen_models.Part.from_text = MagicMock(return_value=MagicMock())
+
+        monkeypatch.setitem(sys.modules, "vertexai.generative_models", mock_gen_models)
+
+        mock_chat = MagicMock()
+        mock_response = MagicMock()
+        mock_response.text = '{"operations": []}'
+        mock_chat.send_message.return_value = mock_response
+        provider._model.start_chat.return_value = mock_chat
+
+        result = provider._call_gemini_chat(
+            provider._model,
+            [{"role": "user", "text": "prev message"}],
+            ["current content"],
+        )
+
+        assert result == '{"operations": []}'
+        provider._model.start_chat.assert_called_once()
+        mock_chat.send_message.assert_called_once()
+
+    def test_call_gemini_chat_blocked(self, monkeypatch):
+        """_call_gemini_chat raises ValueError('blocked') when .text raises."""
+        import sys
+        import types
+
+        provider = _make_provider()
+
+        mock_gen_models = types.ModuleType("vertexai.generative_models")
+        mock_gen_models.Content = MagicMock(return_value=MagicMock())
+        mock_gen_models.Part = MagicMock()
+        mock_gen_models.Part.from_text = MagicMock(return_value=MagicMock())
+
+        monkeypatch.setitem(sys.modules, "vertexai.generative_models", mock_gen_models)
+
+        mock_chat = MagicMock()
+        blocked_response = MagicMock()
+        type(blocked_response).text = property(
+            lambda self: (_ for _ in ()).throw(ValueError("safety filter triggered"))
+        )
+        mock_chat.send_message.return_value = blocked_response
+        provider._model.start_chat.return_value = mock_chat
+
+        with pytest.raises(ValueError, match="blocked"):
+            provider._call_gemini_chat(
+                provider._model,
+                [{"role": "user", "text": "prev"}],
+                ["current"],
+            )
+
+    def test_call_gemini_chat_empty_response(self, monkeypatch):
+        """_call_gemini_chat raises ValueError('empty') when text is '' (lines 212-213)."""
+        import sys
+        import types
+
+        provider = _make_provider()
+
+        mock_gen_models = types.ModuleType("vertexai.generative_models")
+        mock_gen_models.Content = MagicMock(return_value=MagicMock())
+        mock_gen_models.Part = MagicMock()
+        mock_gen_models.Part.from_text = MagicMock(return_value=MagicMock())
+
+        monkeypatch.setitem(sys.modules, "vertexai.generative_models", mock_gen_models)
+
+        mock_chat = MagicMock()
+        empty_response = MagicMock()
+        empty_response.text = ""
+        mock_chat.send_message.return_value = empty_response
+        provider._model.start_chat.return_value = mock_chat
+
+        with pytest.raises(ValueError, match="empty"):
+            provider._call_gemini_chat(
+                provider._model,
+                [{"role": "user", "text": "prev"}],
+                ["current"],
+            )

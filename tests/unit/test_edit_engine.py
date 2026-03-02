@@ -312,3 +312,102 @@ class TestOriginalFileUntouched:
 
         sha_after = hashlib.sha256(sample_dxf.read_bytes()).hexdigest()
         assert sha_before == sha_after
+
+
+class TestEditEngineEdgeCases:
+    """Edge cases targeting previously uncovered branches in edit_engine.py."""
+
+    def test_add_block_empty_name_returns_failure(self, sample_dxf, tmp_path):
+        """ADD_BLOCK with an empty block_name returns success=False."""
+        work = copy_dxf_for_editing(sample_dxf, tmp_path / "work.dxf")
+        engine = EditEngine(work)
+        cs = ChangeSet(
+            prompt="test",
+            operations=[
+                EditOperation(
+                    op_type=OpType.ADD_BLOCK,
+                    params={"block_name": "", "insert_point": {"x": 0, "y": 0}},
+                )
+            ],
+        )
+        results = engine.apply_changeset(cs)
+        assert not results[0].success
+        assert "not found" in results[0].description.lower()
+
+    def test_delete_with_nonexistent_layout_fails(self, sample_dxf, tmp_path):
+        """DELETE_ENTITY targeting a non-existent layout returns success=False."""
+        work = copy_dxf_for_editing(sample_dxf, tmp_path / "work.dxf")
+        handle = _get_first_handle(work, "LINE")
+        assert handle is not None
+
+        engine = EditEngine(work)
+        cs = ChangeSet(
+            prompt="test",
+            operations=[
+                EditOperation(
+                    op_type=OpType.DELETE_ENTITY,
+                    target_handle=handle,
+                    target_space="NoSuchLayout",
+                )
+            ],
+        )
+        results = engine.apply_changeset(cs)
+        assert not results[0].success
+        assert "layout not found" in results[0].description.lower()
+
+    def test_add_block_with_nonexistent_layout_fails(self, sample_dxf, tmp_path):
+        """ADD_BLOCK targeting a non-existent layout returns success=False."""
+        work = copy_dxf_for_editing(sample_dxf, tmp_path / "work.dxf")
+        engine = EditEngine(work)
+        cs = ChangeSet(
+            prompt="test",
+            operations=[
+                EditOperation(
+                    op_type=OpType.ADD_BLOCK,
+                    params={
+                        "block_name": "COLUMN_MARK",
+                        "insert_point": {"x": 0, "y": 0},
+                    },
+                    target_space="NoSuchLayout",
+                )
+            ],
+        )
+        results = engine.apply_changeset(cs)
+        assert not results[0].success
+        assert "layout not found" in results[0].description.lower()
+
+    def test_move_entity_not_found_returns_failure(self, sample_dxf, tmp_path):
+        """MOVE_ENTITY with a non-existent handle returns success=False."""
+        work = copy_dxf_for_editing(sample_dxf, tmp_path / "work.dxf")
+        engine = EditEngine(work)
+        cs = ChangeSet(
+            prompt="test",
+            operations=[
+                EditOperation(
+                    op_type=OpType.MOVE_ENTITY,
+                    target_handle="NONEXISTENT_HANDLE_XYZ",
+                    params={"dx": 1.0, "dy": 1.0},
+                )
+            ],
+        )
+        results = engine.apply_changeset(cs)
+        assert not results[0].success
+        assert "not found" in results[0].description.lower()
+
+    def test_edit_text_entity_not_found_returns_failure(self, sample_dxf, tmp_path):
+        """EDIT_TEXT with a non-existent handle returns success=False."""
+        work = copy_dxf_for_editing(sample_dxf, tmp_path / "work.dxf")
+        engine = EditEngine(work)
+        cs = ChangeSet(
+            prompt="test",
+            operations=[
+                EditOperation(
+                    op_type=OpType.EDIT_TEXT,
+                    target_handle="NONEXISTENT_HANDLE_XYZ",
+                    params={"new_text": "oops"},
+                )
+            ],
+        )
+        results = engine.apply_changeset(cs)
+        assert not results[0].success
+        assert "not found" in results[0].description.lower()

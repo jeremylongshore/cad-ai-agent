@@ -157,3 +157,168 @@ class TestOtelDisabled:
         load_dxf(sample_dxf)
         # No exporter to check — the key point is that load_dxf runs
         # without error even when OTel is in no-op mode
+
+
+class TestOtlpExporter:
+    def test_otlp_exporter_selected(self, monkeypatch):
+        """When otel_endpoint is set and OTLP package is available, uses OTLP exporter."""
+        import sys
+        import types
+        import unittest.mock
+
+        import cad_dxf_agent.otel as otel_mod
+
+        reset_otel()
+        monkeypatch.setenv("OTEL_ENABLED", "true")
+        monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4317")
+
+        mock_exporter_instance = unittest.mock.MagicMock()
+
+        def _make_exporter(endpoint=None):
+            return mock_exporter_instance
+
+        # Build a fake module hierarchy for the OTLP exporter
+        fake_trace_exporter = types.ModuleType(
+            "opentelemetry.exporter.otlp.proto.grpc.trace_exporter"
+        )
+        fake_trace_exporter.OTLPSpanExporter = _make_exporter  # type: ignore[attr-defined]
+
+        for mod_name in [
+            "opentelemetry.exporter.otlp",
+            "opentelemetry.exporter.otlp.proto",
+            "opentelemetry.exporter.otlp.proto.grpc",
+            "opentelemetry.exporter.otlp.proto.grpc.trace_exporter",
+        ]:
+            if mod_name not in sys.modules:
+                monkeypatch.setitem(sys.modules, mod_name, types.ModuleType(mod_name))
+
+        monkeypatch.setitem(
+            sys.modules,
+            "opentelemetry.exporter.otlp.proto.grpc.trace_exporter",
+            fake_trace_exporter,
+        )
+
+        from cad_dxf_agent.settings import Settings
+
+        monkeypatch.setattr("cad_dxf_agent.settings.settings", Settings())
+
+        otel_mod.init_otel(service_name="test-otlp")
+        assert otel_mod._provider is not None
+        reset_otel()
+
+    def test_otlp_fallback_when_package_missing(self, monkeypatch):
+        """When OTLP package is not installed, falls back to console exporter."""
+        import sys
+
+        import cad_dxf_agent.otel as otel_mod
+
+        reset_otel()
+        monkeypatch.setenv("OTEL_ENABLED", "true")
+        monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4317")
+
+        # Setting the module to None causes ImportError on 'from ... import ...'
+        monkeypatch.setitem(
+            sys.modules,
+            "opentelemetry.exporter.otlp.proto.grpc.trace_exporter",
+            None,
+        )
+
+        from cad_dxf_agent.settings import Settings
+
+        monkeypatch.setattr("cad_dxf_agent.settings.settings", Settings())
+
+        # Should not raise — falls back to ConsoleSpanExporter
+        otel_mod.init_otel(service_name="test-otlp-fallback")
+        assert otel_mod._provider is not None
+        reset_otel()
+
+
+class TestResetOtel:
+    def test_reset_calls_provider_shutdown(self, monkeypatch):
+        """reset_otel() calls shutdown on the current provider."""
+        import unittest.mock
+
+        import cad_dxf_agent.otel as otel_mod
+
+        mock_provider = unittest.mock.MagicMock()
+        otel_mod._provider = mock_provider
+        reset_otel()
+        mock_provider.shutdown.assert_called_once()
+        assert otel_mod._provider is None
+
+    def test_reset_when_already_none_is_safe(self):
+        """reset_otel() when _provider is None does not raise."""
+        import cad_dxf_agent.otel as otel_mod
+
+        otel_mod._provider = None
+        reset_otel()  # must not raise
+        assert otel_mod._provider is None
+
+    def test_init_otel_idempotent(self, monkeypatch):
+        """Second call to init_otel while provider is set is a no-op."""
+        import unittest.mock
+
+        import cad_dxf_agent.otel as otel_mod
+
+        # Pre-set a provider so init_otel short-circuits
+        sentinel = unittest.mock.MagicMock()
+        otel_mod._provider = sentinel
+        monkeypatch.setenv("OTEL_ENABLED", "true")
+
+        otel_mod.init_otel(service_name="second-call")
+        # Provider must not have been replaced
+        assert otel_mod._provider is sentinel
+        otel_mod._provider = None  # clean up manually
+
+
+class TestNoOpClasses:
+    """Cover _NoOpSpan and _NoOpTracer methods that are bypassed in normal flow."""
+
+    def test_noop_span_record_exception(self):
+        """_NoOpSpan.record_exception does not raise."""
+        from cad_dxf_agent.otel import _NoOpSpan
+
+        span = _NoOpSpan()
+        span.record_exception(ValueError("boom"))
+
+    def test_noop_span_set_status(self):
+        """_NoOpSpan.set_status does not raise."""
+        from cad_dxf_agent.otel import _NoOpSpan
+
+        span = _NoOpSpan()
+        span.set_status("ERROR", description="something went wrong")
+
+    def test_noop_span_set_attribute(self):
+        """_NoOpSpan.set_attribute does not raise."""
+        from cad_dxf_agent.otel import _NoOpSpan
+
+        span = _NoOpSpan()
+        span.set_attribute("key", "value")
+
+    def test_noop_span_add_event(self):
+        """_NoOpSpan.add_event does not raise."""
+        from cad_dxf_agent.otel import _NoOpSpan
+
+        span = _NoOpSpan()
+        span.add_event("my.event", attributes={"k": "v"})
+
+    def test_noop_tracer_yields_noop_span(self):
+        """_NoOpTracer.start_as_current_span yields a _NoOpSpan."""
+        from cad_dxf_agent.otel import _NoOpSpan, _NoOpTracer
+
+        tracer = _NoOpTracer()
+        with tracer.start_as_current_span("test.span") as s:
+            assert isinstance(s, _NoOpSpan)
+            s.set_attribute("x", 1)  # must not raise
+
+    def test_span_context_manager_no_otel(self):
+        """span() context manager works when OTel provider is not initialised."""
+        import cad_dxf_agent.otel as otel_mod
+        from cad_dxf_agent.otel import span
+
+        reset_otel()
+        otel_mod._provider = None
+
+        with span("test.noop", attributes={"a": 1}) as s:
+            # s is a _NoOpSpan — attribute setting must be silent
+            s.set_attribute("b", 2)
