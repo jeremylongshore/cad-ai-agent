@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback } from 'react';
 
-const ACCEPTED_TYPES = ['.dxf', '.pdf'];
+const ACCEPTED_TYPES = ['.dxf', '.pdf', '.dwg'];
 const MAX_SIZE_MB = 50;
 
 export default function FileUpload({ onUpload, loading }) {
@@ -11,7 +11,7 @@ export default function FileUpload({ onUpload, loading }) {
   const validate = useCallback((file) => {
     const ext = '.' + file.name.split('.').pop().toLowerCase();
     if (!ACCEPTED_TYPES.includes(ext)) {
-      return `Unsupported file type: ${ext}. Use .dxf or .pdf`;
+      return `Unsupported file type: ${ext}. Use .dxf, .dwg, or .pdf`;
     }
     if (file.size > MAX_SIZE_MB * 1024 * 1024) {
       return `File too large (max ${MAX_SIZE_MB}MB)`;
@@ -74,20 +74,20 @@ export default function FileUpload({ onUpload, loading }) {
             <p className="upload-zone__text">
               Drag and drop your file here, or click to browse
             </p>
-            <p className="upload-zone__formats">.dxf, .pdf &mdash; up to {MAX_SIZE_MB}MB</p>
+            <p className="upload-zone__formats">.dxf, .dwg, .pdf &mdash; up to {MAX_SIZE_MB}MB</p>
           </>
         )}
         <input
           ref={inputRef}
           type="file"
-          accept=".dxf,.pdf"
+          accept=".dxf,.dwg,.pdf"
           onChange={handleInputChange}
           style={{ display: 'none' }}
           aria-hidden="true"
         />
       </div>
       <p className="upload-zone__hint">
-        Accepts .dxf and .pdf files. For .dwg files, export as DXF from your CAD software.
+        Accepts .dxf, .dwg, and .pdf files.
       </p>
       {error && <p className="input-group__error mt-2" role="alert">{error}</p>}
     </div>
