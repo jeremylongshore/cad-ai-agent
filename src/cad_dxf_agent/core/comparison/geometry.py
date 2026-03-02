@@ -257,11 +257,8 @@ def _detect_xrefs_and_dynblocks(
         # Check for dynamic block (ACAD_ENHANCEDBLOCK in extension dict)
         try:
             xdict = block_record.extension_dict
-            if xdict is not None:
-                # Use __contains__ instead of iterating; ezdxf ExtensionDict is dict-like
-                xdict_str = str(xdict).upper()
-                if "ENHANCEDBLOCK" in xdict_str or "DYNAMIC" in xdict_str:
-                    dynblock_names.add(block_layout.name)
+            if xdict is not None and "ACAD_ENHANCEDBLOCK" in xdict:
+                dynblock_names.add(block_layout.name)
         except Exception:
             logger.debug("Block %s: extension dict read failed", block_layout.name)
 

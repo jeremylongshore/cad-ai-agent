@@ -14,6 +14,11 @@ from ...models.comparison_schema import (
 )
 from ...otel import get_tracer
 
+# Diff summary warning thresholds
+_LARGE_MOVE_THRESHOLD = 10.0
+_LOW_CONFIDENCE_THRESHOLD = 0.6
+_HIGH_REMOVE_PERCENTAGE = 0.5
+
 tracer = get_tracer(__name__)
 
 
@@ -249,24 +254,27 @@ def generate_summary(result: ComparisonResult) -> DiffSummary:
     # Generate warnings
     warnings: list[str] = []
 
-    # Large moves (displacement > 10 units)
+    # Large moves
     large_moves = 0
     for change in result.changes:
         if change.displacement is not None:
             dist = math.sqrt(change.displacement.x**2 + change.displacement.y**2)
-            if dist > 10.0:
+            if dist > _LARGE_MOVE_THRESHOLD:
                 large_moves += 1
     if large_moves > 0:
-        warnings.append(f"{large_moves} entit{'ies' if large_moves != 1 else 'y'} moved >10 units")
+        noun = "entities" if large_moves != 1 else "entity"
+        warnings.append(f"{large_moves} {noun} moved >{_LARGE_MOVE_THRESHOLD:.0f} units")
 
     # Low-confidence matches
     low_conf = sum(
         1
         for c in result.changes
-        if c.confidence < 0.6 and c.category.value not in ("added", "removed", "unchanged")
+        if c.confidence < _LOW_CONFIDENCE_THRESHOLD
+        and c.category.value not in ("added", "removed", "unchanged")
     )
     if low_conf > 0:
-        warnings.append(f"{low_conf} low-confidence match{'es' if low_conf != 1 else ''} (<0.6)")
+        pl = "es" if low_conf != 1 else ""
+        warnings.append(f"{low_conf} low-confidence match{pl} (<{_LOW_CONFIDENCE_THRESHOLD})")
 
     # High remove count
     master_total = (
@@ -277,7 +285,7 @@ def generate_summary(result: ComparisonResult) -> DiffSummary:
     )
     if master_total > 0:
         remove_pct = result.summary.get("removed", 0) / master_total
-        if remove_pct > 0.5:
+        if remove_pct > _HIGH_REMOVE_PERCENTAGE:
             warnings.append(
                 f"{result.summary['removed']} entities removed (>{remove_pct:.0%} of master)"
             )

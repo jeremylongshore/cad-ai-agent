@@ -7,6 +7,9 @@ const TABS = [
   { key: 'comparison', label: 'Compare' },
 ];
 
+const isOpApproved = (op) =>
+  op.status === 'approved' || op.status === 'auto_approved' || op.status === 'force_approved';
+
 const ALIGNMENT_LABELS = {
   identity: 'Identity',
   translation: 'Translation',
@@ -321,7 +324,7 @@ export default function PreviewPanel({
               {/* Status counts */}
               <div className="revision-apply__summary" aria-live="polite">
                 <span className="comparison-badge comparison-badge--added">
-                  {revisionOps.filter((o) => o.status === 'approved' || o.status === 'auto_approved' || o.status === 'force_approved').length} approved
+                  {revisionOps.filter((o) => isOpApproved(o)).length} approved
                 </span>
                 {revisionOps.filter((o) => o.status === 'pending').length > 0 && (
                   <span className="comparison-badge">
@@ -344,7 +347,7 @@ export default function PreviewPanel({
                 onKeyDown={handleOpsKeyDown}
               >
                 {revisionOps.map((op, i) => {
-                  const isApproved = op.status === 'approved' || op.status === 'auto_approved' || op.status === 'force_approved';
+                  const isApproved = isOpApproved(op);
                   const isRejected = op.status === 'rejected';
                   const isFocused = focusedOpIndex === i;
                   return (
@@ -390,7 +393,7 @@ export default function PreviewPanel({
 
               {/* Apply button — enabled only when no pending ops remain */}
               {(() => {
-                const approved = revisionOps.filter((o) => o.status === 'approved' || o.status === 'auto_approved' || o.status === 'force_approved').length;
+                const approved = revisionOps.filter((o) => isOpApproved(o)).length;
                 const pending = revisionOps.filter((o) => o.status === 'pending').length;
                 const canApply = approved > 0 && pending === 0;
                 return (
