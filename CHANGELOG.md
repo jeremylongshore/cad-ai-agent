@@ -7,6 +7,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-03-02
+
+### Added
+- **Revision Workflow**: Complete upload → align → review → approve → export pipeline (#60)
+  - Alignment ladder with Kabsch rigid transform for geometric alignment (#48)
+  - Confidence-scored entity matching with MatchExplanation (#49, #60)
+  - Per-op approve/reject with bulk actions in web wizard (#60)
+  - Bundle export with alignment_result.json, file hashes, changelog (#50, #60)
+- **DWG Support**: Server-side ODA File Converter integration with license gating (#59)
+- **Comparison Profiles**: Structural filtering presets (e.g., `structural`, `electrical`) (#55-#57)
+  - `ComparisonProfile` schema with layer/entity filters and tolerance settings
+  - Titleblock auto-detection to exclude border regions (#58)
+  - Profile warnings when >25% entities filtered
+- **Revision CLI**: `cad-revision` command for headless revision pipeline
+- **Web Enhancements**:
+  - Chat UX overhaul with progressive loading, suggestions, history (#39, #41)
+  - Separate Apply/Download flow with edited preview (#34)
+  - Clear conversation button
+  - Playwright E2E tests against deployed app
+- Canonical model with stable entity IDs for revision workflow (#47)
+- Revision test corpus with clean/nasty taxonomy (#51)
+- Manual control-point alignment for large offset drawings (#52)
+- Integration tests for alignment ladder orchestrator (#53)
+- DiffSummary with headline, per-layer counts, and warnings (#60)
+- Xref and dynamic block detection with graceful warnings (#60)
+- Semantic DXF validation in E2E + GUI tests (#35)
+- Gemini API key provider (`gemini-key`) option
+
+### Fixed
+- OpenTelemetry tracing in production Cloud Run (#36, #37)
+- Dedicated Cloud Run service account + OTEL env vars in CI deploy (#37)
+- Firebase rewrite 401 handling + planner token explosion (#38)
+- Silent render failures now surface errors (#38)
+- Web layout: drawing preview center, chat sidebar
+- Add pymupdf to backend deps for PDF upload support
+- Qt event loop flush after QThread.wait() in GUI tests
+- CI: GUI module coverage exclusion, web test deps, Qt system package for Noble
+- Docker build in GH Actions instead of Cloud Build --source
+- UTF-8 encoding for changelog file writes (Windows compatibility)
+- Pre-existing lint and test collection failures
+
+### Changed
+- Test count: 578 → 1150+ tests (coverage 68%)
+- 141 files changed, +19654 lines since v0.3.0
+
+### Dependencies
+- Bump google-github-actions/auth from 2 to 3 (#46)
+- Bump google-github-actions/deploy-cloudrun from 2 to 3 (#42)
+- Bump actions/upload-artifact from 6 to 7 (#45)
+- Bump actions/setup-node from 4 to 6 (#43)
+- Bump Minionguyjpro/Inno-Setup-Action from 1.2.4 to 1.2.7 (#44)
+
 ## [0.3.0] - 2026-02-25
 
 ### Added
