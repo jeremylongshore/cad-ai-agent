@@ -77,6 +77,12 @@ async def check_license(user: dict) -> None:
     if os.getenv("CAD_WEB_DEV_MODE", "").lower() in ("1", "true"):
         return
 
+    # Anonymous Firebase users (signInAnonymously) have no email.
+    # Let them use the app without a license — gating is for paid accounts.
+    provider = user.get("firebase", {}).get("sign_in_provider", "")
+    if provider == "anonymous" or not user.get("email"):
+        return
+
     uid = user.get("uid")
     if not uid:
         logger.warning("License check called for user with no UID")
