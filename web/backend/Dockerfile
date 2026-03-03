@@ -11,6 +11,7 @@ WORKDIR /app
 ENV MPLBACKEND=Agg
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONPATH=/app/src
+ENV QT_QPA_PLATFORM=offscreen
 
 # ─── System dependencies ─────────────────────────────────────────────
 # libglib2.0-0: required by pymupdf (PDF → DXF fallback converter).
