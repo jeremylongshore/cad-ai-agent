@@ -42,6 +42,11 @@ jobs:
           username: oauth2accesstoken
           password: ${{ steps.auth.outputs.access_token }}
 
+      - name: Download ODA File Converter from GCS
+        run: |
+          gcloud storage cp gs://cad-dxf-agent-deps/oda/ODAFileConverter_QT6_lnxX64_8.3dll_27.1.deb ./oda.deb \
+            || echo "WARNING: ODA .deb not in GCS — DWG support will be unavailable"
+
       - name: Build and push image
         run: |
           TAG=${{ env.IMAGE }}:${{ github.sha }}

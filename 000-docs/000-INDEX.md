@@ -15,6 +15,7 @@
 | 017 | SPEC | [017-AT-SPEC-fixture-strategy.md](017-AT-SPEC-fixture-strategy.md) |
 
 | 025 | ARCH | [025-AT-ARCH-web-mvp.md](025-AT-ARCH-web-mvp.md) |
+| 030 | AUDT | [030-AT-AUDT-deliverables-v1.md](030-AT-AUDT-deliverables-v1.md) |
 
 ### PP — Product & Planning
 | # | Type | File |
@@ -87,6 +88,7 @@
 | 024 | AA | AADR | Performance hardening plan audit |
 | 025 | AT | ARCH | Web MVP architecture |
 | 026 | AA | AUDT | Beta testing DevOps playbook (appaudit) |
+| 030 | AT | AUDT | Deliverables audit v1 (69-item checklist) |
 
 ## Quick Reference
 
