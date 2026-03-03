@@ -11,7 +11,7 @@ const PLAN_TIMEOUT = 60_000;
 const APPLY_TIMEOUT = 45_000;
 
 test.describe('Chat Features', () => {
-  test('suggestion chips visible on empty chat, click populates textarea', async ({ page }) => {
+  test('suggestion chips appear after clear chat, click populates textarea', async ({ page }) => {
     await page.goto('/');
     await expect(page.locator('h2')).toContainText('Upload a drawing', { timeout: 15_000 });
 
@@ -21,7 +21,13 @@ test.describe('Chat Features', () => {
       page.locator('.message--system').filter({ hasText: 'Loaded' })
     ).toBeVisible({ timeout: 30_000 });
 
-    // Suggestion chips should be visible (initial state, no user messages yet)
+    // After upload, system message exists — suggestion chips are in .chat__empty
+    // which only renders when messages array is empty.  Clear chat to reset.
+    const clearBtn = page.locator('button').filter({ hasText: 'Clear chat' });
+    await expect(clearBtn).toBeVisible({ timeout: 5_000 });
+    await clearBtn.click();
+
+    // Suggestion chips should now be visible (empty chat state)
     const suggestions = page.locator('.chat__suggestion');
     await expect(suggestions.first()).toBeVisible({ timeout: 5_000 });
 
