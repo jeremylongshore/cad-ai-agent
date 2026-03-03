@@ -11,7 +11,7 @@ WORKDIR /app
 ENV MPLBACKEND=Agg
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONPATH=/app/src
-ENV QT_QPA_PLATFORM=offscreen
+ENV DISPLAY=:99
 
 # ─── System dependencies ─────────────────────────────────────────────
 # libglib2.0-0: required by pymupdf (PDF → DXF fallback converter).
@@ -33,8 +33,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Guard: if oda.deb is missing or tiny (<1MB), we skip with a warning.
 COPY oda.deb* /tmp/
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        xvfb libstdc++6 libxkbcommon0 libxcb-icccm4 libxcb-image0 \
-        libxcb-keysyms1 libxcb-render-util0 libxcb-shape0 \
+        xvfb libstdc++6 libxkbcommon0 libxkbcommon-x11-0 \
+        libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
+        libxcb-render-util0 libxcb-shape0 libxcb-xinerama0 \
+        libxcb-cursor0 libxcb-xkb1 \
     && ODA_SIZE=$(stat -c%s /tmp/oda.deb 2>/dev/null || echo 0) \
     && if [ "$ODA_SIZE" -gt 1000000 ]; then \
          echo "ODA package looks valid (${ODA_SIZE} bytes) — installing..." \
