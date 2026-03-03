@@ -949,6 +949,7 @@ def _convert_dwg_to_dxf(dwg_path: Path, output_dir: Path, dest_path: Path) -> li
 
     result = convert_to_dxf(dwg_path, output_dir=output_dir)
     if not result.success:
+        logger.error("DWG conversion failed — raw error: %s", result.error)
         detail = _user_friendly_conversion_error(result.error, ".dwg")
         raise HTTPException(status_code=422, detail=detail)
     shutil.copy2(str(result.output_path), str(dest_path))

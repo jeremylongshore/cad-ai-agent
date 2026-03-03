@@ -168,6 +168,7 @@ def _convert_dwg(source_path: Path, output_dir: str | Path | None) -> Conversion
             warnings=warnings,
         )
     except Exception as e:
+        logger.error("DWG conversion exception: %s", e, exc_info=True)
         return ConversionResult(
             source_path=source_path,
             source_format="dwg",
