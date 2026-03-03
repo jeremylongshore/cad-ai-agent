@@ -154,9 +154,8 @@ def _convert_dwg(source_path: Path, output_dir: str | Path | None) -> Conversion
     warnings: list[str] = []
 
     try:
-        target_version = _version_to_odafc(settings.target_dxf_version)
         doc = odafc.readfile(str(source_path))  # type: ignore[attr-defined]
-        doc.saveas(str(output_path), fmt=target_version)
+        doc.saveas(str(output_path))
 
         logger.info("DWG → DXF: %s → %s", source_path.name, output_path)
 
