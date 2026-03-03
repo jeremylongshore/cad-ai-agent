@@ -31,7 +31,7 @@ test.describe('Comparison Flow — r2000_blocks master', () => {
     await compareTab.click();
     await expect(compareTab).toHaveClass(/preview__tab--active/);
 
-    const uploadBtn = page.locator('button').filter({ hasText: 'Upload Revision DXF' });
+    const uploadBtn = page.locator('button').filter({ hasText: /Upload Revision/ });
     await expect(uploadBtn).toBeVisible({ timeout: 5_000 });
   });
 

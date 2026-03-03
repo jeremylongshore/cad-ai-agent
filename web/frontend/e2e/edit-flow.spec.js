@@ -72,6 +72,26 @@ print(json.dumps({"original": orig, "edited": edited}))
 }
 
 /**
+ * Wait for ops to appear or handle LLM errors gracefully.
+ * Skips the test on 429 rate-limit; fails on other errors.
+ */
+async function waitForOpsOrSkipOnError(page, successLocator) {
+  const opsOrError = await Promise.race([
+    successLocator.waitFor({ timeout: PLAN_TIMEOUT }).then(() => 'ops'),
+    page.locator('.message--error').waitFor({ timeout: PLAN_TIMEOUT }).then(() => 'error'),
+  ]);
+
+  if (opsOrError === 'error') {
+    const errorMsg = await page.locator('.message--error').last().textContent();
+    if (/429|rate.limit|quota/i.test(errorMsg || '')) {
+      test.skip(true, 'LLM rate-limited — transient 429');
+    }
+    console.error('Plan failed on production:', errorMsg);
+    expect(opsOrError, `Plan API error: ${errorMsg}`).toBe('ops');
+  }
+}
+
+/**
  * Apply changes and download the edited DXF file.
  * Returns the local path where the downloaded file was saved.
  */
@@ -84,7 +104,7 @@ async function applyAndDownload(page, filenamePrefix = '') {
     page.locator('.preview__tab--active')
   ).toHaveText('Edited', { timeout: APPLY_TIMEOUT });
 
-  const downloadBtn = page.locator('button').filter({ hasText: 'Download Edited DXF' });
+  const downloadBtn = page.locator('button.btn').filter({ hasText: 'Download Edited DXF' });
   await expect(downloadBtn).toBeVisible({ timeout: 5_000 });
 
   const downloadPromise = page.waitForEvent('download', { timeout: APPLY_TIMEOUT });
@@ -116,16 +136,7 @@ test.describe('Full Edit Flow', () => {
     await page.locator('button[aria-label="Send"]').click();
 
     // 3. Wait for either operations OR an error message (captures both outcomes)
-    const opsOrError = await Promise.race([
-      page.locator('.op-list__title').waitFor({ timeout: PLAN_TIMEOUT }).then(() => 'ops'),
-      page.locator('.message--ai').filter({ hasText: 'Error' }).waitFor({ timeout: PLAN_TIMEOUT }).then(() => 'error'),
-    ]);
-
-    if (opsOrError === 'error') {
-      const errorMsg = await page.locator('.message--ai').filter({ hasText: 'Error' }).textContent();
-      console.error('Plan failed on production:', errorMsg);
-      expect(opsOrError, `Plan API error: ${errorMsg}`).toBe('ops');
-    }
+    await waitForOpsOrSkipOnError(page, page.locator('.op-list__title'));
 
     const opCount = await page.locator('.op-item').count();
     expect(opCount).toBeGreaterThanOrEqual(1);
@@ -180,8 +191,7 @@ test.describe('Full Edit Flow', () => {
     await textarea.fill('Delete the first column mark');
     await page.locator('button[aria-label="Send"]').click();
 
-    // Operation type badge visible
-    await expect(page.locator('.op-item__type').first()).toBeVisible({ timeout: PLAN_TIMEOUT });
+    await waitForOpsOrSkipOnError(page, page.locator('.op-item__type').first());
 
     // Apply + download
     const savedPath = await applyAndDownload(page, 'delete_');
@@ -211,10 +221,10 @@ test.describe('Full Edit Flow', () => {
 
     const textarea = page.locator('.chat__textarea');
     await expect(textarea).toBeEnabled({ timeout: 5_000 });
-    await textarea.fill('Rename the text label to UPDATED');
+    await textarea.fill('Rename text label B00 to UPDATED');
     await page.locator('button[aria-label="Send"]').click();
 
-    await expect(page.locator('.op-item').first()).toBeVisible({ timeout: PLAN_TIMEOUT });
+    await waitForOpsOrSkipOnError(page, page.locator('.op-item').first());
     await expect(page.locator('.message--ai').first()).toBeVisible();
 
     // Apply + download
