@@ -84,7 +84,7 @@ async function applyAndDownload(page, filenamePrefix = '') {
     page.locator('.preview__tab--active')
   ).toHaveText('Edited', { timeout: APPLY_TIMEOUT });
 
-  const downloadBtn = page.locator('button').filter({ hasText: 'Download Edited DXF' });
+  const downloadBtn = page.locator('button.btn').filter({ hasText: 'Download Edited DXF' });
   await expect(downloadBtn).toBeVisible({ timeout: 5_000 });
 
   const downloadPromise = page.waitForEvent('download', { timeout: APPLY_TIMEOUT });
