@@ -56,6 +56,9 @@ tests/live/reports/
 *.exe
 *.msi
 
+# ODA File Converter .deb (downloaded from GCS during CI, ~60MB)
+oda.deb
+
 # bv (beads viewer) local config and caches
 .bv/
 .firebase/

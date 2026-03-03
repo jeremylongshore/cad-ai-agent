@@ -122,21 +122,33 @@ def _passthrough_dxf(source_path: Path, output_dir: str | Path | None) -> Conver
     )
 
 
+def _convert_dwg_cloud_api(source_path: Path, output_dir: str | Path | None) -> ConversionResult:
+    """Future: DWG→DXF via cloud API (CloudConvert, Aspose, etc.).
+
+    Intended as fallback when ODA File Converter is not installed.
+    Requires CAD_DWG_API_PROVIDER and CAD_DWG_API_KEY env vars.
+    """
+    # TODO: Implement cloud API DWG conversion
+    # Candidate services: CloudConvert ($0.01/file), Aspose.CAD Cloud
+    return ConversionResult(
+        source_path=source_path,
+        source_format="dwg",
+        output_path=source_path,
+        success=False,
+        error=(
+            "DWG conversion unavailable — ODA File Converter not installed "
+            "and cloud API fallback not yet implemented. "
+            "Please export as DXF from your CAD software."
+        ),
+    )
+
+
 def _convert_dwg(source_path: Path, output_dir: str | Path | None) -> ConversionResult:
     """Convert DWG to DXF using ODA File Converter via ezdxf.addons.odafc."""
     from ezdxf.addons import odafc
 
     if not odafc.is_installed():  # type: ignore[attr-defined]
-        return ConversionResult(
-            source_path=source_path,
-            source_format="dwg",
-            output_path=source_path,
-            success=False,
-            error=(
-                "ODA File Converter not installed. "
-                "Download free from https://www.opendesign.com/guestfiles/oda_file_converter"
-            ),
-        )
+        return _convert_dwg_cloud_api(source_path, output_dir)
 
     output_path = _get_output_path(source_path, output_dir)
     warnings: list[str] = []

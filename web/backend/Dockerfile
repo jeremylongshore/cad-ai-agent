@@ -24,26 +24,26 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # ODA enables DWG → DXF conversion.  DXF and PDF uploads work without it.
 # The backend returns HTTP 422 if a user uploads a DWG and ODA is missing.
 #
-# Guard: ODA's download URL sometimes redirects to an HTML page (~6KB)
-# instead of the real .deb (~60MB).  We check the file size (>1MB) before
-# attempting to install.  If the download is bad, we skip with a warning
-# and the build continues without DWG support.
-RUN apt-get update && apt-get install -y --no-install-recommends wget \
-    && wget -q "https://download.opendesign.com/guestfiles/ODAFileConverter/ODAFileConverter_QT6_lnxX64_8.3dll_25.12.deb" \
-       -O /tmp/oda.deb \
+# The .deb is self-hosted in GCS (ODA's download page requires SSO).
+# CI downloads it with authenticated gcloud before `docker build`, placing
+# it at ./oda.deb in the build context.  xvfb provides a virtual display
+# for ODA's Qt6 GUI (ezdxf spawns Xvfb automatically).
+#
+# Guard: if oda.deb is missing or tiny (<1MB), we skip with a warning.
+COPY oda.deb* /tmp/
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        xvfb libstdc++6 \
     && ODA_SIZE=$(stat -c%s /tmp/oda.deb 2>/dev/null || echo 0) \
     && if [ "$ODA_SIZE" -gt 1000000 ]; then \
          echo "ODA package looks valid (${ODA_SIZE} bytes) — installing..." \
          && (dpkg -i /tmp/oda.deb || apt-get install -f -y) \
          && echo "ODA File Converter installed successfully"; \
        else \
-         echo "WARNING: ODA download is only ${ODA_SIZE} bytes (expected ~60MB)." \
+         echo "WARNING: oda.deb missing or only ${ODA_SIZE} bytes (expected ~60MB)." \
          && echo "Skipping ODA install — DWG uploads will return HTTP 422."; \
        fi \
     && rm -f /tmp/oda.deb \
-    && apt-get purge -y wget \
-    && rm -rf /var/lib/apt/lists/* \
-    || true
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # ─── Python dependencies ─────────────────────────────────────────────
 # Single pip install layer for cacheability.
