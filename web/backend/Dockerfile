@@ -12,6 +12,7 @@ ENV MPLBACKEND=Agg
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONPATH=/app/src
 ENV DISPLAY=:99
+ENV XDG_RUNTIME_DIR=/tmp/runtime-root
 
 # ─── System dependencies ─────────────────────────────────────────────
 # libglib2.0-0: required by pymupdf (PDF → DXF fallback converter).
@@ -62,6 +63,10 @@ COPY src/ ./src/
 COPY web/backend/ ./web/backend/
 
 # ─── Runtime ──────────────────────────────────────────────────────────
+# Create XDG_RUNTIME_DIR so Qt6 doesn't emit stderr warnings
+# (ezdxf treats ANY stderr from ODA as failure on Linux).
+RUN mkdir -p /tmp/runtime-root && chmod 700 /tmp/runtime-root
+
 ENV PORT=8080
 EXPOSE 8080
 
