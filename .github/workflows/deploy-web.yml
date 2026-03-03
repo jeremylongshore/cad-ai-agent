@@ -44,7 +44,7 @@ jobs:
 
       - name: Download ODA File Converter from GCS
         run: |
-          gcloud storage cp gs://cad-dxf-agent-deps/oda/ODAFileConverter_QT6_lnxX64_8.3dll_25.12.deb ./oda.deb \
+          gcloud storage cp gs://cad-dxf-agent-deps/oda/ODAFileConverter_QT6_lnxX64_8.3dll_27.1.deb ./oda.deb \
             || echo "WARNING: ODA .deb not in GCS — DWG support will be unavailable"
 
       - name: Build and push image
