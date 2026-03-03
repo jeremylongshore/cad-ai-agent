@@ -118,11 +118,14 @@ test.describe('Full Edit Flow', () => {
     // 3. Wait for either operations OR an error message (captures both outcomes)
     const opsOrError = await Promise.race([
       page.locator('.op-list__title').waitFor({ timeout: PLAN_TIMEOUT }).then(() => 'ops'),
-      page.locator('.message--ai').filter({ hasText: 'Error' }).waitFor({ timeout: PLAN_TIMEOUT }).then(() => 'error'),
+      page.locator('.message--ai').filter({ hasText: /Error|error|429|rate.limit/i }).waitFor({ timeout: PLAN_TIMEOUT }).then(() => 'error'),
     ]);
 
     if (opsOrError === 'error') {
-      const errorMsg = await page.locator('.message--ai').filter({ hasText: 'Error' }).textContent();
+      const errorMsg = await page.locator('.message--ai').last().textContent();
+      if (/429|rate.limit|quota/i.test(errorMsg || '')) {
+        test.skip(true, 'LLM rate-limited — transient 429');
+      }
       console.error('Plan failed on production:', errorMsg);
       expect(opsOrError, `Plan API error: ${errorMsg}`).toBe('ops');
     }
@@ -180,8 +183,19 @@ test.describe('Full Edit Flow', () => {
     await textarea.fill('Delete the first column mark');
     await page.locator('button[aria-label="Send"]').click();
 
-    // Operation type badge visible
-    await expect(page.locator('.op-item__type').first()).toBeVisible({ timeout: PLAN_TIMEOUT });
+    // Wait for ops or error
+    const opsOrError = await Promise.race([
+      page.locator('.op-item__type').first().waitFor({ timeout: PLAN_TIMEOUT }).then(() => 'ops'),
+      page.locator('.message--ai').filter({ hasText: /Error|error|429|rate.limit/i }).waitFor({ timeout: PLAN_TIMEOUT }).then(() => 'error'),
+    ]);
+
+    if (opsOrError === 'error') {
+      const errorMsg = await page.locator('.message--ai').last().textContent();
+      if (/429|rate.limit|quota/i.test(errorMsg || '')) {
+        test.skip(true, 'LLM rate-limited — transient 429');
+      }
+      expect(opsOrError, `Plan API error: ${errorMsg}`).toBe('ops');
+    }
 
     // Apply + download
     const savedPath = await applyAndDownload(page, 'delete_');
@@ -211,10 +225,23 @@ test.describe('Full Edit Flow', () => {
 
     const textarea = page.locator('.chat__textarea');
     await expect(textarea).toBeEnabled({ timeout: 5_000 });
-    await textarea.fill('Rename the text label to UPDATED');
+    await textarea.fill('Rename text label B00 to UPDATED');
     await page.locator('button[aria-label="Send"]').click();
 
-    await expect(page.locator('.op-item').first()).toBeVisible({ timeout: PLAN_TIMEOUT });
+    // Wait for ops or error
+    const opsOrError = await Promise.race([
+      page.locator('.op-item').first().waitFor({ timeout: PLAN_TIMEOUT }).then(() => 'ops'),
+      page.locator('.message--ai').filter({ hasText: /Error|error|429|rate.limit/i }).waitFor({ timeout: PLAN_TIMEOUT }).then(() => 'error'),
+    ]);
+
+    if (opsOrError === 'error') {
+      const errorMsg = await page.locator('.message--ai').last().textContent();
+      if (/429|rate.limit|quota/i.test(errorMsg || '')) {
+        test.skip(true, 'LLM rate-limited — transient 429');
+      }
+      expect(opsOrError, `Plan API error: ${errorMsg}`).toBe('ops');
+    }
+
     await expect(page.locator('.message--ai').first()).toBeVisible();
 
     // Apply + download
