@@ -5,7 +5,7 @@ import PreviewPanel from './PreviewPanel';
 
 export default function Workspace({ user, onSignOut }) {
   const session = useSession();
-  const { fileInfo, sessionId, messages, operations, selectedOps, previewUrls, comparisonResult, loading, loadingStartTime, error } = session;
+  const { fileInfo, sessionId, messages, operations, selectedOps, previewUrls, dxfUrls, comparisonResult, loading, loadingStartTime, error } = session;
 
   return (
     <div className="page" style={{ height: '100vh', overflow: 'hidden' }}>
@@ -88,6 +88,7 @@ export default function Workspace({ user, onSignOut }) {
           <section className="workspace__main" aria-label="Drawing preview">
             <PreviewPanel
               previewUrls={previewUrls}
+              dxfUrls={dxfUrls}
               operations={operations}
               selectedOps={selectedOps}
               onToggleOp={session.toggleOp}

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { fetchProfiles } from '../lib/api';
+import DxfViewerComponent from './DxfViewerComponent';
 
 const TABS = [
   { key: 'original', label: 'Original' },
@@ -21,6 +22,7 @@ const ALIGNMENT_LABELS = {
 
 export default function PreviewPanel({
   previewUrls,
+  dxfUrls,
   operations,
   selectedOps,
   onToggleOp,
@@ -139,7 +141,9 @@ export default function PreviewPanel({
       </div>
 
       <div className="preview__image-wrap" role="tabpanel" aria-label={`${activeTab} preview`}>
-        {previewUrls[activeTab] ? (
+        {dxfUrls?.[activeTab] ? (
+          <DxfViewerComponent dxfUrl={dxfUrls[activeTab]} />
+        ) : previewUrls[activeTab] ? (
           <img
             src={previewUrls[activeTab]}
             alt={`${activeTab} drawing preview`}

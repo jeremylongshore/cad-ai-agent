@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
 import {
-  uploadFile, planEdit, applyChanges, downloadFile, getRenderBlob,
+  uploadFile, planEdit, applyChanges, downloadFile, getRenderBlob, getDxfBlob,
   clearHistory, compareFiles, revisionUpload, revisionAlign, revisionDiff,
   revisionApprove, revisionApply, revisionDownloadUrl,
 } from '../lib/api';
@@ -20,6 +20,7 @@ export function useSession() {
   const [selectedOps, setSelectedOps] = useState([]);
   const [validation, setValidation] = useState(null);
   const [previewUrls, setPreviewUrls] = useState({ original: null, edited: null });
+  const [dxfUrls, setDxfUrls] = useState({ original: null, edited: null, comparison: null });
   const [comparisonResult, setComparisonResult] = useState(null);
   const [revisionOps, setRevisionOps] = useState(null);
   const [revisionApplyResult, setRevisionApplyResult] = useState(null);
@@ -47,12 +48,20 @@ export function useSession() {
       const data = await uploadFile(file);
       setSessionId(data.session_id);
       setFileInfo(data.file_info);
-      try {
-        const blob = await getRenderBlob(data.session_id, 'original');
-        const url = URL.createObjectURL(blob);
-        setPreviewUrls((prev) => ({ ...prev, original: url }));
-      } catch (renderErr) {
-        console.warn('[cad] Original render fetch failed:', renderErr.message);
+      // Fetch PNG render and DXF blob in parallel
+      const [renderResult, dxfResult] = await Promise.allSettled([
+        getRenderBlob(data.session_id, 'original'),
+        getDxfBlob(data.session_id, 'original'),
+      ]);
+      if (renderResult.status === 'fulfilled') {
+        setPreviewUrls((prev) => ({ ...prev, original: URL.createObjectURL(renderResult.value) }));
+      } else {
+        console.warn('[cad] Original render fetch failed:', renderResult.reason?.message);
+      }
+      if (dxfResult.status === 'fulfilled') {
+        setDxfUrls((prev) => ({ ...prev, original: URL.createObjectURL(dxfResult.value) }));
+      } else {
+        console.warn('[cad] Original DXF fetch failed:', dxfResult.reason?.message);
       }
       setMessages([msg('system', `Loaded ${file.name} (${data.file_info.entity_count} entities, ${data.file_info.layer_count} layers)`)]);
       setOperations([]);
@@ -182,15 +191,21 @@ export function useSession() {
 
       setMessages((prev) => [...prev, msg('system', summaryText)]);
 
-      try {
-        const blob = await getRenderBlob(sessionId, 'edited');
-        const url = URL.createObjectURL(blob);
-        setPreviewUrls((prev) => ({ ...prev, edited: url }));
-      } catch (renderErr) {
-        console.warn('[cad] Edited render fetch failed:', renderErr.message);
+      // Fetch PNG render and DXF blob in parallel
+      const [renderRes, dxfRes] = await Promise.allSettled([
+        getRenderBlob(sessionId, 'edited'),
+        getDxfBlob(sessionId, 'edited'),
+      ]);
+      if (renderRes.status === 'fulfilled') {
+        setPreviewUrls((prev) => ({ ...prev, edited: URL.createObjectURL(renderRes.value) }));
+      } else {
+        console.warn('[cad] Edited render fetch failed:', renderRes.reason?.message);
         setMessages((prev) => [...prev,
           msg('system', 'Preview not available — download the edited DXF to view.'),
         ]);
+      }
+      if (dxfRes.status === 'fulfilled') {
+        setDxfUrls((prev) => ({ ...prev, edited: URL.createObjectURL(dxfRes.value) }));
       }
     } catch (err) {
       setError(err.message);
@@ -289,6 +304,14 @@ export function useSession() {
         msg('system', diffData.diff_summary?.headline || `${diffData.total_changes} change(s) found`),
       ]);
 
+      // Fetch comparison DXF for interactive viewer
+      try {
+        const compBlob = await getDxfBlob(sessionId, 'comparison');
+        setDxfUrls((prev) => ({ ...prev, comparison: URL.createObjectURL(compBlob) }));
+      } catch (dxfErr) {
+        console.warn('[cad] Comparison DXF fetch failed:', dxfErr.message);
+      }
+
       // Show warnings
       if (diffData.warnings && diffData.warnings.length > 0) {
         setMessages((prev) => [...prev,
@@ -382,6 +405,9 @@ export function useSession() {
     Object.values(previewUrls).forEach((url) => {
       if (url) URL.revokeObjectURL(url);
     });
+    Object.values(dxfUrls).forEach((url) => {
+      if (url) URL.revokeObjectURL(url);
+    });
     setSessionId(null);
     setFileInfo(null);
     setMessages([]);
@@ -389,6 +415,7 @@ export function useSession() {
     setSelectedOps([]);
     setValidation(null);
     setPreviewUrls({ original: null, edited: null, comparison: null });
+    setDxfUrls({ original: null, edited: null, comparison: null });
     setComparisonResult(null);
     setRevisionOps(null);
     setRevisionApplyResult(null);
@@ -400,7 +427,7 @@ export function useSession() {
     setDiffSummary(null);
     setWizardStep(1);
     lastPromptRef.current = null;
-  }, [previewUrls]);
+  }, [previewUrls, dxfUrls]);
 
   return {
     sessionId,
@@ -410,6 +437,7 @@ export function useSession() {
     selectedOps,
     validation,
     previewUrls,
+    dxfUrls,
     comparisonResult,
     loading,
     loadingStartTime,

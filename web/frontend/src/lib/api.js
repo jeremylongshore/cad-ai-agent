@@ -115,6 +115,11 @@ export async function getRenderBlob(sessionId, type = 'original') {
   return res.blob();
 }
 
+export async function getDxfBlob(sessionId, type = 'original') {
+  const res = await request(`/api/dxf?session_id=${sessionId}&type=${type}`);
+  return res.blob();
+}
+
 export async function fetchProfiles() {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
