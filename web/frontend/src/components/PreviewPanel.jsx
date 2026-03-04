@@ -43,6 +43,7 @@ export default function PreviewPanel({
   onRevisionBulkApprove,
   onRevisionApply,
   onBundleDownload,
+  onRealign,
 }) {
   const [activeTab, setActiveTab] = useState('original');
   const hasEdited = !!previewUrls.edited;
@@ -52,6 +53,12 @@ export default function PreviewPanel({
   const [selectedProfile, setSelectedProfile] = useState('');
   const [focusedOpIndex, setFocusedOpIndex] = useState(-1);
   const opsListRef = useRef(null);
+
+  // Control point picker state
+  const [pickingMode, setPickingMode] = useState(false);
+  const [controlPoints, setControlPoints] = useState([]);
+  // Each: { master: {x, y} | null, revision: {x, y} | null }
+  const [currentPairSide, setCurrentPairSide] = useState('master'); // 'master' or 'revision'
 
   useEffect(() => {
     if (previewUrls.edited) setActiveTab('edited');
@@ -121,6 +128,50 @@ export default function PreviewPanel({
     }
   }, [focusedOpIndex]);
 
+  // Control point picking handlers
+  const handleMasterPointClick = useCallback((pos) => {
+    if (!pickingMode) return;
+    setControlPoints((prev) => {
+      const updated = [...prev];
+      // Find first pair without a master point, or add new pair
+      const incomplete = updated.findIndex((p) => !p.master);
+      if (incomplete >= 0) {
+        updated[incomplete] = { ...updated[incomplete], master: pos };
+      } else if (updated.length < 4) {
+        updated.push({ master: pos, revision: null });
+      }
+      return updated;
+    });
+    setCurrentPairSide('revision');
+  }, [pickingMode]);
+
+  const handleRevisionPointClick = useCallback((pos) => {
+    if (!pickingMode) return;
+    setControlPoints((prev) => {
+      const updated = [...prev];
+      // Find first pair with a master but no revision
+      const incomplete = updated.findIndex((p) => p.master && !p.revision);
+      if (incomplete >= 0) {
+        updated[incomplete] = { ...updated[incomplete], revision: pos };
+      }
+      return updated;
+    });
+    setCurrentPairSide('master');
+  }, [pickingMode]);
+
+  const handleRealign = useCallback(() => {
+    if (!onRealign) return;
+    const pairs = controlPoints
+      .filter((p) => p.master && p.revision)
+      .map((p) => `${p.master.x.toFixed(2)},${p.master.y.toFixed(2)}:${p.revision.x.toFixed(2)},${p.revision.y.toFixed(2)}`);
+    if (pairs.length > 0) {
+      onRealign(pairs);
+      setPickingMode(false);
+    }
+  }, [controlPoints, onRealign]);
+
+  const completePairs = controlPoints.filter((p) => p.master && p.revision).length;
+
   // Use wizard upload if available, else fallback to simple compare
   const useWizard = !!onRevisionUpload;
 
@@ -144,12 +195,34 @@ export default function PreviewPanel({
         {activeTab === 'comparison' && dxfUrls?.original && dxfUrls?.comparison ? (
           <div className="compare-split">
             <div className="compare-split__pane">
-              <span className="compare-split__label">Original</span>
-              <DxfViewerComponent dxfUrl={dxfUrls.original} />
+              <span className="compare-split__label">
+                Original{pickingMode && currentPairSide === 'master' ? ' — click a point' : ''}
+              </span>
+              <DxfViewerComponent
+                dxfUrl={dxfUrls.original}
+                pickingMode={pickingMode && currentPairSide === 'master'}
+                onPointClick={handleMasterPointClick}
+              />
+              {pickingMode && controlPoints.map((p, i) => p.master && (
+                <div key={`m-${i}`} className="control-point-marker control-point-marker--master" title={`Point ${i + 1}`}>
+                  {i + 1}
+                </div>
+              ))}
             </div>
             <div className="compare-split__pane">
-              <span className="compare-split__label">Changes</span>
-              <DxfViewerComponent dxfUrl={dxfUrls.comparison} />
+              <span className="compare-split__label">
+                Changes{pickingMode && currentPairSide === 'revision' ? ' — click corresponding point' : ''}
+              </span>
+              <DxfViewerComponent
+                dxfUrl={dxfUrls.comparison}
+                pickingMode={pickingMode && currentPairSide === 'revision'}
+                onPointClick={handleRevisionPointClick}
+              />
+              {pickingMode && controlPoints.map((p, i) => p.revision && (
+                <div key={`r-${i}`} className="control-point-marker control-point-marker--revision" title={`Point ${i + 1}`}>
+                  {i + 1}
+                </div>
+              ))}
             </div>
           </div>
         ) : dxfUrls?.[activeTab] ? (
@@ -272,8 +345,49 @@ export default function PreviewPanel({
                 </div>
                 {alignmentResult.confidence < 0.7 && (
                   <p className="alignment-info__warning">
-                    Low confidence alignment. Results may be inaccurate — consider providing control points.
+                    Low confidence alignment. Results may be inaccurate — provide control points to improve.
                   </p>
+                )}
+                {onRealign && dxfUrls?.original && dxfUrls?.comparison && (
+                  <div className="control-point-actions">
+                    {!pickingMode ? (
+                      <button
+                        className="btn btn--sm btn--secondary"
+                        onClick={() => {
+                          setPickingMode(true);
+                          setControlPoints([]);
+                          setCurrentPairSide('master');
+                        }}
+                      >
+                        Refine Alignment (Control Points)
+                      </button>
+                    ) : (
+                      <div className="control-point-actions__active">
+                        <p className="text-xs text-secondary">
+                          Click matching points on each drawing ({completePairs}/4 pairs).
+                          {currentPairSide === 'master' ? ' Click on Original.' : ' Click on Changes.'}
+                        </p>
+                        <div className="flex gap-2">
+                          <button
+                            className="btn btn--sm btn--primary"
+                            onClick={handleRealign}
+                            disabled={completePairs === 0 || loading}
+                          >
+                            Re-align ({completePairs} pair{completePairs !== 1 ? 's' : ''})
+                          </button>
+                          <button
+                            className="btn btn--sm btn--ghost"
+                            onClick={() => {
+                              setPickingMode(false);
+                              setControlPoints([]);
+                            }}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
             </div>

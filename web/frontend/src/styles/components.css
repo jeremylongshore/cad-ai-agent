@@ -1038,3 +1038,40 @@
   border-radius: var(--radius-sm);
   color: var(--text-secondary);
 }
+
+/* Control point picker */
+.control-point-actions {
+  margin-top: var(--space-2);
+}
+
+.control-point-actions__active {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.control-point-marker {
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--accent-primary);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--accent-primary);
+  background: rgba(255, 255, 255, 0.9);
+  pointer-events: none;
+  z-index: 15;
+}
+
+.control-point-marker--master {
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+}
+
+.control-point-marker--revision {
+  border-color: var(--accent-success);
+  color: var(--accent-success);
+}

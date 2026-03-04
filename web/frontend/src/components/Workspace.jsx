@@ -138,6 +138,7 @@ export default function Workspace({ user, onSignOut }) {
               onRevisionBulkApprove={session.handleRevisionBulkApprove}
               onRevisionApply={session.handleRevisionApply}
               onBundleDownload={session.handleBundleDownload}
+              onRealign={session.handleRealign}
             />
           </section>
 

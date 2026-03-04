@@ -389,6 +389,41 @@ export function useSession() {
     }
   }, [sessionId]);
 
+  const handleRealign = useCallback(async (controlPointStrings) => {
+    if (!sessionId) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const alignData = await revisionAlign(sessionId, controlPointStrings);
+      setAlignmentResult(alignData);
+      setMessages((prev) => [...prev,
+        msg('system', `Re-aligned with ${controlPointStrings.length} control point(s): ${alignData.method} (${(alignData.confidence * 100).toFixed(0)}% confidence)`),
+      ]);
+
+      // Re-run diff with new alignment
+      const diffData = await revisionDiff(sessionId);
+      setComparisonResult(diffData);
+      setRevisionOps(diffData.ops || []);
+      setDiffSummary(diffData.diff_summary || null);
+
+      // Re-fetch comparison DXF
+      try {
+        const compBlob = await getDxfBlob(sessionId, 'comparison');
+        setDxfUrls((prev) => {
+          if (prev.comparison) URL.revokeObjectURL(prev.comparison);
+          return { ...prev, comparison: URL.createObjectURL(compBlob) };
+        });
+      } catch (dxfErr) {
+        console.warn('[cad] Comparison DXF re-fetch failed:', dxfErr.message);
+      }
+    } catch (err) {
+      setError(err.message);
+      setMessages((prev) => [...prev, msg('error', `Re-alignment failed: ${err.message}`)]);
+    } finally {
+      setLoading(false);
+    }
+  }, [sessionId]);
+
   const handleBundleDownload = useCallback(() => {
     if (!sessionId) return;
     const url = revisionDownloadUrl(sessionId);
@@ -463,6 +498,7 @@ export function useSession() {
     handleRevisionBulkApprove,
     handleRevisionApply,
     handleBundleDownload,
+    handleRealign,
     reset,
   };
 }
