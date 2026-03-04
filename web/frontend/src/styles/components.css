@@ -1075,3 +1075,45 @@
   border-color: var(--accent-success);
   color: var(--accent-success);
 }
+
+/* Dark mode overrides for viewer */
+@media (prefers-color-scheme: dark) {
+  .dxf-viewer__overlay {
+    background: rgba(15, 15, 26, 0.85);
+  }
+
+  .dxf-viewer__overlay--error {
+    background: rgba(15, 15, 26, 0.95);
+  }
+
+  .viewer-toolbar__btn {
+    background: rgba(26, 26, 46, 0.85);
+    border-color: var(--border-default);
+  }
+
+  .viewer-toolbar__btn:hover {
+    background: rgba(37, 37, 64, 1);
+  }
+
+  .compare-split__pane {
+    background: var(--bg-primary);
+  }
+
+  .compare-split__label {
+    background: rgba(26, 26, 46, 0.85);
+    border-color: var(--border-default);
+    color: var(--text-secondary);
+  }
+
+  .control-point-marker {
+    background: rgba(26, 26, 46, 0.9);
+  }
+}
+
+/* Responsive compare: stack on narrow */
+@media (max-width: 1024px) {
+  .compare-split {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr 1fr;
+  }
+}
