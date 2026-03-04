@@ -6,6 +6,7 @@ Routes:
     POST /api/plan              — Send prompt, get planned operations + preview
     POST /api/apply             — Apply selected operations
     POST /api/compare           — Upload revision DXF, compare against master
+    GET  /api/dxf               — Get raw DXF file (original/edited/comparison)
     GET  /api/render            — Get PNG render (original/edited/diff/comparison)
     GET  /api/download          — Download edited DXF
     POST /api/revision/upload   — Upload revision DXF to existing session
@@ -518,6 +519,38 @@ async def compare(
         except Exception as e:
             logger.error("Comparison failed: %s", e, exc_info=True)
             raise HTTPException(status_code=500, detail=f"Comparison failed: {e}") from None
+
+
+@app.get("/api/dxf")
+async def get_dxf_file(
+    session_id: str = Query(...),
+    render_type: str = Query("original", alias="type"),
+):
+    """Serve raw DXF for client-side WebGL rendering.
+
+    No auth required — same rationale as /api/render (Firebase rewrites
+    strip Authorization headers on proxied GET requests).
+    """
+    try:
+        session = session_mgr.get_by_id(session_id)
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from None
+
+    dxf_map: dict[str, Path | None] = {
+        "original": session.original_path,
+        "edited": session.edited_path,
+        "comparison": session.diff_overlay_path,
+    }
+    path = dxf_map.get(render_type)
+
+    if path is None or not path.exists():
+        raise HTTPException(status_code=404, detail=f"No {render_type} DXF available")
+
+    return FileResponse(
+        path=str(path),
+        media_type="application/dxf",
+        filename=f"{render_type}.dxf",
+    )
 
 
 @app.get("/api/render")
