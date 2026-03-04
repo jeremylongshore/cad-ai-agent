@@ -26,6 +26,20 @@ async function uploadAndWait(page, filename) {
   ).toBeVisible({ timeout: UPLOAD_TIMEOUT });
 }
 
+/**
+ * Upload original, switch to Compare tab, upload revision, wait for diff.
+ */
+async function uploadAndCompare(page) {
+  await uploadAndWait(page, 'r2000_blocks.dxf');
+  await page.locator('.preview__tab').filter({ hasText: 'Compare' }).click();
+  await page.locator('input#revision-upload').setInputFiles(path.join(DXF_ZOO, 'r2000_revision.dxf'));
+
+  // Wait for comparison — floating diff badges or revision ops list
+  await expect(
+    page.locator('.compare-float-bar--bottom, .revision-ops-list, .wizard-step-compact')
+  ).toBeVisible({ timeout: COMPARE_TIMEOUT });
+}
+
 test.describe('Interactive DXF Viewer', () => {
   test('upload shows interactive WebGL viewer instead of static PNG', async ({ page }) => {
     await uploadAndWait(page, 'r2000_blocks.dxf');
@@ -40,15 +54,12 @@ test.describe('Interactive DXF Viewer', () => {
 
     // The loading overlay should disappear once DXF is loaded
     const overlay = page.locator('.dxf-viewer__overlay');
-    // Either overlay is gone, or it had loading text that resolved
     const overlayCount = await overlay.count();
     if (overlayCount > 0) {
-      // If still present, it should be the error state (not loading)
       const isVisible = await overlay.isVisible();
       if (isVisible) {
         const text = await overlay.textContent();
         console.log(`Viewer overlay still visible: ${text}`);
-        // Loading overlay should not persist
         expect(text).not.toContain('Loading drawing');
       }
     }
@@ -56,52 +67,68 @@ test.describe('Interactive DXF Viewer', () => {
     console.log('Interactive DXF viewer rendered with WebGL canvas');
   });
 
-  test('viewer toolbar has fit-to-view button', async ({ page }) => {
+  test('viewer toolbar has zoom and fit-to-view buttons', async ({ page }) => {
     await uploadAndWait(page, 'r2000_blocks.dxf');
-
-    // Wait for viewer to load
     await expect(page.locator('.dxf-viewer canvas')).toBeVisible({ timeout: VIEWER_TIMEOUT });
 
-    // Toolbar should be visible
     const toolbar = page.locator('.viewer-toolbar');
     await expect(toolbar).toBeVisible();
 
-    // Fit button should be present and clickable
-    const fitBtn = toolbar.locator('.viewer-toolbar__btn').first();
-    await expect(fitBtn).toBeVisible();
-    await expect(fitBtn).toBeEnabled();
+    // Should have 3 buttons: zoom in, zoom out, fit
+    const buttons = toolbar.locator('.viewer-toolbar__btn');
+    const buttonCount = await buttons.count();
+    expect(buttonCount).toBe(3);
 
-    // Clicking fit should not throw
+    // Zoom in button
+    const zoomInBtn = page.locator('button[aria-label="Zoom in"]');
+    await expect(zoomInBtn).toBeVisible();
+    await expect(zoomInBtn).toBeEnabled();
+    await zoomInBtn.click();
+
+    // Zoom out button
+    const zoomOutBtn = page.locator('button[aria-label="Zoom out"]');
+    await expect(zoomOutBtn).toBeVisible();
+    await zoomOutBtn.click();
+
+    // Fit to view button
+    const fitBtn = page.locator('button[aria-label="Fit drawing to view"]');
+    await expect(fitBtn).toBeVisible();
     await fitBtn.click();
 
-    console.log('Viewer toolbar with fit-to-view button rendered and clickable');
+    console.log('Viewer toolbar: zoom in, zoom out, fit — all clickable');
+  });
+
+  test('viewer shows hint text for mouse controls', async ({ page }) => {
+    await uploadAndWait(page, 'r2000_blocks.dxf');
+    await expect(page.locator('.dxf-viewer canvas')).toBeVisible({ timeout: VIEWER_TIMEOUT });
+
+    const hint = page.locator('.viewer-toolbar__hint');
+    await expect(hint).toBeVisible();
+    const hintText = await hint.textContent();
+    expect(hintText).toContain('Scroll to zoom');
+    expect(hintText).toContain('Drag to pan');
+
+    console.log(`Viewer hint: "${hintText}"`);
   });
 
   test('edited tab shows interactive viewer after apply', async ({ page }) => {
     await uploadAndWait(page, 'r2000_blocks.dxf');
-
-    // Wait for viewer on Original tab
     await expect(page.locator('.dxf-viewer canvas')).toBeVisible({ timeout: VIEWER_TIMEOUT });
 
-    // Send a prompt and apply
     const textarea = page.locator('.chat__textarea');
     await textarea.fill('Move the first column 24 feet east');
     await page.locator('button').filter({ hasText: 'Send' }).click();
 
-    // Wait for operations to appear
     const opItem = page.locator('.op-item');
     await expect(opItem.first()).toBeVisible({ timeout: 60_000 });
 
-    // Apply changes
     const applyBtn = page.locator('button').filter({ hasText: 'Apply Changes' });
     await expect(applyBtn).toBeEnabled({ timeout: 5_000 });
     await applyBtn.click();
 
-    // Should auto-switch to Edited tab
     const editedTab = page.locator('.preview__tab').filter({ hasText: 'Edited' });
     await expect(editedTab).toHaveClass(/preview__tab--active/, { timeout: 45_000 });
 
-    // Edited tab should have an interactive viewer (canvas) or at least a preview image
     const editedViewer = page.locator('.dxf-viewer canvas');
     const editedImg = page.locator('img[alt*="edited"]');
 
@@ -113,31 +140,67 @@ test.describe('Interactive DXF Viewer', () => {
   });
 });
 
+test.describe('Sidebar Auto-Collapse', () => {
+  test('sidebar collapses after file upload', async ({ page }) => {
+    await uploadAndWait(page, 'r2000_blocks.dxf');
+
+    // Workspace should have the collapsed class
+    const workspace = page.locator('.workspace');
+    await expect(workspace).toHaveClass(/workspace--sidebar-collapsed/, { timeout: 5_000 });
+
+    // Sidebar should not be visible
+    const sidebar = page.locator('.workspace__sidebar');
+    await expect(sidebar).not.toBeVisible();
+
+    console.log('Sidebar auto-collapsed after upload');
+  });
+
+  test('Info button in compact bar toggles sidebar', async ({ page }) => {
+    await uploadAndWait(page, 'r2000_blocks.dxf');
+
+    // Compact bar should show Info button
+    const infoBtn = page.locator('.upload-bar-compact button').filter({ hasText: 'Info' });
+    await expect(infoBtn).toBeVisible({ timeout: 5_000 });
+
+    // Click Info to expand sidebar
+    await infoBtn.click();
+
+    // Sidebar should now be visible
+    const sidebar = page.locator('.workspace__sidebar');
+    await expect(sidebar).toBeVisible({ timeout: 3_000 });
+
+    // Button should now say "Hide Info"
+    const hideBtn = page.locator('.upload-bar-compact button').filter({ hasText: 'Hide Info' });
+    await expect(hideBtn).toBeVisible();
+
+    // Click again to collapse
+    await hideBtn.click();
+    await expect(sidebar).not.toBeVisible({ timeout: 3_000 });
+
+    console.log('Info toggle works: expand and collapse sidebar');
+  });
+});
+
 test.describe('Compact Upload Bar', () => {
   test('upload bar collapses to compact after file load', async ({ page }) => {
     await uploadAndWait(page, 'r2000_blocks.dxf');
 
-    // Compact upload bar should show filename
     const compactBar = page.locator('.upload-bar-compact');
     await expect(compactBar).toBeVisible({ timeout: 5_000 });
 
-    // Should show the filename
     const filename = page.locator('.upload-bar-compact__filename');
     await expect(filename).toContainText('r2000_blocks.dxf');
 
-    // Should show metadata (entity count + layer count)
     const meta = page.locator('.upload-bar-compact__meta');
     await expect(meta).toBeVisible();
     const metaText = await meta.textContent();
     expect(metaText).toContain('entities');
     expect(metaText).toContain('layers');
 
-    // Replace file button should be present
     const replaceBtn = page.locator('button').filter({ hasText: 'Replace file' });
     await expect(replaceBtn).toBeVisible();
     await expect(replaceBtn).toBeEnabled();
 
-    // Full drag-drop zone should NOT be visible
     const uploadZone = page.locator('.upload-zone');
     const zoneCount = await uploadZone.count();
     expect(zoneCount).toBe(0);
@@ -147,11 +210,8 @@ test.describe('Compact Upload Bar', () => {
 
   test('replace file button triggers new upload', async ({ page }) => {
     await uploadAndWait(page, 'r2000_blocks.dxf');
-
-    // Compact bar should be visible
     await expect(page.locator('.upload-bar-compact')).toBeVisible({ timeout: 5_000 });
 
-    // The hidden file input for replacement should exist
     const replaceInput = page.locator('.upload-bar-compact').locator('..').locator('input[type="file"]');
     const inputCount = await replaceInput.count();
     expect(inputCount).toBeGreaterThanOrEqual(1);
@@ -162,21 +222,9 @@ test.describe('Compact Upload Bar', () => {
 
 test.describe('Side-by-Side Comparison', () => {
   test('compare tab shows split view with two viewers', async ({ page }) => {
-    await uploadAndWait(page, 'r2000_blocks.dxf');
+    await uploadAndCompare(page);
 
-    // Switch to Compare tab
-    const compareTab = page.locator('.preview__tab').filter({ hasText: 'Compare' });
-    await compareTab.click();
-    await expect(compareTab).toHaveClass(/preview__tab--active/);
-
-    // Upload revision
-    const revisionInput = page.locator('input#revision-upload');
-    await revisionInput.setInputFiles(path.join(DXF_ZOO, 'r2000_revision.dxf'));
-
-    // Wait for comparison to complete
-    await expect(page.locator('.comparison-summary')).toBeVisible({ timeout: COMPARE_TIMEOUT });
-
-    // Side-by-side split should be visible
+    // Split view should be visible
     const splitView = page.locator('.compare-split');
     await expect(splitView).toBeVisible({ timeout: VIEWER_TIMEOUT });
 
@@ -195,140 +243,203 @@ test.describe('Side-by-Side Comparison', () => {
     expect(label1).toContain('Original');
     expect(label2).toContain('Changes');
 
-    // Each pane should have a DXF viewer with canvas
     const canvases = splitView.locator('.dxf-viewer canvas');
     const canvasCount = await canvases.count();
-    // May have 2 canvases (one per pane) — or fallback to images
     console.log(`Split view: ${paneCount} panes, ${labelCount} labels, ${canvasCount} canvases`);
     expect(paneCount).toBe(2);
   });
 
   test('both split panes have viewer toolbars', async ({ page }) => {
-    await uploadAndWait(page, 'r2000_blocks.dxf');
+    await uploadAndCompare(page);
 
-    // Navigate to Compare and upload revision
-    await page.locator('.preview__tab').filter({ hasText: 'Compare' }).click();
-    await page.locator('input#revision-upload').setInputFiles(path.join(DXF_ZOO, 'r2000_revision.dxf'));
-    await expect(page.locator('.comparison-summary')).toBeVisible({ timeout: COMPARE_TIMEOUT });
-
-    // Split view should be visible
     const splitView = page.locator('.compare-split');
     await expect(splitView).toBeVisible({ timeout: VIEWER_TIMEOUT });
 
-    // Each pane should have a viewer toolbar with fit button
     const toolbars = splitView.locator('.viewer-toolbar');
     const toolbarCount = await toolbars.count();
     expect(toolbarCount).toBe(2);
 
     console.log(`Split view has ${toolbarCount} viewer toolbars`);
   });
+
+  test('compare sub-tabs switch between Split, Original, Revised views', async ({ page }) => {
+    await uploadAndCompare(page);
+
+    // Sub-tabs should be visible
+    const subtabs = page.locator('.compare-subtabs');
+    await expect(subtabs).toBeVisible({ timeout: 5_000 });
+
+    // Should have 3 buttons
+    const buttons = subtabs.locator('.compare-subtabs__btn');
+    expect(await buttons.count()).toBe(3);
+
+    // Default is Split — should show compare-split with 2 panes
+    await expect(page.locator('.compare-split')).toBeVisible();
+
+    // Click "Original" — single full viewer
+    await buttons.filter({ hasText: 'Original' }).click();
+    await expect(page.locator('.compare-split')).not.toBeVisible({ timeout: 3_000 });
+    // Should still have a DXF viewer
+    await expect(page.locator('.compare-split-wrap .dxf-viewer')).toBeVisible({ timeout: 5_000 });
+
+    // Click "Revised"
+    await buttons.filter({ hasText: 'Revised' }).click();
+    await expect(page.locator('.compare-split-wrap .dxf-viewer')).toBeVisible({ timeout: 5_000 });
+
+    // Click "Split" to go back
+    await buttons.filter({ hasText: 'Split' }).click();
+    await expect(page.locator('.compare-split')).toBeVisible({ timeout: 5_000 });
+
+    console.log('Compare sub-tabs: Split/Original/Revised all work');
+  });
+});
+
+test.describe('Floating Overlays', () => {
+  test('alignment floating bar shows above compare split', async ({ page }) => {
+    await uploadAndCompare(page);
+
+    // Floating alignment bar should be visible
+    const floatBar = page.locator('.compare-float-bar--top');
+    const floatBarCount = await floatBar.count();
+
+    if (floatBarCount > 0) {
+      await expect(floatBar).toBeVisible();
+      // Should show confidence
+      const confidence = page.locator('.compare-float-bar__confidence');
+      await expect(confidence).toBeVisible();
+      const confText = await confidence.textContent();
+      expect(confText).toMatch(/\d+%/);
+
+      // Refine button in the floating bar
+      const refineBtn = floatBar.locator('button').filter({ hasText: 'Refine' });
+      await expect(refineBtn).toBeVisible();
+      await expect(refineBtn).toBeEnabled();
+
+      console.log(`Floating alignment bar: confidence=${confText}`);
+    } else {
+      console.log('Floating alignment bar not shown (no alignment result — OK for some files)');
+    }
+  });
+
+  test('diff summary badges float at bottom of compare split', async ({ page }) => {
+    await uploadAndCompare(page);
+
+    const bottomBar = page.locator('.compare-float-bar--bottom');
+    const bottomBarCount = await bottomBar.count();
+
+    if (bottomBarCount > 0) {
+      await expect(bottomBar).toBeVisible();
+      const badges = bottomBar.locator('.comparison-badge');
+      const badgeCount = await badges.count();
+      expect(badgeCount).toBeGreaterThan(0);
+      console.log(`Floating diff badges: ${badgeCount} badge(s)`);
+    } else {
+      console.log('No floating diff badges (no changes detected — OK)');
+    }
+  });
 });
 
 test.describe('Control Point Picker', () => {
-  test('refine alignment button appears in alignment step', async ({ page }) => {
-    await uploadAndWait(page, 'r2000_blocks.dxf');
+  test('refine button in floating bar enters picking mode', async ({ page }) => {
+    await uploadAndCompare(page);
 
-    // Navigate to Compare and upload revision
-    await page.locator('.preview__tab').filter({ hasText: 'Compare' }).click();
-    await page.locator('input#revision-upload').setInputFiles(path.join(DXF_ZOO, 'r2000_revision.dxf'));
-    await expect(page.locator('.comparison-summary')).toBeVisible({ timeout: COMPARE_TIMEOUT });
+    const floatBar = page.locator('.compare-float-bar--top');
+    const floatBarCount = await floatBar.count();
 
-    // Alignment section should be visible
-    const alignmentInfo = page.locator('.alignment-info');
-    await expect(alignmentInfo).toBeVisible({ timeout: 5_000 });
-
-    // "Refine Alignment" button should be visible (control point actions)
-    const refineBtn = page.locator('button').filter({ hasText: /Refine Alignment/ });
-    const refineBtnCount = await refineBtn.count();
-
-    if (refineBtnCount > 0) {
-      await expect(refineBtn).toBeVisible();
-      await expect(refineBtn).toBeEnabled();
-      console.log('Refine Alignment button visible and enabled');
-    } else {
-      // Button might not appear if alignment is high confidence
-      console.log('Refine Alignment button not shown (alignment may be high confidence — OK)');
+    if (floatBarCount === 0) {
+      console.log('No floating alignment bar — skipping picking mode test');
+      return;
     }
-  });
 
-  test('clicking refine enters picking mode with instructions', async ({ page }) => {
-    await uploadAndWait(page, 'r2000_blocks.dxf');
-
-    // Navigate to Compare and upload revision
-    await page.locator('.preview__tab').filter({ hasText: 'Compare' }).click();
-    await page.locator('input#revision-upload').setInputFiles(path.join(DXF_ZOO, 'r2000_revision.dxf'));
-    await expect(page.locator('.comparison-summary')).toBeVisible({ timeout: COMPARE_TIMEOUT });
-
-    // Try to click Refine Alignment
-    const refineBtn = page.locator('button').filter({ hasText: /Refine Alignment/ });
+    const refineBtn = floatBar.locator('button').filter({ hasText: 'Refine' });
     const refineBtnCount = await refineBtn.count();
 
     if (refineBtnCount === 0) {
-      console.log('Refine Alignment button not shown — skipping picking mode test');
+      console.log('Refine button not shown — skipping picking mode test');
       return;
     }
 
     await refineBtn.click();
 
-    // Should show picking mode instructions
-    const instructions = page.locator('.control-point-actions__active');
-    await expect(instructions).toBeVisible({ timeout: 5_000 });
+    // Should show picking mode instruction banner
+    const instructionBar = page.locator('.compare-float-bar--instruction');
+    await expect(instructionBar).toBeVisible({ timeout: 5_000 });
 
-    // Should show instruction text about clicking points
-    const instructionText = await instructions.textContent();
-    expect(instructionText).toContain('Click');
-    expect(instructionText).toContain('point');
+    const text = await instructionBar.textContent();
+    expect(text).toContain('Click matching points');
 
-    // Re-align button should be present (disabled with 0 pairs)
-    const realignBtn = page.locator('button').filter({ hasText: /Re-align/ });
+    // Re-align button should be present
+    const realignBtn = instructionBar.locator('button').filter({ hasText: 'Re-align' });
     await expect(realignBtn).toBeVisible();
 
-    // Cancel button should be present
-    const cancelBtn = page.locator('button').filter({ hasText: 'Cancel' });
+    // Cancel button
+    const cancelBtn = instructionBar.locator('button').filter({ hasText: 'Cancel' });
     await expect(cancelBtn).toBeVisible();
 
-    console.log(`Picking mode entered. Instructions: "${instructionText?.substring(0, 80)}..."`);
+    console.log(`Picking mode entered. Instructions: "${text?.substring(0, 80)}..."`);
   });
 
   test('cancel exits picking mode', async ({ page }) => {
-    await uploadAndWait(page, 'r2000_blocks.dxf');
+    await uploadAndCompare(page);
 
-    await page.locator('.preview__tab').filter({ hasText: 'Compare' }).click();
-    await page.locator('input#revision-upload').setInputFiles(path.join(DXF_ZOO, 'r2000_revision.dxf'));
-    await expect(page.locator('.comparison-summary')).toBeVisible({ timeout: COMPARE_TIMEOUT });
-
-    const refineBtn = page.locator('button').filter({ hasText: /Refine Alignment/ });
-    const refineBtnCount = await refineBtn.count();
-
-    if (refineBtnCount === 0) {
-      console.log('Refine Alignment button not shown — skipping cancel test');
+    const floatBar = page.locator('.compare-float-bar--top');
+    if (await floatBar.count() === 0) {
+      console.log('No floating alignment bar — skipping cancel test');
       return;
     }
 
-    // Enter picking mode
+    const refineBtn = floatBar.locator('button').filter({ hasText: 'Refine' });
+    if (await refineBtn.count() === 0) {
+      console.log('Refine button not shown — skipping cancel test');
+      return;
+    }
+
     await refineBtn.click();
-    await expect(page.locator('.control-point-actions__active')).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('.compare-float-bar--instruction')).toBeVisible({ timeout: 5_000 });
 
     // Click Cancel
-    await page.locator('button').filter({ hasText: 'Cancel' }).click();
+    await page.locator('.compare-float-bar--instruction button').filter({ hasText: 'Cancel' }).click();
 
-    // Picking mode should exit — active instructions gone
-    await expect(page.locator('.control-point-actions__active')).not.toBeVisible({ timeout: 5_000 });
+    // Instruction banner should disappear
+    await expect(page.locator('.compare-float-bar--instruction')).not.toBeVisible({ timeout: 5_000 });
 
-    // Refine button should reappear
-    await expect(page.locator('button').filter({ hasText: /Refine Alignment/ })).toBeVisible();
+    // Alignment floating bar with Refine should reappear
+    await expect(page.locator('.compare-float-bar--top')).toBeVisible();
 
-    console.log('Cancel exited picking mode, Refine button reappeared');
+    console.log('Cancel exited picking mode, floating bar reappeared');
+  });
+});
+
+test.describe('Compact Wizard', () => {
+  test('wizard step collapses to compact after revision loaded', async ({ page }) => {
+    await uploadAndCompare(page);
+
+    // After comparison, the full upload wizard should be replaced by compact summary
+    const compactStep = page.locator('.wizard-step-compact');
+    const compactCount = await compactStep.count();
+
+    if (compactCount > 0) {
+      await expect(compactStep).toBeVisible();
+
+      // Should show filename
+      const fileText = page.locator('.wizard-step-compact__file');
+      await expect(fileText).toBeVisible();
+
+      // Should have Replace button
+      const replaceBtn = compactStep.locator('button').filter({ hasText: 'Replace' });
+      await expect(replaceBtn).toBeVisible();
+
+      console.log('Wizard step collapsed to compact summary');
+    } else {
+      console.log('Compact wizard step not shown (may be in full wizard mode — OK)');
+    }
   });
 });
 
 test.describe('/api/dxf endpoint', () => {
-  test('DXF file endpoint returns valid DXF content', async ({ page, request }) => {
+  test('DXF file endpoint returns valid DXF content', async ({ page }) => {
     await uploadAndWait(page, 'r2000_blocks.dxf');
 
-    // Extract session ID from the page — it's in the URL after upload or we can get it
-    // by intercepting network calls. Simpler: check that the viewer loaded successfully
-    // which proves the /api/dxf endpoint works.
     const viewer = page.locator('.dxf-viewer');
     const viewerCount = await viewer.count();
 
@@ -338,7 +449,6 @@ test.describe('/api/dxf endpoint', () => {
       expect(canvasCount).toBeGreaterThanOrEqual(1);
       console.log('DXF endpoint working — viewer loaded with canvas');
     } else {
-      // Fallback to PNG — DXF endpoint might have failed but app still works
       const img = page.locator('img[alt*="drawing preview"]');
       const imgCount = await img.count();
       expect(imgCount).toBeGreaterThanOrEqual(1);

@@ -12,7 +12,7 @@ const APPLY_TIMEOUT = 45_000;
 
 /**
  * Upload a master DXF → navigate to Compare tab → upload a revision DXF.
- * Returns after the comparison summary is visible.
+ * Returns after the comparison result is visible (floating bar, ops list, or compact step).
  */
 async function uploadMasterAndRevision(page, masterFile, revisionFile) {
   await page.goto('/');
@@ -33,26 +33,34 @@ async function uploadMasterAndRevision(page, masterFile, revisionFile) {
   const revisionInput = page.locator('input#revision-upload');
   await revisionInput.setInputFiles(path.join(DXF_ZOO, revisionFile));
 
-  // Wait for comparison summary to appear (confirms alignment + diff completed)
-  await expect(page.locator('.comparison-summary')).toBeVisible({ timeout: COMPARE_TIMEOUT });
+  // Wait for any indicator that comparison completed:
+  // floating bottom bar, ops list, or compact wizard step
+  await expect(
+    page.locator('.compare-float-bar--bottom, .revision-ops-list, .wizard-step-compact')
+  ).toBeVisible({ timeout: COMPARE_TIMEOUT });
 }
 
 test.describe('Revision Wizard', () => {
   test('upload revision shows alignment info (method + confidence)', async ({ page }) => {
     await uploadMasterAndRevision(page, 'r2000_blocks.dxf', 'r2000_revision.dxf');
 
-    // Step 2: Alignment info should be visible
-    const alignmentBadge = page.locator('.badge').filter({ hasText: /Identity|Translation|Rigid|Anchor|Feature|Manual/ });
+    // Alignment info is now in the floating top bar
+    const floatBarTop = page.locator('.compare-float-bar--top');
+    await expect(floatBarTop).toBeVisible({ timeout: 5_000 });
+
+    // Method badge inside the top floating bar
+    const alignmentBadge = floatBarTop.locator('.badge').filter({
+      hasText: /Identity|Translation|Rigid|Anchor|Feature|Manual/,
+    });
     await expect(alignmentBadge.first()).toBeVisible({ timeout: 5_000 });
 
-    // Confidence metric rendered (bar may be zero-width at 0% confidence, so check attribute)
-    const confidenceBar = page.locator('.confidence-bar');
-    const barCount = await confidenceBar.count();
-    if (barCount > 0) {
-      const progressbar = page.locator('[role="progressbar"]');
-      const value = await progressbar.getAttribute('aria-valuenow');
-      expect(value).not.toBeNull();
-      console.log(`Alignment confidence: ${value}%`);
+    // Confidence percentage rendered in the floating bar
+    const confidenceEl = floatBarTop.locator('.compare-float-bar__confidence');
+    const confidenceCount = await confidenceEl.count();
+    if (confidenceCount > 0) {
+      const confidenceText = await confidenceEl.textContent();
+      expect(confidenceText).not.toBeNull();
+      console.log(`Alignment confidence: ${confidenceText}`);
     }
 
     const methodText = await alignmentBadge.first().textContent();
@@ -62,20 +70,21 @@ test.describe('Revision Wizard', () => {
   test('diff summary badges appear (added/removed/modified/moved)', async ({ page }) => {
     await uploadMasterAndRevision(page, 'r2000_blocks.dxf', 'r2000_revision.dxf');
 
-    const summary = page.locator('.comparison-summary');
-    const badges = page.locator('.comparison-badge');
+    // Diff summary badges are now floating overlays in the bottom bar
+    const floatBarBottom = page.locator('.compare-float-bar--bottom');
+    await expect(floatBarBottom).toBeVisible({ timeout: 5_000 });
+
+    const badges = floatBarBottom.locator('.comparison-badge');
     const badgeCount = await badges.count();
     expect(badgeCount).toBeGreaterThanOrEqual(1);
 
     // At least one category badge should be present
-    const addedCount = await page.locator('.comparison-badge--added').count();
-    const removedCount = await page.locator('.comparison-badge--removed').count();
-    const modifiedCount = await page.locator('.comparison-badge--modified').count();
-    const movedCount = await page.locator('.comparison-badge--moved').count();
+    const addedCount = await floatBarBottom.locator('.comparison-badge--added').count();
+    const removedCount = await floatBarBottom.locator('.comparison-badge--removed').count();
+    const modifiedCount = await floatBarBottom.locator('.comparison-badge--modified').count();
+    const movedCount = await floatBarBottom.locator('.comparison-badge--moved').count();
     const total = addedCount + removedCount + modifiedCount + movedCount;
 
-    const summaryText = await summary.textContent();
-    expect(summaryText).not.toContain('No changes detected');
     expect(total).toBeGreaterThanOrEqual(1);
 
     console.log(`Diff badges — added: ${addedCount}, removed: ${removedCount}, modified: ${modifiedCount}, moved: ${movedCount}`);
@@ -157,6 +166,19 @@ test.describe('Revision Wizard', () => {
     await expect(hint).toBeVisible();
 
     console.log('Bundle download section rendered with download button and hint');
+  });
+
+  test('Refine button visible in floating alignment bar', async ({ page }) => {
+    await uploadMasterAndRevision(page, 'r2000_blocks.dxf', 'r2000_revision.dxf');
+
+    // "Refine" button (formerly "Refine Alignment") lives in the floating top bar
+    const floatBarTop = page.locator('.compare-float-bar--top');
+    await expect(floatBarTop).toBeVisible({ timeout: 5_000 });
+
+    const refineBtn = floatBarTop.locator('button').filter({ hasText: 'Refine' });
+    await expect(refineBtn).toBeVisible();
+
+    console.log('Refine button visible in floating alignment bar');
   });
 
   test('profile selector visible with options', async ({ page }) => {

@@ -47,20 +47,23 @@ test.describe('Revision Comparison — Sourced Documents', () => {
       const revisionInput = page.locator('input#revision-upload');
       await revisionInput.setInputFiles(path.join(SOURCED, revision));
 
-      // Wait for comparison summary
-      const summary = page.locator('.comparison-summary');
-      await expect(summary).toBeVisible({ timeout: COMPARE_TIMEOUT });
+      // Wait for comparison to complete — float bar, ops list, or compact step all signal done
+      const comparisonReady = page.locator(
+        '.compare-float-bar--bottom, .revision-ops-list, .wizard-step-compact'
+      );
+      await expect(comparisonReady.first()).toBeVisible({ timeout: COMPARE_TIMEOUT });
 
       // Different files → must detect changes
-      const summaryText = await summary.textContent();
-      expect(summaryText).not.toContain('No changes detected');
+      const floatBar = page.locator('.compare-float-bar--bottom');
+      const floatBarText = await floatBar.textContent();
+      expect(floatBarText).not.toContain('No changes detected');
 
-      // At least one diff badge should be present
-      const badges = page.locator('.comparison-badge');
+      // At least one diff badge should be present inside the float bar
+      const badges = floatBar.locator('.comparison-badge');
       const badgeCount = await badges.count();
       expect(badgeCount).toBeGreaterThanOrEqual(1);
 
-      console.log(`[ok] ${label} — ${summaryText?.slice(0, 120)}`);
+      console.log(`[ok] ${label} — ${floatBarText?.slice(0, 120)}`);
     });
   }
 });

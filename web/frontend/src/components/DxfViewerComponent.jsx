@@ -36,6 +36,24 @@ export default function DxfViewerComponent({ dxfUrl, onPointClick, className, pi
     }
   }, []);
 
+  const handleZoomIn = useCallback(() => {
+    const cam = viewerRef.current?.GetCamera?.();
+    if (cam) {
+      cam.zoom *= 1.3;
+      cam.updateProjectionMatrix();
+      viewerRef.current.Render();
+    }
+  }, []);
+
+  const handleZoomOut = useCallback(() => {
+    const cam = viewerRef.current?.GetCamera?.();
+    if (cam) {
+      cam.zoom /= 1.3;
+      cam.updateProjectionMatrix();
+      viewerRef.current.Render();
+    }
+  }, []);
+
   useEffect(() => {
     const container = containerRef.current;
     if (!container || !dxfUrl) return;
@@ -123,6 +141,28 @@ export default function DxfViewerComponent({ dxfUrl, onPointClick, className, pi
       <div className="viewer-toolbar">
         <button
           className="viewer-toolbar__btn"
+          onClick={handleZoomIn}
+          title="Zoom in"
+          aria-label="Zoom in"
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <circle cx="8" cy="8" r="5" />
+            <path d="M8 5.5v5M5.5 8h5" />
+          </svg>
+        </button>
+        <button
+          className="viewer-toolbar__btn"
+          onClick={handleZoomOut}
+          title="Zoom out"
+          aria-label="Zoom out"
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <circle cx="8" cy="8" r="5" />
+            <path d="M5.5 8h5" />
+          </svg>
+        </button>
+        <button
+          className="viewer-toolbar__btn"
           onClick={handleFitView}
           title="Fit to view"
           aria-label="Fit drawing to view"
@@ -133,6 +173,7 @@ export default function DxfViewerComponent({ dxfUrl, onPointClick, className, pi
           </svg>
         </button>
       </div>
+      <span className="viewer-toolbar__hint">Scroll to zoom · Drag to pan</span>
     </div>
   );
 }
