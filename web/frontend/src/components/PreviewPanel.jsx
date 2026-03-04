@@ -141,7 +141,18 @@ export default function PreviewPanel({
       </div>
 
       <div className="preview__image-wrap" role="tabpanel" aria-label={`${activeTab} preview`}>
-        {dxfUrls?.[activeTab] ? (
+        {activeTab === 'comparison' && dxfUrls?.original && dxfUrls?.comparison ? (
+          <div className="compare-split">
+            <div className="compare-split__pane">
+              <span className="compare-split__label">Original</span>
+              <DxfViewerComponent dxfUrl={dxfUrls.original} />
+            </div>
+            <div className="compare-split__pane">
+              <span className="compare-split__label">Changes</span>
+              <DxfViewerComponent dxfUrl={dxfUrls.comparison} />
+            </div>
+          </div>
+        ) : dxfUrls?.[activeTab] ? (
           <DxfViewerComponent dxfUrl={dxfUrls[activeTab]} />
         ) : previewUrls[activeTab] ? (
           <img
