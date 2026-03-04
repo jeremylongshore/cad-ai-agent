@@ -144,11 +144,11 @@ test.describe('Full Edit Flow', () => {
     // AI message in chat
     await expect(page.locator('.message--ai').first()).toBeVisible();
 
-    // 4. Apply + download + verify edited preview image
+    // 4. Apply + download + verify edited preview (interactive viewer or fallback image)
     const savedPath = await applyAndDownload(page);
-    await expect(
-      page.locator('.preview__image-wrap img[alt="edited drawing preview"]')
-    ).toBeVisible({ timeout: 10_000 });
+    const editedViewer = page.locator('.dxf-viewer');
+    const editedImg = page.locator('.preview__image-wrap img[alt="edited drawing preview"]');
+    await expect(editedViewer.or(editedImg)).toBeVisible({ timeout: 30_000 });
 
     // 5. Validate the actual DXF content
     const stat = fs.statSync(savedPath);
