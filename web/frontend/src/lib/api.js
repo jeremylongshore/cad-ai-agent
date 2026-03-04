@@ -1,6 +1,8 @@
 import { auth } from './firebase';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
+const DEFAULT_TIMEOUT_MS = 60_000;   // 60s for most requests
+const UPLOAD_TIMEOUT_MS = 120_000;   // 120s for file uploads
 
 async function getToken() {
   const user = auth.currentUser;
@@ -8,17 +10,41 @@ async function getToken() {
   return user.getIdToken();
 }
 
+/** Turn network-level errors into user-friendly messages */
+function friendlyError(err) {
+  if (err.name === 'AbortError') {
+    return 'Request timed out — the server took too long to respond. Please try again.';
+  }
+  if (err instanceof TypeError && /fetch|network/i.test(err.message)) {
+    return 'Unable to reach the server. Check your internet connection and try again.';
+  }
+  return err.message;
+}
+
 async function request(path, options = {}) {
   const token = await getToken();
   const url = `${API_BASE}${path}`;
+  const timeoutMs = options._timeout || DEFAULT_TIMEOUT_MS;
 
-  const res = await fetch(url, {
-    ...options,
-    headers: {
-      ...options.headers,
-      Authorization: `Bearer ${token}`,
-    },
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  let res;
+  try {
+    res = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+      headers: {
+        ...options.headers,
+        Authorization: `Bearer ${token}`,
+      },
+    });
+  } catch (err) {
+    // Network-level failure (timeout, offline, DNS, etc.)
+    throw new Error(friendlyError(err));
+  } finally {
+    clearTimeout(timer);
+  }
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
@@ -29,8 +55,16 @@ async function request(path, options = {}) {
 }
 
 export async function healthCheck() {
-  const res = await fetch(`${API_BASE}/api/health`);
-  return res.json();
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 10_000);
+  try {
+    const res = await fetch(`${API_BASE}/api/health`, { signal: controller.signal });
+    return res.json();
+  } catch (err) {
+    throw new Error(friendlyError(err));
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export async function uploadFile(file) {
@@ -40,6 +74,7 @@ export async function uploadFile(file) {
   const res = await request('/api/upload', {
     method: 'POST',
     body: formData,
+    _timeout: UPLOAD_TIMEOUT_MS,
   });
   return res.json();
 }
@@ -81,11 +116,19 @@ export async function getRenderBlob(sessionId, type = 'original') {
 }
 
 export async function fetchProfiles() {
-  const res = await fetch(`${API_BASE}/api/profiles`);
-  if (!res.ok) {
-    throw new Error(`Failed to fetch profiles: ${res.status}`);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
+  try {
+    const res = await fetch(`${API_BASE}/api/profiles`, { signal: controller.signal });
+    if (!res.ok) {
+      throw new Error(`Failed to fetch profiles: ${res.status}`);
+    }
+    return res.json();
+  } catch (err) {
+    throw new Error(friendlyError(err));
+  } finally {
+    clearTimeout(timer);
   }
-  return res.json();
 }
 
 export async function compareFiles(sessionId, revisionFile, profile = null) {
@@ -129,6 +172,7 @@ export async function revisionUpload(sessionId, file) {
   const res = await request(`/api/revision/upload?session_id=${sessionId}`, {
     method: 'POST',
     body: formData,
+    _timeout: UPLOAD_TIMEOUT_MS,
   });
   return res.json();
 }
