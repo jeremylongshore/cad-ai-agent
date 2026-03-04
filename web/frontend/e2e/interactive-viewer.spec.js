@@ -36,7 +36,7 @@ async function uploadAndCompare(page) {
 
   // Wait for comparison — floating diff badges or revision ops list
   await expect(
-    page.locator('.compare-float-bar--bottom, .revision-ops-list, .wizard-step-compact')
+    page.locator('.compare-float-bar--bottom, .revision-ops-list, .wizard-step-compact').first()
   ).toBeVisible({ timeout: COMPARE_TIMEOUT });
 }
 
@@ -49,7 +49,7 @@ test.describe('Interactive DXF Viewer', () => {
     await expect(viewer).toBeVisible({ timeout: VIEWER_TIMEOUT });
 
     // The viewer should contain a canvas element (WebGL)
-    const canvas = viewer.locator('canvas');
+    const canvas = viewer.locator('canvas').first();
     await expect(canvas).toBeVisible({ timeout: VIEWER_TIMEOUT });
 
     // The loading overlay should disappear once DXF is loaded
@@ -69,7 +69,7 @@ test.describe('Interactive DXF Viewer', () => {
 
   test('viewer toolbar has zoom and fit-to-view buttons', async ({ page }) => {
     await uploadAndWait(page, 'r2000_blocks.dxf');
-    await expect(page.locator('.dxf-viewer canvas')).toBeVisible({ timeout: VIEWER_TIMEOUT });
+    await expect(page.locator('.dxf-viewer canvas').first()).toBeVisible({ timeout: VIEWER_TIMEOUT });
 
     const toolbar = page.locator('.viewer-toolbar');
     await expect(toolbar).toBeVisible();
@@ -100,7 +100,7 @@ test.describe('Interactive DXF Viewer', () => {
 
   test('viewer shows hint text for mouse controls', async ({ page }) => {
     await uploadAndWait(page, 'r2000_blocks.dxf');
-    await expect(page.locator('.dxf-viewer canvas')).toBeVisible({ timeout: VIEWER_TIMEOUT });
+    await expect(page.locator('.dxf-viewer canvas').first()).toBeVisible({ timeout: VIEWER_TIMEOUT });
 
     const hint = page.locator('.viewer-toolbar__hint');
     await expect(hint).toBeVisible();
@@ -113,7 +113,7 @@ test.describe('Interactive DXF Viewer', () => {
 
   test('edited tab shows interactive viewer after apply', async ({ page }) => {
     await uploadAndWait(page, 'r2000_blocks.dxf');
-    await expect(page.locator('.dxf-viewer canvas')).toBeVisible({ timeout: VIEWER_TIMEOUT });
+    await expect(page.locator('.dxf-viewer canvas').first()).toBeVisible({ timeout: VIEWER_TIMEOUT });
 
     const textarea = page.locator('.chat__textarea');
     await textarea.fill('Move the first column 24 feet east');

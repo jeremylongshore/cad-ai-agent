@@ -182,12 +182,19 @@
 }
 
 .workspace--sidebar-collapsed .workspace__sidebar {
-  display: none;
+  overflow: hidden;
+  padding: 0;
+  border: none;
+  visibility: hidden;
 }
 
 @media (max-width: 1024px) {
   .workspace--sidebar-collapsed {
     grid-template-columns: 1fr;
+  }
+
+  .workspace--sidebar-collapsed .workspace__sidebar {
+    display: none;
   }
 
   .workspace {

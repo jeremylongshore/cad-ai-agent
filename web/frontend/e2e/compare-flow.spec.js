@@ -106,7 +106,7 @@ test.describe('Comparison Flow — r2000_blocks master', () => {
     // For identical files the backend returns 0 changes, so the floating diff
     // bar never renders. Wait for comparison to finish by watching for the
     // compact wizard step or any revision ops list that may appear instead.
-    await expect(page.locator(COMPARE_DONE_SELECTOR)).toBeVisible({ timeout: COMPARE_TIMEOUT });
+    await expect(page.locator(COMPARE_DONE_SELECTOR).first()).toBeVisible({ timeout: COMPARE_TIMEOUT });
 
     // Confirm that no diff badges were rendered
     await expect(page.locator('.compare-float-bar--bottom')).not.toBeVisible();
@@ -178,7 +178,7 @@ test.describe('Comparison Flow — r2018_polylines master', () => {
     await revisionInput.setInputFiles(path.join(DXF_ZOO, 'r2018_polylines.dxf'));
 
     // 0 changes — float bar must stay hidden
-    await expect(page.locator(COMPARE_DONE_SELECTOR)).toBeVisible({ timeout: COMPARE_TIMEOUT });
+    await expect(page.locator(COMPARE_DONE_SELECTOR).first()).toBeVisible({ timeout: COMPARE_TIMEOUT });
     await expect(page.locator('.compare-float-bar--bottom')).not.toBeVisible();
 
     console.log('r2018_polylines self-compare — correctly no changes (float bar absent)');

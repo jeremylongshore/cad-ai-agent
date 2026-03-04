@@ -36,7 +36,7 @@ async function uploadMasterAndRevision(page, masterFile, revisionFile) {
   // Wait for any indicator that comparison completed:
   // floating bottom bar, ops list, or compact wizard step
   await expect(
-    page.locator('.compare-float-bar--bottom, .revision-ops-list, .wizard-step-compact')
+    page.locator('.compare-float-bar--bottom, .revision-ops-list, .wizard-step-compact').first()
   ).toBeVisible({ timeout: COMPARE_TIMEOUT });
 }
 

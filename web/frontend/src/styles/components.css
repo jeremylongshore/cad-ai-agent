@@ -1070,6 +1070,8 @@
   gap: 1px;
   background: var(--border-default);
   flex-shrink: 0;
+  z-index: 15;
+  position: relative;
 }
 
 .compare-subtabs__btn {
@@ -1114,7 +1116,7 @@
 }
 
 .compare-float-bar--top {
-  top: var(--space-2);
+  top: calc(28px + var(--space-2));
   left: 50%;
   transform: translateX(-50%);
 }
@@ -1126,7 +1128,7 @@
 }
 
 .compare-float-bar--instruction {
-  top: var(--space-2);
+  top: calc(28px + var(--space-2));
   left: 50%;
   transform: translateX(-50%);
   background: rgba(37, 99, 235, 0.95);
