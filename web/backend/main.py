@@ -207,6 +207,7 @@ async def upload(
 
     # Convert if needed
     dxf_path = session.original_path
+    pdf_classifications = None
     if ext == ".pdf":
         try:
             from cad_dxf_agent.core.converter import convert_to_dxf
@@ -216,6 +217,8 @@ async def upload(
                 detail = _user_friendly_conversion_error(result.error, ext)
                 raise HTTPException(status_code=422, detail=detail)
             shutil.copy2(str(result.output_path), str(dxf_path))
+            # Store page classifications for response
+            pdf_classifications = result.classifications
         except ImportError:
             raise HTTPException(
                 status_code=500,
@@ -260,10 +263,21 @@ async def upload(
     except Exception as e:
         logger.warning("Original render failed (non-fatal): %s", e, exc_info=True)
 
-    return {
+    response: dict = {
         "session_id": session.session_id,
         "file_info": session.file_info,
     }
+    if pdf_classifications:
+        response["page_classifications"] = [
+            {
+                "page": c.page_num + 1,
+                "type": c.content_type.value,
+                "vectors": c.vector_count,
+                "text": c.text_count,
+            }
+            for c in pdf_classifications
+        ]
+    return response
 
 
 @app.post("/api/plan")

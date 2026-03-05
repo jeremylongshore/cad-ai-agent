@@ -22,6 +22,10 @@ from ..settings import settings
 logger = logging.getLogger(__name__)
 tracer = get_tracer(__name__)
 
+# ACI white — ezdxf's matplotlib renderer uses blackWhiteInversion so
+# entities tagged "white" render as visible black on a white background.
+PDF_ENTITY_COLOR = 7
+
 
 @dataclass
 class ConversionResult:
@@ -33,6 +37,7 @@ class ConversionResult:
     success: bool
     warnings: list[str] = field(default_factory=list)
     error: str | None = None
+    classifications: list | None = None  # list[PageClassification] when available
 
 
 class ConversionError(Exception):
@@ -223,13 +228,30 @@ def _convert_pdf(source_path: Path, output_dir: str | Path | None) -> Conversion
     output_path = _get_output_path(source_path, output_dir)
     warnings: list[str] = [_PDF_WARNING]
 
+    # Run classifier if PyMuPDF is available
+    classifications = None
+    if has_fitz:
+        try:
+            from .pdf_classifier import classify_pdf_pages
+
+            classifications = classify_pdf_pages(source_path)
+            for c in classifications:
+                warnings.append(
+                    f"Page {c.page_num + 1}: {c.content_type.value} "
+                    f"(vectors={c.vector_count}, text={c.text_count})"
+                )
+        except Exception as e:
+            logger.warning("PDF classification failed (non-fatal): %s", e)
+
     try:
         doc = ezdxf.new(dxfversion=_version_to_acdb(settings.target_dxf_version))
+        # Ensure layer "0" has explicit color
+        doc.layers.get("0").color = PDF_ENTITY_COLOR
         msp = doc.modelspace()
         total_entities = 0
 
         if has_fitz:
-            total_entities = _extract_pdf_fitz(msp, source_path)
+            total_entities = _extract_pdf_fitz(msp, source_path, doc)
             if total_entities == 0:
                 warnings.append(
                     "No vector geometry found in PDF — may be a raster/scanned document"
@@ -249,6 +271,9 @@ def _convert_pdf(source_path: Path, output_dir: str | Path | None) -> Conversion
                     )
                 plumber_x_offset = 0.0
                 for page_num, page in enumerate(pdf.pages):
+                    layer = f"PDF_PAGE_{page_num + 1}" if page_num > 0 else "0"
+                    if page_num > 0 and layer not in doc.layers:
+                        doc.layers.add(layer, color=PDF_ENTITY_COLOR)
                     total_entities += _extract_pdf_page_plumber(
                         msp, page, page_num, x_offset=plumber_x_offset
                     )
@@ -270,6 +295,7 @@ def _convert_pdf(source_path: Path, output_dir: str | Path | None) -> Conversion
             output_path=output_path,
             success=True,
             warnings=warnings,
+            classifications=classifications,
         )
     except Exception as e:
         return ConversionResult(
@@ -281,18 +307,54 @@ def _convert_pdf(source_path: Path, output_dir: str | Path | None) -> Conversion
         )
 
 
+# ── Color helpers ─────────────────────────────────────────────────
+
+
+def _rgb_to_aci(rgb_tuple) -> int:
+    """Map PDF RGB stroke color to nearest DXF ACI color index.
+
+    ``rgb_tuple`` comes from PyMuPDF ``path_item["color"]`` — an (R, G, B)
+    tuple with values in [0, 1].  Returns the closest AutoCAD Color Index.
+    """
+    if rgb_tuple is None:
+        return PDF_ENTITY_COLOR
+    try:
+        r, g, b = [int(c * 255) for c in rgb_tuple[:3]]
+    except (TypeError, ValueError):
+        return PDF_ENTITY_COLOR
+    # Near-black → use white (viewer inverts to visible black)
+    if r < 30 and g < 30 and b < 30:
+        return 7
+    if r > 200 and g < 50 and b < 50:
+        return 1  # red
+    if r > 200 and g > 200 and b < 50:
+        return 2  # yellow
+    if g > 200 and r < 50 and b < 50:
+        return 3  # green
+    if g > 200 and b > 200 and r < 50:
+        return 4  # cyan
+    if b > 200 and r < 50 and g < 50:
+        return 5  # blue
+    if r > 200 and b > 200 and g < 50:
+        return 6  # magenta
+    return PDF_ENTITY_COLOR
+
+
 # ── PyMuPDF extraction (preferred) ──────────────────────────────
 
 
 PDF_PAGE_GAP = 50.0  # gap between pages in DXF units (~17.6mm)
 
 
-def _extract_pdf_fitz(msp, source_path: Path) -> int:
+def _extract_pdf_fitz(msp, source_path: Path, doc=None) -> int:
     """Extract vector geometry using PyMuPDF's page.get_drawings().
 
     PyMuPDF recovers Bezier curves, arcs, lines, and rects from PDF
     content streams — much better than pdfplumber for CAD PDFs.
     Multi-page PDFs are laid out side-by-side with PDF_PAGE_GAP spacing.
+
+    When ``doc`` is provided (ezdxf Document), per-page layers are created
+    with explicit colors so entities are visible in viewers.
     """
     import math
 
@@ -304,19 +366,24 @@ def _extract_pdf_fitz(msp, source_path: Path) -> int:
 
     for page_num, page in enumerate(pdf_doc):
         layer = f"PDF_PAGE_{page_num + 1}" if page_num > 0 else "0"
+        # Create layer with explicit color so entities are visible
+        if doc is not None and page_num > 0 and layer not in doc.layers:
+            doc.layers.add(layer, color=PDF_ENTITY_COLOR)
         page_height = page.rect.height
         page_width = page.rect.width
         drawings = page.get_drawings()
 
         for path_item in drawings:
+            stroke_color = _rgb_to_aci(path_item.get("color"))
             for item in path_item.get("items", []):
                 kind = item[0]
+                attribs = {"layer": layer, "color": stroke_color}
 
                 if kind == "l":  # Line
                     p1, p2 = item[1], item[2]
                     x0, y0 = x_offset + float(p1.x), page_height - float(p1.y)
                     x1, y1 = x_offset + float(p2.x), page_height - float(p2.y)
-                    msp.add_line((x0, y0), (x1, y1), dxfattribs={"layer": layer})
+                    msp.add_line((x0, y0), (x1, y1), dxfattribs=attribs)
                     total += 1
 
                 elif kind == "re":  # Rectangle
@@ -326,7 +393,7 @@ def _extract_pdf_fitz(msp, source_path: Path) -> int:
                     x1 = x_offset + float(rect.x1)
                     y1 = page_height - float(rect.y1)
                     points = [(x0, y0), (x1, y0), (x1, y1), (x0, y1)]
-                    msp.add_lwpolyline(points, close=True, dxfattribs={"layer": layer})
+                    msp.add_lwpolyline(points, close=True, dxfattribs=attribs)
                     total += 1
 
                 elif kind == "c":  # Cubic Bezier curve
@@ -339,14 +406,14 @@ def _extract_pdf_fitz(msp, source_path: Path) -> int:
                             radius=radius,
                             start_angle=math.degrees(start_angle),
                             end_angle=math.degrees(end_angle),
-                            dxfattribs={"layer": layer},
+                            dxfattribs=attribs,
                         )
                     else:
                         # Approximate as polyline segments
                         pts = _bezier_to_points(p1, p2, p3, p4, page_height, segments=8)
                         if len(pts) >= 2:
                             shifted = [(x_offset + px, py) for px, py in pts]
-                            msp.add_lwpolyline(shifted, dxfattribs={"layer": layer})
+                            msp.add_lwpolyline(shifted, dxfattribs=attribs)
                     total += 1
 
                 elif kind == "qu":  # Quad (quadrilateral)
@@ -364,7 +431,7 @@ def _extract_pdf_fitz(msp, source_path: Path) -> int:
                             for k in range(1, len(item))
                         ]
                     if len(pts) >= 2:
-                        msp.add_lwpolyline(pts, close=True, dxfattribs={"layer": layer})
+                        msp.add_lwpolyline(pts, close=True, dxfattribs=attribs)
                     total += 1
 
         # Extract text blocks from the page
@@ -384,7 +451,11 @@ def _extract_pdf_fitz(msp, source_path: Path) -> int:
                     msp.add_text(
                         text,
                         height=height * 0.7,
-                        dxfattribs={"layer": layer, "insert": (x, y)},
+                        dxfattribs={
+                            "layer": layer,
+                            "color": PDF_ENTITY_COLOR,
+                            "insert": (x, y),
+                        },
                     )
                     total += 1
 
@@ -474,6 +545,7 @@ def _extract_pdf_page_plumber(msp, page, page_num: int, x_offset: float = 0.0) -
     """
     count = 0
     layer = f"PDF_PAGE_{page_num + 1}" if page_num > 0 else "0"
+    attribs = {"layer": layer, "color": PDF_ENTITY_COLOR}
 
     # Extract lines
     lines = page.lines or []
@@ -484,7 +556,7 @@ def _extract_pdf_page_plumber(msp, page, page_num: int, x_offset: float = 0.0) -
         page_height = float(page.height)
         y0 = page_height - y0
         y1 = page_height - y1
-        msp.add_line((x0, y0), (x1, y1), dxfattribs={"layer": layer})
+        msp.add_line((x0, y0), (x1, y1), dxfattribs=attribs)
         count += 1
 
     # Extract rectangles as polylines
@@ -496,7 +568,7 @@ def _extract_pdf_page_plumber(msp, page, page_num: int, x_offset: float = 0.0) -
         y0 = page_height - y0
         y1 = page_height - y1
         points = [(x0, y0), (x1, y0), (x1, y1), (x0, y1)]
-        msp.add_lwpolyline(points, close=True, dxfattribs={"layer": layer})
+        msp.add_lwpolyline(points, close=True, dxfattribs=attribs)
         count += 1
 
     # Extract text
@@ -509,7 +581,7 @@ def _extract_pdf_page_plumber(msp, page, page_num: int, x_offset: float = 0.0) -
         msp.add_text(
             text,
             height=height * 0.7,  # approximate PDF text height to DXF
-            dxfattribs={"layer": layer, "insert": (x, y)},
+            dxfattribs={"layer": layer, "color": PDF_ENTITY_COLOR, "insert": (x, y)},
         )
         count += 1
 

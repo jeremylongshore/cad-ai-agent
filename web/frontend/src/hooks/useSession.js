@@ -47,7 +47,7 @@ export function useSession() {
     try {
       const data = await uploadFile(file);
       setSessionId(data.session_id);
-      setFileInfo(data.file_info);
+      setFileInfo({ ...data.file_info, page_classifications: data.page_classifications || null });
       // Fetch PNG render and DXF blob in parallel
       const [renderResult, dxfResult] = await Promise.allSettled([
         getRenderBlob(data.session_id, 'original'),

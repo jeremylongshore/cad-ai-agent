@@ -113,6 +113,22 @@ export default function Workspace({ user, onSignOut }) {
                   <span>Layers</span>
                   <span className="file-info__stat-value">{fileInfo.layer_count}</span>
                 </div>
+                {fileInfo.page_classifications && (
+                  <div style={{ marginTop: 'var(--space-3)' }}>
+                    <p className="text-xs text-tertiary" style={{ marginBottom: 'var(--space-1)' }}>Pages</p>
+                    <div className="flex gap-1" style={{ flexWrap: 'wrap' }}>
+                      {fileInfo.page_classifications.map((c) => (
+                        <span
+                          key={c.page}
+                          className={`badge ${c.type === 'vector_layout' ? 'badge--success' : c.type === 'raster_scanned' ? 'badge--warning' : ''}`}
+                          title={`${c.vectors} vectors, ${c.text} text`}
+                        >
+                          P{c.page}: {c.type.replace('_', ' ')}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 {fileInfo.layers && (
                   <div style={{ marginTop: 'var(--space-3)' }}>
                     <p className="text-xs text-tertiary" style={{ marginBottom: 'var(--space-1)' }}>Layers</p>
