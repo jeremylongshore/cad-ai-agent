@@ -234,6 +234,7 @@ export default function PreviewPanel({
                   key={t.key}
                   className={`compare-subtabs__btn${compareView === t.key ? ' compare-subtabs__btn--active' : ''}`}
                   onClick={() => setCompareView(t.key)}
+                  disabled={pickingMode && t.key !== 'split'}
                 >
                   {t.label}
                 </button>
