@@ -345,6 +345,12 @@ def _rgb_to_aci(rgb_tuple) -> int:
 
 PDF_PAGE_GAP = 50.0  # gap between pages in DXF units (~17.6mm)
 
+# Minimum entity length in PDF points.  PDF path decomposition produces
+# thousands of sub-pixel strokes (fill patterns, hatch artifacts, stroke caps)
+# that add density without readable information.  Filtering these reduces the
+# "black blob" effect when viewing dense structural PDFs at auto-fit zoom.
+PDF_MIN_ENTITY_SIZE = 1.0
+
 
 def _extract_pdf_fitz(msp, source_path: Path, doc=None) -> int:
     """Extract vector geometry using PyMuPDF's page.get_drawings().
@@ -383,6 +389,8 @@ def _extract_pdf_fitz(msp, source_path: Path, doc=None) -> int:
                     p1, p2 = item[1], item[2]
                     x0, y0 = x_offset + float(p1.x), page_height - float(p1.y)
                     x1, y1 = x_offset + float(p2.x), page_height - float(p2.y)
+                    if math.hypot(x1 - x0, y1 - y0) < PDF_MIN_ENTITY_SIZE:
+                        continue
                     msp.add_line((x0, y0), (x1, y1), dxfattribs=attribs)
                     total += 1
 
@@ -392,12 +400,20 @@ def _extract_pdf_fitz(msp, source_path: Path, doc=None) -> int:
                     y0 = page_height - float(rect.y0)
                     x1 = x_offset + float(rect.x1)
                     y1 = page_height - float(rect.y1)
+                    if abs(x1 - x0) < PDF_MIN_ENTITY_SIZE and abs(y1 - y0) < PDF_MIN_ENTITY_SIZE:
+                        continue
                     points = [(x0, y0), (x1, y0), (x1, y1), (x0, y1)]
                     msp.add_lwpolyline(points, close=True, dxfattribs=attribs)
                     total += 1
 
                 elif kind == "c":  # Cubic Bezier curve
                     p1, p2, p3, p4 = item[1], item[2], item[3], item[4]
+                    # Skip tiny curves (fill artifacts)
+                    chord = math.hypot(
+                        float(p4.x) - float(p1.x), float(p4.y) - float(p1.y)
+                    )
+                    if chord < PDF_MIN_ENTITY_SIZE:
+                        continue
                     arc = _fit_arc_from_bezier(p1, p2, p3, p4, page_height)
                     if arc:
                         cx, cy, radius, start_angle, end_angle = arc
@@ -543,6 +559,8 @@ def _extract_pdf_page_plumber(msp, page, page_num: int, x_offset: float = 0.0) -
     and text — curves/arcs are lost.  x_offset shifts all X coords for
     side-by-side multi-page layout.
     """
+    import math
+
     count = 0
     layer = f"PDF_PAGE_{page_num + 1}" if page_num > 0 else "0"
     attribs = {"layer": layer, "color": PDF_ENTITY_COLOR}
@@ -556,6 +574,8 @@ def _extract_pdf_page_plumber(msp, page, page_num: int, x_offset: float = 0.0) -
         page_height = float(page.height)
         y0 = page_height - y0
         y1 = page_height - y1
+        if math.hypot(x1 - x0, y1 - y0) < PDF_MIN_ENTITY_SIZE:
+            continue
         msp.add_line((x0, y0), (x1, y1), dxfattribs=attribs)
         count += 1
 
@@ -567,6 +587,8 @@ def _extract_pdf_page_plumber(msp, page, page_num: int, x_offset: float = 0.0) -
         page_height = float(page.height)
         y0 = page_height - y0
         y1 = page_height - y1
+        if abs(x1 - x0) < PDF_MIN_ENTITY_SIZE and abs(y1 - y0) < PDF_MIN_ENTITY_SIZE:
+            continue
         points = [(x0, y0), (x1, y0), (x1, y1), (x0, y1)]
         msp.add_lwpolyline(points, close=True, dxfattribs=attribs)
         count += 1
