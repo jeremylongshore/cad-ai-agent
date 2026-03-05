@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { fetchProfiles } from '../lib/api';
 import DxfViewerComponent from './DxfViewerComponent';
 
@@ -53,6 +53,10 @@ export default function PreviewPanel({
   const [selectedProfile, setSelectedProfile] = useState('');
   const [focusedOpIndex, setFocusedOpIndex] = useState(-1);
   const opsListRef = useRef(null);
+
+  // Resize handle state for controls height
+  const [controlsHeight, setControlsHeight] = useState(240);
+  const dragStartRef = useRef(null);
 
   // Compare sub-view: 'split', 'original', 'revised'
   const [compareView, setCompareView] = useState('split');
@@ -172,6 +176,28 @@ export default function PreviewPanel({
       setPickingMode(false);
     }
   }, [controlPoints, onRealign]);
+
+  // Resize handle drag handlers
+  const handleResizePointerDown = useCallback((e) => {
+    e.preventDefault();
+    e.target.setPointerCapture(e.pointerId);
+    dragStartRef.current = { y: e.clientY, startHeight: controlsHeight };
+  }, [controlsHeight]);
+
+  const handleResizePointerMove = useCallback((e) => {
+    if (!dragStartRef.current) return;
+    const delta = dragStartRef.current.y - e.clientY; // drag up = grow controls
+    const newHeight = Math.min(400, Math.max(80, dragStartRef.current.startHeight + delta));
+    setControlsHeight(newHeight);
+  }, []);
+
+  const handleResizePointerUp = useCallback(() => {
+    dragStartRef.current = null;
+  }, []);
+
+  const controlsStyle = useMemo(() => (
+    activeTab === 'comparison' ? { maxHeight: controlsHeight, minHeight: controlsHeight } : undefined
+  ), [activeTab, controlsHeight]);
 
   const completePairs = controlPoints.filter((p) => p.master && p.revision).length;
 
@@ -337,7 +363,17 @@ export default function PreviewPanel({
 
       {/* ===== COMPARISON TAB CONTENT ===== */}
       {activeTab === 'comparison' && (
-        <div className="preview__controls">
+        <>
+        <div
+          className="resize-handle"
+          onPointerDown={handleResizePointerDown}
+          onPointerMove={handleResizePointerMove}
+          onPointerUp={handleResizePointerUp}
+          role="separator"
+          aria-orientation="horizontal"
+          aria-label="Resize viewer and controls"
+        />
+        <div className="preview__controls" style={controlsStyle}>
           {/* Step 1: Upload — full form if no revision, compact summary if revision loaded */}
           {(!revisionOps || revisionOps.length === 0) && !bundleReady && !alignmentResult && (
             <div className="wizard-step">
@@ -360,10 +396,10 @@ export default function PreviewPanel({
                   </select>
                   <span className="input-group__hint">
                     {selectedProfile === 'structural'
-                      ? 'Lines, polylines, circles, arcs, blocks only — excludes title/notes'
+                      ? 'Geometry only (lines, polylines, arcs, blocks) — excludes text, title blocks, notes, borders, and seal layers'
                       : selectedProfile
                         ? `Filter: ${selectedProfile}`
-                        : 'Compare all entities on all layers'}
+                        : 'Compare all entities on all layers (recommended for saw cuts and annotation changes)'}
                   </span>
                 </div>
               )}
@@ -558,6 +594,7 @@ export default function PreviewPanel({
             </div>
           )}
         </div>
+        </>
       )}
 
       {/* ===== EDIT TAB CONTENT ===== */}

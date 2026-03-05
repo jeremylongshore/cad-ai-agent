@@ -416,6 +416,31 @@
   place-items: center;
 }
 
+/* Resize handle between viewer and controls */
+.resize-handle {
+  flex-shrink: 0;
+  height: 8px;
+  cursor: row-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  touch-action: none;
+}
+
+.resize-handle::before {
+  content: '';
+  width: 40px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--border-strong);
+}
+
+.resize-handle:hover::before,
+.resize-handle:active::before {
+  background: var(--accent-primary);
+}
+
 /* Controls section — scrolls independently, viewer keeps space */
 .preview__controls {
   flex-shrink: 0;
