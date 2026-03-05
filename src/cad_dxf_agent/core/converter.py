@@ -247,8 +247,12 @@ def _convert_pdf(source_path: Path, output_dir: str | Path | None) -> Conversion
                         success=False,
                         error="PDF has no pages",
                     )
+                plumber_x_offset = 0.0
                 for page_num, page in enumerate(pdf.pages):
-                    total_entities += _extract_pdf_page_plumber(msp, page, page_num)
+                    total_entities += _extract_pdf_page_plumber(
+                        msp, page, page_num, x_offset=plumber_x_offset
+                    )
+                    plumber_x_offset += float(page.width) + PDF_PAGE_GAP
 
                 if total_entities == 0:
                     warnings.append(
@@ -280,11 +284,15 @@ def _convert_pdf(source_path: Path, output_dir: str | Path | None) -> Conversion
 # ── PyMuPDF extraction (preferred) ──────────────────────────────
 
 
+PDF_PAGE_GAP = 50.0  # gap between pages in DXF units (~17.6mm)
+
+
 def _extract_pdf_fitz(msp, source_path: Path) -> int:
     """Extract vector geometry using PyMuPDF's page.get_drawings().
 
     PyMuPDF recovers Bezier curves, arcs, lines, and rects from PDF
     content streams — much better than pdfplumber for CAD PDFs.
+    Multi-page PDFs are laid out side-by-side with PDF_PAGE_GAP spacing.
     """
     import math
 
@@ -292,10 +300,12 @@ def _extract_pdf_fitz(msp, source_path: Path) -> int:
 
     pdf_doc = fitz.open(str(source_path))
     total = 0
+    x_offset = 0.0
 
     for page_num, page in enumerate(pdf_doc):
         layer = f"PDF_PAGE_{page_num + 1}" if page_num > 0 else "0"
         page_height = page.rect.height
+        page_width = page.rect.width
         drawings = page.get_drawings()
 
         for path_item in drawings:
@@ -304,16 +314,16 @@ def _extract_pdf_fitz(msp, source_path: Path) -> int:
 
                 if kind == "l":  # Line
                     p1, p2 = item[1], item[2]
-                    x0, y0 = float(p1.x), page_height - float(p1.y)
-                    x1, y1 = float(p2.x), page_height - float(p2.y)
+                    x0, y0 = x_offset + float(p1.x), page_height - float(p1.y)
+                    x1, y1 = x_offset + float(p2.x), page_height - float(p2.y)
                     msp.add_line((x0, y0), (x1, y1), dxfattribs={"layer": layer})
                     total += 1
 
                 elif kind == "re":  # Rectangle
                     rect = item[1]
-                    x0 = float(rect.x0)
+                    x0 = x_offset + float(rect.x0)
                     y0 = page_height - float(rect.y0)
-                    x1 = float(rect.x1)
+                    x1 = x_offset + float(rect.x1)
                     y1 = page_height - float(rect.y1)
                     points = [(x0, y0), (x1, y0), (x1, y1), (x0, y1)]
                     msp.add_lwpolyline(points, close=True, dxfattribs={"layer": layer})
@@ -325,7 +335,7 @@ def _extract_pdf_fitz(msp, source_path: Path) -> int:
                     if arc:
                         cx, cy, radius, start_angle, end_angle = arc
                         msp.add_arc(
-                            center=(cx, cy),
+                            center=(x_offset + cx, cy),
                             radius=radius,
                             start_angle=math.degrees(start_angle),
                             end_angle=math.degrees(end_angle),
@@ -335,7 +345,8 @@ def _extract_pdf_fitz(msp, source_path: Path) -> int:
                         # Approximate as polyline segments
                         pts = _bezier_to_points(p1, p2, p3, p4, page_height, segments=8)
                         if len(pts) >= 2:
-                            msp.add_lwpolyline(pts, dxfattribs={"layer": layer})
+                            shifted = [(x_offset + px, py) for px, py in pts]
+                            msp.add_lwpolyline(shifted, dxfattribs={"layer": layer})
                     total += 1
 
                 elif kind == "qu":  # Quad (quadrilateral)
@@ -343,10 +354,13 @@ def _extract_pdf_fitz(msp, source_path: Path) -> int:
                     # pymupdf <1.27:  ('qu', Point, Point, Point, Point)
                     if len(item) == 2:
                         quad = item[1]
-                        pts = [(float(quad[k].x), page_height - float(quad[k].y)) for k in range(4)]
+                        pts = [
+                            (x_offset + float(quad[k].x), page_height - float(quad[k].y))
+                            for k in range(4)
+                        ]
                     else:
                         pts = [
-                            (float(item[k].x), page_height - float(item[k].y))
+                            (x_offset + float(item[k].x), page_height - float(item[k].y))
                             for k in range(1, len(item))
                         ]
                     if len(pts) >= 2:
@@ -364,7 +378,7 @@ def _extract_pdf_fitz(msp, source_path: Path) -> int:
                     if not text:
                         continue
                     bbox = span.get("bbox", (0, 0, 0, 0))
-                    x = float(bbox[0])
+                    x = x_offset + float(bbox[0])
                     y = page_height - float(bbox[1])
                     height = max(float(bbox[3]) - float(bbox[1]), 1.0)
                     msp.add_text(
@@ -373,6 +387,8 @@ def _extract_pdf_fitz(msp, source_path: Path) -> int:
                         dxfattribs={"layer": layer, "insert": (x, y)},
                     )
                     total += 1
+
+        x_offset += page_width + PDF_PAGE_GAP
 
     pdf_doc.close()
     return total
@@ -449,11 +465,12 @@ def _bezier_to_points(p1, p2, p3, p4, page_height: float, segments: int = 8):
 # ── pdfplumber extraction (fallback) ─────────────────────────────
 
 
-def _extract_pdf_page_plumber(msp, page, page_num: int) -> int:
+def _extract_pdf_page_plumber(msp, page, page_num: int, x_offset: float = 0.0) -> int:
     """Extract vector geometry from a single PDF page using pdfplumber.
 
     Fallback when PyMuPDF is not installed. Only extracts lines, rects,
-    and text — curves/arcs are lost.
+    and text — curves/arcs are lost.  x_offset shifts all X coords for
+    side-by-side multi-page layout.
     """
     count = 0
     layer = f"PDF_PAGE_{page_num + 1}" if page_num > 0 else "0"
@@ -461,8 +478,8 @@ def _extract_pdf_page_plumber(msp, page, page_num: int) -> int:
     # Extract lines
     lines = page.lines or []
     for line in lines:
-        x0, y0 = float(line["x0"]), float(line["top"])
-        x1, y1 = float(line["x1"]), float(line["bottom"])
+        x0, y0 = x_offset + float(line["x0"]), float(line["top"])
+        x1, y1 = x_offset + float(line["x1"]), float(line["bottom"])
         # Flip Y axis (PDF origin is top-left, DXF is bottom-left)
         page_height = float(page.height)
         y0 = page_height - y0
@@ -473,8 +490,8 @@ def _extract_pdf_page_plumber(msp, page, page_num: int) -> int:
     # Extract rectangles as polylines
     rects = page.rects or []
     for rect in rects:
-        x0, y0 = float(rect["x0"]), float(rect["top"])
-        x1, y1 = float(rect["x1"]), float(rect["bottom"])
+        x0, y0 = x_offset + float(rect["x0"]), float(rect["top"])
+        x1, y1 = x_offset + float(rect["x1"]), float(rect["bottom"])
         page_height = float(page.height)
         y0 = page_height - y0
         y1 = page_height - y1
@@ -485,7 +502,7 @@ def _extract_pdf_page_plumber(msp, page, page_num: int) -> int:
     # Extract text
     words = page.extract_words() or []
     for word in words:
-        x = float(word["x0"])
+        x = x_offset + float(word["x0"])
         y = float(page.height) - float(word["top"])
         text = word["text"]
         height = max(float(word["bottom"]) - float(word["top"]), 1.0)

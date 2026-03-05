@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { useSession } from '../hooks/useSession';
 import FileUpload from './FileUpload';
 import ChatPanel from './ChatPanel';
@@ -8,6 +8,12 @@ export default function Workspace({ user, onSignOut }) {
   const session = useSession();
   const { fileInfo, sessionId, messages, operations, selectedOps, previewUrls, dxfUrls, comparisonResult, loading, loadingStartTime, error } = session;
   const replaceInputRef = useRef(null);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  // Auto-collapse sidebar when file is uploaded (compact bar already shows info)
+  useEffect(() => {
+    if (fileInfo) setSidebarCollapsed(true);
+  }, [fileInfo]);
 
   return (
     <div className="page" style={{ height: '100vh', overflow: 'hidden' }}>
@@ -54,7 +60,7 @@ export default function Workspace({ user, onSignOut }) {
           </div>
         </main>
       ) : (
-        <div className="workspace">
+        <div className={`workspace${sidebarCollapsed ? ' workspace--sidebar-collapsed' : ''}`}>
           <div className={`workspace__upload-bar${fileInfo ? ' workspace__upload-bar--compact' : ''}`}>
             {fileInfo ? (
               <div className="upload-bar-compact">
@@ -62,6 +68,13 @@ export default function Workspace({ user, onSignOut }) {
                 <span className="upload-bar-compact__meta">
                   {fileInfo.entity_count} entities &middot; {fileInfo.layer_count} layers
                 </span>
+                <button
+                  className="btn btn--ghost btn--sm"
+                  onClick={() => setSidebarCollapsed((c) => !c)}
+                  title={sidebarCollapsed ? 'Show file info' : 'Hide file info'}
+                >
+                  {sidebarCollapsed ? 'Info' : 'Hide Info'}
+                </button>
                 <button
                   className="btn btn--ghost btn--sm"
                   onClick={() => replaceInputRef.current?.click()}

@@ -232,14 +232,15 @@ class TestFitzExtraction:
 
         return R(x0, y0, x1, y1)
 
-    def _make_page(self, height=792, drawings=None, text_dict=None):
+    def _make_page(self, height=792, width=612, drawings=None, text_dict=None):
         class MockPage:
-            def __init__(self, h, d, t):
+            def __init__(self, h, w, d, t):
                 class Rect:
-                    def __init__(self, h):
+                    def __init__(self, h, w):
                         self.height = h
+                        self.width = w
 
-                self.rect = Rect(h)
+                self.rect = Rect(h, w)
                 self._drawings = d or []
                 self._text = t or {"blocks": []}
 
@@ -249,7 +250,7 @@ class TestFitzExtraction:
             def get_text(self, mode, flags=0):
                 return self._text
 
-        return MockPage(height, drawings, text_dict)
+        return MockPage(height, width, drawings, text_dict)
 
     def test_rectangle_extracted(self, tmp_path, monkeypatch):
         """'re' items produce a closed LWPOLYLINE."""
@@ -474,6 +475,49 @@ class TestFitzExtraction:
         msp = doc.modelspace()
         count = _extract_pdf_fitz(msp, tmp_path / "dummy.pdf")
         assert count == 0
+
+    def test_multipage_pages_are_offset(self, tmp_path, monkeypatch):
+        """Multi-page PDFs lay out pages side-by-side with x_offset."""
+        import sys
+
+        import ezdxf
+
+        from cad_dxf_agent.core.converter import PDF_PAGE_GAP
+
+        page_width = 612.0
+        # Page 1: one line at x=10
+        page1 = self._make_page(
+            width=page_width,
+            drawings=[{"items": [("l", self._make_point(10, 0), self._make_point(10, 100))]}],
+        )
+        # Page 2: one line at x=20 (should be offset by page_width + gap)
+        page2 = self._make_page(
+            width=page_width,
+            drawings=[{"items": [("l", self._make_point(20, 0), self._make_point(20, 100))]}],
+        )
+        fitz_mod = self._make_fitz_module([page1, page2])
+        monkeypatch.setitem(sys.modules, "fitz", fitz_mod)
+
+        from cad_dxf_agent.core.converter import _extract_pdf_fitz
+
+        doc = ezdxf.new()
+        msp = doc.modelspace()
+        count = _extract_pdf_fitz(msp, tmp_path / "dummy.pdf")
+        assert count == 2
+
+        entities = list(msp)
+        line1 = entities[0]
+        line2 = entities[1]
+
+        # Page 1 line stays near x=10
+        assert abs(line1.dxf.start.x - 10.0) < 0.01
+
+        # Page 2 line is offset by page_width + gap
+        expected_x = page_width + PDF_PAGE_GAP + 20.0
+        assert abs(line2.dxf.start.x - expected_x) < 0.01
+
+        # Page 2 goes on named layer
+        assert line2.dxf.layer == "PDF_PAGE_2"
 
 
 class TestArcFittingEdgeCases:
