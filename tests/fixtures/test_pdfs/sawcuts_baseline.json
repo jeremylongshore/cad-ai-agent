@@ -1,0 +1,55 @@
+{
+  "description": "Baseline metrics from S202-S203_SAWCUTS_APP (1).pdf before color/classifier fixes",
+  "date": "2026-03-05",
+  "pages": [
+    {
+      "page": 1,
+      "width": 612.0,
+      "height": 792.0,
+      "drawing_count": 12,
+      "path_item_count": 12,
+      "image_count": 1,
+      "text_span_count": 32,
+      "expected_classification": "cover_text_heavy"
+    },
+    {
+      "page": 2,
+      "width": 3024.0,
+      "height": 2160.0,
+      "drawing_count": 17741,
+      "path_item_count": 18175,
+      "image_count": 1,
+      "text_span_count": 351,
+      "expected_classification": "vector_layout"
+    },
+    {
+      "page": 3,
+      "width": 3024.0,
+      "height": 2160.0,
+      "drawing_count": 14294,
+      "path_item_count": 14672,
+      "image_count": 1,
+      "text_span_count": 316,
+      "expected_classification": "vector_layout"
+    }
+  ],
+  "before": {
+    "total_entities_extracted": 33555,
+    "render_mean_luminance": 254.8,
+    "entity_colors": "all 256 (BYLAYER, no explicit color)",
+    "layers": {
+      "0": {"entity_count": 44, "color": 7},
+      "PDF_PAGE_2": {"entity_count": 18524, "color": "auto-created, no explicit"},
+      "PDF_PAGE_3": {"entity_count": 14987, "color": "auto-created, no explicit"}
+    },
+    "bug": "entities invisible — BYLAYER color on auto-created layers without color metadata renders as white-on-white"
+  },
+  "acceptance_criteria": {
+    "all_entities_have_explicit_color": true,
+    "layers_have_explicit_colors": true,
+    "render_mean_luminance_below": 250,
+    "render_mean_luminance_above": 20,
+    "pages_2_3_classified_as": "vector_layout",
+    "entity_count_threshold": 30000
+  }
+}

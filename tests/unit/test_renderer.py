@@ -6,7 +6,12 @@ from pathlib import Path
 
 import pytest
 
-from cad_dxf_agent.core.renderer import RenderResult, render_dxf_to_pdf, render_dxf_to_png
+from cad_dxf_agent.core.renderer import (
+    RenderResult,
+    _check_render_quality,
+    render_dxf_to_pdf,
+    render_dxf_to_png,
+)
 
 
 class TestPngRendering:
@@ -167,3 +172,57 @@ class TestRenderExceptionPath:
         assert result.success is False
         assert result.error is not None
         assert "Render failed" in result.error
+
+
+class TestRenderQualityGuard:
+    """Tests for _check_render_quality black/blank detection."""
+
+    def test_detects_mostly_black(self, tmp_path: Path):
+        """A nearly-black image triggers a warning."""
+        from PIL import Image
+
+        img = Image.new("L", (100, 100), color=5)
+        output = tmp_path / "black.png"
+        img.save(str(output))
+
+        warnings = _check_render_quality(output)
+        assert len(warnings) == 1
+        assert "mostly black" in warnings[0]
+
+    def test_detects_blank_white(self, tmp_path: Path):
+        """A nearly-white image triggers a warning."""
+        from PIL import Image
+
+        img = Image.new("L", (100, 100), color=252)
+        output = tmp_path / "white.png"
+        img.save(str(output))
+
+        warnings = _check_render_quality(output)
+        assert len(warnings) == 1
+        assert "blank" in warnings[0]
+
+    def test_normal_render_no_warnings(self, tmp_path: Path):
+        """A normal-luminance image produces no warnings."""
+        from PIL import Image
+
+        img = Image.new("L", (100, 100), color=128)
+        output = tmp_path / "normal.png"
+        img.save(str(output))
+
+        warnings = _check_render_quality(output)
+        assert len(warnings) == 0
+
+    def test_skips_non_png(self, tmp_path: Path):
+        """Non-PNG files are skipped (PDF renders can't be opened by PIL)."""
+        output = tmp_path / "render.pdf"
+        output.write_bytes(b"%PDF-fake")
+
+        warnings = _check_render_quality(output)
+        assert len(warnings) == 0
+
+    def test_render_result_includes_quality_warnings(self, sample_dxf: Path, tmp_path: Path):
+        """Successful PNG render includes quality_warnings field."""
+        output = tmp_path / "preview.png"
+        result = render_dxf_to_png(sample_dxf, output_path=output)
+        assert result.success is True
+        assert isinstance(result.quality_warnings, list)

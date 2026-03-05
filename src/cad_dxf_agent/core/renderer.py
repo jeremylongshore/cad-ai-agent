@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import logging
 import tempfile
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import ezdxf
@@ -32,6 +32,7 @@ class RenderResult:
     dpi: int
     success: bool
     error: str | None = None
+    quality_warnings: list[str] = field(default_factory=list)
 
 
 def render_dxf_to_png(
@@ -154,11 +155,16 @@ def _render(
             span.set_attribute("cad.render.output_basename", output_path.name)
             logger.info("Rendered %s → %s (%d dpi)", dxf_path.name, output_path, dpi)
 
+            quality_warnings = _check_render_quality(output_path)
+            for w in quality_warnings:
+                logger.warning("Render quality: %s", w)
+
             return RenderResult(
                 output_path=output_path,
                 format=fmt,
                 dpi=dpi,
                 success=True,
+                quality_warnings=quality_warnings,
             )
 
         except Exception as e:
@@ -170,6 +176,33 @@ def _render(
                 success=False,
                 error=f"Render failed: {e}",
             )
+
+
+def _check_render_quality(output_path: Path) -> list[str]:
+    """Detect mostly-black or mostly-white renders that indicate a rendering bug.
+
+    Only runs on PNG images (PIL can't open PDF renders).
+    """
+    if output_path.suffix.lower() != ".png":
+        return []
+    warnings: list[str] = []
+    try:
+        import numpy as np
+        from PIL import Image
+
+        img = np.array(Image.open(str(output_path)).convert("L"))
+        mean_lum = float(img.mean())
+        if mean_lum < 20:
+            warnings.append(
+                f"Render appears mostly black (mean luminance {mean_lum:.0f}/255)"
+            )
+        elif mean_lum > 250:
+            warnings.append(
+                f"Render appears blank (mean luminance {mean_lum:.0f}/255)"
+            )
+    except ImportError:
+        pass  # PIL/numpy not available, skip check
+    return warnings
 
 
 def _bg_hex(color_name: str) -> str:
