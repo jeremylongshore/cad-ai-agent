@@ -18,16 +18,13 @@ test.describe('DXF Upload', () => {
     const systemMsg = page.locator('.message--system');
     await expect(systemMsg).toContainText('Loaded r2000_blocks.dxf', { timeout: 20_000 });
 
-    // File info sidebar
-    await expect(page.locator('.file-info__name')).toContainText('r2000_blocks.dxf');
+    // Compact bar shows filename (sidebar auto-collapses after upload)
+    await expect(page.locator('.upload-bar-compact__filename')).toContainText('r2000_blocks.dxf');
 
-    // Entity count > 0
-    const entityStat = page.locator('.file-info__stat-value').first();
-    const entityText = await entityStat.textContent();
-    expect(Number(entityText)).toBeGreaterThan(0);
-
-    // Layer badges visible
-    await expect(page.locator('.badge').first()).toBeVisible();
+    // Entity/layer count visible in compact bar meta
+    const compactMeta = page.locator('.upload-bar-compact__meta');
+    const metaText = await compactMeta.textContent();
+    expect(metaText).toMatch(/\d+\s+entities/);
 
     // Preview image rendered
     const previewImg = page.locator('img[alt*="drawing preview"]');
@@ -45,7 +42,7 @@ test.describe('DXF Upload', () => {
     await page.locator('input[type="file"]').setInputFiles(path.join(DXF_ZOO, 'r12_basic.dxf'));
 
     await expect(page.locator('.message--system')).toContainText('Loaded r12_basic.dxf', { timeout: 20_000 });
-    await expect(page.locator('.file-info__name')).toContainText('r12_basic.dxf');
+    await expect(page.locator('.upload-bar-compact__filename')).toContainText('r12_basic.dxf');
   });
 
   test('uploads r2018_polylines.dxf — modern format loads OK', async ({ page }) => {
@@ -55,6 +52,6 @@ test.describe('DXF Upload', () => {
     await page.locator('input[type="file"]').setInputFiles(path.join(DXF_ZOO, 'r2018_polylines.dxf'));
 
     await expect(page.locator('.message--system')).toContainText('Loaded r2018_polylines.dxf', { timeout: 20_000 });
-    await expect(page.locator('.file-info__name')).toContainText('r2018_polylines.dxf');
+    await expect(page.locator('.upload-bar-compact__filename')).toContainText('r2018_polylines.dxf');
   });
 });

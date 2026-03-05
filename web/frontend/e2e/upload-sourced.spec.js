@@ -49,11 +49,10 @@ test.describe('Upload Sourced DXF Files', () => {
           ]);
 
           if (outcome === 'loaded') {
-            await expect(page.locator('.file-info__name')).toContainText(file);
-            const entityStat = page.locator('.file-info__stat-value').first();
-            const entityText = await entityStat.textContent();
-            expect(Number(entityText)).toBeGreaterThanOrEqual(0);
-            console.log(`  [ok] ${file} — loaded, ${entityText} entities`);
+            await expect(page.locator('.upload-bar-compact__filename')).toContainText(file);
+            const metaText = await page.locator('.upload-bar-compact__meta').textContent();
+            expect(metaText).toMatch(/\d+\s+entities/);
+            console.log(`  [ok] ${file} — loaded, ${metaText}`);
           } else {
             const alertText = await page.locator('[role="alert"]').textContent();
             expect(alertText).not.toMatch(/Traceback|Internal Server Error|500/);

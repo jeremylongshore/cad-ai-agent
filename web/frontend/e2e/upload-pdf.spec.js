@@ -20,7 +20,7 @@ test.describe('PDF Upload', () => {
     ]);
 
     if (result === 'success') {
-      await expect(page.locator('.file-info__name')).toBeVisible();
+      await expect(page.locator('.upload-bar-compact__filename')).toBeVisible();
     } else {
       const errorText = await page.locator('[role="alert"]').textContent();
       // Must be user-friendly — no internal tracebacks
@@ -42,10 +42,9 @@ test.describe('PDF Upload', () => {
     ]);
 
     if (result === 'success') {
-      await expect(page.locator('.file-info__name')).toBeVisible();
-      const entityStat = page.locator('.file-info__stat-value').first();
-      const entityText = await entityStat.textContent();
-      expect(Number(entityText)).toBeGreaterThan(0);
+      await expect(page.locator('.upload-bar-compact__filename')).toBeVisible();
+      const metaText = await page.locator('.upload-bar-compact__meta').textContent();
+      expect(metaText).toMatch(/\d+\s+entities/);
     } else {
       const errorText = await page.locator('[role="alert"]').textContent();
       expect(errorText).not.toContain('Traceback');

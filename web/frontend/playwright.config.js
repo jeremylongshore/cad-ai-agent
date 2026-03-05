@@ -12,6 +12,8 @@ const isProduction = TARGET === 'production';
 const PROD_URL = 'https://cad-dxf-agent.web.app';
 const LOCAL_URL = 'http://localhost:3000';
 
+const AUTH_STATE_PATH = path.join(import.meta.dirname, 'test-results', '.auth-state.json');
+
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: false,
@@ -20,6 +22,8 @@ export default defineConfig({
   workers: 1,
   timeout: 90_000, // production can be slower (Cloud Run cold start)
 
+  globalSetup: './e2e/global-setup.js',
+
   reporter: [
     ['list'],
     ['html', { open: 'never' }],
@@ -27,6 +31,7 @@ export default defineConfig({
 
   use: {
     baseURL: isProduction ? PROD_URL : LOCAL_URL,
+    storageState: AUTH_STATE_PATH,
     trace: 'on',
     screenshot: 'on',
     video: 'retain-on-failure',
