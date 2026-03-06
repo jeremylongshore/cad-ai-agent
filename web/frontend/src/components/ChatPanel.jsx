@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import QnaPanel from './QnaPanel';
 
 const SUGGESTIONS = [
   'Move column A1 24 feet east',
-  'Delete the north elevation note',
-  'Rename label FOOTING F1 to FOOTING F2',
+  'What is on layer NOTES?',
+  'How many entities are there?',
   'Add a column mark at grid B3',
 ];
 
@@ -205,9 +206,9 @@ export default function ChatPanel({
       >
         {messages.length === 0 ? (
           <div className="chat__empty">
-            <p className="chat__empty-title">Describe your edit</p>
+            <p className="chat__empty-title">Ask a question or describe an edit</p>
             <p className="chat__empty-text">
-              I can move entities, edit text, delete elements, and add blocks.
+              I can answer questions about your drawing, list entities, search text, and plan edits.
             </p>
             {!disabled && (
               <div className="chat__suggestions">
@@ -229,12 +230,17 @@ export default function ChatPanel({
             const roleClass = msg.role === 'error' ? 'error'
               : msg.role === 'warning' ? 'warning'
               : msg.role;
+            const isQna = msg.qnaData && msg.qnaData.task_family === 'qna';
 
             return (
               <div key={msg.id} className={`message-wrapper message-wrapper--${roleClass}`}>
-                <div className={`message message--${roleClass}`}>
-                  {msg.text}
-                </div>
+                {isQna ? (
+                  <QnaPanel data={msg.qnaData} />
+                ) : (
+                  <div className={`message message--${roleClass}`}>
+                    {msg.text}
+                  </div>
+                )}
                 {/* Actions row for AI/error messages */}
                 {(msg.role === 'ai' || msg.role === 'error') && (
                   <div className="message-actions">
