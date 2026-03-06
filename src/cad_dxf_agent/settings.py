@@ -75,6 +75,15 @@ class Settings:
         self.proxy_url: str | None = os.getenv("CAD_PROXY_URL")
         self.license_key: str | None = os.getenv("CAD_LICENSE_KEY")
 
+        # Router
+        self.enabled_task_families: str | None = os.getenv("CAD_ENABLED_TASK_FAMILIES")
+        self.router_llm_enabled: bool = (
+            os.getenv("CAD_ROUTER_LLM_ENABLED", "false").lower() == "true"
+        )
+        self.router_confidence_threshold: float = float(
+            os.getenv("CAD_ROUTER_CONFIDENCE_THRESHOLD", "0.9")
+        )
+
         # Edit history
         self.max_undo_snapshots: int = int(os.getenv("CAD_MAX_UNDO_SNAPSHOTS", "50"))
 
