@@ -1,0 +1,4 @@
+# Disable CodeRabbit automatic reviews for this repository
+# Gemini Code Assist is the preferred AI reviewer
+reviews:
+  enabled: false

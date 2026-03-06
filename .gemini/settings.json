@@ -1,0 +1,11 @@
+{
+  "reviews": {
+    "enabled": true,
+    "comment_severity_threshold": "MEDIUM",
+    "code_review": {
+      "enabled": true,
+      "comment_on_summary": true,
+      "comment_on_diff": true
+    }
+  }
+}
