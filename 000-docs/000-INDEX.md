@@ -47,6 +47,7 @@
 | 002 | SECU | [002-TQ-SECU-security-policy.md](002-TQ-SECU-security-policy.md) |
 | 018 | SPEC | [018-TQ-SPEC-unit-roundtrip-test-plan.md](018-TQ-SPEC-unit-roundtrip-test-plan.md) |
 | 032 | TEST | [032-TQ-TEST-sawcuts-sample-drawing.pdf](032-TQ-TEST-sawcuts-sample-drawing.pdf) |
+| 037 | SPEC | [037-TQ-SPEC-evaluation-plan.md](037-TQ-SPEC-evaluation-plan.md) |
 
 ### RL — Reports & Releases
 | # | Type | File |
@@ -112,6 +113,7 @@
 | 034 | AT | AUDT | Capability audit: current vs target |
 | 035 | AT | ARCH | Drawing intelligence target architecture |
 | 036 | AT | SPEC | Response contracts and task taxonomy |
+| 037 | TQ | SPEC | Evaluation plan (5-tier, scorecard, golden trajectories) |
 | 039 | AT | ADEC | ADR: intent router design (hybrid heuristic+LLM) |
 
 ## Quick Reference
