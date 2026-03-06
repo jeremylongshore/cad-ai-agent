@@ -10,8 +10,11 @@ import pytest
 from cad_dxf_agent.core.converter import (
     _PDF_WARNING,
     PDF_ENTITY_COLOR,
+    PDF_MAX_HATCH_ENTITIES,
     ConversionResult,
+    _create_fill_hatch,
     _rgb_to_aci,
+    _set_entity_rgb,
     convert_to_dxf,
 )
 
@@ -944,6 +947,406 @@ class TestConversionResultClassifications:
             success=True,
         )
         assert result.classifications is None
+
+
+class TestSetEntityRgb:
+    """Tests for _set_entity_rgb true-color helper."""
+
+    def test_applies_true_color(self):
+        doc = ezdxf.new()
+        msp = doc.modelspace()
+        entity = msp.add_line((0, 0), (10, 10))
+        _set_entity_rgb(entity, (1.0, 0.0, 0.0))  # red
+        assert entity.rgb == (255, 0, 0)
+
+    def test_none_is_noop(self):
+        doc = ezdxf.new()
+        msp = doc.modelspace()
+        entity = msp.add_line((0, 0), (10, 10))
+        _set_entity_rgb(entity, None)
+        assert not entity.rgb  # no true color set
+
+    def test_near_black_skipped(self):
+        doc = ezdxf.new()
+        msp = doc.modelspace()
+        entity = msp.add_line((0, 0), (10, 10))
+        _set_entity_rgb(entity, (0.05, 0.05, 0.05))
+        assert not entity.rgb  # near-black skipped
+
+    def test_invalid_type_is_noop(self):
+        doc = ezdxf.new()
+        msp = doc.modelspace()
+        entity = msp.add_line((0, 0), (10, 10))
+        _set_entity_rgb(entity, "not a tuple")
+        assert not entity.rgb
+
+    def test_values_clamped_to_0_255(self):
+        doc = ezdxf.new()
+        msp = doc.modelspace()
+        entity = msp.add_line((0, 0), (10, 10))
+        _set_entity_rgb(entity, (1.5, -0.1, 0.5))  # out of [0,1] range
+        assert entity.rgb == (255, 0, 127)
+
+
+class TestFitzTrueColor:
+    """Tests for true RGB color applied to fitz-extracted entities."""
+
+    def _make_fitz_module(self, pages):
+        import types
+
+        fitz_mod = types.ModuleType("fitz")
+        fitz_mod.TEXT_PRESERVE_WHITESPACE = 1
+
+        class MockDoc:
+            def __init__(self):
+                self._pages = pages
+
+            def __iter__(self):
+                return iter(self._pages)
+
+            def close(self):
+                pass
+
+        fitz_mod.open = lambda path: MockDoc()
+        return fitz_mod
+
+    def _make_point(self, x, y):
+        class Pt:
+            def __init__(self, x, y):
+                self.x = x
+                self.y = y
+
+        return Pt(x, y)
+
+    def _make_rect(self, x0, y0, x1, y1):
+        class R:
+            def __init__(self, x0, y0, x1, y1):
+                self.x0, self.y0, self.x1, self.y1 = x0, y0, x1, y1
+
+        return R(x0, y0, x1, y1)
+
+    def _make_page(self, height=792, width=612, drawings=None, text_dict=None):
+        class MockPage:
+            def __init__(self, h, w, d, t):
+                class Rect:
+                    def __init__(self, h, w):
+                        self.height = h
+                        self.width = w
+
+                self.rect = Rect(h, w)
+                self._drawings = d or []
+                self._text = t or {"blocks": []}
+
+            def get_drawings(self):
+                return self._drawings
+
+            def get_text(self, mode, flags=0):
+                return self._text
+
+        return MockPage(height, width, drawings, text_dict)
+
+    def test_fitz_line_gets_true_color(self, tmp_path, monkeypatch):
+        """Lines with non-black stroke color get entity.rgb set."""
+        import sys
+
+        page = self._make_page(
+            drawings=[
+                {
+                    "items": [("l", self._make_point(0, 0), self._make_point(10, 100))],
+                    "color": (1.0, 0.0, 0.0),  # red
+                }
+            ],
+        )
+        fitz_mod = self._make_fitz_module([page])
+        monkeypatch.setitem(sys.modules, "fitz", fitz_mod)
+
+        from cad_dxf_agent.core.converter import _extract_pdf_fitz
+
+        doc = ezdxf.new()
+        msp = doc.modelspace()
+        _extract_pdf_fitz(msp, tmp_path / "dummy.pdf")
+        entity = list(msp)[0]
+        assert entity.rgb == (255, 0, 0)
+
+    def test_fitz_rect_gets_true_color(self, tmp_path, monkeypatch):
+        """Rectangles with non-black stroke color get entity.rgb set."""
+        import sys
+
+        rect = self._make_rect(10, 20, 50, 60)
+        page = self._make_page(
+            drawings=[
+                {
+                    "items": [("re", rect)],
+                    "color": (0.0, 0.0, 1.0),  # blue
+                }
+            ],
+        )
+        fitz_mod = self._make_fitz_module([page])
+        monkeypatch.setitem(sys.modules, "fitz", fitz_mod)
+
+        from cad_dxf_agent.core.converter import _extract_pdf_fitz
+
+        doc = ezdxf.new()
+        msp = doc.modelspace()
+        _extract_pdf_fitz(msp, tmp_path / "dummy.pdf")
+        entity = list(msp)[0]
+        assert entity.rgb == (0, 0, 255)
+
+    def test_text_span_color_applied(self, tmp_path, monkeypatch):
+        """Text spans with non-black color get entity.rgb set."""
+        import sys
+
+        # PyMuPDF color is packed int: (R << 16) | (G << 8) | B
+        red_packed = (255 << 16) | (0 << 8) | 0  # 0xFF0000
+
+        text_dict = {
+            "blocks": [
+                {
+                    "type": 0,
+                    "lines": [
+                        {
+                            "spans": [
+                                {
+                                    "text": "Red Label",
+                                    "bbox": (10.0, 20.0, 80.0, 32.0),
+                                    "color": red_packed,
+                                }
+                            ]
+                        }
+                    ],
+                }
+            ]
+        }
+        page = self._make_page(text_dict=text_dict)
+        fitz_mod = self._make_fitz_module([page])
+        monkeypatch.setitem(sys.modules, "fitz", fitz_mod)
+
+        from cad_dxf_agent.core.converter import _extract_pdf_fitz
+
+        doc = ezdxf.new()
+        msp = doc.modelspace()
+        _extract_pdf_fitz(msp, tmp_path / "dummy.pdf")
+        entity = list(msp)[0]
+        assert entity.dxftype() == "TEXT"
+        assert entity.rgb == (255, 0, 0)
+
+    def test_text_span_black_no_true_color(self, tmp_path, monkeypatch):
+        """Text spans with black color (0) do not get entity.rgb set."""
+        import sys
+
+        text_dict = {
+            "blocks": [
+                {
+                    "type": 0,
+                    "lines": [
+                        {
+                            "spans": [
+                                {
+                                    "text": "Black Label",
+                                    "bbox": (10.0, 20.0, 80.0, 32.0),
+                                    "color": 0,  # black
+                                }
+                            ]
+                        }
+                    ],
+                }
+            ]
+        }
+        page = self._make_page(text_dict=text_dict)
+        fitz_mod = self._make_fitz_module([page])
+        monkeypatch.setitem(sys.modules, "fitz", fitz_mod)
+
+        from cad_dxf_agent.core.converter import _extract_pdf_fitz
+
+        doc = ezdxf.new()
+        msp = doc.modelspace()
+        _extract_pdf_fitz(msp, tmp_path / "dummy.pdf")
+        entity = list(msp)[0]
+        assert entity.dxftype() == "TEXT"
+        assert not entity.rgb  # no true color for black text
+
+
+class TestFillHatch:
+    """Tests for _create_fill_hatch and fill detection in extraction."""
+
+    def test_rect_with_fill_creates_hatch(self):
+        """A path_item with a fill and rect items creates a HATCH."""
+        doc = ezdxf.new()
+        msp = doc.modelspace()
+
+        class R:
+            x0, y0, x1, y1 = 10.0, 20.0, 50.0, 60.0
+
+        path_item = {
+            "fill": (1.0, 0.0, 0.0),  # red fill
+            "items": [
+                ("re", R()),
+                ("l", type("P", (), {"x": 10, "y": 20})(), type("P", (), {"x": 50, "y": 20})()),
+            ],
+        }
+        hatch, count = _create_fill_hatch(msp, path_item, 0.0, 792.0, "0", 0)
+        assert hatch is not None
+        assert count == 1
+        assert hatch.dxftype() == "HATCH"
+        assert hatch.rgb == (255, 0, 0)
+
+    def test_rect_stroke_only_no_hatch(self):
+        """A path_item without fill returns None."""
+        doc = ezdxf.new()
+        msp = doc.modelspace()
+
+        path_item = {
+            "fill": None,
+            "items": [
+                ("l", type("P", (), {"x": 0, "y": 0})(), type("P", (), {"x": 10, "y": 0})()),
+            ],
+        }
+        hatch, count = _create_fill_hatch(msp, path_item, 0.0, 792.0, "0", 0)
+        assert hatch is None
+        assert count == 0
+
+    def test_hatch_count_limit(self):
+        """When hatch_count >= limit, no more hatches are created."""
+        doc = ezdxf.new()
+        msp = doc.modelspace()
+
+        path_item = {
+            "fill": (0.0, 1.0, 0.0),
+            "items": [
+                ("l", type("P", (), {"x": 0, "y": 0})(), type("P", (), {"x": 10, "y": 0})()),
+                ("l", type("P", (), {"x": 10, "y": 0})(), type("P", (), {"x": 10, "y": 10})()),
+            ],
+        }
+        hatch, count = _create_fill_hatch(msp, path_item, 0.0, 792.0, "0", PDF_MAX_HATCH_ENTITIES)
+        assert hatch is None
+        assert count == PDF_MAX_HATCH_ENTITIES
+
+    def test_hatch_has_solid_fill(self):
+        """HATCH entities use solid fill pattern."""
+        doc = ezdxf.new()
+        msp = doc.modelspace()
+
+        path_item = {
+            "fill": (0.0, 0.5, 1.0),
+            "items": [
+                ("l", type("P", (), {"x": 0, "y": 0})(), type("P", (), {"x": 10, "y": 0})()),
+                ("l", type("P", (), {"x": 10, "y": 0})(), type("P", (), {"x": 0, "y": 0})()),
+            ],
+        }
+        hatch, _ = _create_fill_hatch(msp, path_item, 0.0, 792.0, "0", 0)
+        assert hatch is not None
+        # Solid fill uses "SOLID" pattern
+        assert hatch.dxf.pattern_name == "SOLID"
+
+    def test_bezier_fill_creates_hatch_with_spline_edges(self):
+        """A path with Bezier fill items creates HATCH with spline edges."""
+        doc = ezdxf.new()
+        msp = doc.modelspace()
+
+        def pt(x, y):
+            return type("P", (), {"x": x, "y": y})()
+
+        path_item = {
+            "fill": (0.0, 1.0, 0.0),
+            "items": [
+                ("c", pt(0, 0), pt(5, 10), pt(15, 10), pt(20, 0)),
+                ("l", pt(20, 0), pt(0, 0)),
+            ],
+        }
+        hatch, count = _create_fill_hatch(msp, path_item, 0.0, 100.0, "0", 0)
+        assert hatch is not None
+        assert count == 1
+
+    def test_too_few_items_no_hatch(self):
+        """Path with < 2 items does not create a hatch."""
+        doc = ezdxf.new()
+        msp = doc.modelspace()
+
+        path_item = {
+            "fill": (1.0, 0.0, 0.0),
+            "items": [
+                ("l", type("P", (), {"x": 0, "y": 0})(), type("P", (), {"x": 10, "y": 0})()),
+            ],
+        }
+        hatch, count = _create_fill_hatch(msp, path_item, 0.0, 792.0, "0", 0)
+        assert hatch is None
+        assert count == 0
+
+    def test_near_black_fill_no_rgb(self):
+        """Near-black fills get ACI color but no true RGB."""
+        doc = ezdxf.new()
+        msp = doc.modelspace()
+
+        path_item = {
+            "fill": (0.05, 0.05, 0.05),
+            "items": [
+                ("l", type("P", (), {"x": 0, "y": 0})(), type("P", (), {"x": 10, "y": 0})()),
+                ("l", type("P", (), {"x": 10, "y": 0})(), type("P", (), {"x": 0, "y": 0})()),
+            ],
+        }
+        hatch, _ = _create_fill_hatch(msp, path_item, 0.0, 792.0, "0", 0)
+        assert hatch is not None
+        assert not hatch.rgb  # near-black: no true color
+
+    def test_mixed_fill_and_stroke_in_extraction(self, tmp_path, monkeypatch):
+        """A path with both fill and stroke creates both hatch and stroke geometry."""
+        import sys
+        import types
+
+        fitz_mod = types.ModuleType("fitz")
+        fitz_mod.TEXT_PRESERVE_WHITESPACE = 1
+
+        class Pt:
+            def __init__(self, x, y):
+                self.x = x
+                self.y = y
+
+        class R:
+            x0, y0, x1, y1 = 10.0, 20.0, 50.0, 60.0
+
+        class MockPage:
+            class Rect:
+                height = 792.0
+                width = 612.0
+
+            rect = Rect()
+
+            def get_drawings(self):
+                return [
+                    {
+                        "items": [
+                            ("re", R()),
+                            ("l", Pt(0, 0), Pt(10, 100)),
+                        ],
+                        "color": (1.0, 0.0, 0.0),  # stroke color
+                        "fill": (0.0, 0.0, 1.0),  # fill color
+                    }
+                ]
+
+            def get_text(self, mode, flags=0):
+                return {"blocks": []}
+
+        class MockDoc:
+            def __iter__(self):
+                return iter([MockPage()])
+
+            def close(self):
+                pass
+
+        fitz_mod.open = lambda path: MockDoc()
+        monkeypatch.setitem(sys.modules, "fitz", fitz_mod)
+
+        from cad_dxf_agent.core.converter import _extract_pdf_fitz
+
+        doc = ezdxf.new()
+        msp = doc.modelspace()
+        count = _extract_pdf_fitz(msp, tmp_path / "dummy.pdf")
+
+        entities = list(msp)
+        types_found = {e.dxftype() for e in entities}
+        # Should have HATCH (fill) + LWPOLYLINE (rect stroke) + LINE (line stroke)
+        assert "HATCH" in types_found
+        assert count >= 3  # 1 hatch + 1 rect + 1 line
 
 
 def _create_minimal_pdf(path: Path, *, empty: bool = False) -> None:
