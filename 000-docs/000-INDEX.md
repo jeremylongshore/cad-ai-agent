@@ -20,6 +20,7 @@
 | 035 | ARCH | [035-AT-ARCH-drawing-intelligence-target.md](035-AT-ARCH-drawing-intelligence-target.md) |
 | 036 | SPEC | [036-AT-SPEC-response-contracts-taxonomy.md](036-AT-SPEC-response-contracts-taxonomy.md) |
 | 039 | ADEC | [039-AT-ADEC-intent-router-design.md](039-AT-ADEC-intent-router-design.md) |
+| 040 | SPEC | [040-AT-SPEC-scale-readiness.md](040-AT-SPEC-scale-readiness.md) |
 
 ### PP — Product & Planning
 | # | Type | File |
@@ -36,6 +37,7 @@
 | 019 | TASK | [019-PM-TASK-ph3-entity-index-context-selectors.md](019-PM-TASK-ph3-entity-index-context-selectors.md) |
 | 031 | PLAN | [031-PM-PLAN-perf-hardening-plan.md](031-PM-PLAN-perf-hardening-plan.md) |
 | 038 | PLAN | [038-PM-PLAN-drawing-intelligence-roadmap.md](038-PM-PLAN-drawing-intelligence-roadmap.md) |
+| 041 | STAT | [041-PM-STAT-implementation-status.md](041-PM-STAT-implementation-status.md) |
 
 ### DR — Documentation & Reference
 | # | Type | File |
@@ -117,8 +119,10 @@
 | 037 | TQ | SPEC | Evaluation plan (5-tier, scorecard, golden trajectories) |
 | 038 | PM | PLAN | Drawing intelligence platform roadmap (12 epics, 5 phases) |
 | 039 | AT | ADEC | ADR: intent router design (hybrid heuristic+LLM) |
+| 040 | AT | SPEC | Scale readiness assessment (bottlenecks, migration path) |
+| 041 | PM | STAT | Implementation status tracker (12 epics, living document) |
 
 ## Quick Reference
 
 - **CC codes:** AT=Architecture, PP=Product, PM=Project Mgmt, DR=Documentation, TQ=Testing, BL=Business, AA=After Action, RL=Research/Releases, RM=Reference Material
-- **Type codes:** AADR=After Action Decision Record, AACR=After Action Review, ADEC=Decision, ARCH=Architecture, AUDT=Audit/Playbook, GUID=Guide, PLAN=Roadmap, POLI=Policy, PROD=Product, REFC=Reference Card, REPT=Report, SECU=Security, SPEC=Specification, TASK=Task, TEST=Test Fixture
+- **Type codes:** AADR=After Action Decision Record, AACR=After Action Review, ADEC=Decision, ARCH=Architecture, AUDT=Audit/Playbook, GUID=Guide, PLAN=Roadmap, POLI=Policy, PROD=Product, REFC=Reference Card, REPT=Report, SECU=Security, SPEC=Specification, STAT=Status Tracker, TASK=Task, TEST=Test Fixture

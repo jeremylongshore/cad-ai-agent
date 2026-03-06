@@ -185,7 +185,95 @@ Ranked by impact on Design Operations and Construction Drawing workflows.
 
 ---
 
-## 5. Current Inventory Summary
+## 5. User Workflow Capability Matrix
+
+Capability score per user workflow class. Each task family scored for how well
+the current system serves that specific user type.
+
+| # | Task Family | Design Ops User | Construction Drawing User | General Review User |
+|---|------------|-----------------|--------------------------|---------------------|
+| 1 | Edit (move/delete/text/block) | 75% — Gemini multi-turn works, protected layers enforced | 70% — same tools but redline markup input missing | 65% — query tools usable but edit risky without domain training |
+| 2 | Q&A | 15% — no intent router, edit ops returned for questions | 10% — same gap, construction specs unclear | 40% — DrawingContext serializable but no answer-only path |
+| 3 | Compare | 80% — full revision pipeline (upload/align/approve/apply/bundle) | 85% — revision workflow matches construction redline process well | 70% — diff available but approval workflow may confuse casual users |
+| 4 | Markup Interpretation | 5% — no redline/cloud input | 0% — critical gap for construction redlines | 5% — no markup detection |
+| 5 | Repeated Condition Search | 10% — text search token-only, no pattern matching | 15% — no multi-layer spatial search | 20% — can list entities by layer via query tools |
+| 6 | Summary | 25% — file_info on upload, no formatted summary | 20% — same | 50% — layers/counts shown in UI |
+| 7 | Takeoff/Estimate | 0% — missing | 5% — entity count available but no quantity logic | 0% — missing |
+| 8 | Design Assist | 5% — missing | 0% — missing | 0% — missing |
+| 9 | Apply Edit | 85% — apply endpoint, validation, rendering, download | 75% — same but no approval workflow for edits (only revisions) | 70% — requires understanding of operations |
+
+**Overall scores:** Design Ops 33%, Construction Drawing 31%, General Review 36%.
+
+---
+
+## 6. Frontend Architecture
+
+**Framework:** React 18.3.1 + Vite, deployed to Firebase Hosting.
+
+**Component structure:**
+
+| Component | Purpose | Path |
+|-----------|---------|------|
+| `App` | Root router, auth check | `web/frontend/src/App.jsx` |
+| `Workspace` | Main layout, orchestrates all panels | `web/frontend/src/components/Workspace.jsx` |
+| `ChatPanel` | Conversational UI, message history, follow-ups | `web/frontend/src/components/ChatPanel.jsx` |
+| `PreviewPanel` | Tabbed viewer (Original/Edited/Compare), revision wizard | `web/frontend/src/components/PreviewPanel.jsx` |
+| `DxfViewerComponent` | WebGL renderer (dxf-viewer + Three.js) | `web/frontend/src/components/DxfViewerComponent.jsx` |
+| `FileUpload` | Drag-drop file picker | `web/frontend/src/components/FileUpload.jsx` |
+
+**State management:** React hooks only (`useSession` custom hook, 504 lines). No Redux.
+All API calls via `fetch()` in `web/frontend/src/lib/api.js`.
+
+**CSS:** Hand-written, 8px grid, CSS custom properties, dark mode via `prefers-color-scheme`.
+
+---
+
+## 7. Session and State Handling
+
+**Session lifecycle:**
+1. `POST /api/upload` → `session_mgr.create(user_id)` → 16-char UUID
+2. Temp directory at `/tmp/cad-sessions/{id}/`
+3. TTL: 2 hours (lazy expiration on next `.get()` call)
+4. No background cleanup daemon
+
+**In-memory state (lost on restart):**
+- Session dict (all session objects)
+- DrawingContext (parsed DXF model)
+- Conversation history (capped at 10 entries)
+- ChangeSet from last plan
+- ComparisonResult, ApprovalSet
+
+**On-disk state (lost on restart):**
+- Original/working/edited DXF files
+- PNG renders
+- Revision files, comparison overlays
+- Bundle directory (master + revision + overlay + changelog)
+
+**Evidence:** `web/backend/session.py` lines 15-136
+
+---
+
+## 8. Storage and File Handling
+
+**Temp file structure:**
+```
+/tmp/cad-sessions/{id}/
+  original.dxf        # User upload (or converted from PDF/DWG)
+  working.dxf         # Working copy for multi-step edits
+  edited.dxf          # Result of /api/apply
+  *.png               # PNG renders (original, edited)
+  revision.dxf        # Uploaded revision for comparison
+  comparison/          # Diff overlay DXF + render
+  bundle/              # Export package (master + revision + overlay + changelog)
+```
+
+**Upload processing:** DXF passthrough, PDF via pymupdf, DWG via ODA FileConverter.
+**Save strategy:** Always save-as (original never modified).
+**Download formats:** DXF (raw copy) or DWG (via ezdxf odafc addon).
+
+---
+
+## 9. Current Inventory Summary
 
 | Dimension | Count | Detail |
 |-----------|-------|--------|
