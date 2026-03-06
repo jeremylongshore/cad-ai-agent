@@ -38,6 +38,7 @@
 | 031 | PLAN | [031-PM-PLAN-perf-hardening-plan.md](031-PM-PLAN-perf-hardening-plan.md) |
 | 038 | PLAN | [038-PM-PLAN-drawing-intelligence-roadmap.md](038-PM-PLAN-drawing-intelligence-roadmap.md) |
 | 041 | STAT | [041-PM-STAT-implementation-status.md](041-PM-STAT-implementation-status.md) |
+| 042 | AAR | [042-PM-AAR-epic-cad-02-aar.md](042-PM-AAR-epic-cad-02-aar.md) |
 
 ### DR — Documentation & Reference
 | # | Type | File |
@@ -121,6 +122,7 @@
 | 039 | AT | ADEC | ADR: intent router design (hybrid heuristic+LLM) |
 | 040 | AT | AUDT | Scale readiness assessment (bottlenecks, migration path) |
 | 041 | PM | STAT | Implementation status tracker (12 epics, living document) |
+| 042 | PM | AAR | EPIC-CAD-02 after action report (end-of-phase) |
 
 ## Quick Reference
 
