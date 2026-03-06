@@ -1,0 +1,10 @@
+{
+  "name": "qna_text_search",
+  "task_family": "qna",
+  "prompt": "Find text containing \"FOOTING\"",
+  "region": null,
+  "expected_response_type": "answer_only",
+  "expected_confidence_min": 0.5,
+  "expected_evidence_min": 1,
+  "answer_must_contain": ["FOOTING"]
+}
