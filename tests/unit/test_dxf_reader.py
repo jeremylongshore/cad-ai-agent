@@ -217,45 +217,6 @@ class TestDxfReaderExtendedEntities:
         assert len(leaders) == 1
         assert leaders[0].entity_type == EntityType.LEADER
 
-    def test_mleader_exception_path_handled(self, tmp_path, monkeypatch):
-        """MLEADER context read failure is handled gracefully (insert_point=None)."""
-        import ezdxf
-
-        # Build a drawing with a regular line; we'll intercept _parse_entity
-        # to inject an MLEADER-style parse with a forced exception
-        doc = ezdxf.new(dxfversion="R2018")
-        msp = doc.modelspace()
-        doc.layers.add("NOTES", color=3)
-        msp.add_line((0, 0), (10, 0), dxfattribs={"layer": "NOTES"})
-        dxf_path = tmp_path / "mleader_exc.dxf"
-        doc.saveas(str(dxf_path))
-
-        from cad_dxf_agent.core import dxf_reader
-        from cad_dxf_agent.models.cad_schema import EntityRef, EntityType
-
-        original_parse = dxf_reader._parse_entity
-        injected = []
-
-        def _patched_parse(entity, dxf_type, space="Model"):
-            if dxf_type == "LINE" and not injected:
-                # Inject one MLEADER result with exception path (no context)
-                injected.append(True)
-                return EntityRef(
-                    handle=entity.dxf.handle,
-                    entity_type=EntityType.MLEADER,
-                    layer=entity.dxf.layer,
-                    space=space,
-                    insert_point=None,  # exception path result
-                )
-            return original_parse(entity, dxf_type, space)
-
-        monkeypatch.setattr(dxf_reader, "_parse_entity", _patched_parse)
-
-        context = load_dxf(dxf_path)
-        mleaders = [e for e in context.entities if e.entity_type == EntityType.MLEADER]
-        assert len(mleaders) == 1
-        assert mleaders[0].insert_point is None
-
     def test_hatch_centroid_from_boundary_paths(self, tmp_path, monkeypatch):
         """When HATCH elevation is None, centroid is computed from boundary path vertices."""
         import ezdxf

@@ -59,6 +59,9 @@ tests/live/reports/
 # ODA File Converter .deb (downloaded from GCS during CI, ~60MB)
 oda.deb
 
+# Playwright / test artifacts
+test-results/
+
 # bv (beads viewer) local config and caches
 .bv/
 .firebase/
