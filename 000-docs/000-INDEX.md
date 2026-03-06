@@ -17,6 +17,8 @@
 | 025 | ARCH | [025-AT-ARCH-web-mvp.md](025-AT-ARCH-web-mvp.md) |
 | 030 | AUDT | [030-AT-AUDT-deliverables-v1.md](030-AT-AUDT-deliverables-v1.md) |
 | 034 | AUDT | [034-AT-AUDT-capability-audit.md](034-AT-AUDT-capability-audit.md) |
+| 035 | ARCH | [035-AT-ARCH-drawing-intelligence-target.md](035-AT-ARCH-drawing-intelligence-target.md) |
+| 039 | ADEC | [039-AT-ADEC-intent-router-design.md](039-AT-ADEC-intent-router-design.md) |
 
 ### PP — Product & Planning
 | # | Type | File |
@@ -107,6 +109,8 @@
 | 032 | TQ | TEST | Sawcuts sample drawing PDF (test fixture) |
 | 033 | AA | AACR | Release v0.5.0 AAR |
 | 034 | AT | AUDT | Capability audit: current vs target |
+| 035 | AT | ARCH | Drawing intelligence target architecture |
+| 039 | AT | ADEC | ADR: intent router design (hybrid heuristic+LLM) |
 
 ## Quick Reference
 
