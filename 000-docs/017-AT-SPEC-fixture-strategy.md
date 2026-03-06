@@ -180,5 +180,6 @@ As Phases 3-10 are implemented, additional fixtures may be needed:
 | DXF with entities on default layer (0) only | 4 | Validator edge case |
 | DXF with duplicate block names | 6 | Edit engine edge case |
 | DXF from older DXF versions (R12, R2000) | 3 | Compatibility testing |
+| Region/markup/association test builders | EPIC-03 | Inline test builders in `test_region_schema.py`, `test_markup_parser.py`, `test_region_associator.py`, `test_selection_debug.py`. No factory file — fixtures are constructed per-test using `NormalizedRegion`, `MarkupOverlay`, and `EntityRef` directly. |
 
 These are documented here for awareness but are not part of the Phase 2 deliverable. They should be added as test needs arise.

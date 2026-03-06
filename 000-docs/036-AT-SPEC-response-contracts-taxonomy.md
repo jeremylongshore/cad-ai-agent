@@ -252,7 +252,7 @@ These rules should be enforced by tests (see 037-TQ-SPEC).
 | **Failure modes** | No markup entities → `unsupported_operation`; ambiguous markup → `needs_clarification` |
 | **Deterministic tooling** | Cloud/arrow detection heuristics (entity type + layer pattern matching) |
 | **Example prompt** | "What do the revision clouds indicate?" |
-| **Status** | MISSING — requires EPIC-03 (markup entity detection) |
+| **Status** | PARTIAL — region model + markup parser implemented (EPIC-03). Full pipeline pending EPIC-04. |
 
 ### 10.3 Repeated Condition Search (`repeated_condition_search`)
 
@@ -651,7 +651,7 @@ These schemas define the target `data` shape for task families not yet implement
 }
 ```
 
-**Status:** MISSING — requires EPIC-03 (markup entity detection and interpretation pipeline).
+**Status:** PARTIAL — region model + markup parser implemented (EPIC-03). Full interpretation pipeline pending EPIC-04.
 
 ### 15.2 Repeated Condition Search Data
 

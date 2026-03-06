@@ -43,7 +43,7 @@
 
 | Branch | Status |
 |--------|--------|
-| `feature/epic-cad-03-selection-markup` | PR created, pending merge |
+| `feature/epic-cad-03-selection-markup` | Squash-merged → main (PR #77) |
 
 ---
 
