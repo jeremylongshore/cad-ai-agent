@@ -119,6 +119,11 @@ async def log_requests(request: Request, call_next):
 # ---------------------------------------------------------------------------
 
 
+class PromptRequest(BaseModel):
+    session_id: str
+    prompt: str
+
+
 class PlanRequest(BaseModel):
     session_id: str
     prompt: str
@@ -357,6 +362,151 @@ async def plan(body: PlanRequest, user: dict = Depends(get_user)):
     except Exception as e:
         logger.error("Plan failed: %s", e, exc_info=True)
         raise HTTPException(status_code=500, detail=f"Planning failed: {e}") from None
+
+
+@app.post("/api/v2/prompt")
+async def v2_prompt(body: PromptRequest, user: dict = Depends(get_user)):
+    """Route a user prompt through the intent router and dispatch to the right handler.
+
+    Returns a typed PlatformResponse envelope for all request types.
+    Non-edit requests never reach the LLM planner.
+    """
+    import time as _time
+
+    from cad_dxf_agent.llm.capability_registry import CapabilityRegistry
+    from cad_dxf_agent.llm.intent_router import IntentRouter
+    from cad_dxf_agent.llm.response_builder import ResponseBuilder
+    from cad_dxf_agent.models.response_schema import AuditMetadata, TaskFamily
+
+    with otel_span("cad.web.v2_prompt", {"cad.web.session_id": body.session_id}):
+        total_start = _time.monotonic()
+
+        # Validate session
+        try:
+            session = session_mgr.get(body.session_id, user["uid"])
+        except (KeyError, PermissionError) as e:
+            raise HTTPException(status_code=404, detail=str(e)) from None
+
+        if session.context is None:
+            raise HTTPException(status_code=400, detail="No file loaded in session")
+
+        # Classify intent
+        router = IntentRouter.from_settings()
+        intent = router.classify(body.prompt)
+
+        audit = AuditMetadata(
+            router_time_ms=intent.router_time_ms,
+            router_source=intent.source,
+            router_confidence=intent.confidence,
+        )
+
+        # Gate unimplemented families
+        registry = CapabilityRegistry()
+        if not registry.is_implemented(intent.family):
+            audit.total_request_time_ms = (_time.monotonic() - total_start) * 1000
+            return ResponseBuilder.unsupported_operation(
+                family=intent.family, audit=audit,
+            ).model_dump()
+
+        # Handle needs_clarification
+        if intent.family == TaskFamily.NEEDS_CLARIFICATION:
+            audit.total_request_time_ms = (_time.monotonic() - total_start) * 1000
+            return ResponseBuilder.needs_clarification(audit=audit).model_dump()
+
+        # Handle compare (requires revision file)
+        if intent.family == TaskFamily.COMPARE:
+            if session.revision_path is None or not session.revision_path.exists():
+                audit.total_request_time_ms = (_time.monotonic() - total_start) * 1000
+                return ResponseBuilder.needs_clarification(
+                    message="Upload a revision file first to compare drawings.",
+                    family=TaskFamily.COMPARE,
+                    audit=audit,
+                ).model_dump()
+            # Full compare pipeline would go here; for now return clarification
+            audit.total_request_time_ms = (_time.monotonic() - total_start) * 1000
+            return ResponseBuilder.needs_clarification(
+                message="Use /api/compare for full comparison workflow.",
+                family=TaskFamily.COMPARE,
+                audit=audit,
+            ).model_dump()
+
+        # Handle edit_plan — dispatch to existing planner
+        if intent.family == TaskFamily.EDIT_PLAN:
+            try:
+                from cad_dxf_agent.core.semantic_model import build_planner_context
+                from cad_dxf_agent.core.validators import validate_changeset
+                from cad_dxf_agent.llm.planner import run_planner
+                from cad_dxf_agent.models.config_schema import RuleConfig
+
+                ctx_start = _time.monotonic()
+                planner_context = build_planner_context(session.context)
+                rule_config = RuleConfig()
+                audit.context_build_time_ms = (_time.monotonic() - ctx_start) * 1000
+
+                llm_start = _time.monotonic()
+                changeset = run_planner(
+                    prompt=body.prompt,
+                    drawing_context=planner_context,
+                    context=session.context,
+                    rule_config=rule_config,
+                    conversation_history=session.conversation_history or None,
+                )
+                session.changeset = changeset
+                audit.llm_time_ms = (_time.monotonic() - llm_start) * 1000
+
+                val_start = _time.monotonic()
+                validation = validate_changeset(changeset, session.context, rule_config)
+                audit.validation_time_ms = (_time.monotonic() - val_start) * 1000
+
+                operations = []
+                for op in changeset.operations:
+                    operations.append(
+                        {
+                            "op_type": op.op_type.value
+                            if hasattr(op.op_type, "value")
+                            else str(op.op_type),
+                            "target_handle": op.target_handle,
+                            "target_layer": op.target_layer,
+                            "description": _describe_op(op),
+                            "params": op.params,
+                        }
+                    )
+
+                summary_parts = [o["description"] for o in operations]
+                summary = "; ".join(summary_parts) if summary_parts else "No operations planned."
+                llm_message = getattr(changeset, "message", None)
+
+                # Track conversation history
+                history_text = llm_message if llm_message else summary
+                session.conversation_history.append({"role": "user", "text": body.prompt})
+                session.conversation_history.append({"role": "model", "text": history_text})
+                if len(session.conversation_history) > MAX_CONVERSATION_HISTORY:
+                    session.conversation_history = session.conversation_history[
+                        -MAX_CONVERSATION_HISTORY:
+                    ]
+
+                audit.total_request_time_ms = (_time.monotonic() - total_start) * 1000
+
+                return ResponseBuilder.plan_only(
+                    operations=operations,
+                    message=llm_message or summary,
+                    validation={
+                        "blockers": [{"message": b.message} for b in validation.blockers],
+                        "warnings": [{"message": w.message} for w in validation.warnings],
+                        "is_valid": len(validation.blockers) == 0,
+                    },
+                    audit=audit,
+                ).model_dump()
+
+            except Exception as e:
+                logger.error("v2 plan failed: %s", e, exc_info=True)
+                raise HTTPException(status_code=500, detail=f"Planning failed: {e}") from None
+
+        # Catch-all for families that are "implemented" but not yet wired
+        audit.total_request_time_ms = (_time.monotonic() - total_start) * 1000
+        return ResponseBuilder.unsupported_operation(
+            family=intent.family, audit=audit,
+        ).model_dump()
 
 
 @app.post("/api/apply")
