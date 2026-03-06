@@ -94,8 +94,46 @@ class TestComparisonResult:
 class TestAnswer:
     def test_answer(self):
         resp = ResponseBuilder.answer(family=TaskFamily.QNA, message="Layer WALLS has 42 entities")
-        assert resp.response_type == ResponseType.ANSWER
+        assert resp.response_type == ResponseType.ANSWER_ONLY
         assert resp.task_family == TaskFamily.QNA
+
+
+class TestPreviewEdit:
+    def test_basic_preview(self):
+        resp = ResponseBuilder.preview_edit(
+            operations=[{"op_type": "move_entity", "target_handle": "A1"}],
+            message="Preview: move A1 by (10, 0)",
+        )
+        assert resp.task_family == TaskFamily.EDIT_PLAN
+        assert resp.response_type == ResponseType.PREVIEW_EDIT
+        assert len(resp.operations) == 1
+
+    def test_risk_inferred(self):
+        resp = ResponseBuilder.preview_edit(
+            operations=[{"op_type": "delete_entity"}],
+            message="Preview delete",
+        )
+        assert resp.risk_level == RiskLevel.MEDIUM
+
+
+class TestAppliedEdit:
+    def test_basic_applied(self):
+        resp = ResponseBuilder.applied_edit(
+            operations=[{"op_type": "move_entity", "target_handle": "A1"}],
+            message="Applied: moved A1",
+        )
+        assert resp.task_family == TaskFamily.APPLY_EDIT
+        assert resp.response_type == ResponseType.APPLIED_EDIT
+        assert resp.risk_level == RiskLevel.NONE
+
+    def test_with_audit(self):
+        audit = AuditMetadata(total_request_time_ms=50.0)
+        resp = ResponseBuilder.applied_edit(
+            operations=[],
+            message="Applied",
+            audit=audit,
+        )
+        assert resp.audit.total_request_time_ms == 50.0
 
 
 class TestAuditPassthrough:

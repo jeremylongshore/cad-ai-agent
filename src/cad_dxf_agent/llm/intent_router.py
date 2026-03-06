@@ -27,6 +27,8 @@ class IntentResult(BaseModel):
     source: str = "heuristic"  # "heuristic" or "llm"
     matched_pattern: str | None = None
     router_time_ms: float = 0.0
+    fallback_reason: str | None = None
+    clarification_required: bool = False
 
 
 @dataclass(frozen=True)
@@ -232,6 +234,8 @@ class IntentRouter:
                 source="heuristic",
                 matched_pattern="no_match",
                 router_time_ms=elapsed,
+                fallback_reason="no_heuristic_match",
+                clarification_required=True,
             )
             _set_span_attrs(s, fallback)
             return fallback

@@ -209,6 +209,26 @@ class TestIntentResult:
         assert data["family"] == "edit_plan"
         assert data["source"] == "heuristic"
 
+    def test_fallback_reason_default_none(self):
+        result = IntentResult(family=TaskFamily.EDIT_PLAN, confidence=0.95)
+        assert result.fallback_reason is None
+
+    def test_clarification_required_default_false(self):
+        result = IntentResult(family=TaskFamily.EDIT_PLAN, confidence=0.95)
+        assert result.clarification_required is False
+
+    def test_fallback_fields_set_on_no_match(self):
+        router = IntentRouter(confidence_threshold=0.9, llm_enabled=False)
+        result = router.classify("hello world")
+        assert result.fallback_reason == "no_heuristic_match"
+        assert result.clarification_required is True
+
+    def test_fallback_fields_not_set_on_match(self):
+        router = IntentRouter(confidence_threshold=0.9, llm_enabled=False)
+        result = router.classify("move the wall")
+        assert result.fallback_reason is None
+        assert result.clarification_required is False
+
 
 # ---------------------------------------------------------------------------
 # LLM fallback
