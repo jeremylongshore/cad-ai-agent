@@ -16,82 +16,95 @@ Lock contracts, build routing and response infrastructure. No new user-visible f
 |------|-------|-------------|------|
 | **EPIC-01** | Capability Audit + Architecture Baseline | 6 docs (034-039), capability matrix | Docs reviewed, `make check` green |
 | **EPIC-02** | Core Contracts + Routing Foundation | `response_schema.py`, `intent_router.py`, TaskFamily/ResponseType enums, unit tests | All contract invariant tests pass |
-| **EPIC-03** | Selection Engine Upgrades | Regex text search, bbox query, find-similar, extended EntityIndex | New query tests pass, existing tests unbroken |
+| **EPIC-03** | Selection + Markup Interpretation Foundation | Region model, markup overlay ingestion, entity association, debug tooling | New query tests pass, existing tests unbroken |
 
 ### Phase 2: Core Intelligence (EPICs 04-06)
 
-First new task families: Q&A, summary, enhanced edits.
+First new task families: Q&A, repeated-condition detection, compare hardening.
 
 | Epic | Title | Deliverables | Gate |
 |------|-------|-------------|------|
-| **EPIC-04** | Q&A Pipeline | `answer` tool, Q&A context strategy, read-only safety check | 5+ Q&A golden trajectories pass |
-| **EPIC-05** | Summary + Statistics | `summarize_drawing` tool, DrawingStats response | Summary scorecard entries pass |
-| **EPIC-06** | Enhanced Edit Safety | Cross-op conflict detection, impact estimation, `protected_blocks` enforcement | Safety unit tests, no regressions |
+| **EPIC-04** | Region Q&A Vertical Slice | Region context builder, grounded Q&A pipeline, UI rendering, golden tests | 5+ Q&A golden trajectories pass |
+| **EPIC-05** | Repeated-Condition Detection | Similarity scoring, candidate search, preview/approval workflow, realistic fixtures | Repeated-condition scorecard entries pass |
+| **EPIC-06** | Compare + Diff Service Hardening | Typed compare schema, alignment diagnostics, changelog, export bundle, regression fixtures | Compare golden trajectories pass |
 
-### Phase 3: Advanced Intelligence (EPICs 07-09)
+### Mandatory Architecture Review (after Phase 2)
 
-Domain-specific capabilities: compare integration, pattern search, markup.
+| Review | Title | Deliverables | Gate |
+|--------|-------|-------------|------|
+| **ARCH-REVIEW-01** | Post-EPIC-06 Architecture Review | Quality assessment, scalability review, LLM/tool boundary review, published decision | Written review with keep/change/remove recommendations |
 
-| Epic | Title | Deliverables | Gate |
-|------|-------|-------------|------|
-| **EPIC-07** | Compare Pipeline Integration | Compare routed through intent router, PlatformResponse for diffs | Compare golden trajectories pass |
-| **EPIC-08** | Repeated Condition Search | `find_pattern` tool, regex/spatial pattern matching | Pattern search scorecard entries pass |
-| **EPIC-09** | Markup Interpretation | Cloud/arrow detection, markup entity classification | Markup golden trajectories pass |
+### Phase 3: Structured Editing (EPICs 07-08)
 
-### Phase 4: Specialized Outputs (EPICs 10-11)
-
-Construction-drawing-specific features.
+Safe edit planning and apply workflows.
 
 | Epic | Title | Deliverables | Gate |
 |------|-------|-------------|------|
-| **EPIC-10** | Takeoff + Estimation | `count_entities` tool, block-based quantity extraction | Takeoff scorecard entries pass |
-| **EPIC-11** | Design Assist | Suggestion engine, rule-based recommendations | Design assist golden trajectories pass |
+| **EPIC-07** | Structured Edit Planning | Edit plan schema, plan builder, constraint validation, golden tests | Safe/unsafe edit plan cases covered |
+| **EPIC-08** | Preview + Apply Workflow | Preview pipeline, apply pipeline, audit trail, UI approval/export | Applied edits produce audit metadata |
 
-### Phase 5: Production (EPIC 12)
+### Phase 4: Workflow Packs (EPICs 09-10)
 
-Full evaluation harness, production hardening, API v2 rollout.
+Domain-specific features for both user workflow classes.
 
 | Epic | Title | Deliverables | Gate |
 |------|-------|-------------|------|
-| **EPIC-12** | Eval Harness + Production Readiness | `make scorecard` target, live regression CI, API v2 endpoints, v1 deprecation plan | Full scorecard green, live regression <5% failure |
+| **EPIC-09** | Design Operations Workflow Pack | Layout recommendations, revision summaries, takeoff candidates, scope outputs | Design-ops scorecard entries pass |
+| **EPIC-10** | Construction Drawing Workflow Pack | Grid/bay summaries, markup-to-redline, batch repeated-condition plans, field summaries | Construction scorecard entries pass |
+
+### Phase 5: Production Readiness (EPICs 11-12)
+
+Scale hardening and evaluation governance.
+
+| Epic | Title | Deliverables | Gate |
+|------|-------|-------------|------|
+| **EPIC-11** | Session Durability + Scale Readiness | State audit, durable metadata model, tracing/metrics, scale smoke tests | Clear path beyond in-process sessions |
+| **EPIC-12** | Evaluation Harness + Quality Governance | Capability scorecard, domain fixture packs, confidence tracking, CI regression | Full scorecard green, live regression <5% failure |
 
 ---
 
 ## 2. Dependency Graph
 
 ```
-EPIC-01 (Audit + Docs)
+EPIC-01 (Capability Audit)
     |
     v
-EPIC-02 (Contracts + Router) ──────────────────────────────┐
-    |                                                       |
-    ├──> EPIC-03 (Selection Upgrades)                       |
-    |        |                                              |
-    |        ├──> EPIC-04 (Q&A Pipeline)                    |
-    |        |        |                                     |
-    |        |        └──> EPIC-05 (Summary)                |
-    |        |                                              |
-    |        ├──> EPIC-08 (Repeated Condition)              |
-    |        |                                              |
-    |        └──> EPIC-09 (Markup Interpretation)           |
-    |                                                       |
-    ├──> EPIC-06 (Edit Safety) ──────┐                      |
-    |                                |                      |
-    ├──> EPIC-07 (Compare Integration)                      |
-    |                                |                      |
-    └──> EPIC-10 (Takeoff) ──────────┤                      |
-         EPIC-11 (Design Assist) ────┘                      |
-                                     |                      |
-                                     v                      |
-                               EPIC-12 (Eval + Production) <┘
+EPIC-02 (Contracts + Router)
+    |
+    ├──> EPIC-03 (Selection + Markup)
+    |        |
+    |        └──> EPIC-04 (Region Q&A)
+    |                  |
+    |                  └──> EPIC-05 (Repeated-Condition)
+    |
+    └──> EPIC-06 (Compare Hardening)
+              |
+    EPIC-04 + 05 + 06
+              |
+              v
+         ARCH-REVIEW-01
+              |
+              ├──> EPIC-07 (Edit Planning)
+              |        |
+              |        └──> EPIC-08 (Preview + Apply)
+              |
+              ├──> EPIC-11 (Scale Readiness)
+              |
+    EPIC-04 + 08 ──> EPIC-09 (Design Ops Pack)
+    EPIC-03 + 06 + 07 ──> EPIC-10 (Construction Pack)
+              |
+    EPIC-04..10
+              |
+              v
+         EPIC-12 (Eval + Governance)
 ```
 
-**Critical path:** EPIC-01 → 02 → 03 → 04 (Q&A is the first user-visible feature).
+**Critical path:** EPIC-01 → 02 → 03 → 04 (Region Q&A is the first user-visible feature).
 
 **Parallel tracks after EPIC-02:**
-- Track A: Selection → Q&A → Summary (read-only features)
-- Track B: Edit Safety → Compare Integration (edit features)
-- Track C: Selection → Repeated Condition / Markup (search features)
+- Track A: Selection → Q&A → Repeated-Condition (read-only features)
+- Track B: Compare Hardening (existing pipeline upgrade)
+- Both converge at ARCH-REVIEW-01 before edit planning begins
 
 ---
 
