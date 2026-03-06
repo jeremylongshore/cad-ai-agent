@@ -1,0 +1,72 @@
+name: 'Gemini PR Review'
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
+  id-token: write
+
+concurrency:
+  group: 'gemini-review-${{ github.event.pull_request.number }}'
+  cancel-in-progress: true
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: 'Gemini PR Review'
+        uses: 'google-github-actions/run-gemini-cli@v0'
+        env:
+          GITHUB_TOKEN: '${{ github.token }}'
+          ISSUE_TITLE: '${{ github.event.pull_request.title }}'
+          ISSUE_BODY: '${{ github.event.pull_request.body }}'
+          PULL_REQUEST_NUMBER: '${{ github.event.pull_request.number }}'
+          REPOSITORY: '${{ github.repository }}'
+        with:
+          gcp_workload_identity_provider: '${{ vars.WIF_PROVIDER }}'
+          gcp_service_account: '${{ vars.WIF_SERVICE_ACCOUNT }}'
+          gcp_project_id: '${{ vars.GCP_PROJECT_ID }}'
+          gcp_location: '${{ vars.GOOGLE_CLOUD_LOCATION }}'
+          use_vertex_ai: '${{ vars.GOOGLE_GENAI_USE_VERTEXAI }}'
+          workflow_name: 'gemini-review'
+          prompt: '/gemini-review'
+          settings: |-
+            {
+              "model": {
+                "maxSessionTurns": 25
+              },
+              "mcpServers": {
+                "github": {
+                  "command": "docker",
+                  "args": [
+                    "run", "-i", "--rm",
+                    "-e", "GITHUB_PERSONAL_ACCESS_TOKEN",
+                    "ghcr.io/github/github-mcp-server:v0.27.0"
+                  ],
+                  "includeTools": [
+                    "add_comment_to_pending_review",
+                    "pull_request_read",
+                    "pull_request_review_write"
+                  ],
+                  "env": {
+                    "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}"
+                  }
+                }
+              },
+              "tools": {
+                "core": [
+                  "run_shell_command(cat)",
+                  "run_shell_command(echo)",
+                  "run_shell_command(grep)",
+                  "run_shell_command(head)",
+                  "run_shell_command(tail)"
+                ]
+              }
+            }
