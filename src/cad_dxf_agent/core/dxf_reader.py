@@ -16,6 +16,8 @@ from ..models.cad_schema import (
     LayoutInfo,
     LoadWarning,
     Point2D,
+    TextGeometry,
+    TextProvenance,
 )
 from ..otel import get_tracer
 from ..settings import settings
@@ -126,6 +128,7 @@ def _parse_entity(
     insert_point = None
     text_content = None
     block_name = None
+    text_geometry = None
 
     attributes: dict[str, Any] = {}
 
@@ -140,14 +143,45 @@ def _parse_entity(
         insert = entity.dxf.insert
         insert_point = Point2D(x=insert.x, y=insert.y)
         text_content = entity.dxf.text
+        text_geometry = _extract_text_geometry(entity)
     elif dxf_type == "MTEXT":
         insert = entity.dxf.insert
         insert_point = Point2D(x=insert.x, y=insert.y)
         text_content = entity.text  # type: ignore[attr-defined]
+        text_geometry = _extract_mtext_geometry(entity)
     elif dxf_type == "INSERT":
         insert = entity.dxf.insert
         insert_point = Point2D(x=insert.x, y=insert.y)
         block_name = entity.dxf.name
+        # Extract ATTRIB text with geometry
+        try:
+            attribs = list(entity.attribs)  # type: ignore[attr-defined]
+            if attribs:
+                attrib_data = {}
+                for attrib in attribs:
+                    tag = attrib.dxf.tag
+                    attrib_data[tag] = {
+                        "text": attrib.dxf.text,
+                        "height": attrib.dxf.get("height", None),
+                        "rotation": attrib.dxf.get("rotation", 0.0),
+                    }
+                    try:
+                        ai = attrib.dxf.insert
+                        attrib_data[tag]["insert"] = {"x": ai.x, "y": ai.y}
+                    except Exception:
+                        logger.debug("INSERT %s: attrib insert read failed", handle)
+                if attrib_data:
+                    attributes["attribs"] = attrib_data
+                    # Use first attrib's text as text_content if none set
+                    first = next(iter(attrib_data.values()))
+                    text_content = first["text"]
+                    text_geometry = TextGeometry(
+                        height=first.get("height"),
+                        rotation=_normalize_rotation(first.get("rotation", 0.0)),
+                        provenance=TextProvenance.BLOCK_ATTRIBUTE_TEXT,
+                    )
+        except Exception:
+            logger.debug("INSERT %s: attrib extraction failed", handle)
     elif dxf_type == "CIRCLE":
         center = entity.dxf.center
         insert_point = Point2D(x=center.x, y=center.y)
@@ -249,6 +283,38 @@ def _parse_entity(
         text_content=text_content,
         block_name=block_name,
         attributes=attributes,
+        text_geometry=text_geometry,
+    )
+
+
+def _normalize_rotation(deg: float) -> float:
+    """Normalize rotation to [0, 360)."""
+    return deg % 360.0
+
+
+def _extract_text_geometry(entity: ezdxf.entities.DXFGraphic) -> TextGeometry:
+    """Extract text geometry from a DXF TEXT entity."""
+    dxf = entity.dxf
+    return TextGeometry(
+        height=dxf.get("height", None),
+        rotation=_normalize_rotation(dxf.get("rotation", 0.0)),
+        halign=dxf.get("halign", 0),
+        valign=dxf.get("valign", 0),
+        width_factor=dxf.get("width", 1.0),
+        oblique=dxf.get("oblique", 0.0),
+        provenance=TextProvenance.NATIVE_CAD_TEXT,
+    )
+
+
+def _extract_mtext_geometry(entity: ezdxf.entities.DXFGraphic) -> TextGeometry:
+    """Extract text geometry from a DXF MTEXT entity."""
+    dxf = entity.dxf
+    return TextGeometry(
+        height=dxf.get("char_height", None),
+        rotation=_normalize_rotation(dxf.get("rotation", 0.0)),
+        attachment_point=dxf.get("attachment_point", None),
+        char_height=dxf.get("char_height", None),
+        provenance=TextProvenance.NATIVE_CAD_TEXT,
     )
 
 

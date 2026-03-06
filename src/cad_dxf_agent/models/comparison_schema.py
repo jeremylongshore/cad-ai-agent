@@ -7,7 +7,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field, computed_field, model_validator
 
-from .cad_schema import EntityType, Point2D
+from .cad_schema import EntityType, Point2D, TextGeometry
 
 # --- Filter profile schemas ---
 
@@ -195,6 +195,7 @@ class GeometrySnapshot(BaseModel):
     text_content: str | None = None
     block_name: str | None = None
     attributes: dict[str, Any] = Field(default_factory=dict)
+    text_geometry: TextGeometry | None = None
     stable_id: str | None = Field(
         default=None,
         description="Geometry-based stable ID (assigned by assign_stable_ids)",

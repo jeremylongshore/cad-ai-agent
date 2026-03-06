@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections import Counter
 from pathlib import Path
 
-from ..models.cad_schema import DrawingContext
+from ..models.cad_schema import DrawingContext, EntityRef
 from ..otel import get_tracer
 
 tracer = get_tracer(__name__)
@@ -49,17 +49,7 @@ def build_planner_context(context: DrawingContext) -> dict:
             entities = entities[:ENTITY_CAP]
 
         entity_summary = [
-            {
-                "handle": e.handle,
-                "type": e.entity_type.value,
-                "layer": e.layer,
-                "space": e.space,
-                "insert_point": (
-                    {"x": e.insert_point.x, "y": e.insert_point.y} if e.insert_point else None
-                ),
-                "text": e.text_content,
-                "block_name": e.block_name,
-            }
+            _entity_to_summary(e)
             for e in entities
         ]
 
@@ -83,6 +73,29 @@ def build_planner_context(context: DrawingContext) -> dict:
             span.set_attribute("cad.entities.truncated", True)
 
         return result
+
+
+def _entity_to_summary(e: EntityRef) -> dict:
+    """Build a JSON-serializable summary dict for a single entity."""
+    d: dict = {
+        "handle": e.handle,
+        "type": e.entity_type.value,
+        "layer": e.layer,
+        "space": e.space,
+        "insert_point": (
+            {"x": e.insert_point.x, "y": e.insert_point.y} if e.insert_point else None
+        ),
+        "text": e.text_content,
+        "block_name": e.block_name,
+    }
+    if e.text_geometry is not None:
+        tg = e.text_geometry
+        d["text_geometry"] = {
+            "height": tg.height,
+            "rotation": tg.rotation,
+            "provenance": tg.provenance.value,
+        }
+    return d
 
 
 def build_compact_context(context: DrawingContext) -> str:

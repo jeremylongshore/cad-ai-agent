@@ -35,6 +35,35 @@ class Point2D(BaseModel):
     y: float
 
 
+class TextProvenance(StrEnum):
+    """Source of text data, ordered by trust (highest first)."""
+
+    NATIVE_CAD_TEXT = "native_cad_text"
+    BLOCK_ATTRIBUTE_TEXT = "block_attribute_text"
+    VECTOR_OUTLINE_TEXT = "vector_outline_text"
+    RASTER_OCR_TEXT = "raster_ocr_text"
+
+
+class TextGeometry(BaseModel):
+    """Text rendering geometry extracted from native CAD entities."""
+
+    height: float | None = None
+    rotation: float = Field(default=0.0, description="Rotation in degrees [0, 360)")
+    halign: int = Field(default=0, description="Horizontal alignment (0=left,1=center,2=right)")
+    valign: int = Field(
+        default=0, description="Vertical alignment (0=baseline,1=bottom,2=mid,3=top)"
+    )
+    width_factor: float = Field(default=1.0, description="Character width scale factor")
+    oblique: float = Field(default=0.0, description="Oblique angle in degrees")
+    attachment_point: int | None = Field(
+        default=None, description="MTEXT attachment point (1-9, top-left to bottom-right)"
+    )
+    char_height: float | None = Field(
+        default=None, description="MTEXT character height (overrides height if set)"
+    )
+    provenance: TextProvenance = TextProvenance.NATIVE_CAD_TEXT
+
+
 class EntityRef(BaseModel):
     """Reference to a DXF entity with identity and location context."""
 
@@ -46,6 +75,7 @@ class EntityRef(BaseModel):
     text_content: str | None = None
     block_name: str | None = None
     attributes: dict[str, Any] = Field(default_factory=dict)
+    text_geometry: TextGeometry | None = None
 
 
 class LayerRule(BaseModel):
