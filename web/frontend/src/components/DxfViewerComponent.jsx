@@ -92,7 +92,7 @@ export default function DxfViewerComponent({ dxfUrl, onPointClick, className, pi
     viewer.Subscribe('pointerdown', handlePointerDown);
 
     viewer
-      .Load({ url: dxfUrl, fonts: null, progressCbk: null })
+      .Load({ url: dxfUrl, fonts: ['/fonts/NotoSans-Regular.ttf'], progressCbk: null })
       .then(() => {
         setLoading(false);
         // Auto fit after load

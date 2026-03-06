@@ -310,6 +310,19 @@ def _convert_pdf(source_path: Path, output_dir: str | Path | None) -> Conversion
 # ── Color helpers ─────────────────────────────────────────────────
 
 
+def _set_entity_rgb(entity, rgb_tuple) -> None:
+    """Apply true RGB color from PDF [0,1] RGB tuple to a DXF entity."""
+    if rgb_tuple is None:
+        return
+    try:
+        r, g, b = [max(0, min(255, int(c * 255))) for c in rgb_tuple[:3]]
+    except (TypeError, ValueError):
+        return
+    if r < 30 and g < 30 and b < 30:
+        return  # near-black: let ACI white + blackWhiteInversion handle it
+    entity.rgb = (r, g, b)
+
+
 def _rgb_to_aci(rgb_tuple) -> int:
     """Map PDF RGB stroke color to nearest DXF ACI color index.
 
@@ -351,6 +364,57 @@ PDF_PAGE_GAP = 50.0  # gap between pages in DXF units (~17.6mm)
 # "black blob" effect when viewing dense structural PDFs at auto-fit zoom.
 PDF_MIN_ENTITY_SIZE = 1.0
 
+# Maximum HATCH entities per page to avoid bloating files with fill patterns.
+PDF_MAX_HATCH_ENTITIES = 500
+
+
+def _create_fill_hatch(msp, path_item, x_offset, page_height, layer, hatch_count):
+    """Create a SOLID HATCH from a filled PDF path_item.
+
+    Returns (hatch_or_none, updated_hatch_count).
+    """
+    fill_rgb = path_item.get("fill")
+    if fill_rgb is None or hatch_count >= PDF_MAX_HATCH_ENTITIES:
+        return None, hatch_count
+
+    items = path_item.get("items", [])
+    if len(items) < 2:
+        return None, hatch_count
+
+    hatch = msp.add_hatch(dxfattribs={"layer": layer, "color": _rgb_to_aci(fill_rgb)})
+    ep = hatch.paths.add_edge_path()
+
+    for item in items:
+        kind = item[0]
+        if kind == "l":  # line segment
+            p1, p2 = item[1], item[2]
+            ep.add_line(
+                (x_offset + float(p1.x), page_height - float(p1.y)),
+                (x_offset + float(p2.x), page_height - float(p2.y)),
+            )
+        elif kind == "c":  # cubic Bezier
+            p1, p2, p3, p4 = item[1], item[2], item[3], item[4]
+            ep.add_spline(
+                control_points=[
+                    (x_offset + float(p.x), page_height - float(p.y)) for p in (p1, p2, p3, p4)
+                ],
+                degree=3,
+            )
+        elif kind == "re":  # rectangle — add 4 line edges
+            rect = item[1]
+            corners = [
+                (x_offset + float(rect.x0), page_height - float(rect.y0)),
+                (x_offset + float(rect.x1), page_height - float(rect.y0)),
+                (x_offset + float(rect.x1), page_height - float(rect.y1)),
+                (x_offset + float(rect.x0), page_height - float(rect.y1)),
+            ]
+            for i in range(4):
+                ep.add_line(corners[i], corners[(i + 1) % 4])
+
+    hatch.set_solid_fill()
+    _set_entity_rgb(hatch, fill_rgb)
+    return hatch, hatch_count + 1
+
 
 def _extract_pdf_fitz(msp, source_path: Path, doc=None) -> int:
     """Extract vector geometry using PyMuPDF's page.get_drawings().
@@ -379,8 +443,19 @@ def _extract_pdf_fitz(msp, source_path: Path, doc=None) -> int:
         page_width = page.rect.width
         drawings = page.get_drawings()
 
+        hatch_count = 0
         for path_item in drawings:
             stroke_color = _rgb_to_aci(path_item.get("color"))
+            stroke_rgb = path_item.get("color")
+
+            # Create fill HATCH if path has a fill color
+            if path_item.get("fill") is not None:
+                hatch, hatch_count = _create_fill_hatch(
+                    msp, path_item, x_offset, page_height, layer, hatch_count
+                )
+                if hatch is not None:
+                    total += 1
+
             for item in path_item.get("items", []):
                 kind = item[0]
                 attribs = {"layer": layer, "color": stroke_color}
@@ -391,7 +466,8 @@ def _extract_pdf_fitz(msp, source_path: Path, doc=None) -> int:
                     x1, y1 = x_offset + float(p2.x), page_height - float(p2.y)
                     if math.hypot(x1 - x0, y1 - y0) < PDF_MIN_ENTITY_SIZE:
                         continue
-                    msp.add_line((x0, y0), (x1, y1), dxfattribs=attribs)
+                    entity = msp.add_line((x0, y0), (x1, y1), dxfattribs=attribs)
+                    _set_entity_rgb(entity, stroke_rgb)
                     total += 1
 
                 elif kind == "re":  # Rectangle
@@ -403,7 +479,8 @@ def _extract_pdf_fitz(msp, source_path: Path, doc=None) -> int:
                     if abs(x1 - x0) < PDF_MIN_ENTITY_SIZE and abs(y1 - y0) < PDF_MIN_ENTITY_SIZE:
                         continue
                     points = [(x0, y0), (x1, y0), (x1, y1), (x0, y1)]
-                    msp.add_lwpolyline(points, close=True, dxfattribs=attribs)
+                    entity = msp.add_lwpolyline(points, close=True, dxfattribs=attribs)
+                    _set_entity_rgb(entity, stroke_rgb)
                     total += 1
 
                 elif kind == "c":  # Cubic Bezier curve
@@ -415,7 +492,7 @@ def _extract_pdf_fitz(msp, source_path: Path, doc=None) -> int:
                     arc = _fit_arc_from_bezier(p1, p2, p3, p4, page_height)
                     if arc:
                         cx, cy, radius, start_angle, end_angle = arc
-                        msp.add_arc(
+                        entity = msp.add_arc(
                             center=(x_offset + cx, cy),
                             radius=radius,
                             start_angle=math.degrees(start_angle),
@@ -427,7 +504,11 @@ def _extract_pdf_fitz(msp, source_path: Path, doc=None) -> int:
                         pts = _bezier_to_points(p1, p2, p3, p4, page_height, segments=8)
                         if len(pts) >= 2:
                             shifted = [(x_offset + px, py) for px, py in pts]
-                            msp.add_lwpolyline(shifted, dxfattribs=attribs)
+                            entity = msp.add_lwpolyline(shifted, dxfattribs=attribs)
+                        else:
+                            entity = None
+                    if entity is not None:
+                        _set_entity_rgb(entity, stroke_rgb)
                     total += 1
 
                 elif kind == "qu":  # Quad (quadrilateral)
@@ -445,7 +526,8 @@ def _extract_pdf_fitz(msp, source_path: Path, doc=None) -> int:
                             for k in range(1, len(item))
                         ]
                     if len(pts) >= 2:
-                        msp.add_lwpolyline(pts, close=True, dxfattribs=attribs)
+                        entity = msp.add_lwpolyline(pts, close=True, dxfattribs=attribs)
+                        _set_entity_rgb(entity, stroke_rgb)
                     total += 1
 
         # Extract text blocks from the page
@@ -462,7 +544,14 @@ def _extract_pdf_fitz(msp, source_path: Path, doc=None) -> int:
                     x = x_offset + float(bbox[0])
                     y = page_height - float(bbox[1])
                     height = max(float(bbox[3]) - float(bbox[1]), 1.0)
-                    msp.add_text(
+
+                    # Extract text color from PyMuPDF packed int
+                    span_color_int = span.get("color", 0)
+                    sr = (span_color_int >> 16) & 0xFF
+                    sg = (span_color_int >> 8) & 0xFF
+                    sb = span_color_int & 0xFF
+
+                    text_entity = msp.add_text(
                         text,
                         height=height * 0.7,
                         dxfattribs={
@@ -471,6 +560,8 @@ def _extract_pdf_fitz(msp, source_path: Path, doc=None) -> int:
                             "insert": (x, y),
                         },
                     )
+                    if sr > 30 or sg > 30 or sb > 30:
+                        text_entity.rgb = (sr, sg, sb)
                     total += 1
 
         x_offset += page_width + PDF_PAGE_GAP
