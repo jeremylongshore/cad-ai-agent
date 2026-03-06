@@ -80,8 +80,8 @@ class TextGeometry(BaseModel):
 
 | File | Change |
 |------|--------|
-| `models/cad_schema.py` | Added TextProvenance, TextGeometry, TEXT_PROVENANCE_TRUST_ORDER, TEXT_PROVENANCE_DEFAULTS; EntityRef gains text_geometry field |
-| `core/dxf_reader.py` | TEXT extracts height/rotation/halign/valign/width_factor/oblique; MTEXT extracts char_height/rotation/attachment_point; INSERT extracts ATTRIB text with geometry |
+| `models/cad_schema.py` | Added TextProvenance, TextGeometry, trust hierarchy, `for_provenance()` factory, `compute_approx_text_bbox()`; EntityRef gains text_geometry field |
+| `core/dxf_reader.py` | TEXT extracts full geometry; MTEXT uses `plain_text()` + extracts mtext_width; INSERT extracts xscale/yscale/rotation + ATTRIB text with 0.95 confidence |
 | `core/semantic_model.py` | Planner context includes text_geometry (height, rotation, provenance) |
 | `core/selection_debug.py` | Debug payload and text output include provenance, confidence, is_high_trust |
 | `core/qna_pipeline.py` | Entity descriptions include height and rotation when present |
@@ -102,7 +102,7 @@ class TextGeometry(BaseModel):
 
 ## Tests Added
 
-55 tests in `tests/unit/test_text_geometry.py`:
+73 tests in `tests/unit/test_text_geometry.py`:
 
 | Test Class | Count | Coverage |
 |-----------|-------|----------|
@@ -119,21 +119,25 @@ class TextGeometry(BaseModel):
 | TestDebugVisibility | 2 | selection_debug includes/excludes text_geometry |
 | TestToolExecutorVisibility | 2 | tool_executor includes/excludes text_geometry |
 | TestSemanticModelTextGeometry | 2 | Planner context includes/excludes text_geometry |
+| TestForProvenanceFactory | 5 | Factory creates correct defaults, overrides work |
+| TestComputeApproxTextBbox | 5 | TEXT/MTEXT bbox, width_factor, None cases |
+| TestInsertTransformExtraction | 4 | xscale/yscale/rotation extracted, ATTRIB height |
+| TestMtextPlainText | 4 | Formatting stripped, width stored, simple unchanged |
 
 ## Known Limitations
 
-1. **OCR and vector contour text paths do not exist** -- enum values and confidence defaults are future-proofing only
-2. **MTEXT rich formatting** (bold, italic, font changes) is not parsed -- only char_height and attachment_point
-3. **Block transform composition** (nested INSERT scales/rotations) is not applied to ATTRIB text geometry
-4. **Text bounding box** is not computed -- would require font metrics not available without rendering
+1. **OCR and vector contour text paths do not exist** -- enum values and confidence defaults are future-proofing only. `TextGeometry.for_provenance()` factory is ready for use when these modules are added.
+2. ~~**MTEXT rich formatting**~~ -- **RESOLVED**: `entity.plain_text()` strips `\P`, `\fArial;`, and other formatting codes.
+3. ~~**Block transform composition**~~ -- **RESOLVED**: INSERT xscale/yscale/rotation extracted into attributes. ATTRIB height already reflects INSERT scale in DXF format. BLOCK_ATTRIBUTE_TEXT confidence set to 0.95.
+4. ~~**Text bounding box**~~ -- **RESOLVED**: `compute_approx_text_bbox()` provides approximate bbox from height, width_factor, text length, and MTEXT column width.
 5. **Style table** (text style names, fonts) is not extracted
+6. **Nested INSERT transforms** (INSERT inside INSERT) are not composed
 
 ## Follow-on Recommendations
 
-1. When OCR or vector contour text is added, use `TextProvenance.RASTER_OCR_TEXT` / `VECTOR_OUTLINE_TEXT` with appropriate confidence defaults
-2. Consider computing approximate text bounding boxes using height + text length + width_factor
-3. Consider extracting text style references for font-aware rendering
-4. Block transform composition for ATTRIB positions should be addressed in EPIC-CAD-09/10
+1. When OCR or vector contour text is added, use `TextGeometry.for_provenance(TextProvenance.RASTER_OCR_TEXT, height=...)` with appropriate overrides
+2. Consider extracting text style references for font-aware rendering
+3. Nested block transform composition should be addressed in EPIC-CAD-09/10
 
 ## Recommendation
 
