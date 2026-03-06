@@ -1,0 +1,60 @@
+[
+  {"prompt": "compare these two drawings", "expected_family": "compare", "expected_source": "heuristic"},
+  {"prompt": "what changed between revisions", "expected_family": "compare", "expected_source": "heuristic"},
+  {"prompt": "show me the diff", "expected_family": "compare", "expected_source": "heuristic"},
+  {"prompt": "compare revision A to revision B", "expected_family": "compare", "expected_source": "heuristic"},
+  {"prompt": "what are the differences between these files", "expected_family": "compare", "expected_source": "heuristic"},
+  {"prompt": "highlight the revision changes", "expected_family": "compare", "expected_source": "heuristic"},
+
+  {"prompt": "interpret the markup clouds", "expected_family": "markup_interpretation", "expected_source": "heuristic"},
+  {"prompt": "what do the redline markups mean", "expected_family": "markup_interpretation", "expected_source": "heuristic"},
+  {"prompt": "identify all the markup clouds in the drawing", "expected_family": "markup_interpretation", "expected_source": "heuristic"},
+  {"prompt": "explain the cloud annotations", "expected_family": "markup_interpretation", "expected_source": "heuristic"},
+
+  {"prompt": "move the wall 10 feet to the right", "expected_family": "edit_plan", "expected_source": "heuristic"},
+  {"prompt": "delete the text on layer NOTES", "expected_family": "edit_plan", "expected_source": "heuristic"},
+  {"prompt": "change text A1 to say REVISED", "expected_family": "edit_plan", "expected_source": "heuristic"},
+  {"prompt": "add a door block at position 50,100", "expected_family": "edit_plan", "expected_source": "heuristic"},
+  {"prompt": "shift entity A5 by 20 units up", "expected_family": "edit_plan", "expected_source": "heuristic"},
+  {"prompt": "remove all entities on layer DEMO", "expected_family": "edit_plan", "expected_source": "heuristic"},
+  {"prompt": "insert a window block on the south wall", "expected_family": "edit_plan", "expected_source": "heuristic"},
+  {"prompt": "rename the text from OLD to NEW", "expected_family": "edit_plan", "expected_source": "heuristic"},
+  {"prompt": "relocate the title block", "expected_family": "edit_plan", "expected_source": "heuristic"},
+  {"prompt": "replace the label text", "expected_family": "edit_plan", "expected_source": "heuristic"},
+  {"prompt": "modify the dimension on layer DIMS", "expected_family": "edit_plan", "expected_source": "heuristic"},
+  {"prompt": "edit the room number text", "expected_family": "edit_plan", "expected_source": "heuristic"},
+  {"prompt": "update the project name", "expected_family": "edit_plan", "expected_source": "heuristic"},
+
+  {"prompt": "do a quantity takeoff for doors", "expected_family": "takeoff_estimate", "expected_source": "heuristic"},
+  {"prompt": "estimate the material quantities", "expected_family": "takeoff_estimate", "expected_source": "heuristic"},
+  {"prompt": "count all windows in the drawing", "expected_family": "takeoff_estimate", "expected_source": "heuristic"},
+  {"prompt": "create a bill of materials", "expected_family": "takeoff_estimate", "expected_source": "heuristic"},
+
+  {"prompt": "find all instances of the fire extinguisher symbol", "expected_family": "repeated_condition", "expected_source": "heuristic"},
+  {"prompt": "show every instance of block CHAIR", "expected_family": "repeated_condition", "expected_source": "heuristic"},
+  {"prompt": "detect recurring patterns in the floor plan", "expected_family": "repeated_condition", "expected_source": "heuristic"},
+  {"prompt": "locate all instances of the exit sign", "expected_family": "repeated_condition", "expected_source": "heuristic"},
+
+  {"prompt": "suggest improvements for the layout", "expected_family": "design_assist", "expected_source": "heuristic"},
+  {"prompt": "recommend a better door placement", "expected_family": "design_assist", "expected_source": "heuristic"},
+  {"prompt": "optimize the corridor width", "expected_family": "design_assist", "expected_source": "heuristic"},
+  {"prompt": "improve the emergency exit routes", "expected_family": "design_assist", "expected_source": "heuristic"},
+
+  {"prompt": "summarize this drawing", "expected_family": "summary", "expected_source": "heuristic"},
+  {"prompt": "give me an overview of the floor plan", "expected_family": "summary", "expected_source": "heuristic"},
+  {"prompt": "describe what this drawing contains", "expected_family": "summary", "expected_source": "heuristic"},
+  {"prompt": "show drawing statistics", "expected_family": "summary", "expected_source": "heuristic"},
+
+  {"prompt": "what is on layer WALLS", "expected_family": "qna", "expected_source": "heuristic"},
+  {"prompt": "which layer has the doors", "expected_family": "qna", "expected_source": "heuristic"},
+  {"prompt": "where is the stairwell located", "expected_family": "qna", "expected_source": "heuristic"},
+  {"prompt": "show me the entities on layer ELECTRICAL", "expected_family": "qna", "expected_source": "heuristic"},
+  {"prompt": "how many entities are on layer WALLS", "expected_family": "qna", "expected_source": "heuristic"},
+  {"prompt": "tell me about the HVAC layer", "expected_family": "qna", "expected_source": "heuristic"},
+
+  {"prompt": "", "expected_family": "needs_clarification", "expected_source": "heuristic"},
+  {"prompt": "   ", "expected_family": "needs_clarification", "expected_source": "heuristic"},
+  {"prompt": "hello", "expected_family": "needs_clarification", "expected_source": "heuristic"},
+  {"prompt": "thanks", "expected_family": "needs_clarification", "expected_source": "heuristic"},
+  {"prompt": "hmm let me think", "expected_family": "needs_clarification", "expected_source": "heuristic"}
+]
