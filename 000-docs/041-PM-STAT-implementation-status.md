@@ -8,21 +8,21 @@
 
 ## 1. Epic Status Overview
 
-| # | Epic | Bead ID | Status | Branch | PR | Key Deliverables |
-|---|------|---------|--------|--------|----|-----------------|
-| 01 | Capability Audit + Architecture Baseline | cad-uns | DONE | `feature/epic-cad-01-capability-audit` | #71 | 6 docs (034-040), beads task tree |
-| 02 | Core Contracts + Routing Foundation | cad-d9a | NOT STARTED | — | — | `response_schema.py`, `intent_router.py`, TaskFamily/ResponseType enums |
-| 03 | Selection + Markup Interpretation Foundation | cad-wd2 | NOT STARTED | — | — | Region model, markup overlay ingestion, entity association |
-| 04 | Region Q&A Vertical Slice | cad-grx | NOT STARTED | — | — | Region context builder, grounded Q&A pipeline, golden tests |
-| 05 | Repeated-Condition Detection | cad-ccd | NOT STARTED | — | — | Similarity scoring, candidate search, preview/approval workflow |
-| 06 | Compare + Diff Service Hardening | cad-3e4 | NOT STARTED | — | — | Typed compare schema, alignment diagnostics, regression fixtures |
-| — | ARCH-REVIEW-01 | cad-sfw | NOT STARTED | — | — | Post-EPIC-06 quality/scalability review |
-| 07 | Structured Edit Planning | cad-9ug | NOT STARTED | — | — | Edit plan schema, plan builder, constraint validation |
-| 08 | Preview + Apply Workflow | cad-6zz | NOT STARTED | — | — | Preview pipeline, apply pipeline, audit trail |
-| 09 | Design Operations Workflow Pack | cad-ady | NOT STARTED | — | — | Layout recommendations, revision summaries, takeoff candidates |
-| 10 | Construction Drawing Workflow Pack | cad-8p2 | NOT STARTED | — | — | Grid/bay summaries, markup-to-redline, batch plans |
-| 11 | Session Durability + Scale Readiness | cad-36p | NOT STARTED | — | — | State audit, durable metadata model, tracing/metrics |
-| 12 | Evaluation Harness + Quality Governance | cad-m7d | NOT STARTED | — | — | Capability scorecard, fixture packs, CI regression |
+| # | Epic | Bead ID | Status | Branch | PR | Key Deliverables | Tests |
+|---|------|---------|--------|--------|----|-----------------|-------|
+| 01 | Capability Audit + Architecture Baseline | cad-uns | DONE | `feature/epic-cad-01-capability-audit` | #71 | 8 docs (034-041), beads task tree | N/A (docs only) |
+| 02 | Core Contracts + Routing Foundation | cad-d9a | NOT STARTED | — | — | `response_schema.py`, `intent_router.py`, TaskFamily/ResponseType enums | TBD — unit (schema validation, router accuracy), golden trajectories (routing decisions) |
+| 03 | Selection + Markup Interpretation Foundation | cad-wd2 | NOT STARTED | — | — | Region model, markup overlay ingestion, entity association | TBD — unit (region model, entity association), integration (markup ingestion pipeline) |
+| 04 | Region Q&A Vertical Slice | cad-grx | NOT STARTED | — | — | Region context builder, grounded Q&A pipeline, golden tests | TBD — golden trajectories (region_qa family), scorecard entries, live API tests |
+| 05 | Repeated-Condition Detection | cad-ccd | NOT STARTED | — | — | Similarity scoring, candidate search, preview/approval workflow | TBD — unit (similarity scoring), golden trajectories (repeated_condition family), scorecard entries |
+| 06 | Compare + Diff Service Hardening | cad-3e4 | NOT STARTED | — | — | Typed compare schema, alignment diagnostics, regression fixtures | TBD — unit (typed schema), regression fixtures, integration (alignment diagnostics) |
+| — | ARCH-REVIEW-01 | cad-sfw | NOT STARTED | — | — | Post-EPIC-06 quality/scalability review; ADR with keep/change/remove decisions per module | N/A (review output is ADR document) |
+| 07 | Structured Edit Planning | cad-9ug | NOT STARTED | — | — | `models/plan_schema.py` (EditPlan), `llm/plan_builder.py`, constraint validation | TBD — unit (plan schema, constraint validation), golden trajectories (structured_edit family) |
+| 08 | Preview + Apply Workflow | cad-6zz | NOT STARTED | — | — | `web/backend/routes/preview.py`, `web/frontend/src/components/PreviewPanel.jsx`, audit trail | TBD — unit (preview generation, audit trail), integration (preview→apply round-trip), web API tests |
+| 09 | Design Operations Workflow Pack | cad-ady | NOT STARTED | — | — | `workflows/design_ops.py`, prompt templates for layout/revision/takeoff | TBD — golden trajectories (design_ops families), scorecard entries, live API tests |
+| 10 | Construction Drawing Workflow Pack | cad-8p2 | NOT STARTED | — | — | `workflows/construction.py`, prompt templates for grid/bay/markup/batch | TBD — golden trajectories (construction families), scorecard entries, live API tests |
+| 11 | Session Durability + Scale Readiness | cad-36p | NOT STARTED | — | — | `core/session_store.py` (ABC + GCS impl), durable metadata model, tracing/metrics | TBD — unit (session store, metadata model), integration (persistence round-trip), migration tests |
+| 12 | Evaluation Harness + Quality Governance | cad-m7d | NOT STARTED | — | — | `tests/eval/` fixture packs, `scripts/run_eval.py`, scorecard JSON schema, CI regression | TBD — meta-tests (scorecard schema validation), CI smoke (eval harness runs clean) |
 
 ---
 
@@ -32,10 +32,10 @@
 |-------|-------|--------|------|
 | **Phase 1: Foundation** | 01, 02, 03 | 1/3 complete | Contracts locked, `make check` green |
 | **Phase 2: Core Intelligence** | 04, 05, 06 | 0/3 complete | Golden trajectories pass per family |
-| **Architecture Review** | ARCH-REVIEW-01 | Not started | Written review with keep/change/remove |
-| **Phase 3: Structured Editing** | 07, 08 | 0/2 complete | Edit plan + apply produce audit metadata |
-| **Phase 4: Workflow Packs** | 09, 10 | 0/2 complete | Domain scorecard entries pass |
-| **Phase 5: Production Readiness** | 11, 12 | 0/2 complete | Durable sessions + full scorecard green |
+| **Architecture Review** | ARCH-REVIEW-01 | Not started | ADR document with keep/change/remove decisions per module |
+| **Phase 3: Structured Editing** | 07, 08 | 0/2 complete | Edit plan + apply produce audit metadata. Key files: `src/cad_dxf_agent/llm/plan_builder.py`, `src/cad_dxf_agent/models/plan_schema.py`, `web/frontend/src/components/PreviewPanel.jsx`, `web/backend/routes/preview.py` |
+| **Phase 4: Workflow Packs** | 09, 10 | 0/2 complete | Domain scorecard entries pass. Key files: `src/cad_dxf_agent/workflows/design_ops.py`, `src/cad_dxf_agent/workflows/construction.py`, domain-specific prompt templates |
+| **Phase 5: Production Readiness** | 11, 12 | 0/2 complete | Durable sessions + full scorecard green. Key files: `src/cad_dxf_agent/core/session_store.py` (GCS integration), `tests/eval/`, `scripts/run_eval.py`, scorecard schema |
 
 ---
 
@@ -69,6 +69,7 @@ contracts and routing foundation are in place.
 | 038 | Drawing Intelligence Roadmap | DONE — 12 epics, 5 phases, dependency graph |
 | 039 | Intent Router Design (ADR) | DONE — Hybrid heuristic+LLM, task family boundaries |
 | 040 | Scale Readiness Assessment | DONE — Bottlenecks, migration path, observability gaps |
+| 041 | Implementation Status Tracker | DONE — This document; living tracker for all 12 epics |
 
 ---
 
@@ -88,18 +89,42 @@ contracts and routing foundation are in place.
 
 ## 6. Risk Summary
 
-| Risk | Status | Mitigation |
-|------|--------|------------|
-| Response contract churn | ACTIVE — schemas are "proposed" | Stabilize in EPIC-02, mark v2 |
-| Intent router accuracy | ACTIVE — no router exists yet | Conservative thresholds in EPIC-02 |
-| Markup entity detection | DEFERRED — no training data | Collect real samples before EPIC-03 |
-| 500-entity context cap | ACTIVE — silent information loss | Token-budget context builder in EPIC-03 |
-| Ephemeral session storage | KNOWN — lost on restart | Durable state migration in EPIC-11 |
-| Large drawing performance | ACTIVE — blocks request thread | Background execution in EPIC-11 |
+| Risk | Epic(s) | Status | Mitigation |
+|------|---------|--------|------------|
+| Response contract churn | 02 | ACTIVE — schemas are "proposed" | Stabilize in EPIC-02, mark v2 |
+| Intent router accuracy | 02, 04 | ACTIVE — no router exists yet | Conservative thresholds in EPIC-02 |
+| Markup entity detection | 03 | DEFERRED — no training data | Collect real samples before EPIC-03 |
+| 500-entity context cap | 03, 04 | ACTIVE — silent information loss | Token-budget context builder in EPIC-03 |
+| Ephemeral session storage | 11 | KNOWN — lost on restart | Durable state migration in EPIC-11 |
+| Large drawing performance | 06, 11 | ACTIVE — blocks request thread | Background execution in EPIC-11 |
+| Domain-specific prompt templates may not generalize | 09 | DEFERRED | Start with narrow domain templates; collect user feedback before broadening |
+| Construction drawing conventions vary by region | 10 | DEFERRED | Parameterize region-specific conventions; validate with multiple regional samples |
+| Migration from in-memory to persistent sessions may break existing tests | 11 | DEFERRED | Implement session store behind ABC; keep in-memory impl for test compatibility |
+| Eval harness depends on quality of golden trajectories from prior epics | 12 | DEFERRED | Gate EPIC-12 on trajectory count threshold (25+); validate trajectory coverage per family |
 
 ---
 
-## 7. Next Actions
+## 7. Per-Epic Next Steps
+
+| # | Epic | Next Step |
+|---|------|-----------|
+| 01 | Capability Audit + Architecture Baseline | Completed — hardening pass in progress |
+| 02 | Core Contracts + Routing Foundation | Define `TaskFamily` enum and `PlatformResponse` model in `response_schema.py`; write unit tests for enum coverage |
+| 03 | Selection + Markup Interpretation Foundation | Design `Region` Pydantic model with bounding box + entity association; draft markup overlay ingestion interface |
+| 04 | Region Q&A Vertical Slice | Implement region context builder that filters entities by bounding box; write first golden trajectory for region_qa |
+| 05 | Repeated-Condition Detection | Prototype entity similarity scoring function; define candidate result schema |
+| 06 | Compare + Diff Service Hardening | Audit existing `core/comparison/` for untyped returns; define typed `CompareResult` schema |
+| — | ARCH-REVIEW-01 | Collect module-level metrics (coupling, test coverage, API surface); draft ADR template with keep/change/remove columns |
+| 07 | Structured Edit Planning | Define `EditPlan` schema in `plan_schema.py`; implement plan builder with constraint pre-checks |
+| 08 | Preview + Apply Workflow | Wire preview generation into web backend route; implement frontend `PreviewPanel` component |
+| 09 | Design Operations Workflow Pack | Draft prompt templates for layout recommendations; implement `design_ops.py` workflow module |
+| 10 | Construction Drawing Workflow Pack | Gather sample construction drawings for regional convention analysis; draft grid/bay extraction logic |
+| 11 | Session Durability + Scale Readiness | Audit current in-memory session lifecycle; define `SessionStore` ABC with GCS-backed implementation |
+| 12 | Evaluation Harness + Quality Governance | Define scorecard JSON schema; scaffold `tests/eval/` directory with first fixture pack |
+
+---
+
+## 8. Global Next Actions
 
 1. **Merge PR #71** — EPIC-01 docs into main
 2. **Begin EPIC-02** — implement `response_schema.py` and `intent_router.py`
@@ -113,3 +138,12 @@ contracts and routing foundation are in place.
 - 034-AT-AUDT — Capability audit baseline
 - 038-PM-PLAN — Roadmap and phasing
 - 040-AT-AUDT — Scale readiness assessment
+
+---
+
+## Changelog
+
+| Date | Change |
+|------|--------|
+| 2026-03-05 | Initial creation with EPIC-01 complete, all other epics NOT STARTED |
+| 2026-03-06 | Audit hardening: fixed doc count (6→8), added Tests column, mapped risks to epics, added Phase 4-5 risks, added per-epic Next Steps, added concrete file paths for Phases 3-5, clarified ARCH-REVIEW-01 output format, added this changelog |

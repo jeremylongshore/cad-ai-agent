@@ -285,6 +285,198 @@ schemas and pipelines are implemented.
 
 ---
 
+## 9. Evaluation by Workflow Class
+
+Each user persona maps to a set of critical task families. Minimum pass rates
+are defined per workflow class to ensure the platform meets the needs of its
+primary audiences.
+
+### Design Operations User
+
+Persona focused on editing, planning, and design assistance workflows.
+
+| Task Family | Description | Minimum Pass Rate |
+|-------------|-------------|-------------------|
+| edit_plan | Move, delete, edit text, add block planning | >= 90% |
+| apply_edit | Confirm and apply a previously planned changeset | >= 90% |
+| design_assist | Suggest improvements, layout optimizations | >= 90% |
+
+**Aggregate requirement:** All three task families must individually meet >= 90%
+pass rate before the Design Operations workflow class is considered ready.
+
+### Construction Drawing User
+
+Persona focused on revision comparison, markup reading, and quantity takeoff.
+
+| Task Family | Description | Minimum Pass Rate |
+|-------------|-------------|-------------------|
+| compare | Diff two drawing revisions, identify changes | >= 85% |
+| markup_interpretation | Detect revision clouds, arrows, markup annotations | >= 85% |
+| takeoff_estimate | Count blocks, measure linear elements | >= 85% |
+
+**Aggregate requirement:** All three task families must individually meet >= 85%
+pass rate before the Construction Drawing workflow class is considered ready.
+
+### General Drawing Review User
+
+Persona focused on querying, summarizing, and searching drawing content.
+
+| Task Family | Description | Minimum Pass Rate |
+|-------------|-------------|-------------------|
+| qna | Layer queries, entity lookups, metadata questions | >= 80% |
+| summary | Drawing summaries, layer/type breakdowns | >= 80% |
+| repeated_condition_search | Find repeated text patterns, block patterns | >= 80% |
+
+**Aggregate requirement:** All three task families must individually meet >= 80%
+pass rate before the General Drawing Review workflow class is considered ready.
+
+---
+
+## 10. Quality Gates (Go/No-Go)
+
+Concrete aggregate thresholds that must be met before merging or releasing.
+Failures at any tier block progression until resolved.
+
+### Per-Tier Gate Criteria
+
+| Tier | Gate | Threshold | On Failure |
+|------|------|-----------|------------|
+| 2 — Golden Trajectory | All trajectories pass | 100% pass rate (deterministic with mock) | Block merge; fix immediately |
+| 3 — Mock Scorecard | All scorecard entries pass | 100% pass rate (deterministic with mock) | Block merge; file issue if systemic |
+| 4 — Live Scorecard | Aggregate pass rate | >= 85% overall, no task family below 70% | Block release; investigate regressions |
+| 5 — End-to-End Workflow | All workflow scenarios | Complete without blockers | Block release; file issue per failing scenario |
+
+### Failure Response Protocol
+
+1. **Tier 2/3 failure (deterministic):** These use mock providers and must be
+   100% reproducible. A failure indicates a code regression, not LLM variance.
+   Block the PR merge. The author must fix before re-requesting review.
+
+2. **Tier 4 failure (live LLM):** LLM variance is expected, but sustained
+   failures indicate prompt or schema regressions. If aggregate drops below 85%
+   or any task family drops below 70%:
+   - Block the release.
+   - Re-run the scorecard 3 times to rule out transient variance.
+   - If failure persists, file an investigation issue with the failing entries
+     and tag the responsible epic owner.
+
+3. **Tier 5 failure (workflow):** A workflow blocker means a user-facing flow is
+   broken end-to-end. Block the release. File an issue per failing scenario
+   with severity `critical`.
+
+### Per-Phase Exit Criteria
+
+| Phase | Exit Gate | "Good Enough to Continue" Criteria |
+|-------|-----------|-----------------------------------|
+| Phase 1 | Contracts + routing foundation | Tier 2: 100%. Tier 3: 100% for `edit_plan` and `qna` families only. No live scorecard required yet. |
+| Phase 2 | Selection + region Q&A + compare | Tier 2: 100%. Tier 3: 100% for all implemented families. Tier 4: >= 80% aggregate (relaxed from 85% — early LLM integration). |
+| Phase 3 | Structured edit + preview/apply | Tier 2: 100%. Tier 3: 100%. Tier 4: >= 85% aggregate, no family below 70%. Design Operations class meets >= 90%. |
+| Phase 4 | Workflow packs (design + construction) | All tiers at full thresholds. All three workflow classes meet their per-class minimums. Tier 5: all scenarios pass. |
+| Phase 5 | Session durability + eval governance | All tiers at full thresholds. Regression detection operational. Scorecard trend data covers >= 30 days. |
+
+---
+
+## 11. Scoring Dimensions
+
+Binary pass/fail is insufficient for tracking quality trends. Each scorecard
+entry is evaluated across multiple dimensions on a 0–1 numeric scale.
+
+### Dimension Definitions
+
+| Dimension | Weight | Scale | Description |
+|-----------|--------|-------|-------------|
+| Intent classification accuracy | 0.20 | 0–1 | Did the router assign the correct `TaskFamily`? 1.0 = exact match, 0.0 = wrong family. |
+| Entity targeting precision | 0.20 | 0–1 | Did operations target the correct entities? 1.0 = all targets correct, 0.0 = all wrong. For non-edit responses, score is 1.0 (not applicable). |
+| Operation correctness | 0.20 | 0–1 | Are the operations valid and semantically correct? 1.0 = all ops correct, 0.0 = all ops wrong. For answer-only responses, score is 1.0. |
+| Response quality | 0.15 | 0–1 | For Q&A: factual correctness of the answer. For edits: completeness of the changeset. 1.0 = fully correct/complete, 0.0 = entirely wrong/missing. |
+| Safety | 0.15 | 0–1 | No operations on protected layers, no destructive unintended side effects. 1.0 = fully safe, 0.0 = violated a protected layer or caused unintended changes. Any safety score below 1.0 forces the entry to fail regardless of composite. |
+| Latency | 0.10 | 0–1 | Response time relative to budget. 1.0 = under 2s, linear decay to 0.0 at 30s. Mock-provider entries always score 1.0. |
+
+### Composite Score
+
+```
+composite = sum(dimension_score * weight for each dimension)
+```
+
+- **Pass threshold:** composite >= 0.70
+- **Safety override:** if `safety < 1.0`, the entry fails regardless of composite
+- **Per-entry output:** all six dimension scores plus the composite are recorded
+
+### Scorecard Result Schema (Extended)
+
+```python
+class ScorecardResult(BaseModel):
+    entry: ScorecardEntry
+    actual_response_type: ResponseType | None
+    actual_op_count: int
+    actual_evidence_count: int
+    passed: bool
+    failure_reason: str | None
+    latency_ms: int
+    # Scoring dimensions (0.0–1.0)
+    score_intent: float
+    score_targeting: float
+    score_operations: float
+    score_quality: float
+    score_safety: float
+    score_latency: float
+    score_composite: float
+```
+
+---
+
+## 12. Regression Detection
+
+### Result Persistence
+
+Scorecard results are persisted as JSON files in `tests/eval/results/` with
+timestamped filenames:
+
+```
+tests/eval/results/
+  scorecard-2026-03-05T14:30:00-mock.json
+  scorecard-2026-03-05T14:35:00-live.json
+```
+
+Each file contains the full list of `ScorecardResult` entries plus run metadata
+(provider, git SHA, timestamp, aggregate scores). These files are committed to
+the repository to maintain a historical record.
+
+### Baseline Establishment
+
+- The first full scorecard run after a phase exit becomes the **baseline** for
+  that phase.
+- Baselines are recorded in `tests/eval/baselines/` as a JSON file per phase:
+  `baseline-phase-1.json`, `baseline-phase-2.json`, etc.
+- Each baseline contains per-task-family aggregate scores and per-dimension
+  averages.
+
+### Regression Definition
+
+A **regression** is detected when any of the following conditions are met
+relative to the most recent baseline:
+
+| Condition | Threshold | Severity |
+|-----------|-----------|----------|
+| Task family aggregate drop | > 5 percentage points from baseline | `warning` if 5–10 points, `critical` if > 10 points |
+| Individual dimension drop (any family) | > 10 percentage points from baseline | `warning` |
+| Safety score drop (any entry) | Any decrease below 1.0 | `critical` (always) |
+| Overall composite drop | > 5 percentage points from baseline | `warning` |
+
+### Alerting
+
+- **CI integration:** The scorecard runner compares results against the active
+  baseline and emits warnings/failures in the test output.
+- **PR blocking:** A `critical` regression blocks the PR merge (same as a
+  Tier 4 gate failure).
+- **Warning behavior:** A `warning` regression does not block merge but is
+  surfaced in the PR check summary. Two consecutive `warning` regressions on
+  the same dimension auto-escalate to `critical`.
+- **Trend tracking:** A summary of per-family scores over the last 10 runs is
+  printed at the end of each scorecard execution to surface gradual drift.
+
+---
+
 ## Related Documents
 
 - 034-AT-AUDT — Capability audit (current test inventory)

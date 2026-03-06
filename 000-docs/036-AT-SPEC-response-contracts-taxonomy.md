@@ -31,6 +31,7 @@ class TaskFamily(str, Enum):
     SUMMARY                  = "summary"                    # Drawing statistics/overview
     TAKEOFF_ESTIMATE         = "takeoff_estimate"           # Quantity/material estimation
     DESIGN_ASSIST            = "design_assist"              # Suggest improvements
+    UNSUPPORTED              = "unsupported_operation"      # Catch-all for unclassifiable prompts
 ```
 
 **Location:** `src/cad_dxf_agent/models/response_schema.py` (proposed)
@@ -124,6 +125,7 @@ Each task family produces a predictable set of response types.
 | `summary` | `answer_only` | — |
 | `takeoff_estimate` | `answer_only` | `needs_clarification` |
 | `design_assist` | `answer_only` or `plan_only` | `needs_clarification` |
+| `unsupported_operation` | `unsupported_operation` | — |
 
 **Invariants:**
 - `answer_only` responses MUST have zero operations
@@ -343,6 +345,20 @@ These rules should be enforced by tests (see 037-TQ-SPEC).
 | **Example prompt** | "Suggest improvements to this floor layout" |
 | **Status** | MISSING (0%) — no suggestion pipeline, domain rules, or improvement heuristics |
 
+### 10.10 Unsupported Operation (`unsupported_operation`)
+
+| Dimension | Detail |
+|-----------|--------|
+| **Intent signals** | Prompt does not match any known task family pattern; or explicitly out-of-scope request |
+| **Inputs** | Raw prompt text (drawing context may or may not be available) |
+| **Outputs** | `unsupported_operation` response with reason code and suggestion |
+| **Confidence model** | Always 1.0 — the system is certain the request is unsupported |
+| **Failure modes** | False positive — a legitimate prompt misclassified as unsupported (router confidence too low for all families). Mitigated by tuning router thresholds and adding `needs_clarification` as an intermediate step. |
+| **Deterministic tooling** | Not required — classification is the router's responsibility |
+| **Example prompt** | "Generate a 3D rendering of this floor plan" |
+| **Example response** | `unsupported_operation` with `data.reason = "unsupported_task"` and helpful suggestion |
+| **Status** | PARTIAL — `unsupported_operation` ResponseType exists, but no dedicated router fallback path yet |
+
 ---
 
 ## 11. Per-Response-Type Detail
@@ -500,6 +516,250 @@ Request cannot be fulfilled by the platform.
 
 **Reasons:** `protected_layer`, `unsupported_entity_type`, `unsupported_task`, `no_drawing_loaded`, `session_expired`.
 **Safety:** No operations executed. Clear explanation of why the request was blocked.
+
+---
+
+## 12. Required vs Optional Fields Matrix
+
+Each `PlatformResponse` field is classified per response type as **REQ** (required — must be present and non-empty), **OPT** (optional — may be present), or **N/A** (not applicable — should be absent or empty).
+
+| Field | `answer_only` | `plan_only` | `preview_edit` | `applied_edit` | `needs_clarification` | `unsupported_operation` |
+|-------|:---:|:---:|:---:|:---:|:---:|:---:|
+| `message` | REQ | REQ | REQ | REQ | REQ | REQ |
+| `data` | REQ | OPT | OPT | OPT | OPT | REQ |
+| `evidence` | REQ (qna, compare) / OPT (others) | OPT | OPT | OPT | OPT | N/A |
+| `operations` | N/A (must be empty) | REQ (>=1) | REQ (>=1) | REQ (>=1) | N/A (must be empty) | N/A (must be empty) |
+| `validation` | N/A | REQ | REQ | REQ (valid=true) | N/A | N/A |
+| `confidence` | REQ | REQ | REQ | REQ | REQ | REQ |
+| `renders` | N/A | N/A | REQ (preview=true) | REQ (edited=true) | N/A | N/A |
+| `warnings` | OPT | OPT (in validation) | OPT (in validation) | OPT (in validation) | OPT | OPT |
+
+**Notes:**
+- `message` is universally required — every response must be explainable in natural language.
+- `data` is required for `answer_only` (carries the answer payload) and `unsupported_operation` (carries reason code). Optional elsewhere for supplemental metadata.
+- `operations` being N/A means the field must be an empty list (`[]`), not absent.
+- `validation` is required for any response that includes operations, even if all checks pass.
+
+---
+
+## 13. Confidence Model
+
+### 13.1 Confidence Sources
+
+Confidence values in `PlatformResponse.confidence` originate from different sources depending on the pipeline stage.
+
+| Source | Description | Produces |
+|--------|-------------|----------|
+| **Router confidence** | How certain the intent classifier is about the selected `TaskFamily` | Float 0.0–1.0 |
+| **LLM confidence** | Self-reported certainty from the LLM provider (when available) | Float 0.0–1.0 |
+| **Validation confidence** | Deterministic — binary pass/fail from the validator | 1.0 (pass) or 0.0 (fail) |
+| **Matching confidence** | Per-entity confidence from the comparison/matching pipeline | Float 0.0–1.0 |
+
+### 13.2 Confidence by Response Type
+
+| ResponseType | Confidence Source | Calculation |
+|-------------|------------------|-------------|
+| `answer_only` | Router + LLM | `min(router_confidence, llm_confidence)` — both must agree |
+| `plan_only` | Router + LLM | `min(router_confidence, llm_confidence)` — entity resolution factors in |
+| `preview_edit` | Router + LLM | Same as `plan_only` |
+| `applied_edit` | Validation | Always 1.0 — validation passed, operations applied successfully |
+| `needs_clarification` | Router | Router confidence that triggered the clarification request |
+| `unsupported_operation` | Router or Validation | 1.0 — the system is certain the request is unsupported or blocked |
+
+### 13.3 Thresholds
+
+| Threshold | Value | Effect |
+|-----------|-------|--------|
+| **Clarification trigger** | Router confidence < 0.5 | Prompt is routed to `needs_clarification` instead of a task family |
+| **Low confidence warning** | confidence < 0.7 | Response includes `data.ambiguity_note` explaining uncertainty |
+| **High confidence** | confidence >= 0.9 | Response is presented without caveats |
+
+### 13.4 Per-Task-Family Acceptable Ranges
+
+| TaskFamily | Typical Range | Notes |
+|-----------|--------------|-------|
+| `qna` | 0.7–1.0 | High when entities found; drops for ambiguous references |
+| `markup_interpretation` | 0.5–0.9 | Depends on markup entity detection quality |
+| `repeated_condition_search` | 0.6–1.0 | Exact text matches = high; fuzzy/spatial = lower |
+| `compare` | 0.6–1.0 | Per-change confidence aggregated to overall |
+| `edit_plan` | 0.7–1.0 | High when entities resolved and ops valid |
+| `apply_edit` | 1.0 | Always 1.0 — validation is binary pass/fail |
+| `summary` | 0.9–1.0 | Deterministic aggregation, always high |
+| `takeoff_estimate` | 0.6–0.9 | Block counts = high; inferred quantities = lower |
+| `design_assist` | 0.4–0.8 | Advisory nature means lower baseline |
+| `unsupported_operation` | 1.0 | Always certain |
+
+### 13.5 Propagation Rules
+
+- **Router confidence** is computed deterministically by the intent classifier (heuristic or hybrid). It is NOT an LLM-generated value.
+- **LLM confidence** is extracted from the provider response when available (e.g., Gemini function-call confidence). If unavailable, defaults to 0.8.
+- **Final confidence** on the `PlatformResponse` is the minimum of all contributing sources — the weakest link determines overall confidence.
+- Confidence values MUST NOT be fabricated. If no meaningful confidence can be computed, the field should be omitted (`None`) rather than set to an arbitrary value.
+
+---
+
+## 14. Schema Versioning
+
+### 14.1 Version Field
+
+The `PlatformResponse` envelope includes a `schema_version` field to support forward-compatible evolution.
+
+```python
+class PlatformResponse(BaseModel):
+    schema_version: str = "1.0"  # Semantic version of the response schema
+    # ... all other fields as defined in section 5
+```
+
+### 14.2 Versioning Rules
+
+1. **Additive-only within a major version.** New optional fields may be added to `PlatformResponse` or `data` payloads without bumping the major version. Existing fields never change type or meaning within a major version.
+2. **Breaking changes require a major version bump.** Removing a field, changing a field's type, renaming a field, or altering enum semantics constitutes a breaking change and requires incrementing the major version (e.g., `1.x` → `2.0`).
+3. **Minor versions for additions.** Adding a new optional field bumps the minor version (e.g., `1.0` → `1.1`). Adding a new `TaskFamily` or `ResponseType` enum value bumps the minor version.
+4. **Clients must tolerate unknown fields.** Pydantic's `model_config = ConfigDict(extra="ignore")` ensures that newer responses with additional fields do not break older clients.
+5. **Version announced in response.** Every `PlatformResponse` includes `schema_version` so clients can detect and adapt to schema changes programmatically.
+
+### 14.3 Migration Path
+
+- v1.0: Initial schema as defined in this document
+- Future additions (new task families, new data fields) increment minor version
+- If the envelope structure itself changes (different discriminator pattern, nested envelopes), that triggers v2.0
+
+---
+
+## 15. Data Payload Schemas for Unimplemented Task Families
+
+These schemas define the target `data` shape for task families not yet implemented. They serve as contracts for future development — implementations MUST conform to these shapes.
+
+### 15.1 Markup Interpretation Data
+
+```python
+{
+    "markups": [
+        {
+            "markup_type": "revision_cloud",       # revision_cloud | arrow | callout | strikethrough
+            "entity_handles": ["4D1", "4D2"],      # Handles of entities forming the markup
+            "layer": "MARKUP",                      # Layer the markup resides on
+            "bounding_box": {"min": [10, 20], "max": [30, 40]},
+            "affected_entities": ["1A3", "2B7"],   # Entities the markup references/surrounds
+            "interpretation": "These walls should be moved 5 units north.",
+            "confidence": 0.75
+        }
+    ],
+    "total_markups": 3,
+    "unresolved_markups": 1,                       # Markups that could not be interpreted
+    "suggested_operations": []                      # Optional: derived edit ops if markup implies changes
+}
+```
+
+**Status:** MISSING — requires EPIC-03 (markup entity detection and interpretation pipeline).
+
+### 15.2 Repeated Condition Search Data
+
+```python
+{
+    "matches": [
+        {
+            "entity_handle": "3C1",
+            "layer": "NOTES",
+            "entity_type": "TEXT",
+            "text_content": "SEE DETAIL A",
+            "location": [45.0, 22.5],
+            "match_type": "exact_text",            # exact_text | fuzzy_text | block_name | spatial_pattern
+            "match_score": 1.0
+        }
+    ],
+    "total_matches": 7,
+    "search_pattern": "SEE DETAIL A",              # The pattern that was searched for
+    "search_scope": {                               # Filters applied during search
+        "layers": null,                             # null = all layers searched
+        "entity_types": ["TEXT", "MTEXT"],
+        "spatial_bounds": null                      # null = entire drawing
+    },
+    "match_methods_used": ["exact_text"]            # Which methods produced results
+}
+```
+
+**Status:** PARTIAL (5%) — literal text search only. Fuzzy, regex, and spatial pattern matching not yet implemented.
+
+### 15.3 Design Assist Data
+
+```python
+{
+    "suggestions": [
+        {
+            "category": "spacing",                 # spacing | alignment | accessibility | code_compliance | efficiency
+            "severity": "recommendation",          # recommendation | warning | critical
+            "description": "Door swing overlaps with adjacent wall segment.",
+            "affected_entities": ["2B7", "1A3"],
+            "suggested_action": "Move door 2B7 by (2, 0) to clear wall 1A3.",
+            "proposed_operations": [               # Optional: concrete ops if suggestion is actionable
+                {"op_type": "move_entity", "target_handle": "2B7", "params": {"dx": 2, "dy": 0}}
+            ],
+            "confidence": 0.6
+        }
+    ],
+    "total_suggestions": 3,
+    "domain": "architectural_floor_plan",          # Detected or user-specified domain context
+    "analysis_scope": "full_drawing"               # full_drawing | selected_region | selected_layer
+}
+```
+
+**Status:** MISSING (0%) — no suggestion pipeline, domain rules, or improvement heuristics.
+
+---
+
+## 16. Risk Model
+
+### 16.1 Risk Level Field
+
+Each `PlatformResponse` carries a `risk_level` field indicating the potential for irreversible or destructive changes.
+
+```python
+class RiskLevel(str, Enum):
+    """Classification of response risk to the user's drawing."""
+    NONE        = "none"          # Read-only, no modification possible
+    LOW         = "low"           # Proposed changes, not yet applied; easily reversible
+    DESTRUCTIVE = "destructive"   # Changes have been applied to a file on disk
+```
+
+```python
+class PlatformResponse(BaseModel):
+    risk_level: RiskLevel = RiskLevel.NONE
+    # ... all other fields as defined in section 5
+```
+
+### 16.2 Risk Classification by Response Type
+
+| ResponseType | Risk Level | Rationale |
+|-------------|-----------|-----------|
+| `answer_only` | `none` | Read-only — no drawing modification possible |
+| `plan_only` | `low` | Proposed operations are not applied; user can discard |
+| `preview_edit` | `low` | Same as `plan_only` — preview renders but does not persist changes |
+| `applied_edit` | `destructive` | Operations applied and written to a new file. Original is preserved (save-as) but the edit is committed. |
+| `needs_clarification` | `none` | No operations executed; informational only |
+| `unsupported_operation` | `none` | No operations executed; request was blocked |
+
+### 16.3 Risk Classification by Task Family
+
+| TaskFamily | Max Risk Level | Notes |
+|-----------|---------------|-------|
+| `qna` | `none` | Always read-only |
+| `markup_interpretation` | `low` | May propose derived edits, never auto-applies |
+| `repeated_condition_search` | `none` | Always read-only search |
+| `compare` | `none` | Read-only diff; revision ops are `plan_only` at most |
+| `edit_plan` | `low` | Proposes but does not apply |
+| `apply_edit` | `destructive` | Applies edits to file (save-as workflow preserves original) |
+| `summary` | `none` | Always read-only |
+| `takeoff_estimate` | `none` | Always read-only |
+| `design_assist` | `low` | May propose edits, never auto-applies |
+| `unsupported_operation` | `none` | No processing occurs |
+
+### 16.4 Safety Invariants
+
+1. **No silent writes.** A response with `risk_level = "destructive"` MUST have been preceded by a `plan_only` or `preview_edit` response that the user explicitly confirmed.
+2. **Original preserved.** Even `destructive` responses use save-as workflow — the original DXF file is never overwritten.
+3. **Protected layers block destructive ops.** Any operation targeting a protected layer (TITLE, TITLEBLOCK, SEAL, REVISION) is rejected before reaching `destructive` risk level.
+4. **Risk level is deterministic.** It is set by the response formatter based on `response_type`, never by the LLM.
 
 ---
 

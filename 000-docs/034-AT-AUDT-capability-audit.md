@@ -188,21 +188,56 @@ Ranked by impact on Design Operations and Construction Drawing workflows.
 ## 5. User Workflow Capability Matrix
 
 Capability score per user workflow class. Each task family scored for how well
-the current system serves that specific user type.
+the current system serves that specific user type. Target state defines "done"
+for each capability per user type.
 
-| # | Task Family | Design Ops User | Construction Drawing User | General Review User |
-|---|------------|-----------------|--------------------------|---------------------|
-| 1 | Edit (move/delete/text/block) | 75% — Gemini multi-turn works, protected layers enforced | 70% — same tools but redline markup input missing | 65% — query tools usable but edit risky without domain training |
-| 2 | Q&A | 15% — no intent router, edit ops returned for questions | 10% — same gap, construction specs unclear | 40% — DrawingContext serializable but no answer-only path |
-| 3 | Compare | 80% — full revision pipeline (upload/align/approve/apply/bundle) | 85% — revision workflow matches construction redline process well | 70% — diff available but approval workflow may confuse casual users |
-| 4 | Markup Interpretation | 5% — no redline/cloud input | 0% — critical gap for construction redlines | 5% — no markup detection |
-| 5 | Repeated Condition Search | 10% — text search token-only, no pattern matching | 15% — no multi-layer spatial search | 20% — can list entities by layer via query tools |
-| 6 | Summary | 25% — file_info on upload, no formatted summary | 20% — same | 50% — layers/counts shown in UI |
-| 7 | Takeoff/Estimate | 0% — missing | 5% — entity count available but no quantity logic | 0% — missing |
-| 8 | Design Assist | 5% — missing | 0% — missing | 0% — missing |
-| 9 | Apply Edit | 85% — apply endpoint, validation, rendering, download | 75% — same but no approval workflow for edits (only revisions) | 70% — requires understanding of operations |
+**Categorical labels:** 0–20% = unsupported, 21–50% = risky/unclear,
+51–75% = partially supported, 76–100% = supported.
 
-**Overall scores:** Design Ops 33%, Construction Drawing 31%, General Review 36%.
+### Design Ops User
+
+| # | Task Family | Current | Label | Target | Target Label |
+|---|------------|---------|-------|--------|--------------|
+| 1 | Edit (move/delete/text/block) | 75% | partially supported | 95% | supported — full multi-turn edit with undo, bulk ops, and V2 entity types |
+| 2 | Q&A | 15% | unsupported | 85% | supported — intent-routed Q&A with evidence citations from entities |
+| 3 | Compare | 80% | supported | 95% | supported — cross-operation conflict checks, visual diff preview |
+| 4 | Markup Interpretation | 5% | unsupported | 80% | supported — redline/cloud detection from uploaded markup images |
+| 5 | Repeated Condition Search | 10% | unsupported | 80% | supported — regex + spatial pattern search across layers |
+| 6 | Summary | 25% | risky/unclear | 85% | supported — formatted statistics with layer/type breakdowns |
+| 7 | Takeoff/Estimate | 0% | unsupported | 70% | partially supported — quantity extraction for common element types |
+| 8 | Design Assist | 5% | unsupported | 60% | partially supported — code-compliance suggestions for known domains |
+| 9 | Apply Edit | 85% | supported | 95% | supported — streaming apply with rollback on failure |
+
+### Construction Drawing User
+
+| # | Task Family | Current | Label | Target | Target Label |
+|---|------------|---------|-------|--------|--------------|
+| 1 | Edit (move/delete/text/block) | 70% | partially supported | 90% | supported — redline markup as edit input, approval workflow for edits |
+| 2 | Q&A | 10% | unsupported | 85% | supported — construction-spec-aware answers with reference citations |
+| 3 | Compare | 85% | supported | 95% | supported — automated revision numbering, transmittal-ready bundles |
+| 4 | Markup Interpretation | 0% | unsupported | 90% | supported — primary workflow; cloud/delta/revision triangle detection |
+| 5 | Repeated Condition Search | 15% | unsupported | 85% | supported — find all instances of detail/condition across sheets |
+| 6 | Summary | 20% | unsupported | 85% | supported — drawing register integration, scope-of-work summaries |
+| 7 | Takeoff/Estimate | 5% | unsupported | 75% | partially supported — BOQ extraction for structural/architectural elements |
+| 8 | Design Assist | 0% | unsupported | 50% | risky/unclear — code-check suggestions (limited domain coverage) |
+| 9 | Apply Edit | 75% | partially supported | 90% | supported — approval workflow for edits matching revision process |
+
+### General Review User
+
+| # | Task Family | Current | Label | Target | Target Label |
+|---|------------|---------|-------|--------|--------------|
+| 1 | Edit (move/delete/text/block) | 65% | partially supported | 85% | supported — guided edit wizard, confirmation prompts for destructive ops |
+| 2 | Q&A | 40% | risky/unclear | 90% | supported — natural language answers without needing CAD expertise |
+| 3 | Compare | 70% | partially supported | 90% | supported — simplified diff view with plain-language change summary |
+| 4 | Markup Interpretation | 5% | unsupported | 60% | partially supported — basic redline detection for review comments |
+| 5 | Repeated Condition Search | 20% | unsupported | 70% | partially supported — text search with fuzzy matching |
+| 6 | Summary | 50% | risky/unclear | 90% | supported — dashboard-style overview accessible to non-engineers |
+| 7 | Takeoff/Estimate | 0% | unsupported | 40% | risky/unclear — high-level counts only, no domain-specific quantities |
+| 8 | Design Assist | 0% | unsupported | 30% | risky/unclear — generic suggestions, limited without domain expertise |
+| 9 | Apply Edit | 70% | partially supported | 85% | supported — simplified apply with clear rollback option |
+
+**Overall current scores:** Design Ops 33%, Construction Drawing 31%, General Review 36%.
+**Overall target scores:** Design Ops 83%, Construction Drawing 83%, General Review 71%.
 
 ---
 
@@ -291,3 +326,169 @@ All API calls via `fetch()` in `web/frontend/src/lib/api.js`.
 | Tests | ~1351 | Unit ~1069, integration ~78, web ~123, benchmark ~15, GUI ~10, property ~7, smoke ~7, live varies |
 | Settings | 31 | Environment variables (all CAD_* prefixed) |
 | Coverage | 65% | Threshold in pyproject.toml |
+
+---
+
+## 10. Scale Risks
+
+Production deployment risks that emerge under load or multi-instance scenarios.
+
+| # | Risk | Impact | Detail |
+|---|------|--------|--------|
+| 1 | **In-memory session store** | No horizontal scaling | `SessionManager` is a process-local dict. A second Cloud Run instance sees no sessions from the first. Sticky sessions or external state store required for >1 instance. |
+| 2 | **Ephemeral `/tmp` on Cloud Run** | Data loss on restart | All DXF files, renders, and bundles live under `/tmp/cad-sessions/`. Cloud Run instances can be evicted at any time; ~2 GB tmpfs limit means large files or many concurrent sessions can exhaust storage. |
+| 3 | **Synchronous matplotlib rendering** | Event loop blocking | `renderer.py` calls matplotlib synchronously. On the async FastAPI backend this blocks the event loop for the duration of the render (seconds for complex drawings), starving other requests. |
+| 4 | **No rate limiting or request queuing** | Resource exhaustion | Any authenticated user can fire unlimited `/api/plan` or `/api/compare` requests. No middleware throttle, no per-user queue, no backpressure signal. |
+| 5 | **Gemini API rate limits not handled** | Silent failures under load | Vertex AI enforces per-project QPM/TPM quotas. The planner retry loop catches generic exceptions but does not detect or back off from 429 rate-limit responses specifically. |
+| 6 | **No background session cleanup daemon** | Disk leak | Session TTL (2 h) is enforced lazily on `.get()` only. If no one fetches an expired session, its `/tmp` directory remains until the container is evicted. No background sweep. |
+| 7 | **All state lost on container restart** | Workflow interruption | In-memory sessions, DrawingContexts, conversation histories, and pending ChangeSets vanish when the container is replaced. Users lose work with no warning or recovery path. |
+| 8 | **Cloud Run default concurrency (80) with CPU-bound sync ops** | Throughput collapse | Planner calls and matplotlib renders are CPU-bound and synchronous. At concurrency 80, a few long-running plans can saturate the single vCPU, causing timeouts for queued requests. |
+| 9 | **No streaming for long-running LLM operations** | Poor perceived latency | `/api/plan` blocks until the full ChangeSet is returned (up to `planner_timeout` seconds). No SSE/WebSocket streaming means the frontend shows a spinner with no progress indication. |
+
+---
+
+## 11. LLM Touchpoint Catalog
+
+All LLM and pseudo-LLM components that participate in the prompt-to-changeset flow.
+
+| Component | Module | API | Auth Model | When Used | Known Failure Modes |
+|-----------|--------|-----|-----------|-----------|---------------------|
+| **deterministic_planner** | `llm/deterministic_planner.py` | None (regex) | N/A | Always — first-try bypass before any LLM call | Returns `None` for prompts that don't match rigid patterns; false positives on ambiguous phrasing |
+| **MockProvider** | `llm/mock_provider.py` | None (keyword match) | N/A | CI tests, smoke tests, fallback when SDK missing | Returns empty ChangeSet for unrecognized keywords; no multi-turn support |
+| **GeminiProvider** | `llm/gemini_provider.py` | Vertex AI `GenerativeModel` | ADC (Application Default Credentials) | Dev, prod (one-shot mode) | Safety filter blocks (`ValueError`), empty response, JSON parse failure, Vertex import missing |
+| **AgentProvider** | `llm/agent_provider.py` | Vertex AI function calling | ADC | Prod (tool-use loop, up to 10 turns) | Infinite loop (capped at `MAX_AGENT_TURNS=10`), per-turn timeout, tool dispatch errors, vision describer failure |
+| **MockAgentProvider** | `llm/agent_provider.py` | None (scripted tool calls) | N/A | CI tests for tool-use flow | Only handles simple move/delete/text; context reconstruction may fail on missing fields |
+| **GeminiKeyProvider** | `llm/gemini_key_provider.py` | Public Gemini API (`google-generativeai` SDK) | API key (`CAD_GEMINI_API_KEY`) | Desktop users without GCP credentials | API key leak risk, no Vertex-specific features (grounding, tuning), rate limits differ from Vertex |
+| **ProxyAgentProvider** | `llm/proxy_client.py` | Cloud Run proxy (HTTP) | License key header | Desktop app via proxy | Proxy downtime, license validation failure, network latency added, double-hop timeout risk |
+
+**Orchestration:** `planner.py:run_planner()` drives the flow: deterministic check → provider
+selection via `get_provider()` → `_call_with_timeout()` with `ThreadPoolExecutor` → optional
+validation feedback loop (re-call LLM with blockers) → retry with exponential backoff on failure.
+Raises `PlannerTimeoutError` on wall-clock timeout, `PlannerRetryExhaustedError` when all
+retry attempts fail.
+
+---
+
+## 12. Backend Architecture
+
+### FastAPI App Structure
+
+The web backend (`web/backend/main.py`) is a single FastAPI application deployed as one
+Cloud Run container. Key structural elements:
+
+- **Lifespan handler** — initializes logging and OpenTelemetry on startup
+- **CORS middleware** — allows Firebase Hosting origins (`cad-dxf-agent.web.app`,
+  `cad-dxf-agent.firebaseapp.com`) plus `localhost:3000`/`localhost:5173` for dev;
+  custom origin via `CAD_WEB_CORS_ORIGIN` env var
+- **Request logging middleware** — logs method, path, status code, and duration for
+  every request; warnings for 4xx/5xx
+- **19 endpoints** — grouped by workflow: upload, plan, apply, compare, revision
+  (upload/align/diff/approve/apply/download), render, download, health
+
+### Auth Dependency Chain
+
+All protected endpoints use FastAPI's `Depends(get_user)` which resolves to
+`get_licensed_user()` in `web/backend/auth.py`:
+
+1. **`verify_token(request)`** — extracts `Authorization: Bearer <token>`, calls
+   `firebase_admin.auth.verify_id_token()`. Returns decoded token dict (`uid`, `email`).
+   Bypassed when `CAD_WEB_DEV_MODE=1`.
+2. **`check_license(user)`** — queries Firestore `licenses/{uid}` for `active: true`.
+   Results cached 5 min (`_license_cache` dict). Anonymous users bypass license check.
+   **Fails closed** — Firestore errors return 403, not 200.
+3. **`get_licensed_user(request)`** — composes `verify_token` then `check_license`.
+
+### Cloud Run Deployment Model
+
+- **Single container** — one Docker image, no sidecar
+- **Ephemeral filesystem** — `/tmp` is tmpfs (~2 GB), lost on instance replacement
+- **Concurrency** — default 80 concurrent requests per instance
+- **CPU** — 1 vCPU, 1 GiB memory (set in deploy command)
+- **Timeout** — 300 s per request
+- **Auto-scaling** — 0 to N instances (scale to zero enabled)
+- **Service account** — `cad-dxf-web-run@cad-dxf-agent.iam.gserviceaccount.com`
+
+### SessionManager Singleton
+
+`session_mgr = SessionManager()` is instantiated at module level in `main.py`. It is a
+plain Python object with no persistence backend:
+
+- `create(user_id)` — generates 16-char UUID, creates `/tmp/cad-sessions/{id}/` directory
+- `get(session_id)` — returns `Session` dataclass or `None` (lazy TTL expiration on access)
+- All session state (DrawingContext, ChangeSet, conversation history, comparison result,
+  approval set) lives in the `Session` dataclass's fields — all in-memory
+
+---
+
+## 13. Pipeline Step-by-Step Flows
+
+### Edit Pipeline
+
+```
+1. Upload         POST /api/upload → save to /tmp/cad-sessions/{id}/original.dxf
+                  (PDF/DWG auto-converted via converter.py)
+2. Load           ezdxf.readfile() → DXF document object
+3. Context build  dxf_reader.load_dxf() → DrawingContext (entities, layers, blocks)
+                  semantic_model.build_planner_context() → JSON dict (capped at 500 entities)
+4. Deterministic  deterministic_planner.deterministic_plan() — regex match for trivial ops
+   check          Returns ChangeSet directly if matched, skipping LLM entirely
+5. LLM plan       provider.plan(prompt, context_dict) → ChangeSet
+                  AgentProvider: multi-turn tool-use loop (query → edit → query → ...)
+                  GeminiProvider: one-shot JSON generation with optional PNG
+6. Validate       validators.validate_changeset(changeset, context, rule_config)
+                  Checks: entity existence, protected layers, numeric validity, move distance
+7. Retry loop     If blockers found: format errors → re-call LLM with corrective prompt
+                  Up to planner_max_validation_retries attempts
+8. Preview        preview_model.generate_preview() → human-readable operation descriptions
+                  Sent to frontend for user review before apply
+9. Apply          edit_engine.apply_changeset() → modified DXF document
+                  Each EditOperation applied to working copy via ezdxf
+10. Revision      revision_notes.insert_notes() → AI_REV_NOTES layer entries
+    notes         Deterministic text from operation metadata (never LLM-generated)
+11. Save          dxf_writer.save_dxf() → /tmp/cad-sessions/{id}/edited.dxf
+                  Original file untouched (save-as workflow)
+```
+
+### Compare Pipeline
+
+```
+1. Extract        geometry.extract_snapshots(master) → list[GeometrySnapshot]
+   snapshots      geometry.extract_snapshots(revision) → list[GeometrySnapshot]
+                  Each snapshot: entity type, vertices/points, layer, text, attributes
+2. Titleblock     geometry.detect_titleblock_region(master_snaps) → BBox | None
+   detect         Auto-excludes titleblock area from comparison to reduce noise
+3. Canonical IDs  canonical.assign_stable_ids(snaps) → snaps with content-hash IDs
+                  canonical.sort_snapshots(snaps) → deterministic ordering
+                  Ensures comparison results are reproducible across runs
+4. Align          alignment.align_drawings(master, revision, config) → AlignmentResult
+                  Alignment ladder: identity → centroid → ICP → manual control points
+                  alignment.apply_alignment(revision, result) → transformed snapshots
+5. Match          matcher.match_entities(master, revision, config) → MatchResult
+                  Pairs master↔revision entities by type + proximity + similarity
+                  Produces: matched pairs, master-only (deleted), revision-only (added)
+6. Classify       classifier.classify_changes(match_result, config) → ClassifiedResult
+                  Each pair → change type: MOVE, MODIFY_GEOMETRY, MODIFY_TEXT,
+                  MODIFY_ATTRIBUTES, or UNCHANGED
+                  Unmatched master → DELETE, unmatched revision → ADD
+7. Changelog      changelog.generate_changelog(result) → ChangeLog
+                  JSON + plain-text summary of all classified changes
+8. Overlay        diff_overlay.write_diff_overlay(master, result, output) → DXF
+                  Color-coded layers: green=added, red=deleted, yellow=modified
+```
+
+---
+
+## 14. Extended Failure Modes
+
+Additions to the failure points listed in section 3.
+
+| # | Failure Mode | Trigger | Impact | Mitigation |
+|---|-------------|---------|--------|------------|
+| 6 | **PlannerTimeoutError** | LLM call exceeds `planner_timeout` (default 120 s) | Request fails with 500; user must retry manually | `_call_with_timeout()` uses `ThreadPoolExecutor` with wall-clock limit; not retryable |
+| 7 | **PlannerRetryExhaustedError** | All `planner_max_retries` attempts fail (API errors, malformed responses) | Request fails with 500; last error propagated | Exponential backoff between retries; configurable via `CAD_PLANNER_MAX_RETRIES` |
+| 8 | **Vision pipeline silent fallback** | `describe_drawing()` fails (matplotlib import missing, render crash, Gemini Flash error) | Agent proceeds with entity JSON only — no visual context; may produce lower-quality plans | `vision_describer.py` is optional; `pipeline_worker.py` logs warning and continues without image |
+| 9 | **Firebase auth failure** | Firebase Admin SDK init fails, token expired/revoked, network error to Google Identity | 401 returned; user cannot access any endpoint | `verify_token()` catches all exceptions and returns generic 401; no retry or token refresh on backend |
+| 10 | **Firestore license fail-closed** | Firestore unreachable, permission denied, or timeout | 403 returned even for licensed users — service effectively down for paid users | `check_license()` explicitly fails closed (`raise HTTPException(403)`); cache mitigates for 5 min |
+| 11 | **ODA converter missing** | DWG upload on system without ODA File Converter installed | DWG conversion fails; cloud API fallback not yet implemented | `_convert_dwg()` returns `ConversionResult(success=False)` with install instructions |
+| 12 | **Concurrent session mutation** | Two requests modify the same session simultaneously (e.g., plan + apply race) | Undefined behavior — ChangeSet may be overwritten mid-apply, partial state corruption | No locking on `Session` dataclass; single-user assumption baked in |
+| 13 | **Large file memory pressure** | DXF with 10k+ entities uploaded; multiple concurrent sessions | OOM on 1 GiB Cloud Run instance; `extract_snapshots()` holds all geometry in memory | 500-entity cap in semantic model limits planner context but full DXF still loaded |
