@@ -55,10 +55,10 @@ pre-commit install
 ### Run Tests (Mock Mode — No API Key Needed)
 
 ```bash
-# All tests (~573 tests)
+# All tests (~1375 tests)
 make test
 
-# With coverage (68%+)
+# With coverage (95%)
 make test-cov
 
 # Web API tests only
