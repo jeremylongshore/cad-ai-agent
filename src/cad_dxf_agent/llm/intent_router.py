@@ -124,7 +124,7 @@ _RULES: list[HeuristicRule] = [
     HeuristicRule(
         family=TaskFamily.SUMMARY,
         patterns=(
-            r"\bsummar",
+            r"\bsummar(y|ize|ise)\b",
             r"\boverview\b",
             r"\bdescribe\b",
             r"\bstatistics\b",
