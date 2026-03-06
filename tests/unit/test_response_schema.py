@@ -7,6 +7,7 @@ import json
 from cad_dxf_agent.models.response_schema import (
     AuditMetadata,
     EvidenceRef,
+    PlatformRequest,
     PlatformResponse,
     ResponseType,
     RiskLevel,
@@ -19,8 +20,8 @@ from cad_dxf_agent.models.response_schema import (
 
 
 class TestTaskFamily:
-    def test_has_10_members(self):
-        assert len(TaskFamily) == 10
+    def test_has_11_members(self):
+        assert len(TaskFamily) == 11
 
     def test_all_values_are_lowercase(self):
         for member in TaskFamily:
@@ -47,6 +48,7 @@ class TestTaskFamily:
             "compare",
             "markup_interpretation",
             "edit_plan",
+            "apply_edit",
             "takeoff_estimate",
             "repeated_condition",
             "design_assist",
@@ -57,6 +59,9 @@ class TestTaskFamily:
         }
         assert {f.value for f in TaskFamily} == expected
 
+    def test_apply_edit_exists(self):
+        assert TaskFamily.APPLY_EDIT == "apply_edit"
+
 
 # ---------------------------------------------------------------------------
 # ResponseType enum
@@ -64,8 +69,8 @@ class TestTaskFamily:
 
 
 class TestResponseType:
-    def test_has_6_members(self):
-        assert len(ResponseType) == 6
+    def test_has_7_members(self):
+        assert len(ResponseType) == 7
 
     def test_plan_only_exists(self):
         assert ResponseType.PLAN_ONLY == "plan_only"
@@ -73,13 +78,23 @@ class TestResponseType:
     def test_all_expected_types_present(self):
         expected = {
             "plan_only",
-            "plan_applied",
-            "answer",
+            "preview_edit",
+            "applied_edit",
+            "answer_only",
             "comparison_result",
             "needs_clarification",
             "unsupported_operation",
         }
         assert {r.value for r in ResponseType} == expected
+
+    def test_answer_only_not_answer(self):
+        assert hasattr(ResponseType, "ANSWER_ONLY")
+
+    def test_preview_edit_exists(self):
+        assert ResponseType.PREVIEW_EDIT == "preview_edit"
+
+    def test_applied_edit_exists(self):
+        assert ResponseType.APPLIED_EDIT == "applied_edit"
 
 
 # ---------------------------------------------------------------------------
@@ -88,12 +103,16 @@ class TestResponseType:
 
 
 class TestRiskLevel:
-    def test_has_3_members(self):
-        assert len(RiskLevel) == 3
+    def test_has_4_members(self):
+        assert len(RiskLevel) == 4
 
     def test_ordering(self):
+        assert RiskLevel.NONE.value == "none"
         assert RiskLevel.LOW.value == "low"
         assert RiskLevel.HIGH.value == "high"
+
+    def test_none_level_exists(self):
+        assert RiskLevel.NONE == "none"
 
 
 # ---------------------------------------------------------------------------
@@ -111,6 +130,19 @@ class TestEvidenceRef:
         ref = EvidenceRef(entity_handle="A1", layer="WALLS", description="moved 5 units")
         assert ref.entity_handle == "A1"
         assert ref.layer == "WALLS"
+
+    def test_extended_fields(self):
+        ref = EvidenceRef(
+            entity_handle="B2",
+            layer="DOORS",
+            description="door entity",
+            entity_type="INSERT",
+            location=(50.0, 100.0),
+            text_excerpt="DOOR-101",
+        )
+        assert ref.entity_type == "INSERT"
+        assert ref.location == (50.0, 100.0)
+        assert ref.text_excerpt == "DOOR-101"
 
 
 # ---------------------------------------------------------------------------
@@ -154,6 +186,54 @@ class TestAuditMetadata:
         audit = AuditMetadata(router_source="heuristic", router_confidence=0.95)
         assert audit.router_source == "heuristic"
         assert audit.router_confidence == 0.95
+
+
+# ---------------------------------------------------------------------------
+# PlatformRequest
+# ---------------------------------------------------------------------------
+
+
+class TestPlatformRequest:
+    def test_minimal_request(self):
+        req = PlatformRequest(prompt="move wall", session_id="sess-1")
+        assert req.prompt == "move wall"
+        assert req.session_id == "sess-1"
+        assert req.request_id  # auto-generated
+        assert req.schema_version == "1.0"
+
+    def test_auto_generated_request_id(self):
+        r1 = PlatformRequest(prompt="a", session_id="s")
+        r2 = PlatformRequest(prompt="a", session_id="s")
+        assert r1.request_id != r2.request_id
+
+    def test_optional_fields_default_empty(self):
+        req = PlatformRequest(prompt="test", session_id="s")
+        assert req.task_family is None
+        assert req.selected_regions == []
+        assert req.drawing_references == []
+        assert req.comparison_references == []
+        assert req.markup_references == []
+        assert req.client_metadata == {}
+
+    def test_full_request(self):
+        req = PlatformRequest(
+            prompt="compare drawings",
+            session_id="sess-1",
+            task_family=TaskFamily.COMPARE,
+            selected_regions=[{"x": 0, "y": 0, "w": 100, "h": 100}],
+            drawing_references=["master.dxf"],
+            comparison_references=["revision.dxf"],
+            client_metadata={"source": "web"},
+        )
+        assert req.task_family == TaskFamily.COMPARE
+        assert len(req.selected_regions) == 1
+        assert req.drawing_references == ["master.dxf"]
+
+    def test_json_serialization(self):
+        req = PlatformRequest(prompt="test", session_id="s")
+        data = json.loads(req.model_dump_json())
+        assert "request_id" in data
+        assert data["schema_version"] == "1.0"
 
 
 # ---------------------------------------------------------------------------
@@ -251,3 +331,65 @@ class TestPlatformResponse:
             operations=[{"op_type": "added", "description": "new wall"}],
         )
         assert resp.response_type == ResponseType.COMPARISON_RESULT
+
+    def test_schema_version_default(self):
+        resp = PlatformResponse(
+            task_family=TaskFamily.EDIT_PLAN,
+            response_type=ResponseType.PLAN_ONLY,
+            message="test",
+        )
+        assert resp.schema_version == "1.0"
+
+    def test_confidence_field(self):
+        resp = PlatformResponse(
+            task_family=TaskFamily.EDIT_PLAN,
+            response_type=ResponseType.PLAN_ONLY,
+            message="test",
+            confidence=0.95,
+        )
+        assert resp.confidence == 0.95
+
+    def test_ambiguity_flags(self):
+        resp = PlatformResponse(
+            task_family=TaskFamily.EDIT_PLAN,
+            response_type=ResponseType.PLAN_ONLY,
+            message="test",
+            ambiguity_flags=["low_confidence", "multiple_matches"],
+        )
+        assert "low_confidence" in resp.ambiguity_flags
+        assert len(resp.ambiguity_flags) == 2
+
+    def test_data_payload(self):
+        resp = PlatformResponse(
+            task_family=TaskFamily.QNA,
+            response_type=ResponseType.ANSWER_ONLY,
+            message="42 entities on WALLS",
+            data={"entity_count": 42, "layer": "WALLS"},
+        )
+        assert resp.data["entity_count"] == 42
+
+    def test_session_id_field(self):
+        resp = PlatformResponse(
+            task_family=TaskFamily.EDIT_PLAN,
+            response_type=ResponseType.PLAN_ONLY,
+            message="test",
+            session_id="sess-123",
+        )
+        assert resp.session_id == "sess-123"
+
+    def test_preview_edit_type(self):
+        resp = PlatformResponse(
+            task_family=TaskFamily.EDIT_PLAN,
+            response_type=ResponseType.PREVIEW_EDIT,
+            message="Preview of proposed changes",
+        )
+        assert resp.response_type == ResponseType.PREVIEW_EDIT
+
+    def test_applied_edit_type(self):
+        resp = PlatformResponse(
+            task_family=TaskFamily.APPLY_EDIT,
+            response_type=ResponseType.APPLIED_EDIT,
+            message="Changes applied",
+        )
+        assert resp.response_type == ResponseType.APPLIED_EDIT
+        assert resp.task_family == TaskFamily.APPLY_EDIT

@@ -45,6 +45,16 @@ class TestCapabilityRegistry:
         assert TaskFamily.UNSUPPORTED not in unimplemented
         assert TaskFamily.EDIT_PLAN not in unimplemented
 
+    def test_apply_edit_not_enabled_by_default(self):
+        reg = CapabilityRegistry(enabled=frozenset({TaskFamily.EDIT_PLAN, TaskFamily.COMPARE}))
+        assert not reg.is_implemented(TaskFamily.APPLY_EDIT)
+
+    def test_apply_edit_can_be_enabled(self):
+        reg = CapabilityRegistry(
+            enabled=frozenset({TaskFamily.EDIT_PLAN, TaskFamily.COMPARE, TaskFamily.APPLY_EDIT})
+        )
+        assert reg.is_implemented(TaskFamily.APPLY_EDIT)
+
     def test_settings_override(self, monkeypatch):
         """CAD_ENABLED_TASK_FAMILIES env var overrides defaults."""
         monkeypatch.setenv("CAD_ENABLED_TASK_FAMILIES", "edit_plan,qna,summary")

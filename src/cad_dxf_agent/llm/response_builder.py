@@ -104,8 +104,45 @@ class ResponseBuilder:
         """Build an answer response (Q&A, summary, etc.)."""
         return PlatformResponse(
             task_family=family,
-            response_type=ResponseType.ANSWER,
+            response_type=ResponseType.ANSWER_ONLY,
             message=message,
+            audit=audit or AuditMetadata(),
+        )
+
+    @staticmethod
+    def preview_edit(
+        *,
+        operations: list[dict[str, Any]],
+        message: str,
+        validation: dict[str, Any] | None = None,
+        audit: AuditMetadata | None = None,
+        risk_level: RiskLevel | None = None,
+    ) -> PlatformResponse:
+        """Build a preview_edit response (proposed edit with diff preview)."""
+        return PlatformResponse(
+            task_family=TaskFamily.EDIT_PLAN,
+            response_type=ResponseType.PREVIEW_EDIT,
+            message=message,
+            operations=operations,
+            validation=validation,
+            risk_level=_infer_risk(operations, risk_level),
+            audit=audit or AuditMetadata(),
+        )
+
+    @staticmethod
+    def applied_edit(
+        *,
+        operations: list[dict[str, Any]],
+        message: str,
+        audit: AuditMetadata | None = None,
+    ) -> PlatformResponse:
+        """Build an applied_edit response (edit was executed and saved)."""
+        return PlatformResponse(
+            task_family=TaskFamily.APPLY_EDIT,
+            response_type=ResponseType.APPLIED_EDIT,
+            message=message,
+            operations=operations,
+            risk_level=RiskLevel.NONE,
             audit=audit or AuditMetadata(),
         )
 
