@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import json
 
-import pytest
-
 from cad_dxf_agent.models.response_schema import (
     AuditMetadata,
     EvidenceRef,
@@ -14,7 +12,6 @@ from cad_dxf_agent.models.response_schema import (
     RiskLevel,
     TaskFamily,
 )
-
 
 # ---------------------------------------------------------------------------
 # TaskFamily enum
@@ -47,9 +44,16 @@ class TestTaskFamily:
 
     def test_all_expected_families_present(self):
         expected = {
-            "compare", "markup_interpretation", "edit_plan",
-            "takeoff_estimate", "repeated_condition", "design_assist",
-            "summary", "qna", "needs_clarification", "unsupported",
+            "compare",
+            "markup_interpretation",
+            "edit_plan",
+            "takeoff_estimate",
+            "repeated_condition",
+            "design_assist",
+            "summary",
+            "qna",
+            "needs_clarification",
+            "unsupported",
         }
         assert {f.value for f in TaskFamily} == expected
 
@@ -68,8 +72,12 @@ class TestResponseType:
 
     def test_all_expected_types_present(self):
         expected = {
-            "plan_only", "plan_applied", "answer",
-            "comparison_result", "needs_clarification", "unsupported_operation",
+            "plan_only",
+            "plan_applied",
+            "answer",
+            "comparison_result",
+            "needs_clarification",
+            "unsupported_operation",
         }
         assert {r.value for r in ResponseType} == expected
 

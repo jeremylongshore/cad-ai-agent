@@ -45,75 +45,111 @@ _RULES: list[HeuristicRule] = [
     HeuristicRule(
         family=TaskFamily.COMPARE,
         patterns=(
-            r"\bcompare\b", r"\bdiff\b", r"\bwhat\s+changed\b",
-            r"\brevision\b", r"\bdifference", r"\bchanges?\s+between\b",
+            r"\bcompare\b",
+            r"\bdiff\b",
+            r"\bwhat\s+changed\b",
+            r"\brevision\b",
+            r"\bdifference",
+            r"\bchanges?\s+between\b",
         ),
     ),
     # Priority 2: Markup interpretation
     HeuristicRule(
         family=TaskFamily.MARKUP_INTERPRETATION,
         patterns=(
-            r"\bmarkup\b", r"\bcloud\b", r"\bredline\b",
-            r"\brevision\s+cloud\b", r"\bdelta\s+cloud\b",
+            r"\bmarkup\b",
+            r"\bcloud\b",
+            r"\bredline\b",
+            r"\brevision\s+cloud\b",
+            r"\bdelta\s+cloud\b",
         ),
     ),
     # Priority 3: Edit plan
     HeuristicRule(
         family=TaskFamily.EDIT_PLAN,
         patterns=(
-            r"\bmove\b", r"\bshift\b", r"\bdelete\b", r"\bremove\b",
-            r"\bchange\s+text\b", r"\brename\b", r"\badd\b", r"\binsert\b",
-            r"\brelocate\b", r"\breplace\b", r"\bmodify\b", r"\bedit\b",
-            r"\bupdate\b", r"\brotate\b", r"\bscale\b",
+            r"\bmove\b",
+            r"\bshift\b",
+            r"\bdelete\b",
+            r"\bremove\b",
+            r"\bchange\s+text\b",
+            r"\brename\b",
+            r"\badd\b",
+            r"\binsert\b",
+            r"\brelocate\b",
+            r"\breplace\b",
+            r"\bmodify\b",
+            r"\bedit\b",
+            r"\bupdate\b",
+            r"\brotate\b",
+            r"\bscale\b",
         ),
     ),
     # Priority 4: Takeoff / estimation
     HeuristicRule(
         family=TaskFamily.TAKEOFF_ESTIMATE,
         patterns=(
-            r"\btakeoff\b", r"\bquantity\b", r"\bestimate\b",
-            r"\bcount\s+all\b", r"\bbill\s+of\b", r"\bmaterial\s+list\b",
+            r"\btakeoff\b",
+            r"\bquantity\b",
+            r"\bestimate\b",
+            r"\bcount\s+all\b",
+            r"\bbill\s+of\b",
+            r"\bmaterial\s+list\b",
         ),
     ),
     # Priority 5: Repeated condition
     HeuristicRule(
         family=TaskFamily.REPEATED_CONDITION,
         patterns=(
-            r"\bfind\s+all\b", r"\bevery\s+instance\b", r"\brecurring\b",
-            r"\bpattern\b", r"\brepeated\b", r"\ball\s+instances\b",
+            r"\bfind\s+all\b",
+            r"\bevery\s+instance\b",
+            r"\brecurring\b",
+            r"\bpattern\b",
+            r"\brepeated\b",
+            r"\ball\s+instances\b",
         ),
     ),
     # Priority 6: Design assist
     HeuristicRule(
         family=TaskFamily.DESIGN_ASSIST,
         patterns=(
-            r"\bsuggest\b", r"\bimprove\b", r"\boptimize\b",
-            r"\brecommend\b", r"\bbetter\s+layout\b",
+            r"\bsuggest\b",
+            r"\bimprove\b",
+            r"\boptimize\b",
+            r"\brecommend\b",
+            r"\bbetter\s+layout\b",
         ),
     ),
     # Priority 7: Summary
     HeuristicRule(
         family=TaskFamily.SUMMARY,
         patterns=(
-            r"\bsummar", r"\boverview\b", r"\bdescribe\b",
-            r"\bstatistics\b", r"\bstats\b",
+            r"\bsummar",
+            r"\boverview\b",
+            r"\bdescribe\b",
+            r"\bstatistics\b",
+            r"\bstats\b",
         ),
     ),
     # Priority 8: Q&A
     HeuristicRule(
         family=TaskFamily.QNA,
         patterns=(
-            r"\bwhat\s+is\b", r"\bwhich\s+layer\b", r"\bwhere\s+is\b",
-            r"\bshow\s+me\b", r"\bhow\s+many\b", r"\blist\s+all\b",
-            r"\btell\s+me\b", r"\bwhat\s+are\b",
+            r"\bwhat\s+is\b",
+            r"\bwhich\s+layer\b",
+            r"\bwhere\s+is\b",
+            r"\bshow\s+me\b",
+            r"\bhow\s+many\b",
+            r"\blist\s+all\b",
+            r"\btell\s+me\b",
+            r"\bwhat\s+are\b",
         ),
     ),
 ]
 
 # Pre-compile all patterns
 _COMPILED_RULES: list[tuple[HeuristicRule, list[re.Pattern[str]]]] = [
-    (rule, [re.compile(p, re.IGNORECASE) for p in rule.patterns])
-    for rule in _RULES
+    (rule, [re.compile(p, re.IGNORECASE) for p in rule.patterns]) for rule in _RULES
 ]
 
 
@@ -137,6 +173,7 @@ class IntentRouter:
         """Create router from application settings."""
         try:
             from cad_dxf_agent.settings import settings
+
             return cls(
                 confidence_threshold=settings.router_confidence_threshold,
                 llm_enabled=settings.router_llm_enabled,
@@ -167,13 +204,16 @@ class IntentRouter:
                 return result
 
             # Run heuristic rules in priority order
-            result = self._heuristic_classify(stripped)
+            heuristic_result = self._heuristic_classify(stripped)
 
-            if result is not None and result.confidence >= self._confidence_threshold:
+            if (
+                heuristic_result is not None
+                and heuristic_result.confidence >= self._confidence_threshold
+            ):
                 elapsed = (time.monotonic() - start) * 1000
-                result.router_time_ms = elapsed
-                _set_span_attrs(s, result)
-                return result
+                heuristic_result.router_time_ms = elapsed
+                _set_span_attrs(s, heuristic_result)
+                return heuristic_result
 
             # LLM fallback (disabled by default)
             if self._llm_enabled:

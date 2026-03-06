@@ -11,7 +11,7 @@
 | # | Epic | Bead ID | Status | Branch | PR | Key Deliverables | Tests |
 |---|------|---------|--------|--------|----|-----------------|-------|
 | 01 | Capability Audit + Architecture Baseline | cad-uns | DONE | `feature/epic-cad-01-capability-audit` | #71 | 8 docs (034-041), beads task tree | N/A (docs only) |
-| 02 | Core Contracts + Routing Foundation | cad-d9a | NOT STARTED | — | — | `response_schema.py`, `intent_router.py`, TaskFamily/ResponseType enums | TBD — unit (schema validation, router accuracy), golden trajectories (routing decisions) |
+| 02 | Core Contracts + Routing Foundation | cad-d9a | DONE | `feature/epic-cad-02-core-contracts-routing` | TBD | `response_schema.py`, `intent_router.py`, `capability_registry.py`, `response_builder.py`, `/api/v2/prompt` | 112 tests — unit (29 schema + 44 router + 8 registry + 14 builder), web (12 v2 endpoint), integration (5 pipeline) + 50-entry golden routing file |
 | 03 | Selection + Markup Interpretation Foundation | cad-wd2 | NOT STARTED | — | — | Region model, markup overlay ingestion, entity association | TBD — unit (region model, entity association), integration (markup ingestion pipeline) |
 | 04 | Region Q&A Vertical Slice | cad-grx | NOT STARTED | — | — | Region context builder, grounded Q&A pipeline, golden tests | TBD — golden trajectories (region_qa family), scorecard entries, live API tests |
 | 05 | Repeated-Condition Detection | cad-ccd | NOT STARTED | — | — | Similarity scoring, candidate search, preview/approval workflow | TBD — unit (similarity scoring), golden trajectories (repeated_condition family), scorecard entries |
@@ -30,7 +30,7 @@
 
 | Phase | Epics | Status | Gate |
 |-------|-------|--------|------|
-| **Phase 1: Foundation** | 01, 02, 03 | 1/3 complete | Contracts locked, `make check` green |
+| **Phase 1: Foundation** | 01, 02, 03 | 2/3 complete | Contracts locked, `make check` green |
 | **Phase 2: Core Intelligence** | 04, 05, 06 | 0/3 complete | Golden trajectories pass per family |
 | **Architecture Review** | ARCH-REVIEW-01 | Not started | ADR document with keep/change/remove decisions per module |
 | **Phase 3: Structured Editing** | 07, 08 | 0/2 complete | Edit plan + apply produce audit metadata. Key files: `src/cad_dxf_agent/llm/plan_builder.py`, `src/cad_dxf_agent/models/plan_schema.py`, `web/frontend/src/components/PreviewPanel.jsx`, `web/backend/routes/preview.py` |
@@ -42,7 +42,7 @@
 ## 3. Dependency Chain Status
 
 ```
-EPIC-01 (DONE) → EPIC-02 (next)
+EPIC-01 (DONE) → EPIC-02 (DONE)
                     ├──> EPIC-03 → EPIC-04 → EPIC-05
                     └──> EPIC-06
               EPIC-04 + 05 + 06 → ARCH-REVIEW-01
@@ -77,11 +77,11 @@ contracts and routing foundation are in place.
 
 | Metric | Current (v0.5.0) | Target (all epics) |
 |--------|-------------------|-------------------|
-| Total tests | ~1351 | 1500+ |
+| Total tests | ~1462 | 1500+ |
 | Coverage | 65% | 70%+ |
 | Golden trajectories | 5 (edit_plan only) | 25+ (all 9 families) |
 | Scorecard entries | 0 | 32+ |
-| Task families tested | 1 | 9 |
+| Task families tested | 2 (edit_plan + compare) | 9 |
 | Scorecard pass rate (mock) | N/A | 100% |
 | Scorecard pass rate (live) | N/A | >= 95% |
 
@@ -91,8 +91,8 @@ contracts and routing foundation are in place.
 
 | Risk | Epic(s) | Status | Mitigation |
 |------|---------|--------|------------|
-| Response contract churn | 02 | ACTIVE — schemas are "proposed" | Stabilize in EPIC-02, mark v2 |
-| Intent router accuracy | 02, 04 | ACTIVE — no router exists yet | Conservative thresholds in EPIC-02 |
+| Response contract churn | 02 | RESOLVED — schemas implemented and tested | Stabilized in EPIC-02 with 29 unit tests |
+| Intent router accuracy | 02, 04 | RESOLVED — heuristic router implemented | 50-entry golden file, 0.95 confidence, conservative thresholds |
 | Markup entity detection | 03 | DEFERRED — no training data | Collect real samples before EPIC-03 |
 | 500-entity context cap | 03, 04 | ACTIVE — silent information loss | Token-budget context builder in EPIC-03 |
 | Ephemeral session storage | 11 | KNOWN — lost on restart | Durable state migration in EPIC-11 |
@@ -109,7 +109,7 @@ contracts and routing foundation are in place.
 | # | Epic | Next Step |
 |---|------|-----------|
 | 01 | Capability Audit + Architecture Baseline | Completed — hardening pass in progress |
-| 02 | Core Contracts + Routing Foundation | Define `TaskFamily` enum and `PlatformResponse` model in `response_schema.py`; write unit tests for enum coverage |
+| 02 | Core Contracts + Routing Foundation | DONE — merge PR, close bead |
 | 03 | Selection + Markup Interpretation Foundation | Design `Region` Pydantic model with bounding box + entity association; draft markup overlay ingestion interface |
 | 04 | Region Q&A Vertical Slice | Implement region context builder that filters entities by bounding box; write first golden trajectory for region_qa |
 | 05 | Repeated-Condition Detection | Prototype entity similarity scoring function; define candidate result schema |
@@ -126,10 +126,9 @@ contracts and routing foundation are in place.
 
 ## 8. Global Next Actions
 
-1. **Merge PR #71** — EPIC-01 docs into main
-2. **Begin EPIC-02** — implement `response_schema.py` and `intent_router.py`
-3. **Create feature branch** `feature/epic-cad-02-contracts-routing`
-4. **First code deliverables:** TaskFamily enum, ResponseType enum, PlatformResponse model
+1. **Merge EPIC-02 PR** — core contracts + routing foundation
+2. **Begin EPIC-03** — Selection + Markup Interpretation Foundation
+3. **Begin EPIC-06** — Compare + Diff Service Hardening (can start in parallel)
 
 ---
 
@@ -147,3 +146,4 @@ contracts and routing foundation are in place.
 |------|--------|
 | 2026-03-05 | Initial creation with EPIC-01 complete, all other epics NOT STARTED |
 | 2026-03-06 | Audit hardening: fixed doc count (6→8), added Tests column, mapped risks to epics, added Phase 4-5 risks, added per-epic Next Steps, added concrete file paths for Phases 3-5, clarified ARCH-REVIEW-01 output format, added this changelog |
+| 2026-03-06 | EPIC-02 DONE: 112 new tests, 7 new/modified files, response contracts + intent router + capability registry + response builder + /api/v2/prompt endpoint |

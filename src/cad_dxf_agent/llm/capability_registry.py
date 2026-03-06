@@ -6,13 +6,17 @@ unsupported_operation responses without hitting the LLM.
 
 from __future__ import annotations
 
+import logging
+
 from cad_dxf_agent.models.response_schema import TaskFamily
 
 # Families that have working pipeline implementations
-_DEFAULT_ENABLED: frozenset[TaskFamily] = frozenset({
-    TaskFamily.EDIT_PLAN,
-    TaskFamily.COMPARE,
-})
+_DEFAULT_ENABLED: frozenset[TaskFamily] = frozenset(
+    {
+        TaskFamily.EDIT_PLAN,
+        TaskFamily.COMPARE,
+    }
+)
 
 
 class CapabilityRegistry:
@@ -54,5 +58,5 @@ def _default_from_settings() -> frozenset[TaskFamily]:
         if raw:
             return frozenset(TaskFamily(f.strip()) for f in raw.split(",") if f.strip())
     except Exception:
-        pass
+        logging.getLogger(__name__).debug("Failed to load task families from settings")
     return _DEFAULT_ENABLED

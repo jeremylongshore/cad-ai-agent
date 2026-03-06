@@ -187,11 +187,11 @@ class TestEdgeCases:
 
 class TestIntentResult:
     def test_confidence_clamped_min(self):
-        with pytest.raises(Exception):
+        with pytest.raises(ValueError):
             IntentResult(family=TaskFamily.EDIT_PLAN, confidence=-0.1)
 
     def test_confidence_clamped_max(self):
-        with pytest.raises(Exception):
+        with pytest.raises(ValueError):
             IntentResult(family=TaskFamily.EDIT_PLAN, confidence=1.1)
 
     def test_valid_confidence(self):

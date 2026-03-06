@@ -5,8 +5,6 @@ Tests the full v2 routing pipeline end-to-end via TestClient.
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
 
 starlette = pytest.importorskip("starlette", reason="integration tests require fastapi/starlette")

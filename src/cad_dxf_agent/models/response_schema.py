@@ -9,7 +9,7 @@ All responses from /api/v2/prompt use PlatformResponse regardless of task family
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
 
@@ -75,9 +75,7 @@ class AuditMetadata(BaseModel):
     """Audit trail and latency instrumentation for every response."""
 
     trace_id: str = Field(default_factory=lambda: uuid.uuid4().hex[:16])
-    timestamp: str = Field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
+    timestamp: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
     router_time_ms: float | None = None
     context_build_time_ms: float | None = None
     llm_time_ms: float | None = None

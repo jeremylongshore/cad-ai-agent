@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from cad_dxf_agent.llm.capability_registry import CapabilityRegistry
 from cad_dxf_agent.models.response_schema import TaskFamily
 
@@ -30,9 +28,7 @@ class TestCapabilityRegistry:
         assert reg.is_implemented(TaskFamily.UNSUPPORTED)
 
     def test_custom_enabled_set(self):
-        reg = CapabilityRegistry(
-            enabled=frozenset({TaskFamily.EDIT_PLAN, TaskFamily.QNA})
-        )
+        reg = CapabilityRegistry(enabled=frozenset({TaskFamily.EDIT_PLAN, TaskFamily.QNA}))
         assert reg.is_implemented(TaskFamily.QNA)
         assert not reg.is_implemented(TaskFamily.COMPARE)
 

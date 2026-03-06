@@ -107,7 +107,9 @@ class TestAuditPassthrough:
             router_confidence=0.95,
         )
         resp = ResponseBuilder.plan_only(
-            operations=[], message="test", audit=audit,
+            operations=[],
+            message="test",
+            audit=audit,
         )
         assert resp.audit.router_time_ms == 1.5
         assert resp.audit.total_request_time_ms == 100.0
