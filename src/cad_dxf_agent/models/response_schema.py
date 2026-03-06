@@ -63,9 +63,9 @@ class ResponseType(StrEnum):
 class RiskLevel(StrEnum):
     """Risk classification for planned operations."""
 
-    NONE = "none"
-    LOW = "low"
-    MEDIUM = "medium"
+    NONE = "none"  # no risk, informational
+    LOW = "low"  # reversible, non-destructive
+    MEDIUM = "medium"  # potentially destructive, requires confirmation
     HIGH = "high"  # destructive/irreversible operations
 
 
