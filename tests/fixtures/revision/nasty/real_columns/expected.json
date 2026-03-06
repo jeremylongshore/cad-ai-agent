@@ -20,31 +20,31 @@
       "category": "modified",
       "entity_type": "MTEXT",
       "layer": "0",
-      "confidence": 0.9318,
+      "confidence": 0.925,
       "match_method": "spatial",
       "modifications": {
         "text_content": {
-          "from": "Line 1\\PLine 2\\PLine 3\\PLine 4\\PLine 5",
-          "to": "Line 1\\PLine 2\\PLine 3\\PLine 4\\PLine 5 [mod]"
+          "from": "Line 1\nLine 2\nLine 3\nLine 4\nLine 5",
+          "to": "Line 1\nLine 2\nLine 3\nLine 4\nLine 5 [mod]"
         }
       },
       "point_count": 1,
-      "text_content": "Line 1\\PLine 2\\PLine 3\\PLine 4\\PLine 5"
+      "text_content": "Line 1\nLine 2\nLine 3\nLine 4\nLine 5"
     },
     {
       "category": "modified",
       "entity_type": "MTEXT",
       "layer": "0",
-      "confidence": 0.9318,
+      "confidence": 0.925,
       "match_method": "spatial",
       "modifications": {
         "text_content": {
-          "from": "Line 1\\PLine 2\\PLine 3\\PLine 4\\PLine 5",
-          "to": "Line 1\\PLine 2\\PLine 3\\PLine 4\\PLine 5 [mod]"
+          "from": "Line 1\nLine 2\nLine 3\nLine 4\nLine 5",
+          "to": "Line 1\nLine 2\nLine 3\nLine 4\nLine 5 [mod]"
         }
       },
       "point_count": 1,
-      "text_content": "Line 1\\PLine 2\\PLine 3\\PLine 4\\PLine 5"
+      "text_content": "Line 1\nLine 2\nLine 3\nLine 4\nLine 5"
     },
     {
       "category": "modified",
@@ -317,7 +317,7 @@
       "confidence": 1.0,
       "match_method": "fingerprint",
       "point_count": 1,
-      "text_content": "Line 1\\PLine 2\\PLine 3\\PLine 4\\PLine 5"
+      "text_content": "Line 1\nLine 2\nLine 3\nLine 4\nLine 5"
     },
     {
       "category": "unchanged",
@@ -335,7 +335,7 @@
       "confidence": 1.0,
       "match_method": "fingerprint",
       "point_count": 1,
-      "text_content": "LongestLineEver1\\PLongestLineEver2"
+      "text_content": "LongestLineEver1\nLongestLineEver2"
     },
     {
       "category": "unchanged",
@@ -362,7 +362,7 @@
       "confidence": 1.0,
       "match_method": "fingerprint",
       "point_count": 1,
-      "text_content": "Line 1\\PLine 2\\PLine 3\\PLine 4\\PLine 5"
+      "text_content": "Line 1\nLine 2\nLine 3\nLine 4\nLine 5"
     },
     {
       "category": "unchanged",
@@ -371,7 +371,7 @@
       "confidence": 1.0,
       "match_method": "fingerprint",
       "point_count": 1,
-      "text_content": "Line 1\\PLine 2\\PLine 3\\PLine 4\\PLine 5\\PLine 6\\PLine 7\\PLine 8\\PLine 9"
+      "text_content": "Line 1\nLine 2\nLine 3\nLine 4\nLine 5\nLine 6\nLine 7\nLine 8\nLine 9"
     },
     {
       "category": "unchanged",
@@ -389,7 +389,7 @@
       "confidence": 1.0,
       "match_method": "fingerprint",
       "point_count": 1,
-      "text_content": "Line 1\\PLine 2\\PLine 3\\PLine 4"
+      "text_content": "Line 1\nLine 2\nLine 3\nLine 4"
     },
     {
       "category": "unchanged",
@@ -398,7 +398,7 @@
       "confidence": 1.0,
       "match_method": "fingerprint",
       "point_count": 1,
-      "text_content": "STATIC COLUMNS\\P(3 COLUMNS)"
+      "text_content": "STATIC COLUMNS\n(3 COLUMNS)"
     },
     {
       "category": "unchanged",
@@ -407,7 +407,7 @@
       "confidence": 1.0,
       "match_method": "fingerprint",
       "point_count": 1,
-      "text_content": "Line 1\\PLine 2\\PLine 3\\PLine 4\\PLine 5\\PLine 6"
+      "text_content": "Line 1\nLine 2\nLine 3\nLine 4\nLine 5\nLine 6"
     },
     {
       "category": "unchanged",
@@ -425,7 +425,7 @@
       "confidence": 1.0,
       "match_method": "fingerprint",
       "point_count": 1,
-      "text_content": "Line 1\\NLine 2\\PLine 3\\PLine 4"
+      "text_content": "Line 1 Line 2\nLine 3\nLine 4"
     },
     {
       "category": "unchanged",
@@ -434,7 +434,7 @@
       "confidence": 1.0,
       "match_method": "fingerprint",
       "point_count": 1,
-      "text_content": "STATIC COLUMNS\\P(3 COLUMNS) with column breaks"
+      "text_content": "STATIC COLUMNS\n(3 COLUMNS) with column breaks"
     },
     {
       "category": "unchanged",
@@ -443,7 +443,7 @@
       "confidence": 1.0,
       "match_method": "fingerprint",
       "point_count": 1,
-      "text_content": "Line 1\\PLine 2\\N\\PLine 3\\PLine 4"
+      "text_content": "Line 1\nLine 2 \nLine 3\nLine 4"
     },
     {
       "category": "unchanged",
@@ -452,7 +452,7 @@
       "confidence": 1.0,
       "match_method": "fingerprint",
       "point_count": 1,
-      "text_content": "Line 1\\PLine 2\\N\\N\\N\\PLine 3\\N\\PLine 4"
+      "text_content": "Line 1\nLine 2   \nLine 3 \nLine 4"
     },
     {
       "category": "unchanged",
@@ -461,7 +461,7 @@
       "confidence": 1.0,
       "match_method": "fingerprint",
       "point_count": 1,
-      "text_content": "Line 1\\PLine 2\\NLine 3\\PLine 4\\PLine 5\\NLine 6"
+      "text_content": "Line 1\nLine 2 Line 3\nLine 4\nLine 5 Line 6"
     },
     {
       "category": "unchanged",

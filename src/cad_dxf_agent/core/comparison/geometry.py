@@ -315,13 +315,16 @@ def _extract_one(
         elif dxf_type == "MTEXT":
             insert = entity.dxf.insert
             points = [Point2D(x=insert.x, y=insert.y)]
-            text_content = entity.text  # type: ignore[attr-defined]
+            text_content = entity.plain_text()  # type: ignore[attr-defined]
             text_geometry = _snap_mtext_geometry(entity)
 
         elif dxf_type == "INSERT":
             insert = entity.dxf.insert
             points = [Point2D(x=insert.x, y=insert.y)]
             block_name = entity.dxf.name
+            attributes["insert_xscale"] = entity.dxf.get("xscale", 1.0)
+            attributes["insert_yscale"] = entity.dxf.get("yscale", 1.0)
+            attributes["insert_rotation"] = entity.dxf.get("rotation", 0.0) % 360.0
 
         elif dxf_type == "CIRCLE":
             center = entity.dxf.center

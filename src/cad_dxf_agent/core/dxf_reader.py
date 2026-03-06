@@ -147,12 +147,21 @@ def _parse_entity(
     elif dxf_type == "MTEXT":
         insert = entity.dxf.insert
         insert_point = Point2D(x=insert.x, y=insert.y)
-        text_content = entity.text  # type: ignore[attr-defined]
+        text_content = entity.plain_text()  # type: ignore[attr-defined]
         text_geometry = _extract_mtext_geometry(entity)
+        mtext_width = entity.dxf.get("width", None)
+        if mtext_width is not None and mtext_width > 0:
+            attributes["mtext_width"] = mtext_width
     elif dxf_type == "INSERT":
         insert = entity.dxf.insert
         insert_point = Point2D(x=insert.x, y=insert.y)
         block_name = entity.dxf.name
+        insert_xscale = entity.dxf.get("xscale", 1.0)
+        insert_yscale = entity.dxf.get("yscale", 1.0)
+        insert_rotation = _normalize_rotation(entity.dxf.get("rotation", 0.0))
+        attributes["insert_xscale"] = insert_xscale
+        attributes["insert_yscale"] = insert_yscale
+        attributes["insert_rotation"] = insert_rotation
         # Extract ATTRIB text with geometry
         try:
             attribs = list(entity.attribs)  # type: ignore[attr-defined]
@@ -175,10 +184,13 @@ def _parse_entity(
                     # Use first attrib's text as text_content if none set
                     first = next(iter(attrib_data.values()))
                     text_content = first["text"]
+                    # ATTRIB height already reflects INSERT scale in DXF
                     text_geometry = TextGeometry(
                         height=first.get("height"),
                         rotation=_normalize_rotation(first.get("rotation", 0.0)),
                         provenance=TextProvenance.BLOCK_ATTRIBUTE_TEXT,
+                        confidence_position=0.95,
+                        confidence_rotation=0.95,
                     )
         except Exception:
             logger.debug("INSERT %s: attrib extraction failed", handle)

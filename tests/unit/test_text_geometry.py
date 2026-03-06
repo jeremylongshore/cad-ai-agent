@@ -685,3 +685,112 @@ class TestComputeApproxTextBbox:
     def test_none_for_empty_text(self):
         tg = TextGeometry(height=10.0)
         assert compute_approx_text_bbox("", tg) is None
+
+
+# ==========================================================================
+# INSERT transform extraction
+# ==========================================================================
+
+
+class TestInsertTransformExtraction:
+    def test_default_scale_insert(self, tmp_path):
+        from tests.helpers.dxf_factory import create_scaled_insert_drawing
+
+        dxf_path = create_scaled_insert_drawing(tmp_path)
+        ctx = load_dxf(dxf_path)
+        inserts = [e for e in ctx.entities if e.entity_type == EntityType.INSERT]
+        assert len(inserts) == 3
+
+        # First INSERT: default scale
+        ins_a = [i for i in inserts if i.text_content == "MARK-A"][0]
+        assert ins_a.attributes["insert_xscale"] == 1.0
+        assert ins_a.attributes["insert_yscale"] == 1.0
+        assert ins_a.attributes["insert_rotation"] == 0.0
+
+    def test_nonuniform_scale_insert(self, tmp_path):
+        from tests.helpers.dxf_factory import create_scaled_insert_drawing
+
+        dxf_path = create_scaled_insert_drawing(tmp_path)
+        ctx = load_dxf(dxf_path)
+        inserts = [e for e in ctx.entities if e.entity_type == EntityType.INSERT]
+        ins_b = [i for i in inserts if i.text_content == "MARK-B"][0]
+        assert ins_b.attributes["insert_xscale"] == 2.0
+        assert ins_b.attributes["insert_yscale"] == 0.5
+
+    def test_rotated_insert(self, tmp_path):
+        from tests.helpers.dxf_factory import create_scaled_insert_drawing
+
+        dxf_path = create_scaled_insert_drawing(tmp_path)
+        ctx = load_dxf(dxf_path)
+        inserts = [e for e in ctx.entities if e.entity_type == EntityType.INSERT]
+        ins_c = [i for i in inserts if i.text_content == "MARK-C"][0]
+        assert ins_c.attributes["insert_rotation"] == 30.0
+
+    def test_attrib_height_reflects_yscale(self, tmp_path):
+        """ATTRIB height in DXF already incorporates INSERT yscale."""
+        from tests.helpers.dxf_factory import create_scaled_insert_drawing
+
+        dxf_path = create_scaled_insert_drawing(tmp_path)
+        ctx = load_dxf(dxf_path)
+        inserts = [e for e in ctx.entities if e.entity_type == EntityType.INSERT]
+
+        ins_a = [i for i in inserts if i.text_content == "MARK-A"][0]
+        ins_b = [i for i in inserts if i.text_content == "MARK-B"][0]
+
+        # ATTDEF height=2.0; ATTRIB stores already-scaled height
+        # MARK-A: yscale=1.0 → height=2.0
+        assert ins_a.text_geometry.height == 2.0
+        # MARK-B: yscale=0.5 → height=1.0 (already scaled by ezdxf)
+        assert ins_b.text_geometry.height == 1.0
+        # Both should have BLOCK_ATTRIBUTE_TEXT provenance with 0.95 confidence
+        assert ins_a.text_geometry.provenance == TextProvenance.BLOCK_ATTRIBUTE_TEXT
+        assert ins_b.text_geometry.confidence_position == 0.95
+
+
+# ==========================================================================
+# MTEXT plain_text extraction
+# ==========================================================================
+
+
+class TestMtextPlainText:
+    def test_paragraph_breaks_converted(self, tmp_path):
+        from tests.helpers.dxf_factory import create_rich_mtext_drawing
+
+        dxf_path = create_rich_mtext_drawing(tmp_path)
+        ctx = load_dxf(dxf_path)
+        mtexts = [e for e in ctx.entities if e.entity_type == EntityType.MTEXT]
+
+        multi_line = [m for m in mtexts if "Line one" in (m.text_content or "")][0]
+        # plain_text converts \P to \n
+        assert "\n" in multi_line.text_content
+        assert "\\P" not in multi_line.text_content
+
+    def test_mtext_width_stored(self, tmp_path):
+        from tests.helpers.dxf_factory import create_rich_mtext_drawing
+
+        dxf_path = create_rich_mtext_drawing(tmp_path)
+        ctx = load_dxf(dxf_path)
+        mtexts = [e for e in ctx.entities if e.entity_type == EntityType.MTEXT]
+
+        constrained = [m for m in mtexts if "Constrained" in (m.text_content or "")][0]
+        assert constrained.attributes.get("mtext_width") == 40.0
+
+    def test_simple_mtext_unchanged(self, tmp_path):
+        from tests.helpers.dxf_factory import create_rich_mtext_drawing
+
+        dxf_path = create_rich_mtext_drawing(tmp_path)
+        ctx = load_dxf(dxf_path)
+        mtexts = [e for e in ctx.entities if e.entity_type == EntityType.MTEXT]
+
+        simple = [m for m in mtexts if m.text_content == "SIMPLE NOTE"][0]
+        assert simple.text_content == "SIMPLE NOTE"
+
+    def test_no_mtext_width_for_unconstrained(self, tmp_path):
+        from tests.helpers.dxf_factory import create_rich_mtext_drawing
+
+        dxf_path = create_rich_mtext_drawing(tmp_path)
+        ctx = load_dxf(dxf_path)
+        mtexts = [e for e in ctx.entities if e.entity_type == EntityType.MTEXT]
+
+        simple = [m for m in mtexts if m.text_content == "SIMPLE NOTE"][0]
+        assert "mtext_width" not in simple.attributes

@@ -379,7 +379,7 @@
       "confidence": 1.0,
       "match_method": "fingerprint",
       "point_count": 1,
-      "text_content": "CIRCLE\\PDIMENSION"
+      "text_content": "CIRCLE\nDIMENSION"
     },
     {
       "category": "unchanged",
@@ -388,7 +388,7 @@
       "confidence": 1.0,
       "match_method": "fingerprint",
       "point_count": 1,
-      "text_content": "ANGLE\\PDIMENSION"
+      "text_content": "ANGLE\nDIMENSION"
     },
     {
       "category": "unchanged",
@@ -397,7 +397,7 @@
       "confidence": 1.0,
       "match_method": "fingerprint",
       "point_count": 1,
-      "text_content": "ARC\\PDIMENSION"
+      "text_content": "ARC\nDIMENSION"
     },
     {
       "category": "unchanged",
@@ -406,7 +406,7 @@
       "confidence": 1.0,
       "match_method": "fingerprint",
       "point_count": 1,
-      "text_content": "ORDINATE\\PDIMENSION"
+      "text_content": "ORDINATE\nDIMENSION"
     },
     {
       "category": "unchanged",
@@ -442,7 +442,7 @@
       "confidence": 1.0,
       "match_method": "fingerprint",
       "point_count": 1,
-      "text_content": "LINE1\\PLINE2\\PLINE3"
+      "text_content": "LINE1\nLINE2\nLINE3"
     },
     {
       "category": "unchanged",
@@ -496,7 +496,7 @@
       "confidence": 1.0,
       "match_method": "fingerprint",
       "point_count": 1,
-      "text_content": "BLOCK WITH\\PATTRIBUTES"
+      "text_content": "BLOCK WITH\nATTRIBUTES"
     },
     {
       "category": "unchanged",
