@@ -38,7 +38,7 @@ class TestV2PromptRouting:
         assert data["audit"]["router_source"] == "heuristic"
         assert data["audit"]["router_time_ms"] >= 0
 
-    def test_qna_returns_unsupported(self, client, upload_dxf):
+    def test_qna_returns_answer(self, client, upload_dxf):
         session_id, _ = upload_dxf
         resp = client.post(
             "/api/v2/prompt",
@@ -47,8 +47,9 @@ class TestV2PromptRouting:
         assert resp.status_code == 200
         data = resp.json()
         assert data["task_family"] == "qna"
-        assert data["response_type"] == "unsupported_operation"
-        assert "not yet available" in data["message"]
+        assert data["response_type"] == "answer_only"
+        assert data["audit"]["total_request_time_ms"] is not None
+        assert data["audit"]["context_build_time_ms"] is not None
 
     def test_summary_returns_unsupported(self, client, upload_dxf):
         session_id, _ = upload_dxf
@@ -124,7 +125,7 @@ class TestV2PromptAudit:
         session_id, _ = upload_dxf
         resp = client.post(
             "/api/v2/prompt",
-            json={"session_id": session_id, "prompt": "what is on layer WALLS"},
+            json={"session_id": session_id, "prompt": "summarize this drawing"},
         )
         audit = resp.json()["audit"]
         assert audit["total_request_time_ms"] is not None

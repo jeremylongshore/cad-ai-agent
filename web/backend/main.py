@@ -122,6 +122,7 @@ async def log_requests(request: Request, call_next):
 class PromptRequest(BaseModel):
     session_id: str
     prompt: str
+    selected_regions: list[dict] | None = None
 
 
 class PlanRequest(BaseModel):
@@ -412,6 +413,21 @@ async def v2_prompt(body: PromptRequest, user: dict = Depends(get_user)):
         if intent.family == TaskFamily.NEEDS_CLARIFICATION:
             audit.total_request_time_ms = (_time.monotonic() - total_start) * 1000
             return ResponseBuilder.needs_clarification(audit=audit).model_dump()
+
+        # Handle Q&A — deterministic, no LLM
+        if intent.family == TaskFamily.QNA:
+            from cad_dxf_agent.core.qna_pipeline import QnaPipeline
+
+            pipeline = QnaPipeline()
+            region = _parse_selected_region(body.selected_regions)
+            ctx_start = _time.monotonic()
+            result = pipeline.answer(
+                prompt=body.prompt, context=session.context, region=region,
+            )
+            audit.context_build_time_ms = (_time.monotonic() - ctx_start) * 1000
+            audit.total_request_time_ms = (_time.monotonic() - total_start) * 1000
+            result.audit = audit
+            return result.model_dump()
 
         # Handle compare (requires revision file)
         if intent.family == TaskFamily.COMPARE:
@@ -1197,6 +1213,29 @@ def _user_friendly_conversion_error(raw_error: str | None, ext: str) -> str:
             "Please export as DXF from your CAD software."
         )
     return f"Could not convert your {ext} file. Please try exporting as DXF from your CAD software."
+
+
+def _parse_selected_region(selected_regions: list[dict] | None):
+    """Parse the first selected region dict into a NormalizedRegion, or None."""
+    if not selected_regions:
+        return None
+    try:
+        from cad_dxf_agent.models.cad_schema import Point2D
+        from cad_dxf_agent.models.region_schema import BoundingBox, NormalizedRegion, RegionType
+
+        r = selected_regions[0]
+        bounds = r.get("bounds", {})
+        min_x = float(bounds.get("min_x", 0))
+        min_y = float(bounds.get("min_y", 0))
+        max_x = float(bounds.get("max_x", 0))
+        max_y = float(bounds.get("max_y", 0))
+        return NormalizedRegion(
+            source_type=RegionType(r.get("source_type", "box_select")),
+            bounds=BoundingBox(min_x=min_x, min_y=min_y, max_x=max_x, max_y=max_y),
+            center=Point2D(x=(min_x + max_x) / 2, y=(min_y + max_y) / 2),
+        )
+    except (KeyError, ValueError, TypeError):
+        return None
 
 
 def _describe_op(op) -> str:

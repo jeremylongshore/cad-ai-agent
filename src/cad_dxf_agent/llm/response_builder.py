@@ -99,6 +99,10 @@ class ResponseBuilder:
         *,
         family: TaskFamily,
         message: str,
+        evidence: list[Any] | None = None,
+        confidence: float | None = None,
+        data: dict[str, Any] | None = None,
+        ambiguity_flags: list[str] | None = None,
         audit: AuditMetadata | None = None,
     ) -> PlatformResponse:
         """Build an answer response (Q&A, summary, etc.)."""
@@ -106,6 +110,10 @@ class ResponseBuilder:
             task_family=family,
             response_type=ResponseType.ANSWER_ONLY,
             message=message,
+            evidence=evidence or [],
+            confidence=confidence,
+            data=data or {},
+            ambiguity_flags=ambiguity_flags or [],
             audit=audit or AuditMetadata(),
         )
 

@@ -15,6 +15,7 @@ _DEFAULT_ENABLED: frozenset[TaskFamily] = frozenset(
     {
         TaskFamily.EDIT_PLAN,
         TaskFamily.COMPARE,
+        TaskFamily.QNA,
     }
 )
 
