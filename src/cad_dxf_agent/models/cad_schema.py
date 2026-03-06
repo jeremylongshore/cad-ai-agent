@@ -62,6 +62,53 @@ class TextGeometry(BaseModel):
         default=None, description="MTEXT character height (overrides height if set)"
     )
     provenance: TextProvenance = TextProvenance.NATIVE_CAD_TEXT
+    confidence_position: float = Field(
+        default=1.0, description="Positional confidence [0-1], 1.0 for native CAD"
+    )
+    confidence_rotation: float = Field(
+        default=1.0, description="Rotation confidence [0-1], 1.0 for native CAD"
+    )
+    confidence_content: float = Field(
+        default=1.0, description="Text content confidence [0-1], 1.0 for native CAD"
+    )
+
+    @property
+    def effective_height(self) -> float | None:
+        """Return char_height (MTEXT) if set, else height (TEXT)."""
+        return self.char_height if self.char_height is not None else self.height
+
+    @property
+    def is_high_trust(self) -> bool:
+        """True if provenance is native CAD or block attribute text."""
+        return self.provenance in (
+            TextProvenance.NATIVE_CAD_TEXT,
+            TextProvenance.BLOCK_ATTRIBUTE_TEXT,
+        )
+
+
+# Trust hierarchy ordering — lower index = higher trust
+TEXT_PROVENANCE_TRUST_ORDER: list[TextProvenance] = [
+    TextProvenance.NATIVE_CAD_TEXT,
+    TextProvenance.BLOCK_ATTRIBUTE_TEXT,
+    TextProvenance.VECTOR_OUTLINE_TEXT,
+    TextProvenance.RASTER_OCR_TEXT,
+]
+
+# Default confidence by provenance
+TEXT_PROVENANCE_DEFAULTS: dict[TextProvenance, dict[str, float]] = {
+    TextProvenance.NATIVE_CAD_TEXT: {
+        "position": 1.0, "rotation": 1.0, "content": 1.0,
+    },
+    TextProvenance.BLOCK_ATTRIBUTE_TEXT: {
+        "position": 0.95, "rotation": 0.95, "content": 1.0,
+    },
+    TextProvenance.VECTOR_OUTLINE_TEXT: {
+        "position": 0.6, "rotation": 0.5, "content": 0.7,
+    },
+    TextProvenance.RASTER_OCR_TEXT: {
+        "position": 0.3, "rotation": 0.2, "content": 0.5,
+    },
+}
 
 
 class EntityRef(BaseModel):

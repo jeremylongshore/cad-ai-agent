@@ -188,6 +188,18 @@ def _describe_modifications(
             "to": r_snap.text_content,
         }
 
+    # Detect text geometry changes (height, rotation)
+    m_tg = m_snap.text_geometry
+    r_tg = r_snap.text_geometry
+    if m_tg and r_tg:
+        if m_tg.height != r_tg.height:
+            mods["text_height"] = {"from": m_tg.height, "to": r_tg.height}
+        if abs(m_tg.rotation - r_tg.rotation) > 0.01:
+            mods["text_rotation"] = {
+                "from": m_tg.rotation,
+                "to": r_tg.rotation,
+            }
+
     if m_snap.block_name != r_snap.block_name:
         mods["block_name"] = {
             "from": m_snap.block_name,

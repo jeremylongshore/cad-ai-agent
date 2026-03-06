@@ -263,4 +263,11 @@ def _entity_to_dict(entity: EntityRef) -> dict[str, Any]:
         d["block_name"] = entity.block_name
     if entity.attributes:
         d["attributes"] = entity.attributes
+    if entity.text_geometry:
+        tg = entity.text_geometry
+        d["text_geometry"] = {
+            "height": tg.effective_height,
+            "rotation": tg.rotation,
+            "provenance": tg.provenance.value,
+        }
     return d

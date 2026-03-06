@@ -1,4 +1,4 @@
-"""Tests for TextGeometry, TextProvenance, and dxf_reader text extraction."""
+"""Tests for TextGeometry, TextProvenance, trust hierarchy, and dxf_reader text extraction."""
 
 from __future__ import annotations
 
@@ -9,6 +9,8 @@ from cad_dxf_agent.core.dxf_reader import (
     load_dxf,
 )
 from cad_dxf_agent.models.cad_schema import (
+    TEXT_PROVENANCE_DEFAULTS,
+    TEXT_PROVENANCE_TRUST_ORDER,
     EntityRef,
     EntityType,
     Point2D,
@@ -284,3 +286,317 @@ class TestExtractMtextGeometry:
         assert tg.char_height is None
         assert tg.rotation == 0.0
         assert tg.attachment_point is None
+
+
+# ==========================================================================
+# Confidence fields
+# ==========================================================================
+
+
+class TestTextGeometryConfidence:
+    def test_native_defaults_full_confidence(self):
+        tg = TextGeometry(provenance=TextProvenance.NATIVE_CAD_TEXT)
+        assert tg.confidence_position == 1.0
+        assert tg.confidence_rotation == 1.0
+        assert tg.confidence_content == 1.0
+
+    def test_explicit_lower_confidence(self):
+        tg = TextGeometry(
+            provenance=TextProvenance.RASTER_OCR_TEXT,
+            confidence_position=0.3,
+            confidence_rotation=0.2,
+            confidence_content=0.5,
+        )
+        assert tg.confidence_position == 0.3
+        assert tg.confidence_rotation == 0.2
+        assert tg.confidence_content == 0.5
+
+    def test_is_high_trust_native(self):
+        tg = TextGeometry(provenance=TextProvenance.NATIVE_CAD_TEXT)
+        assert tg.is_high_trust is True
+
+    def test_is_high_trust_block_attribute(self):
+        tg = TextGeometry(provenance=TextProvenance.BLOCK_ATTRIBUTE_TEXT)
+        assert tg.is_high_trust is True
+
+    def test_is_not_high_trust_vector(self):
+        tg = TextGeometry(provenance=TextProvenance.VECTOR_OUTLINE_TEXT)
+        assert tg.is_high_trust is False
+
+    def test_is_not_high_trust_ocr(self):
+        tg = TextGeometry(provenance=TextProvenance.RASTER_OCR_TEXT)
+        assert tg.is_high_trust is False
+
+    def test_effective_height_text(self):
+        tg = TextGeometry(height=2.5)
+        assert tg.effective_height == 2.5
+
+    def test_effective_height_mtext(self):
+        tg = TextGeometry(height=2.5, char_height=3.0)
+        assert tg.effective_height == 3.0
+
+    def test_effective_height_none(self):
+        tg = TextGeometry()
+        assert tg.effective_height is None
+
+
+# ==========================================================================
+# Trust hierarchy
+# ==========================================================================
+
+
+class TestTrustHierarchy:
+    def test_trust_order_length(self):
+        assert len(TEXT_PROVENANCE_TRUST_ORDER) == 4
+
+    def test_trust_order_native_first(self):
+        assert TEXT_PROVENANCE_TRUST_ORDER[0] == TextProvenance.NATIVE_CAD_TEXT
+
+    def test_trust_order_ocr_last(self):
+        assert TEXT_PROVENANCE_TRUST_ORDER[-1] == TextProvenance.RASTER_OCR_TEXT
+
+    def test_native_higher_trust_than_ocr(self):
+        native_idx = TEXT_PROVENANCE_TRUST_ORDER.index(TextProvenance.NATIVE_CAD_TEXT)
+        ocr_idx = TEXT_PROVENANCE_TRUST_ORDER.index(TextProvenance.RASTER_OCR_TEXT)
+        assert native_idx < ocr_idx
+
+    def test_block_attr_higher_than_vector(self):
+        ba_idx = TEXT_PROVENANCE_TRUST_ORDER.index(
+            TextProvenance.BLOCK_ATTRIBUTE_TEXT
+        )
+        vo_idx = TEXT_PROVENANCE_TRUST_ORDER.index(
+            TextProvenance.VECTOR_OUTLINE_TEXT
+        )
+        assert ba_idx < vo_idx
+
+    def test_defaults_all_provenances_covered(self):
+        for prov in TextProvenance:
+            assert prov in TEXT_PROVENANCE_DEFAULTS
+
+    def test_native_defaults_full(self):
+        d = TEXT_PROVENANCE_DEFAULTS[TextProvenance.NATIVE_CAD_TEXT]
+        assert d["position"] == 1.0
+        assert d["rotation"] == 1.0
+        assert d["content"] == 1.0
+
+    def test_ocr_defaults_low(self):
+        d = TEXT_PROVENANCE_DEFAULTS[TextProvenance.RASTER_OCR_TEXT]
+        assert d["position"] < 0.5
+        assert d["rotation"] < 0.5
+
+    def test_trust_degrades_monotonically(self):
+        """Confidence should decrease (or stay equal) as trust decreases."""
+        for key in ("position", "rotation", "content"):
+            values = [
+                TEXT_PROVENANCE_DEFAULTS[p][key] for p in TEXT_PROVENANCE_TRUST_ORDER
+            ]
+            for i in range(len(values) - 1):
+                assert values[i] >= values[i + 1], (
+                    f"{key} confidence should degrade: "
+                    f"{TEXT_PROVENANCE_TRUST_ORDER[i]} ({values[i]}) vs "
+                    f"{TEXT_PROVENANCE_TRUST_ORDER[i+1]} ({values[i+1]})"
+                )
+
+
+# ==========================================================================
+# Anti-regression: native CAD text must not be replaced by OCR
+# ==========================================================================
+
+
+class TestAntiRegression:
+    def test_native_text_provenance_preserved_through_reader(self, sample_dxf):
+        """Native CAD text from dxf_reader must always have native provenance."""
+        ctx = load_dxf(sample_dxf)
+        text_entities = [
+            e for e in ctx.entities
+            if e.entity_type in (EntityType.TEXT, EntityType.MTEXT)
+        ]
+        for ent in text_entities:
+            assert ent.text_geometry is not None
+            assert ent.text_geometry.provenance == TextProvenance.NATIVE_CAD_TEXT
+            assert ent.text_geometry.is_high_trust
+
+    def test_native_text_full_confidence(self, sample_dxf):
+        """Native CAD text must have full confidence scores."""
+        ctx = load_dxf(sample_dxf)
+        text_entities = [
+            e for e in ctx.entities
+            if e.entity_type in (EntityType.TEXT, EntityType.MTEXT)
+        ]
+        for ent in text_entities:
+            tg = ent.text_geometry
+            assert tg.confidence_position == 1.0
+            assert tg.confidence_rotation == 1.0
+            assert tg.confidence_content == 1.0
+
+    def test_ocr_text_cannot_masquerade_as_native(self):
+        """OCR-sourced text must not pass is_high_trust."""
+        tg = TextGeometry(
+            provenance=TextProvenance.RASTER_OCR_TEXT,
+            confidence_position=0.3,
+        )
+        assert not tg.is_high_trust
+
+    def test_vector_text_cannot_masquerade_as_native(self):
+        """Vector-outline text must not pass is_high_trust."""
+        tg = TextGeometry(
+            provenance=TextProvenance.VECTOR_OUTLINE_TEXT,
+            confidence_position=0.6,
+        )
+        assert not tg.is_high_trust
+
+
+# ==========================================================================
+# Debug visibility (selection_debug integration)
+# ==========================================================================
+
+
+class TestDebugVisibility:
+    def test_debug_payload_includes_text_geometry(self):
+        """selection_debug _serialize_entity includes text_geometry."""
+        from cad_dxf_agent.core.region_associator import (
+            AssociatedEntity,
+            AssociationType,
+        )
+        from cad_dxf_agent.core.selection_debug import _serialize_entity
+
+        ent = EntityRef(
+            handle="T1",
+            entity_type=EntityType.TEXT,
+            layer="NOTES",
+            text_content="FOOTING",
+            insert_point=Point2D(x=10, y=20),
+            text_geometry=TextGeometry(
+                height=2.5,
+                rotation=45.0,
+                provenance=TextProvenance.NATIVE_CAD_TEXT,
+            ),
+        )
+        assoc = AssociatedEntity(
+            entity=ent,
+            distance=0.0,
+            association_type=AssociationType.INSIDE,
+            rank=1,
+        )
+        data = _serialize_entity(assoc)
+        assert "text_geometry" in data
+        assert data["text_geometry"]["provenance"] == "native_cad_text"
+        assert data["text_geometry"]["is_high_trust"] is True
+        assert data["text_geometry"]["height"] == 2.5
+        assert data["text_geometry"]["rotation"] == 45.0
+
+    def test_debug_payload_no_geometry_for_line(self):
+        """Non-text entities should not have text_geometry in debug."""
+        from cad_dxf_agent.core.region_associator import (
+            AssociatedEntity,
+            AssociationType,
+        )
+        from cad_dxf_agent.core.selection_debug import _serialize_entity
+
+        ent = EntityRef(
+            handle="L1",
+            entity_type=EntityType.LINE,
+            layer="STRUCTURAL",
+            insert_point=Point2D(x=0, y=0),
+        )
+        assoc = AssociatedEntity(
+            entity=ent,
+            distance=5.0,
+            association_type=AssociationType.NEARBY,
+            rank=2,
+        )
+        data = _serialize_entity(assoc)
+        assert "text_geometry" not in data
+
+
+# ==========================================================================
+# Tool executor visibility
+# ==========================================================================
+
+
+class TestToolExecutorVisibility:
+    def test_entity_to_dict_includes_text_geometry(self):
+        from cad_dxf_agent.llm.tool_executor import _entity_to_dict
+
+        ent = EntityRef(
+            handle="T1",
+            entity_type=EntityType.TEXT,
+            layer="NOTES",
+            text_content="COLUMN A-1",
+            insert_point=Point2D(x=10, y=20),
+            text_geometry=TextGeometry(
+                height=3.0,
+                rotation=90.0,
+                provenance=TextProvenance.NATIVE_CAD_TEXT,
+            ),
+        )
+        d = _entity_to_dict(ent)
+        assert "text_geometry" in d
+        assert d["text_geometry"]["height"] == 3.0
+        assert d["text_geometry"]["rotation"] == 90.0
+        assert d["text_geometry"]["provenance"] == "native_cad_text"
+
+    def test_entity_to_dict_no_geometry_for_line(self):
+        from cad_dxf_agent.llm.tool_executor import _entity_to_dict
+
+        ent = EntityRef(
+            handle="L1",
+            entity_type=EntityType.LINE,
+            layer="STRUCTURAL",
+            insert_point=Point2D(x=0, y=0),
+        )
+        d = _entity_to_dict(ent)
+        assert "text_geometry" not in d
+
+
+# ==========================================================================
+# Semantic model planner context
+# ==========================================================================
+
+
+class TestSemanticModelTextGeometry:
+    def test_planner_context_includes_text_geometry(self):
+        from cad_dxf_agent.core.semantic_model import build_planner_context
+        from cad_dxf_agent.models.cad_schema import DrawingContext
+
+        ctx = DrawingContext(
+            file_path="test.dxf",
+            entities=[
+                EntityRef(
+                    handle="T1",
+                    entity_type=EntityType.TEXT,
+                    layer="NOTES",
+                    text_content="LABEL",
+                    insert_point=Point2D(x=10, y=20),
+                    text_geometry=TextGeometry(
+                        height=2.5,
+                        rotation=45.0,
+                        provenance=TextProvenance.NATIVE_CAD_TEXT,
+                    ),
+                ),
+            ],
+        )
+        result = build_planner_context(ctx)
+        entity = result["entities"][0]
+        assert "text_geometry" in entity
+        assert entity["text_geometry"]["height"] == 2.5
+        assert entity["text_geometry"]["rotation"] == 45.0
+        assert entity["text_geometry"]["provenance"] == "native_cad_text"
+
+    def test_planner_context_no_geometry_for_line(self):
+        from cad_dxf_agent.core.semantic_model import build_planner_context
+        from cad_dxf_agent.models.cad_schema import DrawingContext
+
+        ctx = DrawingContext(
+            file_path="test.dxf",
+            entities=[
+                EntityRef(
+                    handle="L1",
+                    entity_type=EntityType.LINE,
+                    layer="STRUCTURAL",
+                    insert_point=Point2D(x=0, y=0),
+                ),
+            ],
+        )
+        result = build_planner_context(ctx)
+        assert "text_geometry" not in result["entities"][0]
