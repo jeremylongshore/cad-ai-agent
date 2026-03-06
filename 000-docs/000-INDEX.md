@@ -39,6 +39,7 @@
 | 038 | PLAN | [038-PM-PLAN-drawing-intelligence-roadmap.md](038-PM-PLAN-drawing-intelligence-roadmap.md) |
 | 041 | STAT | [041-PM-STAT-implementation-status.md](041-PM-STAT-implementation-status.md) |
 | 042 | AAR | [042-PM-AAR-epic-cad-02-aar.md](042-PM-AAR-epic-cad-02-aar.md) |
+| 043 | AAR | [043-PM-AAR-epic-cad-03-aar.md](043-PM-AAR-epic-cad-03-aar.md) |
 
 ### DR — Documentation & Reference
 | # | Type | File |
@@ -123,6 +124,7 @@
 | 040 | AT | AUDT | Scale readiness assessment (bottlenecks, migration path) |
 | 041 | PM | STAT | Implementation status tracker (12 epics, living document) |
 | 042 | PM | AAR | EPIC-CAD-02 after action report (end-of-phase) |
+| 043 | PM | AAR | EPIC-CAD-03 after action report (Phase 1 complete) |
 
 ## Quick Reference
 
