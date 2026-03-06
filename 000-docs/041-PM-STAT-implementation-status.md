@@ -112,4 +112,4 @@ contracts and routing foundation are in place.
 
 - 034-AT-AUDT — Capability audit baseline
 - 038-PM-PLAN — Roadmap and phasing
-- 040-AT-SPEC — Scale readiness assessment
+- 040-AT-AUDT — Scale readiness assessment

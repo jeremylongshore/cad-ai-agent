@@ -20,7 +20,7 @@
 | 035 | ARCH | [035-AT-ARCH-drawing-intelligence-target.md](035-AT-ARCH-drawing-intelligence-target.md) |
 | 036 | SPEC | [036-AT-SPEC-response-contracts-taxonomy.md](036-AT-SPEC-response-contracts-taxonomy.md) |
 | 039 | ADEC | [039-AT-ADEC-intent-router-design.md](039-AT-ADEC-intent-router-design.md) |
-| 040 | SPEC | [040-AT-SPEC-scale-readiness.md](040-AT-SPEC-scale-readiness.md) |
+| 040 | AUDT | [040-AT-AUDT-scale-readiness.md](040-AT-AUDT-scale-readiness.md) |
 
 ### PP — Product & Planning
 | # | Type | File |
@@ -119,7 +119,7 @@
 | 037 | TQ | SPEC | Evaluation plan (5-tier, scorecard, golden trajectories) |
 | 038 | PM | PLAN | Drawing intelligence platform roadmap (12 epics, 5 phases) |
 | 039 | AT | ADEC | ADR: intent router design (hybrid heuristic+LLM) |
-| 040 | AT | SPEC | Scale readiness assessment (bottlenecks, migration path) |
+| 040 | AT | AUDT | Scale readiness assessment (bottlenecks, migration path) |
 | 041 | PM | STAT | Implementation status tracker (12 epics, living document) |
 
 ## Quick Reference
