@@ -163,9 +163,7 @@ class TestRegionContext:
         assert result.entity_count > 0
         # Categories should still work
         total_categorized = (
-            len(result.text_entities)
-            + len(result.dimension_entities)
-            + len(result.block_refs)
+            len(result.text_entities) + len(result.dimension_entities) + len(result.block_refs)
         )
         # Not all entities are categorized (LINE/LWPOLYLINE are just in entities)
         assert total_categorized <= result.entity_count
@@ -206,7 +204,9 @@ class TestEdgeCases:
         assert result.layers == ["NOTES"]
 
     def test_all_same_type(self, builder):
-        entities = [_entity(f"T{i}", EntityType.TEXT, "L", i * 10, 0, text=f"T{i}") for i in range(5)]
+        entities = [
+            _entity(f"T{i}", EntityType.TEXT, "L", i * 10, 0, text=f"T{i}") for i in range(5)
+        ]
         ctx = _context(entities)
         result = builder.build(ctx)
         assert len(result.text_entities) == 5

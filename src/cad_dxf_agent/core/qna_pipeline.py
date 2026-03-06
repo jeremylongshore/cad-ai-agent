@@ -120,9 +120,7 @@ class QuestionClassifier:
 class AnswerGenerator:
     """Generate deterministic answers from RegionContext and question type."""
 
-    def generate(
-        self, qtype: QnaQuestionType, ctx: RegionContext, prompt: str
-    ) -> QnaAnswer:
+    def generate(self, qtype: QnaQuestionType, ctx: RegionContext, prompt: str) -> QnaAnswer:
         if ctx.entity_count == 0:
             return self._empty_answer(qtype, ctx)
 
@@ -182,9 +180,10 @@ class AnswerGenerator:
             text = f'No text containing "{term}" found.'
             confidence = ctx.confidence * 0.8
         else:
-            lines = [f'  - {_describe_entity(e)}' for e in matches[:20]]
+            lines = [f"  - {_describe_entity(e)}" for e in matches[:20]]
             suffix = f"\n({len(matches) - 20} more)" if len(matches) > 20 else ""
-            text = f'Found {len(matches)} text entity(ies) containing "{term}":\n' + "\n".join(lines) + suffix
+            header = f'Found {len(matches)} text entity(ies) containing "{term}":'
+            text = f"{header}\n" + "\n".join(lines) + suffix
             confidence = ctx.confidence
 
         return QnaAnswer(
@@ -209,7 +208,7 @@ class AnswerGenerator:
             suffix = f"\n({count - 20} more)" if count > 20 else ""
             text = f"Layer {layer} has {count} entity(ies):\n" + "\n".join(lines) + suffix
         else:
-            lines = [f"  - {l}: {ctx.layer_counts[l]} entity(ies)" for l in ctx.layers]
+            lines = [f"  - {ly}: {ctx.layer_counts[ly]} entity(ies)" for ly in ctx.layers]
             evidence = []
             text = f"{len(ctx.layers)} layer(s) with entities:\n" + "\n".join(lines)
 
@@ -225,7 +224,9 @@ class AnswerGenerator:
 
     def _region_summary(self, ctx: RegionContext, prompt: str) -> QnaAnswer:
         scope = "Drawing" if ctx.is_whole_drawing else "Region"
-        parts = [f"{scope} contains {ctx.entity_count} entity(ies) across {len(ctx.layers)} layer(s)."]
+        parts = [
+            f"{scope} contains {ctx.entity_count} entity(ies) across {len(ctx.layers)} layer(s)."
+        ]
 
         if ctx.text_entities:
             parts.append(f"Text: {len(ctx.text_entities)} label(s).")
@@ -254,13 +255,16 @@ class AnswerGenerator:
         layer_name = _extract_layer_name(prompt, ctx.layers)
 
         if type_name:
-            count = sum(1 for e in ctx.entities if e.entity_type.value.upper() == type_name.upper())
+            upper_name = type_name.upper()
+            type_match = [e for e in ctx.entities if e.entity_type.value.upper() == upper_name]
+            count = len(type_match)
             text = f"There are {count} {type_name} entity(ies)."
-            evidence = [_evidence_from(e) for e in ctx.entities if e.entity_type.value.upper() == type_name.upper()][:10]
+            evidence = [_evidence_from(e) for e in type_match[:10]]
         elif layer_name:
             count = ctx.layer_counts.get(layer_name, 0)
             text = f"Layer {layer_name} has {count} entity(ies)."
-            evidence = [_evidence_from(e) for e in ctx.entities if e.layer.upper() == layer_name.upper()][:10]
+            layer_match = [e for e in ctx.entities if e.layer.upper() == layer_name.upper()]
+            evidence = [_evidence_from(e) for e in layer_match[:10]]
         else:
             text = f"There are {ctx.entity_count} entity(ies) total."
             evidence = [_evidence_from(e) for e in ctx.entities[:10]]
@@ -340,7 +344,8 @@ class AnswerGenerator:
         if term:
             # Search by text content first, then by handle
             matches = [
-                e for e in ctx.entities
+                e
+                for e in ctx.entities
                 if (e.text_content and term.lower() in e.text_content.lower())
                 or (e.block_name and term.lower() in e.block_name.lower())
                 or e.handle.lower() == term.lower()
@@ -403,9 +408,7 @@ class QnaPipeline:
         margin: float = 5.0,
     ) -> None:
         self._classifier = QuestionClassifier()
-        self._context_builder = RegionContextBuilder(
-            max_entities=max_entities, margin=margin
-        )
+        self._context_builder = RegionContextBuilder(max_entities=max_entities, margin=margin)
         self._generator = AnswerGenerator()
 
     def answer(

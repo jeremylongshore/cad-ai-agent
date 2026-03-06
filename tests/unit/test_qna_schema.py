@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from cad_dxf_agent.models.cad_schema import EntityRef, EntityType, Point2D
 from cad_dxf_agent.models.qna_schema import QnaAnswer, QnaQuestionType, RegionContext
 from cad_dxf_agent.models.region_schema import BoundingBox
@@ -46,8 +44,13 @@ class TestRegionContext:
         assert ctx.bounds is None
 
     def test_with_entities(self):
-        ent = EntityRef(handle="A1", entity_type=EntityType.TEXT, layer="NOTES",
-                        insert_point=Point2D(x=10, y=20), text_content="Hello")
+        ent = EntityRef(
+            handle="A1",
+            entity_type=EntityType.TEXT,
+            layer="NOTES",
+            insert_point=Point2D(x=10, y=20),
+            text_content="Hello",
+        )
         ctx = RegionContext(
             entities=[ent],
             text_entities=[ent],

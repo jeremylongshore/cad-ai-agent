@@ -10,7 +10,6 @@ These tests prove that:
 from __future__ import annotations
 
 import importlib
-import sys
 
 import pytest
 
@@ -28,16 +27,24 @@ def _sample_context():
         file_path="test.dxf",
         entities=[
             EntityRef(
-                handle="T1", entity_type=EntityType.TEXT, layer="NOTES",
-                insert_point=Point2D(x=10, y=10), text_content="FOOTING F1",
+                handle="T1",
+                entity_type=EntityType.TEXT,
+                layer="NOTES",
+                insert_point=Point2D(x=10, y=10),
+                text_content="FOOTING F1",
             ),
             EntityRef(
-                handle="L1", entity_type=EntityType.LINE, layer="STRUCTURAL",
+                handle="L1",
+                entity_type=EntityType.LINE,
+                layer="STRUCTURAL",
                 insert_point=Point2D(x=20, y=20),
             ),
             EntityRef(
-                handle="B1", entity_type=EntityType.INSERT, layer="STRUCTURAL",
-                insert_point=Point2D(x=30, y=30), block_name="COLUMN_MARK",
+                handle="B1",
+                entity_type=EntityType.INSERT,
+                layer="STRUCTURAL",
+                insert_point=Point2D(x=30, y=30),
+                block_name="COLUMN_MARK",
             ),
         ],
     )
@@ -54,21 +61,23 @@ class TestQnaDoesNotProduceOperations:
     def context(self):
         return _sample_context()
 
-    @pytest.mark.parametrize("prompt", [
-        "What is on layer NOTES?",
-        "How many entities are there?",
-        'Find text containing "FOOTING"',
-        "What dimensions are here?",
-        "What blocks are in the drawing?",
-        "Where is entity T1?",
-        "Tell me about this area",
-        "List all entities",
-    ])
+    @pytest.mark.parametrize(
+        "prompt",
+        [
+            "What is on layer NOTES?",
+            "How many entities are there?",
+            'Find text containing "FOOTING"',
+            "What dimensions are here?",
+            "What blocks are in the drawing?",
+            "Where is entity T1?",
+            "Tell me about this area",
+            "List all entities",
+        ],
+    )
     def test_qna_prompt_does_not_produce_operations(self, pipeline, context, prompt):
         resp = pipeline.answer(prompt, context)
         assert resp.operations == [], (
-            f"QNA response for '{prompt}' should have no operations, "
-            f"got {len(resp.operations)}"
+            f"QNA response for '{prompt}' should have no operations, got {len(resp.operations)}"
         )
 
 
@@ -98,12 +107,15 @@ class TestQnaResponseType:
     def context(self):
         return _sample_context()
 
-    @pytest.mark.parametrize("prompt", [
-        "What is on layer NOTES?",
-        "How many entities?",
-        "List entities",
-        "Tell me about this area",
-    ])
+    @pytest.mark.parametrize(
+        "prompt",
+        [
+            "What is on layer NOTES?",
+            "How many entities?",
+            "List entities",
+            "Tell me about this area",
+        ],
+    )
     def test_qna_response_type_is_answer_only(self, pipeline, context, prompt):
         resp = pipeline.answer(prompt, context)
         assert resp.response_type in ("answer_only", "needs_clarification"), (
@@ -118,8 +130,7 @@ class TestQnaV2EndpointDoesNotCallPlanner:
     """V2 endpoint QNA handler must dispatch to QnaPipeline, not run_planner."""
 
     def test_qna_v2_endpoint_does_not_call_run_planner(self):
-        starlette = pytest.importorskip("starlette")
-        import importlib
+        pytest.importorskip("starlette")
         mod = importlib.import_module("web.backend.main")
         source = importlib.util.find_spec(mod.__name__).origin
         with open(source) as f:

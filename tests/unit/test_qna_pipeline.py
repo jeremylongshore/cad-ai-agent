@@ -142,7 +142,8 @@ class TestAnswerGenerator:
     @pytest.fixture
     def region_ctx(self, sample_entities):
         texts = [e for e in sample_entities if e.entity_type in (EntityType.TEXT, EntityType.MTEXT)]
-        dims = [e for e in sample_entities if e.entity_type in (EntityType.DIMENSION, EntityType.LEADER)]
+        dim_types = (EntityType.DIMENSION, EntityType.LEADER)
+        dims = [e for e in sample_entities if e.entity_type in dim_types]
         blocks = [e for e in sample_entities if e.entity_type == EntityType.INSERT]
         return RegionContext(
             entities=sample_entities,
@@ -193,7 +194,11 @@ class TestAnswerGenerator:
         assert "10 entity(ies)" in ans.answer_text
 
     def test_entity_count_by_type(self, generator, region_ctx):
-        ans = generator.generate(QnaQuestionType.ENTITY_COUNT, region_ctx, "How many LINE entities?")
+        ans = generator.generate(
+            QnaQuestionType.ENTITY_COUNT,
+            region_ctx,
+            "How many LINE entities?",
+        )
         assert "LINE" in ans.answer_text
 
     def test_dimension_query_with_dims(self, generator, region_ctx):
@@ -201,8 +206,11 @@ class TestAnswerGenerator:
         assert "2 dimension(s)" in ans.answer_text
 
     def test_dimension_query_no_dims(self, generator):
-        ctx = RegionContext(entities=[_entity("L1", EntityType.LINE, "L", 0, 0)],
-                           entity_count=1, is_whole_drawing=True)
+        ctx = RegionContext(
+            entities=[_entity("L1", EntityType.LINE, "L", 0, 0)],
+            entity_count=1,
+            is_whole_drawing=True,
+        )
         ans = generator.generate(QnaQuestionType.DIMENSION_QUERY, ctx, "Dimensions?")
         assert "No dimensions" in ans.answer_text
 
@@ -212,8 +220,11 @@ class TestAnswerGenerator:
         assert "COLUMN_MARK" in ans.answer_text
 
     def test_block_query_no_blocks(self, generator):
-        ctx = RegionContext(entities=[_entity("L1", EntityType.LINE, "L", 0, 0)],
-                           entity_count=1, is_whole_drawing=True)
+        ctx = RegionContext(
+            entities=[_entity("L1", EntityType.LINE, "L", 0, 0)],
+            entity_count=1,
+            is_whole_drawing=True,
+        )
         ans = generator.generate(QnaQuestionType.BLOCK_QUERY, ctx, "Blocks?")
         assert "No block references" in ans.answer_text
 
@@ -338,7 +349,8 @@ class TestExtractLayerName:
         assert result == "UNKNOWN"
 
     def test_implicit_layer_in_prompt(self):
-        assert _extract_layer_name("Show STRUCTURAL entities", ["NOTES", "STRUCTURAL"]) == "STRUCTURAL"
+        result = _extract_layer_name("Show STRUCTURAL entities", ["NOTES", "STRUCTURAL"])
+        assert result == "STRUCTURAL"
 
     def test_no_layer(self):
         assert _extract_layer_name("Hello world", ["NOTES"]) is None
