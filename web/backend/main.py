@@ -1235,6 +1235,7 @@ def _parse_selected_region(selected_regions: list[dict] | None):
             center=Point2D(x=(min_x + max_x) / 2, y=(min_y + max_y) / 2),
         )
     except (KeyError, ValueError, TypeError):
+        logger.debug("Failed to parse selected_region: %s", selected_regions, exc_info=True)
         return None
 
 

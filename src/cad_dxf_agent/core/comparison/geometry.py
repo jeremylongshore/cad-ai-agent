@@ -9,7 +9,7 @@ from typing import Any
 
 import ezdxf
 
-from ...models.cad_schema import EntityType, Point2D, TextGeometry, TextProvenance
+from ...models.cad_schema import EntityType, Point2D, TextGeometry
 from ...models.comparison_schema import (
     BBoxRegion,
     ComparisonConfig,
@@ -17,6 +17,7 @@ from ...models.comparison_schema import (
     GeometrySnapshot,
 )
 from ...otel import get_tracer
+from ..dxf_reader import _extract_mtext_geometry, _extract_text_geometry
 
 logger = logging.getLogger(__name__)
 tracer = get_tracer(__name__)
@@ -310,13 +311,13 @@ def _extract_one(
             insert = entity.dxf.insert
             points = [Point2D(x=insert.x, y=insert.y)]
             text_content = entity.dxf.text
-            text_geometry = _snap_text_geometry(entity)
+            text_geometry = _extract_text_geometry(entity)
 
         elif dxf_type == "MTEXT":
             insert = entity.dxf.insert
             points = [Point2D(x=insert.x, y=insert.y)]
             text_content = entity.plain_text()  # type: ignore[attr-defined]
-            text_geometry = _snap_mtext_geometry(entity)
+            text_geometry = _extract_mtext_geometry(entity)
 
         elif dxf_type == "INSERT":
             insert = entity.dxf.insert
@@ -436,27 +437,3 @@ def _extract_one(
     )
 
 
-def _snap_text_geometry(entity: ezdxf.entities.DXFGraphic) -> TextGeometry:
-    """Extract text geometry from a DXF TEXT entity for comparison snapshots."""
-    dxf = entity.dxf
-    return TextGeometry(
-        height=dxf.get("height", None),
-        rotation=dxf.get("rotation", 0.0) % 360.0,
-        halign=dxf.get("halign", 0),
-        valign=dxf.get("valign", 0),
-        width_factor=dxf.get("width", 1.0),
-        oblique=dxf.get("oblique", 0.0),
-        provenance=TextProvenance.NATIVE_CAD_TEXT,
-    )
-
-
-def _snap_mtext_geometry(entity: ezdxf.entities.DXFGraphic) -> TextGeometry:
-    """Extract text geometry from a DXF MTEXT entity for comparison snapshots."""
-    dxf = entity.dxf
-    return TextGeometry(
-        height=dxf.get("char_height", None),
-        rotation=dxf.get("rotation", 0.0) % 360.0,
-        attachment_point=dxf.get("attachment_point", None),
-        char_height=dxf.get("char_height", None),
-        provenance=TextProvenance.NATIVE_CAD_TEXT,
-    )

@@ -5,7 +5,7 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class EntityType(StrEnum):
@@ -72,6 +72,11 @@ class TextGeometry(BaseModel):
         default=1.0, description="Text content confidence [0-1], 1.0 for native CAD"
     )
 
+    @field_validator("rotation", mode="before")
+    @classmethod
+    def _normalize_rotation(cls, v: float) -> float:
+        return v % 360.0
+
     @property
     def effective_height(self) -> float | None:
         """Return char_height (MTEXT) if set, else height (TEXT)."""
@@ -128,6 +133,7 @@ TEXT_PROVENANCE_DEFAULTS: dict[TextProvenance, dict[str, float]] = {
 }
 
 _AVG_CHAR_WIDTH_RATIO = 0.6
+_APPROX_LINE_SPACING = 1.2
 
 
 def compute_approx_text_bbox(
@@ -142,7 +148,7 @@ def compute_approx_text_bbox(
         return None
     if mtext_width and mtext_width > 0:
         w = mtext_width
-        total_h = h * max(len(text.split("\n")), 1) * 1.2
+        total_h = h * max(len(text.split("\n")), 1) * _APPROX_LINE_SPACING
     else:
         w = h * len(text) * tg.width_factor * _AVG_CHAR_WIDTH_RATIO
         total_h = h

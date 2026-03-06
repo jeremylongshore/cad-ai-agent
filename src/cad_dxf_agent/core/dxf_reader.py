@@ -162,7 +162,9 @@ def _parse_entity(
         attributes["insert_xscale"] = insert_xscale
         attributes["insert_yscale"] = insert_yscale
         attributes["insert_rotation"] = insert_rotation
-        # Extract ATTRIB text with geometry
+        # Extract ATTRIB text with geometry.
+        # NOTE: text_content/text_geometry use the first ATTRIB only;
+        # all ATTRIBs are stored in attributes["attribs"] for full access.
         try:
             attribs = list(entity.attribs)  # type: ignore[attr-defined]
             if attribs:
@@ -177,11 +179,10 @@ def _parse_entity(
                     try:
                         ai = attrib.dxf.insert
                         attrib_data[tag]["insert"] = {"x": ai.x, "y": ai.y}
-                    except Exception:
-                        logger.debug("INSERT %s: attrib insert read failed", handle)
+                    except Exception as e:
+                        logger.debug("INSERT %s: attrib insert read failed: %s", handle, e)
                 if attrib_data:
                     attributes["attribs"] = attrib_data
-                    # Use first attrib's text as text_content if none set
                     first = next(iter(attrib_data.values()))
                     text_content = first["text"]
                     # ATTRIB height already reflects INSERT scale in DXF
@@ -192,8 +193,12 @@ def _parse_entity(
                         confidence_position=0.95,
                         confidence_rotation=0.95,
                     )
+        except AttributeError:
+            logger.debug("INSERT %s: entity has no attribs attribute", handle)
         except Exception:
-            logger.debug("INSERT %s: attrib extraction failed", handle)
+            logger.warning(
+                "INSERT %s: unexpected error in attrib extraction", handle, exc_info=True
+            )
     elif dxf_type == "CIRCLE":
         center = entity.dxf.center
         insert_point = Point2D(x=center.x, y=center.y)
