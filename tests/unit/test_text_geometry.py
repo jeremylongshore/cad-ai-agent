@@ -16,6 +16,7 @@ from cad_dxf_agent.models.cad_schema import (
     Point2D,
     TextGeometry,
     TextProvenance,
+    compute_approx_text_bbox,
 )
 
 # ==========================================================================
@@ -600,3 +601,87 @@ class TestSemanticModelTextGeometry:
         )
         result = build_planner_context(ctx)
         assert "text_geometry" not in result["entities"][0]
+
+
+# ==========================================================================
+# for_provenance() factory
+# ==========================================================================
+
+
+class TestForProvenanceFactory:
+    def test_native_cad_defaults(self):
+        tg = TextGeometry.for_provenance(TextProvenance.NATIVE_CAD_TEXT)
+        assert tg.provenance == TextProvenance.NATIVE_CAD_TEXT
+        assert tg.confidence_position == 1.0
+        assert tg.confidence_rotation == 1.0
+        assert tg.confidence_content == 1.0
+
+    def test_ocr_defaults(self):
+        tg = TextGeometry.for_provenance(TextProvenance.RASTER_OCR_TEXT)
+        assert tg.provenance == TextProvenance.RASTER_OCR_TEXT
+        assert tg.confidence_position == 0.3
+        assert tg.confidence_rotation == 0.2
+        assert tg.confidence_content == 0.5
+
+    def test_vector_defaults(self):
+        tg = TextGeometry.for_provenance(TextProvenance.VECTOR_OUTLINE_TEXT)
+        assert tg.provenance == TextProvenance.VECTOR_OUTLINE_TEXT
+        assert tg.confidence_position == 0.6
+
+    def test_block_attribute_defaults(self):
+        tg = TextGeometry.for_provenance(TextProvenance.BLOCK_ATTRIBUTE_TEXT)
+        assert tg.provenance == TextProvenance.BLOCK_ATTRIBUTE_TEXT
+        assert tg.confidence_position == 0.95
+        assert tg.confidence_content == 1.0
+
+    def test_overrides_applied(self):
+        tg = TextGeometry.for_provenance(
+            TextProvenance.RASTER_OCR_TEXT, height=12.0, confidence_content=0.9
+        )
+        assert tg.height == 12.0
+        assert tg.confidence_content == 0.9
+        # Non-overridden fields use defaults
+        assert tg.confidence_position == 0.3
+
+
+# ==========================================================================
+# compute_approx_text_bbox()
+# ==========================================================================
+
+
+class TestComputeApproxTextBbox:
+    def test_simple_text(self):
+        tg = TextGeometry(height=10.0)
+        bbox = compute_approx_text_bbox("HELLO", tg)
+        assert bbox is not None
+        min_pt, max_pt = bbox
+        assert min_pt.x == 0.0
+        assert min_pt.y == 0.0
+        # width = 10 * 5 * 1.0 * 0.6 = 30
+        assert max_pt.x == 30.0
+        assert max_pt.y == 10.0
+
+    def test_width_factor_scales(self):
+        tg = TextGeometry(height=10.0, width_factor=2.0)
+        bbox = compute_approx_text_bbox("AB", tg)
+        assert bbox is not None
+        _, max_pt = bbox
+        # width = 10 * 2 * 2.0 * 0.6 = 24
+        assert max_pt.x == 24.0
+
+    def test_mtext_with_width(self):
+        tg = TextGeometry(height=5.0, char_height=5.0)
+        bbox = compute_approx_text_bbox("Line1\nLine2\nLine3", tg, mtext_width=50.0)
+        assert bbox is not None
+        _, max_pt = bbox
+        assert max_pt.x == 50.0
+        # total_h = 5 * 3 * 1.2 = 18
+        assert max_pt.y == 18.0
+
+    def test_none_for_missing_height(self):
+        tg = TextGeometry()
+        assert compute_approx_text_bbox("text", tg) is None
+
+    def test_none_for_empty_text(self):
+        tg = TextGeometry(height=10.0)
+        assert compute_approx_text_bbox("", tg) is None

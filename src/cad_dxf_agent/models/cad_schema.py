@@ -85,6 +85,23 @@ class TextGeometry(BaseModel):
             TextProvenance.BLOCK_ATTRIBUTE_TEXT,
         )
 
+    @classmethod
+    def for_provenance(cls, provenance: TextProvenance, **overrides: Any) -> TextGeometry:
+        """Factory with default confidence for a given provenance.
+
+        Usage for future OCR/vector modules:
+            tg = TextGeometry.for_provenance(TextProvenance.RASTER_OCR_TEXT, height=12.0)
+        """
+        defaults = TEXT_PROVENANCE_DEFAULTS[provenance]
+        kwargs: dict[str, Any] = {
+            "provenance": provenance,
+            "confidence_position": defaults["position"],
+            "confidence_rotation": defaults["rotation"],
+            "confidence_content": defaults["content"],
+        }
+        kwargs.update(overrides)
+        return cls(**kwargs)
+
 
 # Trust hierarchy ordering — lower index = higher trust
 TEXT_PROVENANCE_TRUST_ORDER: list[TextProvenance] = [
@@ -109,6 +126,27 @@ TEXT_PROVENANCE_DEFAULTS: dict[TextProvenance, dict[str, float]] = {
         "position": 0.3, "rotation": 0.2, "content": 0.5,
     },
 }
+
+_AVG_CHAR_WIDTH_RATIO = 0.6
+
+
+def compute_approx_text_bbox(
+    text: str,
+    tg: TextGeometry,
+    *,
+    mtext_width: float | None = None,
+) -> tuple[Point2D, Point2D] | None:
+    """Approximate text bbox in local space (pre-rotation). Returns (min, max) corners."""
+    h = tg.effective_height
+    if h is None or not text:
+        return None
+    if mtext_width and mtext_width > 0:
+        w = mtext_width
+        total_h = h * max(len(text.split("\n")), 1) * 1.2
+    else:
+        w = h * len(text) * tg.width_factor * _AVG_CHAR_WIDTH_RATIO
+        total_h = h
+    return (Point2D(x=0.0, y=0.0), Point2D(x=w, y=total_h))
 
 
 class EntityRef(BaseModel):
