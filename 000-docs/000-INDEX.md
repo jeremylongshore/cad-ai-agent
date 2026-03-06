@@ -16,6 +16,7 @@
 
 | 025 | ARCH | [025-AT-ARCH-web-mvp.md](025-AT-ARCH-web-mvp.md) |
 | 030 | AUDT | [030-AT-AUDT-deliverables-v1.md](030-AT-AUDT-deliverables-v1.md) |
+| 034 | AUDT | [034-AT-AUDT-capability-audit.md](034-AT-AUDT-capability-audit.md) |
 
 ### PP — Product & Planning
 | # | Type | File |
@@ -105,6 +106,7 @@
 | 031 | PM | PLAN | Performance hardening plan (6-phase program) |
 | 032 | TQ | TEST | Sawcuts sample drawing PDF (test fixture) |
 | 033 | AA | AACR | Release v0.5.0 AAR |
+| 034 | AT | AUDT | Capability audit: current vs target |
 
 ## Quick Reference
 
