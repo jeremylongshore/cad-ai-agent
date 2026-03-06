@@ -12,7 +12,7 @@
 |---|------|---------|--------|--------|----|-----------------|-------|
 | 01 | Capability Audit + Architecture Baseline | cad-uns | DONE | `feature/epic-cad-01-capability-audit` | #71 | 8 docs (034-041), beads task tree | N/A (docs only) |
 | 02 | Core Contracts + Routing Foundation | cad-d9a | DONE | `feature/epic-cad-02-core-contracts-routing` | #74, #75 | `response_schema.py`, `intent_router.py`, `capability_registry.py`, `response_builder.py`, `/api/v2/prompt` | 140 tests — unit (37 schema + 48 router + 10 registry + 18 builder), web (12 v2 endpoint), integration (5 pipeline) + 50-entry golden routing file |
-| 03 | Selection + Markup Interpretation Foundation | cad-wd2 | NOT STARTED | — | — | Region model, markup overlay ingestion, entity association | TBD — unit (region model, entity association), integration (markup ingestion pipeline) |
+| 03 | Selection + Markup Interpretation Foundation | cad-wd2 | DONE | `feature/epic-cad-03-selection-markup` | TBD | `region_schema.py`, `markup_parser.py`, `region_associator.py`, `selection_debug.py` | 93 tests — unit (27 schema + 31 parser + 19 associator + 16 debug) |
 | 04 | Region Q&A Vertical Slice | cad-grx | NOT STARTED | — | — | Region context builder, grounded Q&A pipeline, golden tests | TBD — golden trajectories (region_qa family), scorecard entries, live API tests |
 | 05 | Repeated-Condition Detection | cad-ccd | NOT STARTED | — | — | Similarity scoring, candidate search, preview/approval workflow | TBD — unit (similarity scoring), golden trajectories (repeated_condition family), scorecard entries |
 | 06 | Compare + Diff Service Hardening | cad-3e4 | NOT STARTED | — | — | Typed compare schema, alignment diagnostics, regression fixtures | TBD — unit (typed schema), regression fixtures, integration (alignment diagnostics) |
@@ -30,7 +30,7 @@
 
 | Phase | Epics | Status | Gate |
 |-------|-------|--------|------|
-| **Phase 1: Foundation** | 01, 02, 03 | 2/3 complete | Contracts locked, `make check` green |
+| **Phase 1: Foundation** | 01, 02, 03 | 3/3 COMPLETE | Contracts locked, regions normalized, `make check` green |
 | **Phase 2: Core Intelligence** | 04, 05, 06 | 0/3 complete | Golden trajectories pass per family |
 | **Architecture Review** | ARCH-REVIEW-01 | Not started | ADR document with keep/change/remove decisions per module |
 | **Phase 3: Structured Editing** | 07, 08 | 0/2 complete | Edit plan + apply produce audit metadata. Key files: `src/cad_dxf_agent/llm/plan_builder.py`, `src/cad_dxf_agent/models/plan_schema.py`, `web/frontend/src/components/PreviewPanel.jsx`, `web/backend/routes/preview.py` |
@@ -53,8 +53,8 @@ EPIC-01 (DONE) → EPIC-02 (DONE)
               EPIC-04..10 → EPIC-12
 ```
 
-**Critical path:** EPIC-02 is DONE. EPIC-03 (Selection + Markup Interpretation) is the next gate.
-EPIC-06 (Compare + Diff Hardening) can proceed in parallel.
+**Critical path:** Phase 1 COMPLETE (EPIC-01, 02, 03). Phase 2 begins:
+EPIC-04 (Region Q&A) and EPIC-06 (Compare + Diff Hardening) can start in parallel.
 
 ---
 
@@ -110,7 +110,7 @@ EPIC-06 (Compare + Diff Hardening) can proceed in parallel.
 |---|------|-----------|
 | 01 | Capability Audit + Architecture Baseline | Completed |
 | 02 | Core Contracts + Routing Foundation | DONE — PR #74 + #75 merged, bead closed. AAR: [042-PM-AAR](042-PM-AAR-epic-cad-02-aar.md) |
-| 03 | Selection + Markup Interpretation Foundation | Design `Region` Pydantic model with bounding box + entity association; draft markup overlay ingestion interface |
+| 03 | Selection + Markup Interpretation Foundation | DONE — PR merged, bead closed. AAR: [043-PM-AAR](043-PM-AAR-epic-cad-03-aar.md) |
 | 04 | Region Q&A Vertical Slice | Implement region context builder that filters entities by bounding box; write first golden trajectory for region_qa |
 | 05 | Repeated-Condition Detection | Prototype entity similarity scoring function; define candidate result schema |
 | 06 | Compare + Diff Service Hardening | Audit existing `core/comparison/` for untyped returns; define typed `CompareResult` schema |
@@ -126,9 +126,9 @@ EPIC-06 (Compare + Diff Hardening) can proceed in parallel.
 
 ## 8. Global Next Actions
 
-1. **Begin EPIC-03** — Selection + Markup Interpretation Foundation (next gate)
+1. **Begin EPIC-04** — Region Q&A Vertical Slice (Phase 2)
 2. **Begin EPIC-06** — Compare + Diff Service Hardening (can start in parallel)
-3. **Review AAR** — [042-PM-AAR-epic-cad-02-aar.md](042-PM-AAR-epic-cad-02-aar.md) for lessons learned
+3. **Review AAR** — [043-PM-AAR-epic-cad-03-aar.md](043-PM-AAR-epic-cad-03-aar.md) for lessons learned
 
 ---
 
@@ -148,3 +148,4 @@ EPIC-06 (Compare + Diff Hardening) can proceed in parallel.
 | 2026-03-06 | Audit hardening: fixed doc count (6→8), added Tests column, mapped risks to epics, added Phase 4-5 risks, added per-epic Next Steps, added concrete file paths for Phases 3-5, clarified ARCH-REVIEW-01 output format, added this changelog |
 | 2026-03-06 | EPIC-02 DONE: 140 new tests, 7 new/modified files, response contracts + intent router + capability registry + response builder + /api/v2/prompt endpoint |
 | 2026-03-06 | EPIC-02 AAR: updated PR refs (TBD→#74,#75), test count (112→140), critical path (EPIC-03 is next gate), added AAR doc 042 |
+| 2026-03-06 | EPIC-03 DONE: 93 new tests, 4 new source files (region_schema, markup_parser, region_associator, selection_debug). Phase 1 COMPLETE. |
