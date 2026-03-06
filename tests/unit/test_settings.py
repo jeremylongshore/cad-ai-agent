@@ -43,9 +43,9 @@ class TestSettings:
         """get_api_key returns the env var value for known providers."""
         from cad_dxf_agent.settings import Settings
 
-        with patch.dict(os.environ, {"CAD_OPENAI_API_KEY": "sk-test123"}, clear=True):
+        with patch.dict(os.environ, {"CAD_GEMINI_API_KEY": "test-key-123"}, clear=True):
             s = Settings()
-            assert s.get_api_key("openai") == "sk-test123"
+            assert s.get_api_key("gemini-key") == "test-key-123"
 
     def test_get_api_key_unknown_provider(self):
         """get_api_key returns None for unknown providers."""

@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-03-06
+
+### Added
+- **Interactive WebGL Viewer**: Hardware-accelerated DXF rendering with pan/zoom/rotate in browser (#63)
+- **Compare Tab UX Overhaul**: Streamlined revision comparison workflow with improved side-by-side views (#65)
+- **DWG on Cloud Run**: Server-side DWG-to-DXF conversion via ODA File Converter for web uploads
+
+### Fixed
+- Filter sub-pixel noise entities from PDF extraction to reduce false matches (#68)
+- PDF entity colors, classifier heuristics, and render quality guard (#67)
+- E2E global auth setup and sidebar close behavior (#66)
+- Fetch timeouts, friendly error messages, and request logging in web backend
+- Anonymous Firebase users bypass license check (#auth)
+- Docker ODA install made optional with file-size guard (#docker)
+- E2E test stability: sourced upload batching, suggestion chips, alignment confidence
+
+### Changed
+- Test count: 1150 → 1375 tests
+- Coverage: 89% → 95% across all modules (#61)
+- E2E suite: +36 tests (interactive viewer, sourced uploads)
+
+### Dependencies
+- Bump docker/login-action from 3 to 4 (#69)
+
 ## [0.4.0] - 2026-03-02
 
 ### Added

@@ -1,3 +1,4 @@
+import { useRef, useState, useEffect } from 'react';
 import { useSession } from '../hooks/useSession';
 import FileUpload from './FileUpload';
 import ChatPanel from './ChatPanel';
@@ -5,7 +6,14 @@ import PreviewPanel from './PreviewPanel';
 
 export default function Workspace({ user, onSignOut }) {
   const session = useSession();
-  const { fileInfo, sessionId, messages, operations, selectedOps, previewUrls, comparisonResult, loading, loadingStartTime, error } = session;
+  const { fileInfo, sessionId, messages, operations, selectedOps, previewUrls, dxfUrls, comparisonResult, loading, loadingStartTime, error } = session;
+  const replaceInputRef = useRef(null);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  // Auto-collapse sidebar when file is uploaded (compact bar already shows info)
+  useEffect(() => {
+    if (fileInfo) setSidebarCollapsed(true);
+  }, [fileInfo]);
 
   return (
     <div className="page" style={{ height: '100vh', overflow: 'hidden' }}>
@@ -52,9 +60,43 @@ export default function Workspace({ user, onSignOut }) {
           </div>
         </main>
       ) : (
-        <div className="workspace">
-          <div className="workspace__upload-bar">
-            <FileUpload onUpload={session.upload} loading={loading} />
+        <div className={`workspace${sidebarCollapsed ? ' workspace--sidebar-collapsed' : ''}`}>
+          <div className={`workspace__upload-bar${fileInfo ? ' workspace__upload-bar--compact' : ''}`}>
+            {fileInfo ? (
+              <div className="upload-bar-compact">
+                <span className="upload-bar-compact__filename">{fileInfo.filename}</span>
+                <span className="upload-bar-compact__meta">
+                  {fileInfo.entity_count} entities &middot; {fileInfo.layer_count} layers
+                </span>
+                <button
+                  className="btn btn--ghost btn--sm"
+                  onClick={() => setSidebarCollapsed((c) => !c)}
+                  title={sidebarCollapsed ? 'Show file info' : 'Hide file info'}
+                >
+                  {sidebarCollapsed ? 'Info' : 'Hide Info'}
+                </button>
+                <button
+                  className="btn btn--ghost btn--sm"
+                  onClick={() => replaceInputRef.current?.click()}
+                >
+                  Replace file
+                </button>
+                <input
+                  ref={replaceInputRef}
+                  type="file"
+                  accept=".dxf,.dwg,.pdf"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) session.upload(file);
+                    e.target.value = '';
+                  }}
+                  style={{ display: 'none' }}
+                  aria-hidden="true"
+                />
+              </div>
+            ) : (
+              <FileUpload onUpload={session.upload} loading={loading} />
+            )}
           </div>
 
           <aside className="workspace__sidebar" aria-label="File information">
@@ -71,6 +113,22 @@ export default function Workspace({ user, onSignOut }) {
                   <span>Layers</span>
                   <span className="file-info__stat-value">{fileInfo.layer_count}</span>
                 </div>
+                {fileInfo.page_classifications && (
+                  <div style={{ marginTop: 'var(--space-3)' }}>
+                    <p className="text-xs text-tertiary" style={{ marginBottom: 'var(--space-1)' }}>Pages</p>
+                    <div className="flex gap-1" style={{ flexWrap: 'wrap' }}>
+                      {fileInfo.page_classifications.map((c) => (
+                        <span
+                          key={c.page}
+                          className={`badge ${c.type === 'vector_layout' ? 'badge--success' : c.type === 'raster_scanned' ? 'badge--warning' : ''}`}
+                          title={`${c.vectors} vectors, ${c.text} text`}
+                        >
+                          P{c.page}: {c.type.replace('_', ' ')}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 {fileInfo.layers && (
                   <div style={{ marginTop: 'var(--space-3)' }}>
                     <p className="text-xs text-tertiary" style={{ marginBottom: 'var(--space-1)' }}>Layers</p>
@@ -88,6 +146,7 @@ export default function Workspace({ user, onSignOut }) {
           <section className="workspace__main" aria-label="Drawing preview">
             <PreviewPanel
               previewUrls={previewUrls}
+              dxfUrls={dxfUrls}
               operations={operations}
               selectedOps={selectedOps}
               onToggleOp={session.toggleOp}
@@ -108,6 +167,7 @@ export default function Workspace({ user, onSignOut }) {
               onRevisionBulkApprove={session.handleRevisionBulkApprove}
               onRevisionApply={session.handleRevisionApply}
               onBundleDownload={session.handleBundleDownload}
+              onRealign={session.handleRealign}
             />
           </section>
 

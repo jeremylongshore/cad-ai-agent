@@ -7,7 +7,13 @@ from pathlib import Path
 import ezdxf
 import pytest
 
-from cad_dxf_agent.core.converter import _PDF_WARNING, ConversionResult, convert_to_dxf
+from cad_dxf_agent.core.converter import (
+    _PDF_WARNING,
+    PDF_ENTITY_COLOR,
+    ConversionResult,
+    _rgb_to_aci,
+    convert_to_dxf,
+)
 
 
 class TestDxfPassthrough:
@@ -232,14 +238,15 @@ class TestFitzExtraction:
 
         return R(x0, y0, x1, y1)
 
-    def _make_page(self, height=792, drawings=None, text_dict=None):
+    def _make_page(self, height=792, width=612, drawings=None, text_dict=None):
         class MockPage:
-            def __init__(self, h, d, t):
+            def __init__(self, h, w, d, t):
                 class Rect:
-                    def __init__(self, h):
+                    def __init__(self, h, w):
                         self.height = h
+                        self.width = w
 
-                self.rect = Rect(h)
+                self.rect = Rect(h, w)
                 self._drawings = d or []
                 self._text = t or {"blocks": []}
 
@@ -249,7 +256,7 @@ class TestFitzExtraction:
             def get_text(self, mode, flags=0):
                 return self._text
 
-        return MockPage(height, drawings, text_dict)
+        return MockPage(height, width, drawings, text_dict)
 
     def test_rectangle_extracted(self, tmp_path, monkeypatch):
         """'re' items produce a closed LWPOLYLINE."""
@@ -474,6 +481,49 @@ class TestFitzExtraction:
         msp = doc.modelspace()
         count = _extract_pdf_fitz(msp, tmp_path / "dummy.pdf")
         assert count == 0
+
+    def test_multipage_pages_are_offset(self, tmp_path, monkeypatch):
+        """Multi-page PDFs lay out pages side-by-side with x_offset."""
+        import sys
+
+        import ezdxf
+
+        from cad_dxf_agent.core.converter import PDF_PAGE_GAP
+
+        page_width = 612.0
+        # Page 1: one line at x=10
+        page1 = self._make_page(
+            width=page_width,
+            drawings=[{"items": [("l", self._make_point(10, 0), self._make_point(10, 100))]}],
+        )
+        # Page 2: one line at x=20 (should be offset by page_width + gap)
+        page2 = self._make_page(
+            width=page_width,
+            drawings=[{"items": [("l", self._make_point(20, 0), self._make_point(20, 100))]}],
+        )
+        fitz_mod = self._make_fitz_module([page1, page2])
+        monkeypatch.setitem(sys.modules, "fitz", fitz_mod)
+
+        from cad_dxf_agent.core.converter import _extract_pdf_fitz
+
+        doc = ezdxf.new()
+        msp = doc.modelspace()
+        count = _extract_pdf_fitz(msp, tmp_path / "dummy.pdf")
+        assert count == 2
+
+        entities = list(msp)
+        line1 = entities[0]
+        line2 = entities[1]
+
+        # Page 1 line stays near x=10
+        assert abs(line1.dxf.start.x - 10.0) < 0.01
+
+        # Page 2 line is offset by page_width + gap
+        expected_x = page_width + PDF_PAGE_GAP + 20.0
+        assert abs(line2.dxf.start.x - expected_x) < 0.01
+
+        # Page 2 goes on named layer
+        assert line2.dxf.layer == "PDF_PAGE_2"
 
 
 class TestArcFittingEdgeCases:
@@ -723,6 +773,177 @@ class TestPdfConversionException:
         result = _convert_pdf(pdf_path, tmp_path)
         assert result.success is False
         assert "PDF conversion failed" in (result.error or "")
+
+
+class TestPdfEntityColors:
+    """Entities from PDF extraction must have explicit ACI colors."""
+
+    def test_fitz_entities_have_explicit_color(self, tmp_path, monkeypatch):
+        """Every entity from _extract_pdf_fitz has an explicit color (not BYLAYER/256)."""
+        import sys
+        import types
+
+        import ezdxf
+
+        fitz_mod = types.ModuleType("fitz")
+        fitz_mod.TEXT_PRESERVE_WHITESPACE = 1
+
+        class Pt:
+            def __init__(self, x, y):
+                self.x = x
+                self.y = y
+
+        class MockPage:
+            class Rect:
+                height = 792.0
+                width = 612.0
+
+            rect = Rect()
+
+            def get_drawings(self):
+                return [{"items": [("l", Pt(0, 0), Pt(10, 10))], "color": None}]
+
+            def get_text(self, mode, flags=0):
+                return {"blocks": []}
+
+        class MockDoc:
+            def __iter__(self):
+                return iter([MockPage()])
+
+            def close(self):
+                pass
+
+        fitz_mod.open = lambda path: MockDoc()
+        monkeypatch.setitem(sys.modules, "fitz", fitz_mod)
+
+        from cad_dxf_agent.core.converter import _extract_pdf_fitz
+
+        doc = ezdxf.new()
+        doc.layers.get("0").color = PDF_ENTITY_COLOR
+        msp = doc.modelspace()
+        count = _extract_pdf_fitz(msp, tmp_path / "dummy.pdf", doc)
+        assert count == 1
+
+        for entity in msp:
+            assert entity.dxf.color != 256, f"{entity.dxftype()} has BYLAYER color"
+            assert entity.dxf.color == PDF_ENTITY_COLOR
+
+    def test_fitz_layers_created_with_color(self, tmp_path, monkeypatch):
+        """Per-page layers (PDF_PAGE_2, etc.) are created with explicit colors."""
+        import sys
+        import types
+
+        import ezdxf
+
+        fitz_mod = types.ModuleType("fitz")
+        fitz_mod.TEXT_PRESERVE_WHITESPACE = 1
+
+        class Pt:
+            def __init__(self, x, y):
+                self.x = x
+                self.y = y
+
+        class MockPage:
+            def __init__(self, w=612, h=792):
+                class R:
+                    height = h
+                    width = w
+
+                self.rect = R()
+
+            def get_drawings(self):
+                return [{"items": [("l", Pt(0, 0), Pt(10, 10))]}]
+
+            def get_text(self, mode, flags=0):
+                return {"blocks": []}
+
+        class MockDoc:
+            def __iter__(self):
+                return iter([MockPage(), MockPage()])
+
+            def close(self):
+                pass
+
+        fitz_mod.open = lambda path: MockDoc()
+        monkeypatch.setitem(sys.modules, "fitz", fitz_mod)
+
+        from cad_dxf_agent.core.converter import _extract_pdf_fitz
+
+        doc = ezdxf.new()
+        doc.layers.get("0").color = PDF_ENTITY_COLOR
+        msp = doc.modelspace()
+        _extract_pdf_fitz(msp, tmp_path / "dummy.pdf", doc)
+
+        layer2 = doc.layers.get("PDF_PAGE_2")
+        assert layer2.color == PDF_ENTITY_COLOR
+
+    def test_pdfplumber_entities_have_explicit_color(self, tmp_path):
+        """pdfplumber fallback entities have explicit color."""
+        import ezdxf
+
+        from cad_dxf_agent.core.converter import _extract_pdf_page_plumber
+
+        class SingleLinePage:
+            height = 792.0
+            lines = [{"x0": 0.0, "top": 0.0, "x1": 50.0, "bottom": 0.0}]
+            rects = []
+
+            def extract_words(self):
+                return []
+
+        doc = ezdxf.new()
+        msp = doc.modelspace()
+        _extract_pdf_page_plumber(msp, SingleLinePage(), 0)
+
+        for entity in msp:
+            assert entity.dxf.color == PDF_ENTITY_COLOR
+
+
+class TestRgbToAci:
+    """Tests for _rgb_to_aci color mapping."""
+
+    def test_none_returns_default(self):
+        assert _rgb_to_aci(None) == PDF_ENTITY_COLOR
+
+    def test_black_returns_white(self):
+        assert _rgb_to_aci((0, 0, 0)) == 7
+
+    def test_red(self):
+        assert _rgb_to_aci((1.0, 0, 0)) == 1
+
+    def test_green(self):
+        assert _rgb_to_aci((0, 1.0, 0)) == 3
+
+    def test_blue(self):
+        assert _rgb_to_aci((0, 0, 1.0)) == 5
+
+    def test_yellow(self):
+        assert _rgb_to_aci((1.0, 1.0, 0)) == 2
+
+    def test_cyan(self):
+        assert _rgb_to_aci((0, 1.0, 1.0)) == 4
+
+    def test_magenta(self):
+        assert _rgb_to_aci((1.0, 0, 1.0)) == 6
+
+    def test_invalid_type_returns_default(self):
+        assert _rgb_to_aci("not a tuple") == PDF_ENTITY_COLOR
+
+    def test_near_black_returns_white(self):
+        assert _rgb_to_aci((0.05, 0.05, 0.05)) == 7
+
+
+class TestConversionResultClassifications:
+    """ConversionResult includes classifications field."""
+
+    def test_classifications_default_none(self, tmp_path):
+        result = ConversionResult(
+            source_path=tmp_path / "test.dxf",
+            source_format="pdf",
+            output_path=tmp_path / "out.dxf",
+            success=True,
+        )
+        assert result.classifications is None
 
 
 def _create_minimal_pdf(path: Path, *, empty: bool = False) -> None:

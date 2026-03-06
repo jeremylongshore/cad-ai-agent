@@ -1,5 +1,6 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { fetchProfiles } from '../lib/api';
+import DxfViewerComponent from './DxfViewerComponent';
 
 const TABS = [
   { key: 'original', label: 'Original' },
@@ -21,6 +22,7 @@ const ALIGNMENT_LABELS = {
 
 export default function PreviewPanel({
   previewUrls,
+  dxfUrls,
   operations,
   selectedOps,
   onToggleOp,
@@ -41,6 +43,7 @@ export default function PreviewPanel({
   onRevisionBulkApprove,
   onRevisionApply,
   onBundleDownload,
+  onRealign,
 }) {
   const [activeTab, setActiveTab] = useState('original');
   const hasEdited = !!previewUrls.edited;
@@ -50,6 +53,19 @@ export default function PreviewPanel({
   const [selectedProfile, setSelectedProfile] = useState('');
   const [focusedOpIndex, setFocusedOpIndex] = useState(-1);
   const opsListRef = useRef(null);
+
+  // Resize handle state for controls height
+  const [controlsHeight, setControlsHeight] = useState(240);
+  const dragStartRef = useRef(null);
+
+  // Compare sub-view: 'split', 'original', 'revised'
+  const [compareView, setCompareView] = useState('split');
+
+  // Control point picker state
+  const [pickingMode, setPickingMode] = useState(false);
+  const [controlPoints, setControlPoints] = useState([]);
+  // Each: { master: {x, y} | null, revision: {x, y} | null }
+  const [currentPairSide, setCurrentPairSide] = useState('master'); // 'master' or 'revision'
 
   useEffect(() => {
     if (previewUrls.edited) setActiveTab('edited');
@@ -119,6 +135,72 @@ export default function PreviewPanel({
     }
   }, [focusedOpIndex]);
 
+  // Control point picking handlers
+  const handleMasterPointClick = useCallback((pos) => {
+    if (!pickingMode) return;
+    setControlPoints((prev) => {
+      const updated = [...prev];
+      // Find first pair without a master point, or add new pair
+      const incomplete = updated.findIndex((p) => !p.master);
+      if (incomplete >= 0) {
+        updated[incomplete] = { ...updated[incomplete], master: pos };
+      } else if (updated.length < 4) {
+        updated.push({ master: pos, revision: null });
+      }
+      return updated;
+    });
+    setCurrentPairSide('revision');
+  }, [pickingMode]);
+
+  const handleRevisionPointClick = useCallback((pos) => {
+    if (!pickingMode) return;
+    setControlPoints((prev) => {
+      const updated = [...prev];
+      // Find first pair with a master but no revision
+      const incomplete = updated.findIndex((p) => p.master && !p.revision);
+      if (incomplete >= 0) {
+        updated[incomplete] = { ...updated[incomplete], revision: pos };
+      }
+      return updated;
+    });
+    setCurrentPairSide('master');
+  }, [pickingMode]);
+
+  const handleRealign = useCallback(() => {
+    if (!onRealign) return;
+    const pairs = controlPoints
+      .filter((p) => p.master && p.revision)
+      .map((p) => `${p.master.x.toFixed(2)},${p.master.y.toFixed(2)}:${p.revision.x.toFixed(2)},${p.revision.y.toFixed(2)}`);
+    if (pairs.length > 0) {
+      onRealign(pairs);
+      setPickingMode(false);
+    }
+  }, [controlPoints, onRealign]);
+
+  // Resize handle drag handlers
+  const handleResizePointerDown = useCallback((e) => {
+    e.preventDefault();
+    e.target.setPointerCapture(e.pointerId);
+    dragStartRef.current = { y: e.clientY, startHeight: controlsHeight };
+  }, [controlsHeight]);
+
+  const handleResizePointerMove = useCallback((e) => {
+    if (!dragStartRef.current) return;
+    const delta = dragStartRef.current.y - e.clientY; // drag up = grow controls
+    const newHeight = Math.min(400, Math.max(80, dragStartRef.current.startHeight + delta));
+    setControlsHeight(newHeight);
+  }, []);
+
+  const handleResizePointerUp = useCallback(() => {
+    dragStartRef.current = null;
+  }, []);
+
+  const controlsStyle = useMemo(() => (
+    activeTab === 'comparison' ? { maxHeight: controlsHeight, minHeight: controlsHeight } : undefined
+  ), [activeTab, controlsHeight]);
+
+  const completePairs = controlPoints.filter((p) => p.master && p.revision).length;
+
   // Use wizard upload if available, else fallback to simple compare
   const useWizard = !!onRevisionUpload;
 
@@ -139,7 +221,131 @@ export default function PreviewPanel({
       </div>
 
       <div className="preview__image-wrap" role="tabpanel" aria-label={`${activeTab} preview`}>
-        {previewUrls[activeTab] ? (
+        {activeTab === 'comparison' && dxfUrls?.original && dxfUrls?.comparison ? (
+          <div className="compare-split-wrap">
+            {/* Sub-tab bar: Split | Original | Revised */}
+            <div className="compare-subtabs">
+              {[
+                { key: 'split', label: 'Split' },
+                { key: 'original', label: 'Original' },
+                { key: 'revised', label: 'Revised' },
+              ].map((t) => (
+                <button
+                  key={t.key}
+                  className={`compare-subtabs__btn${compareView === t.key ? ' compare-subtabs__btn--active' : ''}`}
+                  onClick={() => setCompareView(t.key)}
+                  disabled={pickingMode && t.key !== 'split'}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Floating alignment bar */}
+            {alignmentResult && !pickingMode && (
+              <div className="compare-float-bar compare-float-bar--top">
+                <span className={`badge ${alignmentResult.confidence >= 0.7 ? 'badge--success' : 'badge--warning'}`}>
+                  {ALIGNMENT_LABELS[alignmentResult.method] || alignmentResult.method}
+                </span>
+                <span className="compare-float-bar__confidence">
+                  {(alignmentResult.confidence * 100).toFixed(0)}%
+                </span>
+                {onRealign && (
+                  <button
+                    className="btn btn--sm btn--secondary"
+                    onClick={() => {
+                      setPickingMode(true);
+                      setControlPoints([]);
+                      setCurrentPairSide('master');
+                      setCompareView('split');
+                    }}
+                  >
+                    Refine
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Picking mode instruction banner */}
+            {pickingMode && (
+              <div className="compare-float-bar compare-float-bar--instruction">
+                Click matching points: {currentPairSide === 'master' ? 'Original' : 'Changes'} ({completePairs}/4 pairs)
+                <button className="btn btn--sm btn--primary" onClick={handleRealign} disabled={completePairs === 0 || loading}>
+                  Re-align
+                </button>
+                <button className="btn btn--sm btn--ghost" onClick={() => { setPickingMode(false); setControlPoints([]); }}>
+                  Cancel
+                </button>
+              </div>
+            )}
+
+            {/* Split view */}
+            {compareView === 'split' && (
+              <div className="compare-split">
+                <div className="compare-split__pane">
+                  <span className="compare-split__label">
+                    Original{pickingMode && currentPairSide === 'master' ? ' — click a point' : ''}
+                  </span>
+                  <DxfViewerComponent
+                    dxfUrl={dxfUrls.original}
+                    pickingMode={pickingMode && currentPairSide === 'master'}
+                    onPointClick={handleMasterPointClick}
+                  />
+                  {pickingMode && controlPoints.map((p, i) => p.master && (
+                    <div key={`m-${i}`} className="control-point-marker control-point-marker--master" title={`Point ${i + 1}`}>
+                      {i + 1}
+                    </div>
+                  ))}
+                </div>
+                <div className="compare-split__pane">
+                  <span className="compare-split__label">
+                    Changes{pickingMode && currentPairSide === 'revision' ? ' — click corresponding point' : ''}
+                  </span>
+                  <DxfViewerComponent
+                    dxfUrl={dxfUrls.comparison}
+                    pickingMode={pickingMode && currentPairSide === 'revision'}
+                    onPointClick={handleRevisionPointClick}
+                  />
+                  {pickingMode && controlPoints.map((p, i) => p.revision && (
+                    <div key={`r-${i}`} className="control-point-marker control-point-marker--revision" title={`Point ${i + 1}`}>
+                      {i + 1}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Full-screen Original view */}
+            {compareView === 'original' && (
+              <DxfViewerComponent dxfUrl={dxfUrls.original} />
+            )}
+
+            {/* Full-screen Revised view */}
+            {compareView === 'revised' && (
+              <DxfViewerComponent dxfUrl={dxfUrls.comparison} />
+            )}
+
+            {/* Floating diff summary badges */}
+            {comparisonResult && comparisonResult.summary && comparisonResult.total_changes > 0 && (
+              <div className="compare-float-bar compare-float-bar--bottom">
+                {comparisonResult.summary.added > 0 && (
+                  <span className="comparison-badge comparison-badge--added">+{comparisonResult.summary.added} added</span>
+                )}
+                {comparisonResult.summary.removed > 0 && (
+                  <span className="comparison-badge comparison-badge--removed">-{comparisonResult.summary.removed} removed</span>
+                )}
+                {comparisonResult.summary.modified > 0 && (
+                  <span className="comparison-badge comparison-badge--modified">~{comparisonResult.summary.modified} modified</span>
+                )}
+                {comparisonResult.summary.moved > 0 && (
+                  <span className="comparison-badge comparison-badge--moved">&rarr;{comparisonResult.summary.moved} moved</span>
+                )}
+              </div>
+            )}
+          </div>
+        ) : dxfUrls?.[activeTab] ? (
+          <DxfViewerComponent dxfUrl={dxfUrls[activeTab]} />
+        ) : previewUrls[activeTab] ? (
           <img
             src={previewUrls[activeTab]}
             alt={`${activeTab} drawing preview`}
@@ -159,10 +365,20 @@ export default function PreviewPanel({
       {/* ===== COMPARISON TAB CONTENT ===== */}
       {activeTab === 'comparison' && (
         <>
-          {/* Step 1: Profile selector + upload (cad-du8.3) */}
-          {(!revisionOps || revisionOps.length === 0) && !bundleReady && (
+        <div
+          className="resize-handle"
+          onPointerDown={handleResizePointerDown}
+          onPointerMove={handleResizePointerMove}
+          onPointerUp={handleResizePointerUp}
+          role="separator"
+          aria-orientation="horizontal"
+          aria-label="Resize viewer and controls"
+        />
+        <div className="preview__controls" style={controlsStyle}>
+          {/* Step 1: Upload — full form if no revision, compact summary if revision loaded */}
+          {(!revisionOps || revisionOps.length === 0) && !bundleReady && !alignmentResult && (
             <div className="wizard-step">
-              <h4 className="op-list__title">Step 1: Upload Revision</h4>
+              <h4 className="op-list__title">Upload Revision</h4>
               {profileNames.length > 0 && (
                 <div className="input-group" style={{ marginBottom: 'var(--space-2)' }}>
                   <label className="input-group__label" htmlFor="profile-select">
@@ -181,10 +397,10 @@ export default function PreviewPanel({
                   </select>
                   <span className="input-group__hint">
                     {selectedProfile === 'structural'
-                      ? 'Lines, polylines, circles, arcs, blocks only — excludes title/notes'
+                      ? 'Geometry only (lines, polylines, arcs, blocks) — excludes text, title blocks, notes, borders, and seal layers'
                       : selectedProfile
                         ? `Filter: ${selectedProfile}`
-                        : 'Compare all entities on all layers'}
+                        : 'Compare all entities on all layers (recommended for saw cuts and annotation changes)'}
                   </span>
                 </div>
               )}
@@ -212,89 +428,31 @@ export default function PreviewPanel({
             </div>
           )}
 
-          {/* Step 2: Alignment preview (cad-du8.4 / cad-31i.8) */}
-          {alignmentResult && wizardStep >= 2 && (
-            <div className="wizard-step">
-              <h4 className="op-list__title">Step 2: Alignment</h4>
-              <div className="alignment-info">
-                <span className={`badge ${alignmentResult.confidence >= 0.7 ? 'badge--success' : 'badge--warning'}`}>
-                  {ALIGNMENT_LABELS[alignmentResult.method] || alignmentResult.method}
-                </span>
-                <div className="alignment-info__metrics">
-                  <div className="alignment-info__metric">
-                    <span className="alignment-info__label">Confidence</span>
-                    <div className="confidence-bar">
-                      <div
-                        className="confidence-bar__fill"
-                        style={{ width: `${(alignmentResult.confidence * 100).toFixed(0)}%` }}
-                        role="progressbar"
-                        aria-valuenow={Math.round(alignmentResult.confidence * 100)}
-                        aria-valuemin={0}
-                        aria-valuemax={100}
-                        aria-label={`Alignment confidence: ${Math.round(alignmentResult.confidence * 100)}%`}
-                      />
-                    </div>
-                    <span className="alignment-info__value">
-                      {(alignmentResult.confidence * 100).toFixed(0)}%
-                    </span>
-                  </div>
-                  {(alignmentResult.translation[0] !== 0 || alignmentResult.translation[1] !== 0) && (
-                    <div className="alignment-info__metric">
-                      <span className="alignment-info__label">Translation</span>
-                      <span className="alignment-info__value">
-                        ({alignmentResult.translation[0].toFixed(1)}, {alignmentResult.translation[1].toFixed(1)})
-                      </span>
-                    </div>
-                  )}
-                  {alignmentResult.rotation_deg !== 0 && (
-                    <div className="alignment-info__metric">
-                      <span className="alignment-info__label">Rotation</span>
-                      <span className="alignment-info__value">
-                        {alignmentResult.rotation_deg.toFixed(2)}&deg;
-                      </span>
-                    </div>
-                  )}
-                </div>
-                {alignmentResult.confidence < 0.7 && (
-                  <p className="alignment-info__warning">
-                    Low confidence alignment. Results may be inaccurate — consider providing control points.
-                  </p>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Comparison summary badges */}
-          {comparisonResult && comparisonResult.summary && (
-            <div className="comparison-summary">
-              <h4 className="op-list__title">
-                {diffSummary ? diffSummary.headline : 'Comparison Results'}
-              </h4>
-              <div className="comparison-summary__grid">
-                {comparisonResult.summary.added > 0 && (
-                  <span className="comparison-badge comparison-badge--added">
-                    +{comparisonResult.summary.added} added
-                  </span>
-                )}
-                {comparisonResult.summary.removed > 0 && (
-                  <span className="comparison-badge comparison-badge--removed">
-                    -{comparisonResult.summary.removed} removed
-                  </span>
-                )}
-                {comparisonResult.summary.modified > 0 && (
-                  <span className="comparison-badge comparison-badge--modified">
-                    ~{comparisonResult.summary.modified} modified
-                  </span>
-                )}
-                {comparisonResult.summary.moved > 0 && (
-                  <span className="comparison-badge comparison-badge--moved">
-                    &rarr;{comparisonResult.summary.moved} moved
-                  </span>
-                )}
-                {comparisonResult.total_changes === 0 && (
-                  <span className="comparison-badge">No changes detected</span>
-                )}
-              </div>
+          {/* Compact file summary after revision loaded */}
+          {(revisionOps?.length > 0 || alignmentResult) && !bundleReady && (
+            <div className="wizard-step-compact">
+              <input
+                ref={revisionInputRef}
+                type="file"
+                accept=".dxf,.dwg"
+                onChange={useWizard ? handleRevisionUpload : handleSimpleCompare}
+                style={{ display: 'none' }}
+                id="revision-upload-replace"
+                aria-label="Replace revision file"
+              />
+              <span className="wizard-step-compact__file">
+                {revisionFile || 'Revision file'}
+              </span>
+              <button
+                className="btn btn--sm btn--ghost"
+                onClick={() => revisionInputRef.current?.click()}
+                disabled={loading}
+              >
+                Replace
+              </button>
+              {diffSummary && (
+                <span className="text-xs text-secondary">{diffSummary.headline}</span>
+              )}
             </div>
           )}
 
@@ -436,50 +594,55 @@ export default function PreviewPanel({
               </p>
             </div>
           )}
+        </div>
         </>
       )}
 
       {/* ===== EDIT TAB CONTENT ===== */}
-      {hasOperations && activeTab !== 'comparison' && (
-        <div className="op-list">
-          <h4 className="op-list__title">Planned operations</h4>
-          {operations.map((op, i) => (
-            <label key={i} className="op-item">
-              <input
-                type="checkbox"
-                className="op-item__checkbox"
-                checked={selectedOps.includes(i)}
-                onChange={() => onToggleOp(i)}
-              />
-              <span className="op-item__text">{op.description || op.summary || `Operation ${i + 1}`}</span>
-              <span className={`op-item__type op-item__type--${opTypeClass(op.op_type)}`}>
-                {op.op_type}
-              </span>
-            </label>
-          ))}
-        </div>
-      )}
+      {(hasOperations || hasEdited) && activeTab !== 'comparison' && (
+        <div className="preview__controls">
+          {hasOperations && (
+            <div className="op-list">
+              <h4 className="op-list__title">Planned operations</h4>
+              {operations.map((op, i) => (
+                <label key={i} className="op-item">
+                  <input
+                    type="checkbox"
+                    className="op-item__checkbox"
+                    checked={selectedOps.includes(i)}
+                    onChange={() => onToggleOp(i)}
+                  />
+                  <span className="op-item__text">{op.description || op.summary || `Operation ${i + 1}`}</span>
+                  <span className={`op-item__type op-item__type--${opTypeClass(op.op_type)}`}>
+                    {op.op_type}
+                  </span>
+                </label>
+              ))}
+            </div>
+          )}
 
-      {hasOperations && activeTab !== 'comparison' && (
-        <div className="flex gap-2">
-          <button
-            className="btn btn--primary btn--full"
-            onClick={onApply}
-            disabled={loading || selectedOps.length === 0}
-          >
-            {loading ? <span className="spinner" aria-hidden="true" /> : 'Apply Changes'}
-          </button>
-        </div>
-      )}
+          {hasOperations && (
+            <div className="flex gap-2">
+              <button
+                className="btn btn--primary btn--full"
+                onClick={onApply}
+                disabled={loading || selectedOps.length === 0}
+              >
+                {loading ? <span className="spinner" aria-hidden="true" /> : 'Apply Changes'}
+              </button>
+            </div>
+          )}
 
-      {hasEdited && (
-        <button
-          className="btn btn--secondary btn--full"
-          onClick={onDownload}
-          disabled={loading}
-        >
-          Download Edited DXF
-        </button>
+          {hasEdited && (
+            <button
+              className="btn btn--secondary btn--full"
+              onClick={onDownload}
+              disabled={loading}
+            >
+              Download Edited DXF
+            </button>
+          )}
+        </div>
       )}
     </div>
   );

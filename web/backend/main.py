@@ -6,6 +6,7 @@ Routes:
     POST /api/plan              — Send prompt, get planned operations + preview
     POST /api/apply             — Apply selected operations
     POST /api/compare           — Upload revision DXF, compare against master
+    GET  /api/dxf               — Get raw DXF file (original/edited/comparison)
     GET  /api/render            — Get PNG render (original/edited/diff/comparison)
     GET  /api/download          — Download edited DXF
     POST /api/revision/upload   — Upload revision DXF to existing session
@@ -89,6 +90,28 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    """Log every request/response for debugging (method, path, status, duration)."""
+    import time
+
+    start = time.monotonic()
+    response = await call_next(request)
+    elapsed_ms = (time.monotonic() - start) * 1000
+
+    if response.status_code >= 400:
+        logger.warning(
+            "%s %s → %d (%.0fms)",
+            request.method, request.url.path, response.status_code, elapsed_ms,
+        )
+    else:
+        logger.info(
+            "%s %s → %d (%.0fms)",
+            request.method, request.url.path, response.status_code, elapsed_ms,
+        )
+    return response
 
 
 # ---------------------------------------------------------------------------
@@ -184,6 +207,7 @@ async def upload(
 
     # Convert if needed
     dxf_path = session.original_path
+    pdf_classifications = None
     if ext == ".pdf":
         try:
             from cad_dxf_agent.core.converter import convert_to_dxf
@@ -193,6 +217,8 @@ async def upload(
                 detail = _user_friendly_conversion_error(result.error, ext)
                 raise HTTPException(status_code=422, detail=detail)
             shutil.copy2(str(result.output_path), str(dxf_path))
+            # Store page classifications for response
+            pdf_classifications = result.classifications
         except ImportError:
             raise HTTPException(
                 status_code=500,
@@ -237,10 +263,21 @@ async def upload(
     except Exception as e:
         logger.warning("Original render failed (non-fatal): %s", e, exc_info=True)
 
-    return {
+    response: dict = {
         "session_id": session.session_id,
         "file_info": session.file_info,
     }
+    if pdf_classifications:
+        response["page_classifications"] = [
+            {
+                "page": c.page_num + 1,
+                "type": c.content_type.value,
+                "vectors": c.vector_count,
+                "text": c.text_count,
+            }
+            for c in pdf_classifications
+        ]
+    return response
 
 
 @app.post("/api/plan")
@@ -496,6 +533,38 @@ async def compare(
         except Exception as e:
             logger.error("Comparison failed: %s", e, exc_info=True)
             raise HTTPException(status_code=500, detail=f"Comparison failed: {e}") from None
+
+
+@app.get("/api/dxf")
+async def get_dxf_file(
+    session_id: str = Query(...),
+    render_type: str = Query("original", alias="type"),
+):
+    """Serve raw DXF for client-side WebGL rendering.
+
+    No auth required — same rationale as /api/render (Firebase rewrites
+    strip Authorization headers on proxied GET requests).
+    """
+    try:
+        session = session_mgr.get_by_id(session_id)
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from None
+
+    dxf_map: dict[str, Path | None] = {
+        "original": session.original_path,
+        "edited": session.edited_path,
+        "comparison": session.diff_overlay_path,
+    }
+    path = dxf_map.get(render_type)
+
+    if path is None or not path.exists():
+        raise HTTPException(status_code=404, detail=f"No {render_type} DXF available")
+
+    return FileResponse(
+        path=str(path),
+        media_type="application/dxf",
+        filename=f"{render_type}.dxf",
+    )
 
 
 @app.get("/api/render")

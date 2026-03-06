@@ -411,9 +411,46 @@
   overflow: hidden;
   background: white;
   flex: 1;
-  min-height: 0;
+  min-height: 200px;
   display: grid;
   place-items: center;
+}
+
+/* Resize handle between viewer and controls */
+.resize-handle {
+  flex-shrink: 0;
+  height: 8px;
+  cursor: row-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  touch-action: none;
+}
+
+.resize-handle::before {
+  content: '';
+  width: 40px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--border-strong);
+}
+
+.resize-handle:hover::before,
+.resize-handle:active::before {
+  background: var(--accent-primary);
+}
+
+/* Controls section — scrolls independently, viewer keeps space */
+.preview__controls {
+  flex-shrink: 0;
+  max-height: 240px;
+  overflow-y: auto;
+  border-top: 1px solid var(--border-default);
+  padding-top: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
 }
 
 .preview__image-wrap img {
@@ -929,4 +966,325 @@
 .revision-op-item__actions {
   display: flex;
   gap: var(--space-1);
+}
+
+/* DXF Viewer */
+.dxf-viewer {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 200px;
+}
+
+.dxf-viewer__canvas {
+  width: 100%;
+  height: 100%;
+}
+
+.dxf-viewer__canvas canvas {
+  display: block;
+}
+
+.dxf-viewer__overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  background: rgba(255, 255, 255, 0.85);
+  z-index: 5;
+}
+
+.dxf-viewer__overlay--error {
+  background: rgba(255, 255, 255, 0.95);
+}
+
+.dxf-viewer__overlay-text {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.dxf-viewer--picking {
+  cursor: crosshair;
+}
+
+.dxf-viewer--picking canvas {
+  cursor: crosshair;
+}
+
+/* Viewer toolbar */
+.viewer-toolbar {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  z-index: 10;
+}
+
+.viewer-toolbar__btn {
+  width: 32px;
+  height: 32px;
+  backdrop-filter: blur(8px);
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: all var(--transition-fast);
+  color: var(--text-secondary);
+}
+
+.viewer-toolbar__btn:hover {
+  background: rgba(255, 255, 255, 1);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-sm);
+}
+
+.viewer-toolbar__hint {
+  position: absolute;
+  bottom: var(--space-2);
+  right: var(--space-2);
+  font-size: 10px;
+  color: var(--text-tertiary);
+  backdrop-filter: blur(8px);
+  background: rgba(255, 255, 255, 0.7);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* Compact wizard step (after upload) */
+.wizard-step-compact {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  background: var(--bg-secondary);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-default);
+  font-size: var(--text-sm);
+}
+
+.wizard-step-compact__file {
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
+}
+
+/* Compare split wrapper (positioned for floating overlays) */
+.compare-split-wrap {
+  position: relative;
+  height: 100%;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Compare sub-tabs: Split | Original | Revised */
+.compare-subtabs {
+  display: flex;
+  gap: 1px;
+  background: var(--border-default);
+  flex-shrink: 0;
+  z-index: 15;
+  position: relative;
+}
+
+.compare-subtabs__btn {
+  flex: 1;
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  text-align: center;
+  border: none;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  font-family: var(--font-body);
+}
+
+.compare-subtabs__btn:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.compare-subtabs__btn--active {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+/* Floating bars over compare split */
+.compare-float-bar {
+  position: absolute;
+  z-index: 12;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  backdrop-filter: blur(8px);
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  font-size: var(--text-xs);
+  box-shadow: var(--shadow-sm);
+}
+
+.compare-float-bar--top {
+  top: calc(28px + var(--space-2));
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.compare-float-bar--bottom {
+  bottom: var(--space-2);
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.compare-float-bar--instruction {
+  top: calc(28px + var(--space-2));
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(37, 99, 235, 0.95);
+  color: white;
+  border-color: transparent;
+}
+
+.compare-float-bar__confidence {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* Side-by-side comparison */
+.compare-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  background: var(--border-default);
+}
+
+.compare-split__pane {
+  position: relative;
+  background: white;
+  overflow: hidden;
+}
+
+.compare-split__label {
+  position: absolute;
+  top: var(--space-2);
+  left: var(--space-2);
+  z-index: 10;
+  padding: 2px 8px;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  backdrop-filter: blur(8px);
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+}
+
+/* Control point picker */
+.control-point-actions {
+  margin-top: var(--space-2);
+}
+
+.control-point-actions__active {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.control-point-marker {
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--accent-primary);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--accent-primary);
+  background: rgba(255, 255, 255, 0.9);
+  pointer-events: none;
+  z-index: 15;
+}
+
+.control-point-marker--master {
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+}
+
+.control-point-marker--revision {
+  border-color: var(--accent-success);
+  color: var(--accent-success);
+}
+
+/* Dark mode overrides for viewer */
+@media (prefers-color-scheme: dark) {
+  .dxf-viewer__overlay {
+    background: rgba(15, 15, 26, 0.85);
+  }
+
+  .dxf-viewer__overlay--error {
+    background: rgba(15, 15, 26, 0.95);
+  }
+
+  .viewer-toolbar__btn {
+    background: rgba(26, 26, 46, 0.85);
+    border-color: var(--border-default);
+  }
+
+  .viewer-toolbar__btn:hover {
+    background: rgba(37, 37, 64, 1);
+  }
+
+  .viewer-toolbar__hint {
+    background: rgba(26, 26, 46, 0.7);
+  }
+
+  .compare-split__pane {
+    background: var(--bg-primary);
+  }
+
+  .compare-split__label {
+    background: rgba(26, 26, 46, 0.85);
+    border-color: var(--border-default);
+    color: var(--text-secondary);
+  }
+
+  .control-point-marker {
+    background: rgba(26, 26, 46, 0.9);
+  }
+
+  .compare-float-bar {
+    background: rgba(26, 26, 46, 0.9);
+  }
+
+  .compare-float-bar__confidence {
+    color: var(--text-primary);
+  }
+}
+
+/* Responsive compare: stack on narrow */
+@media (max-width: 1024px) {
+  .compare-split {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr 1fr;
+  }
 }

@@ -24,7 +24,6 @@ class EntityType(StrEnum):
     SPLINE = "SPLINE"
     POLYLINE = "POLYLINE"
     ELLIPSE = "ELLIPSE"
-    MLEADER = "MLEADER"
     SOLID = "SOLID"
     LEADER = "LEADER"
 
