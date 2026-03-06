@@ -11,7 +11,7 @@
 | # | Epic | Bead ID | Status | Branch | PR | Key Deliverables | Tests |
 |---|------|---------|--------|--------|----|-----------------|-------|
 | 01 | Capability Audit + Architecture Baseline | cad-uns | DONE | `feature/epic-cad-01-capability-audit` | #71 | 8 docs (034-041), beads task tree | N/A (docs only) |
-| 02 | Core Contracts + Routing Foundation | cad-d9a | DONE | `feature/epic-cad-02-core-contracts-routing` | TBD | `response_schema.py`, `intent_router.py`, `capability_registry.py`, `response_builder.py`, `/api/v2/prompt` | 112 tests — unit (29 schema + 44 router + 8 registry + 14 builder), web (12 v2 endpoint), integration (5 pipeline) + 50-entry golden routing file |
+| 02 | Core Contracts + Routing Foundation | cad-d9a | DONE | `feature/epic-cad-02-core-contracts-routing` | #74, #75 | `response_schema.py`, `intent_router.py`, `capability_registry.py`, `response_builder.py`, `/api/v2/prompt` | 140 tests — unit (37 schema + 48 router + 10 registry + 18 builder), web (12 v2 endpoint), integration (5 pipeline) + 50-entry golden routing file |
 | 03 | Selection + Markup Interpretation Foundation | cad-wd2 | NOT STARTED | — | — | Region model, markup overlay ingestion, entity association | TBD — unit (region model, entity association), integration (markup ingestion pipeline) |
 | 04 | Region Q&A Vertical Slice | cad-grx | NOT STARTED | — | — | Region context builder, grounded Q&A pipeline, golden tests | TBD — golden trajectories (region_qa family), scorecard entries, live API tests |
 | 05 | Repeated-Condition Detection | cad-ccd | NOT STARTED | — | — | Similarity scoring, candidate search, preview/approval workflow | TBD — unit (similarity scoring), golden trajectories (repeated_condition family), scorecard entries |
@@ -53,8 +53,8 @@ EPIC-01 (DONE) → EPIC-02 (DONE)
               EPIC-04..10 → EPIC-12
 ```
 
-**Critical path:** EPIC-02 is the next gate. All downstream work is blocked until
-contracts and routing foundation are in place.
+**Critical path:** EPIC-02 is DONE. EPIC-03 (Selection + Markup Interpretation) is the next gate.
+EPIC-06 (Compare + Diff Hardening) can proceed in parallel.
 
 ---
 
@@ -108,8 +108,8 @@ contracts and routing foundation are in place.
 
 | # | Epic | Next Step |
 |---|------|-----------|
-| 01 | Capability Audit + Architecture Baseline | Completed — hardening pass in progress |
-| 02 | Core Contracts + Routing Foundation | DONE — merge PR, close bead |
+| 01 | Capability Audit + Architecture Baseline | Completed |
+| 02 | Core Contracts + Routing Foundation | DONE — PR #74 + #75 merged, bead closed. AAR: [042-PM-AAR](042-PM-AAR-epic-cad-02-aar.md) |
 | 03 | Selection + Markup Interpretation Foundation | Design `Region` Pydantic model with bounding box + entity association; draft markup overlay ingestion interface |
 | 04 | Region Q&A Vertical Slice | Implement region context builder that filters entities by bounding box; write first golden trajectory for region_qa |
 | 05 | Repeated-Condition Detection | Prototype entity similarity scoring function; define candidate result schema |
@@ -126,9 +126,9 @@ contracts and routing foundation are in place.
 
 ## 8. Global Next Actions
 
-1. **Merge EPIC-02 PR** — core contracts + routing foundation
-2. **Begin EPIC-03** — Selection + Markup Interpretation Foundation
-3. **Begin EPIC-06** — Compare + Diff Service Hardening (can start in parallel)
+1. **Begin EPIC-03** — Selection + Markup Interpretation Foundation (next gate)
+2. **Begin EPIC-06** — Compare + Diff Service Hardening (can start in parallel)
+3. **Review AAR** — [042-PM-AAR-epic-cad-02-aar.md](042-PM-AAR-epic-cad-02-aar.md) for lessons learned
 
 ---
 
@@ -146,4 +146,5 @@ contracts and routing foundation are in place.
 |------|--------|
 | 2026-03-05 | Initial creation with EPIC-01 complete, all other epics NOT STARTED |
 | 2026-03-06 | Audit hardening: fixed doc count (6→8), added Tests column, mapped risks to epics, added Phase 4-5 risks, added per-epic Next Steps, added concrete file paths for Phases 3-5, clarified ARCH-REVIEW-01 output format, added this changelog |
-| 2026-03-06 | EPIC-02 DONE: 112 new tests, 7 new/modified files, response contracts + intent router + capability registry + response builder + /api/v2/prompt endpoint |
+| 2026-03-06 | EPIC-02 DONE: 140 new tests, 7 new/modified files, response contracts + intent router + capability registry + response builder + /api/v2/prompt endpoint |
+| 2026-03-06 | EPIC-02 AAR: updated PR refs (TBD→#74,#75), test count (112→140), critical path (EPIC-03 is next gate), added AAR doc 042 |
