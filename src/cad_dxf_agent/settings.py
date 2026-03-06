@@ -18,7 +18,6 @@ class Settings:
 
     def __init__(self) -> None:
         self.llm_provider: str = os.getenv("CAD_LLM_PROVIDER", "mock")
-        self.llm_model: str | None = os.getenv("CAD_LLM_MODEL")
 
         # Protected layers (never editable)
         raw_layers = os.getenv("CAD_PROTECTED_LAYERS", "TITLE,TITLEBLOCK,SEAL,REVISION")
@@ -79,16 +78,9 @@ class Settings:
         # Edit history
         self.max_undo_snapshots: int = int(os.getenv("CAD_MAX_UNDO_SNAPSHOTS", "50"))
 
-        # Local API
-        self.api_host: str = os.getenv("CAD_API_HOST", "127.0.0.1")
-        self.api_port: int = int(os.getenv("CAD_API_PORT", "8321"))
-
     def get_api_key(self, provider: str) -> str | None:
         """Retrieve API key for a provider. Never logs the key."""
         key_map = {
-            "openai": "CAD_OPENAI_API_KEY",
-            "anthropic": "CAD_ANTHROPIC_API_KEY",
-            "google": "CAD_GOOGLE_API_KEY",
             "gemini-key": "CAD_GEMINI_API_KEY",
         }
         env_var = key_map.get(provider)
