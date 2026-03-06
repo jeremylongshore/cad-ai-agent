@@ -47,6 +47,21 @@ jobs:
           gcloud storage cp gs://cad-dxf-agent-deps/oda/ODAFileConverter_QT6_lnxX64_8.3dll_27.1.deb ./oda.deb \
             || echo "WARNING: ODA .deb not in GCS — DWG support will be unavailable"
 
+      - name: Validate ODA download
+        run: |
+          if [ -f ./oda.deb ]; then
+            SIZE=$(stat -c%s ./oda.deb)
+            if [ "$SIZE" -gt 1000000 ]; then
+              echo "ODA .deb valid (${SIZE} bytes)"
+            else
+              echo "::warning::ODA .deb is only ${SIZE} bytes (expected ~60MB) — DWG support unavailable"
+              rm -f ./oda.deb
+            fi
+          else
+            echo "::warning::ODA .deb not downloaded — DWG uploads will return HTTP 422"
+          fi
+
+
       - name: Build and push image
         run: |
           TAG=${{ env.IMAGE }}:${{ github.sha }}

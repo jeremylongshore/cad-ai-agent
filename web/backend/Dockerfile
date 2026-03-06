@@ -14,26 +14,22 @@ ENV PYTHONPATH=/app/src
 ENV DISPLAY=:99
 ENV XDG_RUNTIME_DIR=/tmp/runtime-root
 
-# ─── System dependencies ─────────────────────────────────────────────
+# ─── System dependencies + ODA File Converter (optional) ─────────────
 # libglib2.0-0: required by pymupdf (PDF → DXF fallback converter).
 # libfontconfig1: font rendering for matplotlib previews.
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libglib2.0-0 \
-    libfontconfig1 \
-    && rm -rf /var/lib/apt/lists/*
-
-# ─── ODA File Converter (optional — DWG support) ─────────────────────
+# xvfb + Qt6/X11 libs: virtual display for ODA's Qt6 GUI.
+#
 # ODA enables DWG → DXF conversion.  DXF and PDF uploads work without it.
 # The backend returns HTTP 422 if a user uploads a DWG and ODA is missing.
 #
 # The .deb is self-hosted in GCS (ODA's download page requires SSO).
 # CI downloads it with authenticated gcloud before `docker build`, placing
-# it at ./oda.deb in the build context.  xvfb provides a virtual display
-# for ODA's Qt6 GUI (ezdxf spawns Xvfb automatically).
+# it at ./oda.deb in the build context.
 #
 # Guard: if oda.deb is missing or tiny (<1MB), we skip with a warning.
 COPY oda.deb* /tmp/
 RUN apt-get update && apt-get install -y --no-install-recommends \
+        libglib2.0-0 libfontconfig1 \
         xvfb libstdc++6 libxkbcommon0 libxkbcommon-x11-0 \
         libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
         libxcb-render-util0 libxcb-shape0 libxcb-xinerama0 \

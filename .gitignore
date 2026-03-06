@@ -62,6 +62,7 @@ oda.deb
 # Playwright / test artifacts
 test-results/
 
+
 # bv (beads viewer) local config and caches
 .bv/
 .firebase/
