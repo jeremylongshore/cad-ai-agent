@@ -18,6 +18,7 @@
 | 030 | AUDT | [030-AT-AUDT-deliverables-v1.md](030-AT-AUDT-deliverables-v1.md) |
 | 034 | AUDT | [034-AT-AUDT-capability-audit.md](034-AT-AUDT-capability-audit.md) |
 | 035 | ARCH | [035-AT-ARCH-drawing-intelligence-target.md](035-AT-ARCH-drawing-intelligence-target.md) |
+| 036 | SPEC | [036-AT-SPEC-response-contracts-taxonomy.md](036-AT-SPEC-response-contracts-taxonomy.md) |
 | 039 | ADEC | [039-AT-ADEC-intent-router-design.md](039-AT-ADEC-intent-router-design.md) |
 
 ### PP — Product & Planning
@@ -110,6 +111,7 @@
 | 033 | AA | AACR | Release v0.5.0 AAR |
 | 034 | AT | AUDT | Capability audit: current vs target |
 | 035 | AT | ARCH | Drawing intelligence target architecture |
+| 036 | AT | SPEC | Response contracts and task taxonomy |
 | 039 | AT | ADEC | ADR: intent router design (hybrid heuristic+LLM) |
 
 ## Quick Reference
