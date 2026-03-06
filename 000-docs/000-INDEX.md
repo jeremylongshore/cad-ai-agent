@@ -30,6 +30,7 @@
 | 012 | PLAN | [012-PM-PLAN-v1-10-phase-roadmap.md](012-PM-PLAN-v1-10-phase-roadmap.md) |
 | 013 | TASK | [013-PM-TASK-ph2-schemas-dxf-io-test-plan.md](013-PM-TASK-ph2-schemas-dxf-io-test-plan.md) |
 | 019 | TASK | [019-PM-TASK-ph3-entity-index-context-selectors.md](019-PM-TASK-ph3-entity-index-context-selectors.md) |
+| 031 | PLAN | [031-PM-PLAN-perf-hardening-plan.md](031-PM-PLAN-perf-hardening-plan.md) |
 
 ### DR — Documentation & Reference
 | # | Type | File |
@@ -41,6 +42,14 @@
 |---|------|------|
 | 002 | SECU | [002-TQ-SECU-security-policy.md](002-TQ-SECU-security-policy.md) |
 | 018 | SPEC | [018-TQ-SPEC-unit-roundtrip-test-plan.md](018-TQ-SPEC-unit-roundtrip-test-plan.md) |
+| 032 | TEST | [032-TQ-TEST-sawcuts-sample-drawing.pdf](032-TQ-TEST-sawcuts-sample-drawing.pdf) |
+
+### RL — Reports & Releases
+| # | Type | File |
+|---|------|------|
+| 027 | REPT | [027-RL-REPT-release-v0.2.0.md](027-RL-REPT-release-v0.2.0.md) |
+| 028 | REPT | [028-RL-REPT-release-v0.3.0.md](028-RL-REPT-release-v0.3.0.md) |
+| 029 | REFC | [029-RM-REFC-appauditmini-quick-reference.md](029-RM-REFC-appauditmini-quick-reference.md) |
 
 ### BL — Business & Legal
 | # | Type | File |
@@ -57,6 +66,7 @@
 | 023 | AUDT | [023-AA-AUDT-appaudit-devops-playbook.md](023-AA-AUDT-appaudit-devops-playbook.md) |
 | 024 | AADR | [024-AA-AADR-perf-plan-audit.md](024-AA-AADR-perf-plan-audit.md) |
 | 026 | AUDT | [026-AA-AUDT-appaudit-devops-playbook.md](026-AA-AUDT-appaudit-devops-playbook.md) |
+| 033 | AACR | [033-AA-AACR-release-v0.5.0.md](033-AA-AACR-release-v0.5.0.md) |
 
 ## Chronological Listing
 
@@ -88,9 +98,15 @@
 | 024 | AA | AADR | Performance hardening plan audit |
 | 025 | AT | ARCH | Web MVP architecture |
 | 026 | AA | AUDT | Beta testing DevOps playbook (appaudit) |
+| 027 | RL | REPT | Release v0.2.0 report |
+| 028 | RL | REPT | Release v0.3.0 report |
+| 029 | RM | REFC | AppAuditMini quick reference card |
 | 030 | AT | AUDT | Deliverables audit v1 (69-item checklist) |
+| 031 | PM | PLAN | Performance hardening plan (6-phase program) |
+| 032 | TQ | TEST | Sawcuts sample drawing PDF (test fixture) |
+| 033 | AA | AACR | Release v0.5.0 AAR |
 
 ## Quick Reference
 
-- **CC codes:** AT=Architecture, PP=Product, PM=Project Mgmt, DR=Documentation, TQ=Testing, BL=Business, AA=After Action
-- **Type codes:** AADR=After Action Decision Record, AACR=After Action Review, ADEC=Decision, ARCH=Architecture, AUDT=Audit/Playbook, GUID=Guide, PLAN=Roadmap, POLI=Policy, PROD=Product, SECU=Security, SPEC=Specification, TASK=Task
+- **CC codes:** AT=Architecture, PP=Product, PM=Project Mgmt, DR=Documentation, TQ=Testing, BL=Business, AA=After Action, RL=Research/Releases, RM=Reference Material
+- **Type codes:** AADR=After Action Decision Record, AACR=After Action Review, ADEC=Decision, ARCH=Architecture, AUDT=Audit/Playbook, GUID=Guide, PLAN=Roadmap, POLI=Policy, PROD=Product, REFC=Reference Card, REPT=Report, SECU=Security, SPEC=Specification, TASK=Task, TEST=Test Fixture
