@@ -193,13 +193,9 @@ def _check_render_quality(output_path: Path) -> list[str]:
         img = np.array(Image.open(str(output_path)).convert("L"))
         mean_lum = float(img.mean())
         if mean_lum < 20:
-            warnings.append(
-                f"Render appears mostly black (mean luminance {mean_lum:.0f}/255)"
-            )
+            warnings.append(f"Render appears mostly black (mean luminance {mean_lum:.0f}/255)")
         elif mean_lum > 250:
-            warnings.append(
-                f"Render appears blank (mean luminance {mean_lum:.0f}/255)"
-            )
+            warnings.append(f"Render appears blank (mean luminance {mean_lum:.0f}/255)")
     except ImportError:
         pass  # PIL/numpy not available, skip check
     return warnings

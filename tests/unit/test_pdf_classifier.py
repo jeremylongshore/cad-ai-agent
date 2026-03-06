@@ -13,7 +13,10 @@ class TestClassifyPageRules:
 
     def test_vector_layout(self):
         result = _classify_page(
-            vector_count=500, image_count=0, image_area_ratio=0.0, text_count=10,
+            vector_count=500,
+            image_count=0,
+            image_area_ratio=0.0,
+            text_count=10,
         )
         assert result == PageContentType.VECTOR_LAYOUT
 
@@ -40,7 +43,10 @@ class TestClassifyPageRules:
     def test_many_vectors_with_small_image(self):
         """Vectors dominate despite small embedded image."""
         result = _classify_page(
-            vector_count=1000, image_count=1, image_area_ratio=0.1, text_count=50,
+            vector_count=1000,
+            image_count=1,
+            image_area_ratio=0.1,
+            text_count=50,
         )
         assert result == PageContentType.VECTOR_LAYOUT
 
@@ -62,6 +68,7 @@ class TestClassifyPdfPages:
                     def __init__(self, w, h):
                         self.width = w
                         self.height = h
+
                 self.rect = Rect(w, h)
                 self._drawings = drawings
                 self._images = images
@@ -77,17 +84,21 @@ class TestClassifyPdfPages:
                 return self._text
 
         # Page 1: cover (few vectors, lots of text)
-        page1 = MockPage(612, 792,
+        page1 = MockPage(
+            612,
+            792,
             drawings=[{"items": [("l",)]}],  # 1 item
             images=[],
             text_dict={
-                "blocks": [{"type": 0, "lines": [
-                    {"spans": [{"text": f"word{i}"} for i in range(25)]}
-                ]}],
+                "blocks": [
+                    {"type": 0, "lines": [{"spans": [{"text": f"word{i}"} for i in range(25)]}]}
+                ],
             },
         )
         # Page 2: vector layout (many vectors, no images)
-        page2 = MockPage(3024, 2160,
+        page2 = MockPage(
+            3024,
+            2160,
             drawings=[{"items": [("l",)] * 200}],
             images=[],
             text_dict={"blocks": []},
@@ -96,8 +107,10 @@ class TestClassifyPdfPages:
         class MockDoc:
             def __init__(self):
                 self._pages = [page1, page2]
+
             def __iter__(self):
                 return iter(self._pages)
+
             def close(self):
                 pass
 

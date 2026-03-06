@@ -409,9 +409,7 @@ def _extract_pdf_fitz(msp, source_path: Path, doc=None) -> int:
                 elif kind == "c":  # Cubic Bezier curve
                     p1, p2, p3, p4 = item[1], item[2], item[3], item[4]
                     # Skip tiny curves (fill artifacts)
-                    chord = math.hypot(
-                        float(p4.x) - float(p1.x), float(p4.y) - float(p1.y)
-                    )
+                    chord = math.hypot(float(p4.x) - float(p1.x), float(p4.y) - float(p1.y))
                     if chord < PDF_MIN_ENTITY_SIZE:
                         continue
                     arc = _fit_arc_from_bezier(p1, p2, p3, p4, page_height)
