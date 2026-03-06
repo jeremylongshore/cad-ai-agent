@@ -35,6 +35,7 @@
 | 013 | TASK | [013-PM-TASK-ph2-schemas-dxf-io-test-plan.md](013-PM-TASK-ph2-schemas-dxf-io-test-plan.md) |
 | 019 | TASK | [019-PM-TASK-ph3-entity-index-context-selectors.md](019-PM-TASK-ph3-entity-index-context-selectors.md) |
 | 031 | PLAN | [031-PM-PLAN-perf-hardening-plan.md](031-PM-PLAN-perf-hardening-plan.md) |
+| 038 | PLAN | [038-PM-PLAN-drawing-intelligence-roadmap.md](038-PM-PLAN-drawing-intelligence-roadmap.md) |
 
 ### DR — Documentation & Reference
 | # | Type | File |
@@ -114,6 +115,7 @@
 | 035 | AT | ARCH | Drawing intelligence target architecture |
 | 036 | AT | SPEC | Response contracts and task taxonomy |
 | 037 | TQ | SPEC | Evaluation plan (5-tier, scorecard, golden trajectories) |
+| 038 | PM | PLAN | Drawing intelligence platform roadmap (12 epics, 5 phases) |
 | 039 | AT | ADEC | ADR: intent router design (hybrid heuristic+LLM) |
 
 ## Quick Reference
