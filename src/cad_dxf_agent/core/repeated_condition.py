@@ -12,6 +12,7 @@ import math
 from collections import Counter
 
 from ..models.cad_schema import (
+    TEXT_PROVENANCE_DEFAULTS,
     DrawingContext,
     EntityRef,
     EntityType,
@@ -650,8 +651,6 @@ class ConditionDetector:
 
     def _avg_text_trust(self, entities: list[EntityRef]) -> float:
         """Average text provenance trust level for entities with text geometry."""
-        from ..models.cad_schema import TEXT_PROVENANCE_DEFAULTS
-
         trusts: list[float] = []
         for e in entities:
             if e.text_geometry and e.entity_type in _TEXT_TYPES:
