@@ -20,8 +20,8 @@ export default function Workspace({ user, onSignOut }) {
       <header className="site-header">
         <div className="container--wide site-header__inner" style={{ paddingInline: 'var(--space-4)' }}>
           <div className="site-header__logo">
-            <div className="site-header__logo-icon" aria-hidden="true">C</div>
-            <span className="hide-mobile">CAD DXF Agent</span>
+            <div className="site-header__logo-icon" aria-hidden="true">I</div>
+            <span className="hide-mobile">IntentCAD</span>
           </div>
           <div className="flex items-center gap-3">
             {sessionId && (
