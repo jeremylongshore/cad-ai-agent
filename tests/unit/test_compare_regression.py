@@ -162,7 +162,7 @@ class TestMatchSummaryPopulated:
 
 
 class TestCompareEditIsolation:
-    """Anti-regression: compare intent must never enter the edit planner path."""
+    """Ensures compare intents don't route to the edit planner."""
 
     def test_compare_intent_does_not_route_to_edit(self):
         from cad_dxf_agent.llm.intent_router import IntentRouter
