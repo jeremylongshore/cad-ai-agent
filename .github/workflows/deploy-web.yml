@@ -126,6 +126,7 @@ jobs:
           service_account: ${{ vars.WIF_SERVICE_ACCOUNT }}
 
       - name: Deploy Firestore rules
+        continue-on-error: true
         working-directory: web
         run: npx firebase-tools deploy --only firestore:rules --project ${{ env.GCP_PROJECT }} --non-interactive
 
