@@ -51,7 +51,7 @@ class TestV2PromptRouting:
         assert data["audit"]["total_request_time_ms"] is not None
         assert data["audit"]["context_build_time_ms"] is not None
 
-    def test_summary_returns_unsupported(self, client, upload_dxf):
+    def test_summary_returns_answer_only(self, client, upload_dxf):
         session_id, _ = upload_dxf
         resp = client.post(
             "/api/v2/prompt",
@@ -60,7 +60,7 @@ class TestV2PromptRouting:
         assert resp.status_code == 200
         data = resp.json()
         assert data["task_family"] == "summary"
-        assert data["response_type"] == "unsupported_operation"
+        assert data["response_type"] == "answer_only"
 
     def test_empty_prompt_returns_clarification(self, client, upload_dxf):
         session_id, _ = upload_dxf

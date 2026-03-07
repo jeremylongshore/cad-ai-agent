@@ -1,0 +1,10 @@
+{
+  "prompt": "Generate a full report scope of work for this drawing",
+  "description": "Design-ops assembles scope with layout, takeoff, and optional revision sections",
+  "task_family": "design_assist",
+  "response_type": "answer_only",
+  "expected_data_keys": ["sections", "aggregate_confidence", "omitted_sections", "caveats"],
+  "must_not_produce_ops": true,
+  "must_have_evidence": false,
+  "risk_level": "none"
+}

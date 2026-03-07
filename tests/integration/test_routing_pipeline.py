@@ -88,8 +88,8 @@ class TestRoutingPipelineIntegration:
         assert data["audit"]["llm_time_ms"] is None
         assert data["audit"]["validation_time_ms"] is None
 
-    def test_unsupported_never_reaches_planner(self, client, uploaded_session):
-        """Summary prompt should return unsupported without calling the planner."""
+    def test_summary_is_deterministic_no_llm(self, client, uploaded_session):
+        """Summary prompt should return answer_only without calling the LLM."""
         session_id, _ = uploaded_session
 
         resp = client.post(
@@ -99,7 +99,7 @@ class TestRoutingPipelineIntegration:
         data = resp.json()
 
         assert data["task_family"] == "summary"
-        assert data["response_type"] == "unsupported_operation"
+        assert data["response_type"] == "answer_only"
         assert data["audit"]["llm_time_ms"] is None
         assert data["audit"]["validation_time_ms"] is None
 

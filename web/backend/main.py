@@ -542,6 +542,116 @@ async def v2_prompt(body: PromptRequest, user: dict = Depends(get_user)):
                 audit=audit,
             ).model_dump()
 
+        # Handle design_assist — deterministic layout analysis, no LLM
+        if intent.family == TaskFamily.DESIGN_ASSIST:
+            from cad_dxf_agent.core.design_ops import LayoutRecommender, ScopeBuilder
+            from cad_dxf_agent.core.region_context import RegionContextBuilder
+
+            ctx_start = _time.monotonic()
+            region = None
+            parsed_region = _parse_selected_region(body.selected_regions)
+            if parsed_region:
+                region = RegionContextBuilder().build(session.context, parsed_region)
+
+            # Detect scope workflow
+            prompt_lower = body.prompt.lower()
+            is_scope = any(
+                kw in prompt_lower
+                for kw in ("scope of work", "full report", "design summary", "scope summary")
+            )
+
+            if is_scope:
+                result = ScopeBuilder().build(
+                    context=session.context,
+                    prompt=body.prompt,
+                    region=region,
+                    comparison_result=session.comparison_result,
+                    changeset=session.changeset,
+                )
+                data = result.model_dump()
+                message = f"Scope summary: {len(result.sections)} section(s) available."
+                confidence = result.aggregate_confidence
+                flags = result.ambiguity_flags
+            else:
+                result = LayoutRecommender().recommend(
+                    session.context, body.prompt, region,
+                )
+                data = result.model_dump()
+                message = (
+                    f"{result.total_recommendations} recommendation(s). "
+                    f"{result.drawing_summary}"
+                )
+                confidence = result.aggregate_confidence
+                flags = result.ambiguity_flags
+
+            audit.context_build_time_ms = (_time.monotonic() - ctx_start) * 1000
+            audit.total_request_time_ms = (_time.monotonic() - total_start) * 1000
+
+            return ResponseBuilder.design_assist(
+                message=message,
+                data=data,
+                confidence=confidence,
+                ambiguity_flags=flags,
+                audit=audit,
+            ).model_dump()
+
+        # Handle summary — deterministic revision summary, no LLM
+        if intent.family == TaskFamily.SUMMARY:
+            from cad_dxf_agent.core.design_ops import RevisionSummarizer
+
+            ctx_start = _time.monotonic()
+            result = RevisionSummarizer().summarize(
+                comparison_result=session.comparison_result,
+                changeset=session.changeset,
+                context=session.context,
+            )
+            audit.context_build_time_ms = (_time.monotonic() - ctx_start) * 1000
+            audit.total_request_time_ms = (_time.monotonic() - total_start) * 1000
+
+            return ResponseBuilder.summary_result(
+                message=result.headline,
+                data=result.model_dump(),
+                confidence=min(
+                    (e.confidence for e in result.key_changes), default=0.5,
+                ),
+                ambiguity_flags=result.ambiguity_flags,
+                audit=audit,
+            ).model_dump()
+
+        # Handle takeoff_estimate — deterministic counting, no LLM
+        if intent.family == TaskFamily.TAKEOFF_ESTIMATE:
+            from cad_dxf_agent.core.design_ops import TakeoffGenerator
+            from cad_dxf_agent.core.region_context import RegionContextBuilder
+
+            ctx_start = _time.monotonic()
+            region = None
+            parsed_region = _parse_selected_region(body.selected_regions)
+            if parsed_region:
+                region = RegionContextBuilder().build(session.context, parsed_region)
+
+            result = TakeoffGenerator().generate(
+                session.context, body.prompt, region,
+            )
+            audit.context_build_time_ms = (_time.monotonic() - ctx_start) * 1000
+            audit.total_request_time_ms = (_time.monotonic() - total_start) * 1000
+
+            _conf_labels = {
+                "high": 0.95,
+                "medium": 0.7,
+                "low": 0.4,
+                "estimate_only": 0.2,
+            }
+            return ResponseBuilder.takeoff_result(
+                message=(
+                    f"{result.total_items} takeoff item(s), "
+                    f"{result.total_quantity_items} total quantity."
+                ),
+                data=result.model_dump(),
+                confidence=_conf_labels.get(result.aggregate_confidence.value, 0.5),
+                ambiguity_flags=result.ambiguity_flags,
+                audit=audit,
+            ).model_dump()
+
         # Handle edit_plan — dispatch to existing planner
         if intent.family == TaskFamily.EDIT_PLAN:
             try:
