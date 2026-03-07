@@ -1,0 +1,13 @@
+{
+  "name": "repeated_condition_blocks",
+  "description": "Find repeated block instances (column marks at regular spacing)",
+  "task_family": "repeated_condition",
+  "prompt": "Find all instances like this column mark",
+  "exemplar_handles": ["COL_0"],
+  "expected_behavior": {
+    "total_found_min": 3,
+    "signals_present": ["block_name", "layer_context"],
+    "confidence_min": 0.5,
+    "exemplar_excluded": true
+  }
+}
