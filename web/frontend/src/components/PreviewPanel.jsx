@@ -20,6 +20,16 @@ const ALIGNMENT_LABELS = {
   manual: 'Manual',
 };
 
+function RotateBar({ rotation, onRotate }) {
+  return (
+    <div className="rotate-bar">
+      <button className="btn btn--ghost btn--sm" onClick={() => onRotate(-90)} title="Rotate left 90°">&#8634;</button>
+      <span className="text-xs text-secondary">{rotation}°</span>
+      <button className="btn btn--ghost btn--sm" onClick={() => onRotate(90)} title="Rotate right 90°">&#8635;</button>
+    </div>
+  );
+}
+
 export default function PreviewPanel({
   previewUrls,
   dxfUrls,
@@ -63,6 +73,10 @@ export default function PreviewPanel({
   // Resize handle state for controls height
   const [controlsHeight, setControlsHeight] = useState(240);
   const dragStartRef = useRef(null);
+
+  // Drawing rotation (degrees, multiples of 90)
+  const [rotation, setRotation] = useState(0);
+  const handleRotate = useCallback((deg) => setRotation((r) => (r + deg + 360) % 360), []);
 
   // Compare sub-view: 'split', 'original', 'revised'
   const [compareView, setCompareView] = useState('split');
@@ -226,6 +240,7 @@ export default function PreviewPanel({
         ))}
       </div>
 
+      {activeTab !== 'comparison' && <RotateBar rotation={rotation} onRotate={handleRotate} />}
       <div className="preview__image-wrap" role="tabpanel" aria-label={`${activeTab} preview`}>
         {activeTab === 'comparison' && dxfUrls?.original && dxfUrls?.comparison ? (
           <div className="compare-split-wrap">
@@ -350,12 +365,15 @@ export default function PreviewPanel({
             )}
           </div>
         ) : dxfUrls?.[activeTab] ? (
-          <DxfViewerComponent dxfUrl={dxfUrls[activeTab]} />
+          <div style={{ transform: `rotate(${rotation}deg)`, transition: 'transform 0.3s', width: '100%', height: '100%' }}>
+            <DxfViewerComponent dxfUrl={dxfUrls[activeTab]} />
+          </div>
         ) : previewUrls[activeTab] ? (
           <img
             src={previewUrls[activeTab]}
             alt={`${activeTab} drawing preview`}
             loading="lazy"
+            style={{ transform: `rotate(${rotation}deg)`, transition: 'transform 0.3s', maxWidth: '100%' }}
           />
         ) : (
           <div className="preview__placeholder">
