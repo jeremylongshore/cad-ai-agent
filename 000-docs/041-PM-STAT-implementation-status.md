@@ -17,7 +17,7 @@
 | — | SIDEQUEST-CAD-67: Text Positional Accuracy | cad-xiw | DONE | `feature/sidequest-cad-67-text-accuracy` | #79 | `TextProvenance` enum, `TextGeometry` model, trust hierarchy, enhanced TEXT/MTEXT/INSERT extraction, downstream wiring (selection, Q&A, compare, planner) | 788+ unit tests (test_text_geometry.py) + 534 e2e tests (test_text_accuracy_e2e.py) |
 | 05 | Repeated-Condition Detection | cad-ccd | DONE | `feature/epic-cad-05-repeated-conditions` | #81 | `repeated_condition_schema.py`, `repeated_condition.py`, web endpoint, 4 golden trajectories | 63 tests — unit (38 detection + 19 schema), integration (6 factory DXF) |
 | 06 | Compare + Diff Service Hardening | cad-3e4 | DONE | `feature/epic-cad-06-compare-diff` | #82 | `comparison_schema.py` (MatchSummary, DiffSummaryData, ComparePackage), scorer text-trust, changelog enrichment, `export_compare_package()`, web endpoint hardening | 15 tests — unit (9 schema + 2 anti-regression), regression (13 comparison pipeline) |
-| — | ARCH-REVIEW-01 | cad-sfw | NOT STARTED | — | — | Post-EPIC-06 quality/scalability review; ADR with keep/change/remove decisions per module | N/A (review output is ADR document) |
+| — | ARCH-REVIEW-01 | cad-sfw | DONE | `feature/arch-review-cad-01` | — | [046-AT-AUDT](046-AT-AUDT-arch-review-cad-01.md): 10-dimension review, CONDITIONAL GO for EPIC-07, 3 prerequisites, 2 constraints | N/A (review output is ADR document) |
 | 07 | Structured Edit Planning | cad-9ug | NOT STARTED | — | — | `models/plan_schema.py` (EditPlan), `llm/plan_builder.py`, constraint validation | TBD — unit (plan schema, constraint validation), golden trajectories (structured_edit family) |
 | 08 | Preview + Apply Workflow | cad-6zz | NOT STARTED | — | — | `web/backend/routes/preview.py`, `web/frontend/src/components/PreviewPanel.jsx`, audit trail | TBD — unit (preview generation, audit trail), integration (preview→apply round-trip), web API tests |
 | 09 | Design Operations Workflow Pack | cad-ady | NOT STARTED | — | — | `workflows/design_ops.py`, prompt templates for layout/revision/takeoff | TBD — golden trajectories (design_ops families), scorecard entries, live API tests |
@@ -33,7 +33,7 @@
 |-------|-------|--------|------|
 | **Phase 1: Foundation** | 01, 02, 03 | 3/3 COMPLETE | Contracts locked, regions normalized, `make check` green |
 | **Phase 2: Core Intelligence** | 04, 05, 06 | 3/3 COMPLETE (+ SQ67 done) | Golden trajectories pass per family |
-| **Architecture Review** | ARCH-REVIEW-01 | Not started | ADR document with keep/change/remove decisions per module |
+| **Architecture Review** | ARCH-REVIEW-01 | COMPLETE | CONDITIONAL GO — doc 046 published, 3 prerequisites for EPIC-07 |
 | **Phase 3: Structured Editing** | 07, 08 | 0/2 complete | Edit plan + apply produce audit metadata. Key files: `src/cad_dxf_agent/llm/plan_builder.py`, `src/cad_dxf_agent/models/plan_schema.py`, `web/frontend/src/components/PreviewPanel.jsx`, `web/backend/routes/preview.py` |
 | **Phase 4: Workflow Packs** | 09, 10 | 0/2 complete | Domain scorecard entries pass. Key files: `src/cad_dxf_agent/workflows/design_ops.py`, `src/cad_dxf_agent/workflows/construction.py`, domain-specific prompt templates |
 | **Phase 5: Production Readiness** | 11, 12 | 0/2 complete | Durable sessions + full scorecard green. Key files: `src/cad_dxf_agent/core/session_store.py` (GCS integration), `tests/eval/`, `scripts/run_eval.py`, scorecard schema |
@@ -54,8 +54,8 @@ EPIC-01 (DONE) → EPIC-02 (DONE)
               EPIC-04..10 → EPIC-12
 ```
 
-**Critical path:** Phase 1 COMPLETE. Phase 2 COMPLETE (EPIC-04 + SQ67 + EPIC-05 + EPIC-06 all DONE).
-Next: ARCH-REVIEW-01 (post-Phase 2 architecture review gate).
+**Critical path:** Phase 1 COMPLETE. Phase 2 COMPLETE. ARCH-REVIEW-01 COMPLETE (CONDITIONAL GO).
+Next: EPIC-CAD-07 (Structured Edit Planning) — after 3 prerequisites from review.
 
 ---
 
@@ -78,8 +78,8 @@ Next: ARCH-REVIEW-01 (post-Phase 2 architecture review gate).
 
 | Metric | Current (post-SQ67) | Target (all epics) |
 |--------|-------------------|-------------------|
-| Total tests | ~1823 | 2000+ |
-| Coverage | 65% | 70%+ |
+| Total tests | 1,924 | 2000+ |
+| Coverage | 95.24% | 70%+ |
 | Golden trajectories | 15 (edit_plan 5 + qna 6 + repeated_condition 4) | 25+ (all 9 families) |
 | Scorecard entries | 0 | 32+ |
 | Task families tested | 4 (edit_plan + compare + qna + repeated_condition) | 9 |
@@ -116,7 +116,7 @@ Next: ARCH-REVIEW-01 (post-Phase 2 architecture review gate).
 | — | SIDEQUEST-CAD-67 | DONE — PR #79 merged. TextGeometry + TextProvenance models, enhanced extraction, trust hierarchy, downstream wiring, 788+ tests. Doc: [044-AT-SPEC](044-AT-SPEC-sidequest-cad-67-text-accuracy.md) |
 | 05 | Repeated-Condition Detection | DONE — PR #81. Similarity scoring model (6 signals, text-trust weighting), ConditionDetector with spatial clustering, preview/approval workflow, web endpoint, 63 tests, 4 golden trajectories. Doc: [045-AT-SPEC](045-AT-SPEC-repeated-condition-scoring.md) |
 | 06 | Compare + Diff Service Hardening | DONE — PR #82 merged. Typed compare schema, scorer text-trust, changelog enrichment, export package, web endpoint hardening. 15 tests. Compliance audit: 2 anti-regression tests added. |
-| — | ARCH-REVIEW-01 | Collect module-level metrics (coupling, test coverage, API surface); draft ADR template with keep/change/remove columns |
+| — | ARCH-REVIEW-01 | DONE — doc 046 published. CONDITIONAL GO for EPIC-07 with 3 prerequisites (upload size, text_utils extraction, truncation confidence) |
 | 07 | Structured Edit Planning | Define `EditPlan` schema in `plan_schema.py`; implement plan builder with constraint pre-checks |
 | 08 | Preview + Apply Workflow | Wire preview generation into web backend route; implement frontend `PreviewPanel` component |
 | 09 | Design Operations Workflow Pack | Draft prompt templates for layout recommendations; implement `design_ops.py` workflow module |
@@ -128,9 +128,10 @@ Next: ARCH-REVIEW-01 (post-Phase 2 architecture review gate).
 
 ## 8. Global Next Actions
 
-1. **Begin ARCH-REVIEW-01** — Post-Phase 2 architecture review gate
-2. **Begin Phase 3** — EPIC-07 (Structured Edit Planning) after architecture review
-3. **Begin EPIC-08** — Preview + Apply Workflow after EPIC-07
+1. **ARCH-REVIEW-01 COMPLETE** — CONDITIONAL GO issued (doc 046)
+2. **Fix prerequisites** — upload size validation (P0), extract text_utils (P1), truncation confidence (P1)
+3. **Begin EPIC-07** — Structured Edit Planning (after prerequisites)
+4. **Begin EPIC-08** — Preview + Apply Workflow after EPIC-07
 
 ---
 
@@ -156,3 +157,4 @@ Next: ARCH-REVIEW-01 (post-Phase 2 architecture review gate).
 | 2026-03-06 | Test count: ~1462 → ~1760. Golden trajectories: 5 → 11. Task families tested: 2 → 3 (added qna). |
 | 2026-03-06 | EPIC-05 started: Repeated-Condition Detection (in progress). |
 | 2026-03-06 | EPIC-05 DONE: PR #81. Similarity scoring model (6 weighted signals), ConditionDetector with spatial clustering, preview/approval workflow, web endpoint. 63 new tests (38 unit + 19 schema + 6 integration). 4 golden trajectories. Doc 045 added. Test count: ~1760→~1823. Golden trajectories: 11→15. Task families: 3→4. Phase 2: 2/3 complete. |
+| 2026-03-07 | ARCH-REVIEW-01 DONE: 10-dimension architecture review. CONDITIONAL GO for EPIC-07. Doc 046 published. Test count: 1,924. Coverage: 95.24%. Prerequisites: upload size validation (P0), extract text_utils (P1), truncation confidence (P1). |

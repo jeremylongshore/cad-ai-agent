@@ -22,6 +22,7 @@
 | 039 | ADEC | [039-AT-ADEC-intent-router-design.md](039-AT-ADEC-intent-router-design.md) |
 | 040 | AUDT | [040-AT-AUDT-scale-readiness.md](040-AT-AUDT-scale-readiness.md) |
 | 044 | SPEC | [044-AT-SPEC-sidequest-cad-67-text-accuracy.md](044-AT-SPEC-sidequest-cad-67-text-accuracy.md) |
+| 046 | AUDT | [046-AT-AUDT-arch-review-cad-01.md](046-AT-AUDT-arch-review-cad-01.md) |
 
 ### PP — Product & Planning
 | # | Type | File |
@@ -128,6 +129,7 @@
 | 043 | PM | AAR | EPIC-CAD-03 after action report (Phase 1 complete) |
 | 044 | AT | SPEC | SIDEQUEST-CAD-67: Text / label positional accuracy |
 | 045 | AT | SPEC | Repeated-condition scoring model (EPIC-CAD-05) |
+| 046 | AT | AUDT | Post-EPIC-06 architecture review (ARCH-REVIEW-CAD-01) |
 
 ## Quick Reference
 
