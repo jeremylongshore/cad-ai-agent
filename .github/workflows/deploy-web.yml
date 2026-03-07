@@ -125,6 +125,10 @@ jobs:
           workload_identity_provider: ${{ vars.WIF_PROVIDER }}
           service_account: ${{ vars.WIF_SERVICE_ACCOUNT }}
 
+      - name: Deploy Firestore rules
+        working-directory: web
+        run: npx firebase-tools deploy --only firestore:rules --project ${{ env.GCP_PROJECT }} --non-interactive
+
       - name: Deploy to Firebase Hosting
         working-directory: web
         run: npx firebase-tools deploy --only hosting --project ${{ env.GCP_PROJECT }} --non-interactive
