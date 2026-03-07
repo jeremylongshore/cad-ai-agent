@@ -58,7 +58,7 @@ class _ExemplarProfile:
             cx = sum(p.x for p in pts) / len(pts)
             cy = sum(p.y for p in pts) / len(pts)
             self.centroid = Point2D(x=cx, y=cy)
-            self.radius = max(math.hypot(p.x - cx, p.y - cy) for p in pts) if len(pts) > 1 else 50.0
+            self.radius = max(math.hypot(p.x - cx, p.y - cy) for p in pts) if len(pts) > 1 else 0.0
         else:
             self.centroid = Point2D(x=0.0, y=0.0)
             self.radius = 50.0
@@ -252,6 +252,8 @@ class ConditionDetector:
             and s.insert_point is not None
         ]
 
+        single_entity = len(profile.entities) == 1
+
         for anchor in anchors:
             if anchor.handle in used:
                 continue
@@ -264,11 +266,16 @@ class ConditionDetector:
             if dist_to_exemplar < min_separation:
                 continue
 
-            # Gather nearby entities
-            cluster = self._index.find_in_radius(cx, cy, cluster_radius)
-            cluster = [
-                e for e in cluster if e.handle not in profile.handles and e.handle not in used
-            ]
+            # For single-entity exemplars, the anchor IS the cluster
+            if single_entity:
+                cluster = [anchor]
+            else:
+                # Gather nearby entities
+                cluster = self._index.find_in_radius(cx, cy, cluster_radius)
+                cluster = [
+                    e for e in cluster if e.handle not in profile.handles and e.handle not in used
+                ]
+
             if not cluster:
                 continue
 
@@ -288,6 +295,7 @@ class ConditionDetector:
         """Cluster seeds by spatial proximity without block anchors."""
         clusters: list[list[EntityRef]] = []
         used: set[str] = set()
+        single_entity = len(profile.entities) == 1
 
         # Sort by position for deterministic clustering
         positioned = [s for s in seeds if s.insert_point is not None]
@@ -304,10 +312,15 @@ class ConditionDetector:
             if dist_to_exemplar < min_separation:
                 continue
 
-            cluster = self._index.find_in_radius(cx, cy, cluster_radius)
-            cluster = [
-                e for e in cluster if e.handle not in profile.handles and e.handle not in used
-            ]
+            # For single-entity exemplars, the seed IS the cluster
+            if single_entity:
+                cluster = [seed]
+            else:
+                cluster = self._index.find_in_radius(cx, cy, cluster_radius)
+                cluster = [
+                    e for e in cluster if e.handle not in profile.handles and e.handle not in used
+                ]
+
             if not cluster:
                 continue
 

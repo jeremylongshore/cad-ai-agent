@@ -446,6 +446,34 @@ async def v2_prompt(body: PromptRequest, user: dict = Depends(get_user)):
                 audit=audit,
             ).model_dump()
 
+        # Handle repeated_condition — deterministic, no LLM
+        if intent.family == TaskFamily.REPEATED_CONDITION:
+            from cad_dxf_agent.core.repeated_condition import ConditionDetector
+
+            exemplar_handles = body.selected_regions[0].get("handles", []) if body.selected_regions else []
+            if not exemplar_handles:
+                audit.total_request_time_ms = (_time.monotonic() - total_start) * 1000
+                return ResponseBuilder.needs_clarification(
+                    message="Select entities to use as the exemplar for repeated-condition search.",
+                    family=TaskFamily.REPEATED_CONDITION,
+                    audit=audit,
+                ).model_dump()
+
+            ctx_start = _time.monotonic()
+            detector = ConditionDetector(session.context)
+            result = detector.find_repeated(exemplar_handles)
+            audit.context_build_time_ms = (_time.monotonic() - ctx_start) * 1000
+            audit.total_request_time_ms = (_time.monotonic() - total_start) * 1000
+
+            return ResponseBuilder.repeated_condition(
+                message=result.summary,
+                data=result.model_dump(),
+                evidence=[ev.model_dump() for c in result.candidates for ev in c.evidence[:3]],
+                confidence=result.candidates[0].confidence if result.candidates else 0.0,
+                ambiguity_flags=result.ambiguity_flags,
+                audit=audit,
+            ).model_dump()
+
         # Handle edit_plan — dispatch to existing planner
         if intent.family == TaskFamily.EDIT_PLAN:
             try:

@@ -114,7 +114,7 @@ class TestExemplarProfile:
     def test_single_entity_default_radius(self):
         entities = [_entity("A", x=50, y=50)]
         profile = _ExemplarProfile(entities)
-        assert profile.radius == 50.0  # default
+        assert profile.radius == 0.0  # single entity has no extent
 
     def test_block_name_counting(self):
         entities = [
