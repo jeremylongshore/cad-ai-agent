@@ -97,10 +97,16 @@ def format_debug_text(result: AssociationResult) -> str:
         for e in result.entities[:10]:
             ent = e.entity
             label = ent.text_content or ent.block_name or ent.entity_type.value
+            suffix = ""
+            if ent.text_geometry:
+                tg = ent.text_geometry
+                suffix = (
+                    f" prov={tg.provenance.value} h={tg.effective_height} rot={tg.rotation:.1f}"
+                )
             lines.append(
                 f"  #{e.rank} [{e.association_type.value}] "
                 f"{ent.handle} {label} "
-                f"layer={ent.layer} dist={e.distance:.2f}"
+                f"layer={ent.layer} dist={e.distance:.2f}{suffix}"
             )
 
     return "\n".join(lines)
@@ -144,6 +150,17 @@ def _serialize_entity(assoc: AssociatedEntity) -> dict[str, Any]:
         data["text"] = ent.text_content
     if ent.block_name:
         data["block_name"] = ent.block_name
+    if ent.text_geometry:
+        tg = ent.text_geometry
+        data["text_geometry"] = {
+            "height": tg.effective_height,
+            "rotation": tg.rotation,
+            "provenance": tg.provenance.value,
+            "confidence_position": tg.confidence_position,
+            "confidence_rotation": tg.confidence_rotation,
+            "confidence_content": tg.confidence_content,
+            "is_high_trust": tg.is_high_trust,
+        }
     return data
 
 

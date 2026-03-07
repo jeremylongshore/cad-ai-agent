@@ -9,7 +9,7 @@ from typing import Any
 
 import ezdxf
 
-from ...models.cad_schema import EntityType, Point2D
+from ...models.cad_schema import EntityType, Point2D, TextGeometry
 from ...models.comparison_schema import (
     BBoxRegion,
     ComparisonConfig,
@@ -17,6 +17,7 @@ from ...models.comparison_schema import (
     GeometrySnapshot,
 )
 from ...otel import get_tracer
+from ..dxf_reader import _extract_mtext_geometry, _extract_text_geometry
 
 logger = logging.getLogger(__name__)
 tracer = get_tracer(__name__)
@@ -294,6 +295,7 @@ def _extract_one(
     text_content: str | None = None
     block_name: str | None = None
     attributes: dict[str, Any] = {}
+    text_geometry: TextGeometry | None = None
 
     try:
         if dxf_type == "LINE":
@@ -309,16 +311,21 @@ def _extract_one(
             insert = entity.dxf.insert
             points = [Point2D(x=insert.x, y=insert.y)]
             text_content = entity.dxf.text
+            text_geometry = _extract_text_geometry(entity)
 
         elif dxf_type == "MTEXT":
             insert = entity.dxf.insert
             points = [Point2D(x=insert.x, y=insert.y)]
-            text_content = entity.text  # type: ignore[attr-defined]
+            text_content = entity.plain_text()  # type: ignore[attr-defined]
+            text_geometry = _extract_mtext_geometry(entity)
 
         elif dxf_type == "INSERT":
             insert = entity.dxf.insert
             points = [Point2D(x=insert.x, y=insert.y)]
             block_name = entity.dxf.name
+            attributes["insert_xscale"] = entity.dxf.get("xscale", 1.0)
+            attributes["insert_yscale"] = entity.dxf.get("yscale", 1.0)
+            attributes["insert_rotation"] = entity.dxf.get("rotation", 0.0) % 360.0
 
         elif dxf_type == "CIRCLE":
             center = entity.dxf.center
@@ -426,4 +433,5 @@ def _extract_one(
         text_content=text_content,
         block_name=block_name,
         attributes=attributes,
+        text_geometry=text_geometry,
     )

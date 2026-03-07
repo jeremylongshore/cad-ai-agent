@@ -496,3 +496,101 @@ def create_drawing_with_layout(
     dxf_path = tmp_path / filename
     doc.saveas(str(dxf_path))
     return dxf_path
+
+
+def create_scaled_insert_drawing(
+    tmp_path: Path,
+    *,
+    filename: str = "scaled_inserts.dxf",
+) -> Path:
+    """Build a drawing with INSERT entities at different scales and rotations.
+
+    Block "LABELED_MARK" has an ATTDEF (tag=LABEL, height=2.0).
+    Three INSERTs:
+    - Default scale (1, 1, 0°)
+    - xscale=2, yscale=0.5
+    - rotation=30°
+    """
+    doc = ezdxf.new(dxfversion="R2018")
+    msp = doc.modelspace()
+    doc.layers.add("MARKS", color=1)
+
+    # Block with ATTDEF
+    block = doc.blocks.new("LABELED_MARK")
+    block.add_circle((0, 0), radius=3)
+    block.add_attdef("LABEL", (0, -5), dxfattribs={"height": 2.0})
+
+    # INSERT 1: default scale
+    ref1 = msp.add_blockref("LABELED_MARK", insert=(10, 10), dxfattribs={"layer": "MARKS"})
+    ref1.add_auto_attribs({"LABEL": "MARK-A"})
+
+    # INSERT 2: non-uniform scale
+    ref2 = msp.add_blockref(
+        "LABELED_MARK",
+        insert=(50, 10),
+        dxfattribs={"layer": "MARKS", "xscale": 2.0, "yscale": 0.5},
+    )
+    ref2.add_auto_attribs({"LABEL": "MARK-B"})
+
+    # INSERT 3: rotated
+    ref3 = msp.add_blockref(
+        "LABELED_MARK",
+        insert=(90, 10),
+        dxfattribs={"layer": "MARKS", "rotation": 30.0},
+    )
+    ref3.add_auto_attribs({"LABEL": "MARK-C"})
+
+    dxf_path = tmp_path / filename
+    doc.saveas(str(dxf_path))
+    return dxf_path
+
+
+def create_rich_mtext_drawing(
+    tmp_path: Path,
+    *,
+    filename: str = "rich_mtext.dxf",
+) -> Path:
+    """Build a drawing with MTEXT containing formatting codes.
+
+    - MTEXT with paragraph breaks (\\n input becomes \\P in DXF)
+    - MTEXT with explicit column width
+    - Simple MTEXT without formatting
+    """
+    doc = ezdxf.new(dxfversion="R2018")
+    msp = doc.modelspace()
+    doc.layers.add("NOTES", color=3)
+
+    # MTEXT with formatting — ezdxf converts \n to \P internally
+    msp.add_mtext(
+        "Line one\nLine two\nLine three",
+        dxfattribs={
+            "layer": "NOTES",
+            "insert": (0, 0),
+            "char_height": 2.5,
+        },
+    )
+
+    # MTEXT with explicit width
+    msp.add_mtext(
+        "Constrained width text that should wrap",
+        dxfattribs={
+            "layer": "NOTES",
+            "insert": (0, 30),
+            "char_height": 2.0,
+            "width": 40.0,
+        },
+    )
+
+    # Simple MTEXT
+    msp.add_mtext(
+        "SIMPLE NOTE",
+        dxfattribs={
+            "layer": "NOTES",
+            "insert": (0, 60),
+            "char_height": 3.0,
+        },
+    )
+
+    dxf_path = tmp_path / filename
+    doc.saveas(str(dxf_path))
+    return dxf_path

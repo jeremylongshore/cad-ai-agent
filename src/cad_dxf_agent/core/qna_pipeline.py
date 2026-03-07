@@ -466,6 +466,12 @@ def _describe_entity(ent) -> str:
     parts.append(f"on {ent.layer}")
     if ent.insert_point:
         parts.append(f"at ({ent.insert_point.x:.0f}, {ent.insert_point.y:.0f})")
+    if ent.text_geometry:
+        tg = ent.text_geometry
+        if tg.effective_height is not None:
+            parts.append(f"h={tg.effective_height}")
+        if tg.rotation != 0.0:
+            parts.append(f"rot={tg.rotation:.1f}")
     parts.append(f"[{ent.handle}]")
     return " ".join(parts)
 

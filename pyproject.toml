@@ -140,6 +140,7 @@ markers = [
     "benchmark: performance micro-benchmarks (pytest-benchmark)",
     "web: web backend API tests (FastAPI TestClient)",
     "web_live: tests against deployed web backend (require CAD_WEB_URL)",
+    "e2e: end-to-end tests using real DXF files (run scripts/download_e2e_fixtures.sh first)",
 ]
 
 [tool.coverage.run]

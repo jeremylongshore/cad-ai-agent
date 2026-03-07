@@ -52,6 +52,9 @@ tmp/
 # Live test reports (uploaded as CI artifacts, not committed)
 tests/live/reports/
 
+# E2E sourced DXF fixtures (downloaded, not committed)
+tests/fixtures/e2e_sourced/*.dxf
+
 # Distribution
 *.exe
 *.msi
