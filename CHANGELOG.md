@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-03-07
+
+### Added
+- **EPIC-CAD-02: Core Contracts + Routing Foundation**: `PlatformResponse` envelope, `TaskFamily` taxonomy, `IntentRouter` with heuristic classification, `CapabilityRegistry` (#74, #75)
+- **EPIC-CAD-03: Selection + Markup Interpretation**: `RegionSchema`, `MarkupParser`, `RegionAssociator`, `SelectionDebug` for region-based entity selection (#77)
+- **EPIC-CAD-04: Region Q&A Vertical Slice**: Deterministic Q&A pipeline with 8 question types, template-based answers, 6 golden trajectories (#78)
+- **EPIC-CAD-05: Repeated-Condition Detection**: 6-signal similarity scoring, spatial clustering, preview/approval workflow (#81)
+- **EPIC-CAD-06: Compare + Diff Service Hardening**: Typed compare schema, text-trust scorer, changelog enrichment, export package (#82)
+- **SIDEQUEST-CAD-67: Text Positional Accuracy**: `TextGeometry` + `TextProvenance` models, trust hierarchy (NATIVE > BLOCK > VECTOR > OCR), enhanced extraction (#79)
+- **Multi-user Workspace**: Google auth integration with email allowlist for team access (#80)
+- **IntentCAD Rebrand**: Updated web UI branding and polished login page
+
+### Fixed
+- Firestore rules deploy made non-blocking for CI stability
+- PDF text display and color detection improvements (#72)
+
+### Changed
+- Test count: 1375 → 1924 tests
+- Coverage: 95% → 95.24%
+- Golden trajectories: 5 → 15 (qna, repeated_condition, edit_plan families)
+- Task families tested: 2 → 4
+
+### Documentation
+- EPIC-CAD-01: 8 foundation documents (capability audit, target architecture, evaluation plan, roadmap, etc.)
+- ARCH-REVIEW-CAD-01: 10-dimension architecture review with CONDITIONAL GO for EPIC-CAD-07 (#84)
+- After-action reports for EPIC-CAD-02 and EPIC-CAD-03
+
 ## [0.5.0] - 2026-03-06
 
 ### Added

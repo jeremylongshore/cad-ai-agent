@@ -30,7 +30,7 @@ Local-first DXF layout editor with LLM-assisted prompt-to-edit planning, validat
 | Gemini vision pipeline (Vertex AI) | |
 
 For full details see:
-- [Full Application Audit (v0.5.0)](https://gist.github.com/jeremylongshore/0303189683f9547c79e1fc1fc68be711) — complete feature documentation, architecture, API reference, and tech stack
+- [Full Application Audit (v0.6.0)](https://gist.github.com/jeremylongshore/0303189683f9547c79e1fc1fc68be711) — complete feature documentation, architecture, API reference, and tech stack
 - [V1 Blueprint](000-docs/007-AT-ARCH-v1-blueprint.md) — engineering architecture and module map
 - [PRD Addendum](000-docs/008-PP-PROD-prd-addendum.md) — product requirements and acceptance criteria
 
