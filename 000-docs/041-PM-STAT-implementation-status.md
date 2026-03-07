@@ -21,7 +21,7 @@
 | 07 | Structured Edit Planning | cad-9ug | DONE | `feature/epic-cad-07-edit-planning` | #85 | `plan_schema.py` (EditPlan, EditAction, 5 action types), `plan_builder.py` (deterministic, no LLM), `plan_validator.py` (protected layers, text trust, move limits), `text_utils.py` (shared utilities) | 109 tests — unit (25 schema + 30 builder + 20 validator + 16 text_utils), anti-regression (15), golden (10) |
 | 08 | Preview + Apply Workflow | cad-6zz | DONE | `feature/epic-cad-08-preview-apply` | #86 | `preview_schema.py`, `apply_schema.py`, `plan_converter.py`, `preview_builder.py`, `apply_pipeline.py`, web endpoints (`/api/v2/preview`, `/approve`, `/apply`), `PreviewPanel.jsx`, session-scoped audit trail | 105 tests — unit (12 preview schema + 20 preview builder + 16 apply schema + 15 apply pipeline + 15 plan converter), anti-regression (8), golden (4), web (15) |
 | 09 | Design Operations Workflow Pack | cad-ady | DONE | `feature/epic-cad-09-design-operations` | #88 | `design_ops_schema.py`, `design_ops.py` (LayoutRecommender, RevisionSummarizer, TakeoffGenerator, ScopeBuilder), `DesignOpsPanel.jsx`, web dispatch for 3 task families, intent router patterns | 176 tests — unit (34 schema + 30 layout + 22 revision + 27 takeoff + 20 scope + 23 anti-regression), web (20 endpoint), 4 golden trajectories |
-| 10 | Construction Drawing Workflow Pack | cad-8p2 | NOT STARTED | — | — | `workflows/construction.py`, prompt templates for grid/bay/markup/batch | TBD — golden trajectories (construction families), scorecard entries, live API tests |
+| 10 | Construction Drawing Workflow Pack | cad-8p2 | DONE | `feature/epic-cad-10-construction-ops` | TBD | `construction_ops_schema.py`, `construction_ops.py` (GridAnalyzer, MarkupRedlineGenerator, BatchConditionPlanner, FieldSummaryBuilder), DesignOpsPanel extensions, intent router + registry + dispatch wiring | 194 tests — unit (25 schema + 24 grid + 32 redline + 30 condition + 23 field + 37 anti-regression), web (23 endpoint), 4 golden trajectories |
 | 11 | Session Durability + Scale Readiness | cad-36p | NOT STARTED | — | — | `core/session_store.py` (ABC + GCS impl), durable metadata model, tracing/metrics | TBD — unit (session store, metadata model), integration (persistence round-trip), migration tests |
 | 12 | Evaluation Harness + Quality Governance | cad-m7d | NOT STARTED | — | — | `tests/eval/` fixture packs, `scripts/run_eval.py`, scorecard JSON schema, CI regression | TBD — meta-tests (scorecard schema validation), CI smoke (eval harness runs clean) |
 
@@ -35,7 +35,7 @@
 | **Phase 2: Core Intelligence** | 04, 05, 06 | 3/3 COMPLETE (+ SQ67 done) | Golden trajectories pass per family |
 | **Architecture Review** | ARCH-REVIEW-01 | COMPLETE | CONDITIONAL GO — doc 046 published, 3 prerequisites for EPIC-07 |
 | **Phase 3: Structured Editing** | 07, 08 | 2/2 COMPLETE | EPIC-07 DONE (edit plan schema + builder + validator). EPIC-08 DONE (preview + apply workflow, PR #86). Phase gate: structured edit plans validated, previewed, and applied end-to-end. |
-| **Phase 4: Workflow Packs** | 09, 10 | 1/2 complete | EPIC-09 DONE (design-ops: layout, revision, takeoff, scope). Key files: `src/cad_dxf_agent/core/design_ops.py`, `src/cad_dxf_agent/models/design_ops_schema.py`, `src/cad_dxf_agent/workflows/construction.py` |
+| **Phase 4: Workflow Packs** | 09, 10 | 2/2 COMPLETE | EPIC-09 DONE (design-ops: layout, revision, takeoff, scope). EPIC-10 DONE (construction-ops: grid/bay, markup-to-redline, batch conditions, field summary). Key files: `core/design_ops.py`, `models/design_ops_schema.py`, `core/construction_ops.py`, `models/construction_ops_schema.py` |
 | **Phase 5: Production Readiness** | 11, 12 | 0/2 complete | Durable sessions + full scorecard green. Key files: `src/cad_dxf_agent/core/session_store.py` (GCS integration), `tests/eval/`, `scripts/run_eval.py`, scorecard schema |
 
 ---
@@ -55,7 +55,7 @@ EPIC-01 (DONE) → EPIC-02 (DONE)
 ```
 
 **Critical path:** Phase 1 COMPLETE. Phase 2 COMPLETE. ARCH-REVIEW-01 COMPLETE (CONDITIONAL GO).
-Phase 3 COMPLETE (EPIC-07 + EPIC-08). Phase 4: EPIC-09 DONE. Next: EPIC-10 (Construction Workflows).
+Phase 3 COMPLETE (EPIC-07 + EPIC-08). Phase 4 COMPLETE (EPIC-09 + EPIC-10). Next: Phase 5 (EPIC-11 Session Durability, EPIC-12 Eval Harness).
 
 ---
 
@@ -78,11 +78,11 @@ Phase 3 COMPLETE (EPIC-07 + EPIC-08). Phase 4: EPIC-09 DONE. Next: EPIC-10 (Cons
 
 | Metric | Current (post-SQ67) | Target (all epics) |
 |--------|-------------------|-------------------|
-| Total tests | 2,249+ (collected) | 2000+ |
+| Total tests | 2,422+ (collected) | 2000+ |
 | Coverage | ~95% | 70%+ |
-| Golden trajectories | 23 (edit_plan 5 + qna 6 + repeated_condition 4 + preview_apply 4 + design_ops 4) | 25+ (all 9 families) |
+| Golden trajectories | 27 (edit_plan 5 + qna 6 + repeated_condition 4 + preview_apply 4 + design_ops 4 + construction_ops 4) | 25+ (all 9 families) |
 | Scorecard entries | 0 | 32+ |
-| Task families tested | 8 (edit_plan + compare + qna + repeated_condition + preview_apply + design_assist + summary + takeoff_estimate) | 9 |
+| Task families tested | 9 (edit_plan + compare + qna + repeated_condition + preview_apply + design_assist + summary + takeoff_estimate + markup_interpretation) | 9 |
 | Scorecard pass rate (mock) | N/A | 100% |
 | Scorecard pass rate (live) | N/A | >= 95% |
 
@@ -120,7 +120,7 @@ Phase 3 COMPLETE (EPIC-07 + EPIC-08). Phase 4: EPIC-09 DONE. Next: EPIC-10 (Cons
 | 07 | Structured Edit Planning | DONE — PR #85. EditPlan schema (5 action types), deterministic plan builder (no LLM), plan validator (protected layers, text trust, move limits), shared text_utils. 109 new tests. All 3 ARCH-REVIEW prerequisites satisfied. |
 | 08 | Preview + Apply Workflow | DONE — PR #86. AAR: [049-PM-AAR](049-PM-AAR-epic-cad-08-aar.md) |
 | 09 | Design Operations Workflow Pack | DONE — PR #88. AAR: [050-PM-AAR](050-PM-AAR-epic-cad-09-aar.md) |
-| 10 | Construction Drawing Workflow Pack | Gather sample construction drawings for regional convention analysis; draft grid/bay extraction logic |
+| 10 | Construction Drawing Workflow Pack | DONE — PR TBD. AAR: [051-PM-AAR](051-PM-AAR-epic-cad-10-aar.md) |
 | 11 | Session Durability + Scale Readiness | Audit current in-memory session lifecycle; define `SessionStore` ABC with GCS-backed implementation |
 | 12 | Evaluation Harness + Quality Governance | Define scorecard JSON schema; scaffold `tests/eval/` directory with first fixture pack |
 
@@ -129,8 +129,8 @@ Phase 3 COMPLETE (EPIC-07 + EPIC-08). Phase 4: EPIC-09 DONE. Next: EPIC-10 (Cons
 ## 8. Global Next Actions
 
 1. **Phase 3 COMPLETE** — EPIC-07 (Structured Edit Planning, PR #85) + EPIC-08 (Preview + Apply Workflow, PR #86)
-2. **EPIC-09 DONE** — Design Operations Workflow Pack (layout, revision, takeoff, scope). 176 new tests, 4 golden trajectories, 3 new task families wired.
-3. **Begin EPIC-10** — Construction Drawing Workflow Pack (grid/bay/markup/batch)
+2. **Phase 4 COMPLETE** — EPIC-09 (Design Operations, PR #88) + EPIC-10 (Construction Operations). 370 new tests across both epics, 8 golden trajectories, all 9 task families wired.
+3. **Begin Phase 5** — EPIC-11 (Session Durability + Scale Readiness) + EPIC-12 (Evaluation Harness + Quality Governance)
 
 ---
 
@@ -160,3 +160,4 @@ Phase 3 COMPLETE (EPIC-07 + EPIC-08). Phase 4: EPIC-09 DONE. Next: EPIC-10 (Cons
 | 2026-03-07 | EPIC-07 DONE: PR #85. 4 new source files (plan_schema.py, plan_builder.py, plan_validator.py, text_utils.py). 109 new tests (25 schema + 30 builder + 20 validator + 15 anti-regression + 10 golden + 16 text_utils). All 3 ARCH-REVIEW prerequisites satisfied. Test count: 1,760 collected, all pass. Phase 3: 1/2 complete. Doc 048 added. |
 | 2026-03-07 | EPIC-08 DONE: PR #86. 5 new source files (preview_schema, apply_schema, plan_converter, preview_builder, apply_pipeline). 105 new tests. 3 web endpoints. Phase 3: 2/2 COMPLETE. Total tests: 2,144. Golden trajectories: 19. Task families: 5. Doc 049 added. |
 | 2026-03-07 | EPIC-09 DONE: PR #88. 2 new source files (design_ops_schema.py, design_ops.py — 4 classes). 176 new tests (156 unit + 20 web). 4 golden trajectories. 3 task families wired (design_assist, summary, takeoff_estimate). DesignOpsPanel.jsx frontend. Phase 4: 1/2 complete. Total tests: 2,249+. Golden trajectories: 23. Task families: 8. Doc 050 added. |
+| 2026-03-07 | EPIC-10 DONE: 2 new source files (construction_ops_schema.py, construction_ops.py — 4 classes). 194 new tests (171 unit + 23 web). 4 golden trajectories. 1 new task family wired (markup_interpretation), 2 existing extended (design_assist grid/field, repeated_condition batch). dxf_reader LINE/LWPOLYLINE vertex storage. DesignOpsPanel.jsx extended. Phase 4: 2/2 COMPLETE. Total tests: 2,422+. Golden trajectories: 27. Task families: 9. Doc 051 added. |

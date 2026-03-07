@@ -45,6 +45,7 @@
 | 048 | AAR | [048-PM-AAR-epic-cad-07-aar.md](048-PM-AAR-epic-cad-07-aar.md) |
 | 049 | AAR | [049-PM-AAR-epic-cad-08-aar.md](049-PM-AAR-epic-cad-08-aar.md) |
 | 050 | AAR | [050-PM-AAR-epic-cad-09-aar.md](050-PM-AAR-epic-cad-09-aar.md) |
+| 051 | AAR | [051-PM-AAR-epic-cad-10-aar.md](051-PM-AAR-epic-cad-10-aar.md) |
 
 ### DR — Documentation & Reference
 | # | Type | File |
@@ -138,6 +139,7 @@
 | 048 | PM | AAR | EPIC-CAD-07 end-of-phase report (Structured Edit Planning) |
 | 049 | PM | AAR | EPIC-CAD-08 end-of-phase report (Preview + Apply Workflow) |
 | 050 | PM | AAR | EPIC-CAD-09 end-of-phase report (Design Operations Workflow Pack) |
+| 051 | PM | AAR | EPIC-CAD-10 end-of-phase report (Construction Drawing Workflow Pack) |
 
 ## Quick Reference
 
