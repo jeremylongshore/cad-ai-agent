@@ -48,10 +48,7 @@ def build_planner_context(context: DrawingContext) -> dict:
         if truncated:
             entities = entities[:ENTITY_CAP]
 
-        entity_summary = [
-            _entity_to_summary(e)
-            for e in entities
-        ]
+        entity_summary = [_entity_to_summary(e) for e in entities]
 
         layout_summary = [
             {"name": layout.name, "entity_count": layout.entity_count} for layout in context.layouts

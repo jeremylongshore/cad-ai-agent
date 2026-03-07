@@ -119,16 +119,24 @@ TEXT_PROVENANCE_TRUST_ORDER: list[TextProvenance] = [
 # Default confidence by provenance
 TEXT_PROVENANCE_DEFAULTS: dict[TextProvenance, dict[str, float]] = {
     TextProvenance.NATIVE_CAD_TEXT: {
-        "position": 1.0, "rotation": 1.0, "content": 1.0,
+        "position": 1.0,
+        "rotation": 1.0,
+        "content": 1.0,
     },
     TextProvenance.BLOCK_ATTRIBUTE_TEXT: {
-        "position": 0.95, "rotation": 0.95, "content": 1.0,
+        "position": 0.95,
+        "rotation": 0.95,
+        "content": 1.0,
     },
     TextProvenance.VECTOR_OUTLINE_TEXT: {
-        "position": 0.6, "rotation": 0.5, "content": 0.7,
+        "position": 0.6,
+        "rotation": 0.5,
+        "content": 0.7,
     },
     TextProvenance.RASTER_OCR_TEXT: {
-        "position": 0.3, "rotation": 0.2, "content": 0.5,
+        "position": 0.3,
+        "rotation": 0.2,
+        "content": 0.5,
     },
 }
 

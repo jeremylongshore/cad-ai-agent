@@ -435,5 +435,3 @@ def _extract_one(
         attributes=attributes,
         text_geometry=text_geometry,
     )
-
-

@@ -216,9 +216,7 @@ class TestAttribConfidenceProvenance:
     def test_factory_attrib_provenance(self, scaled_insert_dxf):
         """Factory: ATTRIBs get BLOCK_ATTRIBUTE_TEXT provenance."""
         ctx = load_dxf(str(scaled_insert_dxf))
-        inserts_with_attribs = [
-            e for e in _insert_entities(ctx) if "attribs" in e.attributes
-        ]
+        inserts_with_attribs = [e for e in _insert_entities(ctx) if "attribs" in e.attributes]
         if not inserts_with_attribs:
             pytest.skip("No ATTRIBs in scaled_insert factory fixture")
         for e in inserts_with_attribs:
@@ -228,9 +226,7 @@ class TestAttribConfidenceProvenance:
     def test_factory_attrib_confidence_095(self, scaled_insert_dxf):
         """Factory: ATTRIB position/rotation confidence = 0.95."""
         ctx = load_dxf(str(scaled_insert_dxf))
-        inserts_with_attribs = [
-            e for e in _insert_entities(ctx) if "attribs" in e.attributes
-        ]
+        inserts_with_attribs = [e for e in _insert_entities(ctx) if "attribs" in e.attributes]
         if not inserts_with_attribs:
             pytest.skip("No ATTRIBs in scaled_insert factory fixture")
         for e in inserts_with_attribs:
@@ -242,9 +238,7 @@ class TestAttribConfidenceProvenance:
     def test_committed_door_attribs(self, block_attrib_master):
         """Committed: DOOR ATTRIBs have correct provenance."""
         ctx = load_dxf(str(block_attrib_master))
-        inserts_with_attribs = [
-            e for e in _insert_entities(ctx) if "attribs" in e.attributes
-        ]
+        inserts_with_attribs = [e for e in _insert_entities(ctx) if "attribs" in e.attributes]
         assert len(inserts_with_attribs) > 0
         for e in inserts_with_attribs:
             assert e.text_geometry is not None
@@ -253,9 +247,7 @@ class TestAttribConfidenceProvenance:
     def test_attrib_height_no_double_scaling(self, scaled_insert_dxf):
         """Factory: ATTRIB height reflects DXF value (no double-scaling)."""
         ctx = load_dxf(str(scaled_insert_dxf))
-        inserts_with_attribs = [
-            e for e in _insert_entities(ctx) if "attribs" in e.attributes
-        ]
+        inserts_with_attribs = [e for e in _insert_entities(ctx) if "attribs" in e.attributes]
         if not inserts_with_attribs:
             pytest.skip("No ATTRIBs in scaled_insert factory fixture")
         for e in inserts_with_attribs:
@@ -319,9 +311,7 @@ class TestTextGeometryFull:
         for e in texts:
             if e.text_geometry is not None:
                 rot = e.text_geometry.rotation
-                assert 0.0 <= rot < 360.0, (
-                    f"Handle {e.handle}: rotation {rot} not in [0, 360)"
-                )
+                assert 0.0 <= rot < 360.0, f"Handle {e.handle}: rotation {rot} not in [0, 360)"
 
     def test_mtext_provenance_native(self, real_columns_master):
         """Committed real_columns: MTEXT -> NATIVE_CAD_TEXT."""
@@ -352,9 +342,7 @@ class TestTextGeometryFull:
 class TestComparisonTextChanges:
     """Verify diff engine detects text_height and text_rotation modifications."""
 
-    def test_real_columns_snapshots_have_geometry(
-        self, real_columns_master, real_columns_revision
-    ):
+    def test_real_columns_snapshots_have_geometry(self, real_columns_master, real_columns_revision):
         """Committed pair: MTEXT snapshots include text_geometry."""
         from cad_dxf_agent.core.comparison.geometry import extract_snapshots
 
@@ -362,9 +350,7 @@ class TestComparisonTextChanges:
         mtexts = [s for s in snaps if s.entity_type.value == "MTEXT"]
         assert len(mtexts) > 0
         for s in mtexts:
-            assert s.text_geometry is not None, (
-                f"Handle {s.handle}: snapshot missing text_geometry"
-            )
+            assert s.text_geometry is not None, f"Handle {s.handle}: snapshot missing text_geometry"
 
     def test_factory_height_change_detected(self, tmp_path):
         """Factory pair: TEXT height 2->4 — snapshots capture different heights."""
@@ -409,9 +395,7 @@ class TestComparisonTextChanges:
         # Build revision with rotation
         doc2 = ezdxf.new()
         msp2 = doc2.modelspace()
-        msp2.add_text(
-            "LABEL", dxfattribs={"height": 2.5, "insert": (20, 20), "rotation": 45.0}
-        )
+        msp2.add_text("LABEL", dxfattribs={"height": 2.5, "insert": (20, 20), "rotation": 45.0})
         rev_path = tmp_path / "revision.dxf"
         doc2.saveas(str(rev_path))
 
@@ -526,9 +510,7 @@ class TestFullPipelineIntegration:
         planner_ctx = build_planner_context(ctx)
 
         text_entities_with_geom = [
-            e
-            for e in planner_ctx["entities"]
-            if e.get("text") and e.get("text_geometry")
+            e for e in planner_ctx["entities"] if e.get("text") and e.get("text_geometry")
         ]
         assert len(text_entities_with_geom) > 0, (
             "Expected text entities with text_geometry in planner context"
@@ -549,6 +531,4 @@ class TestFullPipelineIntegration:
         if not texts:
             pytest.skip("No TEXT/MTEXT in floorplan")
         for e in texts:
-            assert e.text_geometry is not None, (
-                f"Handle {e.handle}: missing text_geometry"
-            )
+            assert e.text_geometry is not None, f"Handle {e.handle}: missing text_geometry"

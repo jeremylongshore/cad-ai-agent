@@ -362,12 +362,8 @@ class TestTrustHierarchy:
         assert native_idx < ocr_idx
 
     def test_block_attr_higher_than_vector(self):
-        ba_idx = TEXT_PROVENANCE_TRUST_ORDER.index(
-            TextProvenance.BLOCK_ATTRIBUTE_TEXT
-        )
-        vo_idx = TEXT_PROVENANCE_TRUST_ORDER.index(
-            TextProvenance.VECTOR_OUTLINE_TEXT
-        )
+        ba_idx = TEXT_PROVENANCE_TRUST_ORDER.index(TextProvenance.BLOCK_ATTRIBUTE_TEXT)
+        vo_idx = TEXT_PROVENANCE_TRUST_ORDER.index(TextProvenance.VECTOR_OUTLINE_TEXT)
         assert ba_idx < vo_idx
 
     def test_defaults_all_provenances_covered(self):
@@ -388,14 +384,12 @@ class TestTrustHierarchy:
     def test_trust_degrades_monotonically(self):
         """Confidence should decrease (or stay equal) as trust decreases."""
         for key in ("position", "rotation", "content"):
-            values = [
-                TEXT_PROVENANCE_DEFAULTS[p][key] for p in TEXT_PROVENANCE_TRUST_ORDER
-            ]
+            values = [TEXT_PROVENANCE_DEFAULTS[p][key] for p in TEXT_PROVENANCE_TRUST_ORDER]
             for i in range(len(values) - 1):
                 assert values[i] >= values[i + 1], (
                     f"{key} confidence should degrade: "
                     f"{TEXT_PROVENANCE_TRUST_ORDER[i]} ({values[i]}) vs "
-                    f"{TEXT_PROVENANCE_TRUST_ORDER[i+1]} ({values[i+1]})"
+                    f"{TEXT_PROVENANCE_TRUST_ORDER[i + 1]} ({values[i + 1]})"
                 )
 
 
@@ -409,8 +403,7 @@ class TestAntiRegression:
         """Native CAD text from dxf_reader must always have native provenance."""
         ctx = load_dxf(sample_dxf)
         text_entities = [
-            e for e in ctx.entities
-            if e.entity_type in (EntityType.TEXT, EntityType.MTEXT)
+            e for e in ctx.entities if e.entity_type in (EntityType.TEXT, EntityType.MTEXT)
         ]
         for ent in text_entities:
             assert ent.text_geometry is not None
@@ -421,8 +414,7 @@ class TestAntiRegression:
         """Native CAD text must have full confidence scores."""
         ctx = load_dxf(sample_dxf)
         text_entities = [
-            e for e in ctx.entities
-            if e.entity_type in (EntityType.TEXT, EntityType.MTEXT)
+            e for e in ctx.entities if e.entity_type in (EntityType.TEXT, EntityType.MTEXT)
         ]
         for ent in text_entities:
             tg = ent.text_geometry

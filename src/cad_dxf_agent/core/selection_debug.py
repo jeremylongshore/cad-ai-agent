@@ -101,9 +101,7 @@ def format_debug_text(result: AssociationResult) -> str:
             if ent.text_geometry:
                 tg = ent.text_geometry
                 suffix = (
-                    f" prov={tg.provenance.value}"
-                    f" h={tg.effective_height}"
-                    f" rot={tg.rotation:.1f}"
+                    f" prov={tg.provenance.value} h={tg.effective_height} rot={tg.rotation:.1f}"
                 )
             lines.append(
                 f"  #{e.rank} [{e.association_type.value}] "

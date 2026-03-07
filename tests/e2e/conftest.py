@@ -15,9 +15,7 @@ import pytest
 SOURCED_DIR = Path(__file__).parent.parent / "fixtures" / "e2e_sourced"
 FIXTURES_DIR = Path(__file__).parent.parent / "fixtures"
 
-E2E_SKIP_REASON = (
-    "E2E sourced DXF not found. Run: bash scripts/download_e2e_fixtures.sh"
-)
+E2E_SKIP_REASON = "E2E sourced DXF not found. Run: bash scripts/download_e2e_fixtures.sh"
 
 
 def _has_sourced_dxfs() -> bool:
