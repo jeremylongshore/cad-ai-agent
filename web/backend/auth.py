@@ -146,14 +146,16 @@ def _provision_license(uid: str, email: str) -> None:
     from google.cloud import firestore
 
     db = firestore.Client()
-    db.collection("licenses").document(uid).set({
-        "active": True,
-        "email": email,
-        "plan": "trial",
-        "provisioned_by": "auto",
-        "created_at": firestore.SERVER_TIMESTAMP,
-        "expires_at": datetime.datetime.now(datetime.UTC) + datetime.timedelta(days=30),
-    })
+    db.collection("licenses").document(uid).set(
+        {
+            "active": True,
+            "email": email,
+            "plan": "trial",
+            "provisioned_by": "auto",
+            "created_at": firestore.SERVER_TIMESTAMP,
+            "expires_at": datetime.datetime.now(datetime.UTC) + datetime.timedelta(days=30),
+        }
+    )
 
 
 async def get_licensed_user(request: Request) -> dict:

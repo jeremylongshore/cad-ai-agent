@@ -168,8 +168,11 @@ class TestCheckLicense:
 
         from web.backend.auth import check_license
 
-        user = {"uid": "licensed-user", "email": "u@example.com",
-                "firebase": {"sign_in_provider": "google.com"}}
+        user = {
+            "uid": "licensed-user",
+            "email": "u@example.com",
+            "firebase": {"sign_in_provider": "google.com"},
+        }
         with patch("web.backend.auth._fetch_license", return_value=True):
             await check_license(user)  # should not raise
 
@@ -179,8 +182,11 @@ class TestCheckLicense:
 
         from web.backend.auth import check_license
 
-        user = {"uid": "new-user", "email": "anyone@gmail.com",
-                "firebase": {"sign_in_provider": "google.com"}}
+        user = {
+            "uid": "new-user",
+            "email": "anyone@gmail.com",
+            "firebase": {"sign_in_provider": "google.com"},
+        }
 
         mock_provision = MagicMock()
         with (
@@ -197,8 +203,11 @@ class TestCheckLicense:
 
         from web.backend.auth import check_license
 
-        user = {"uid": "expired-user", "email": "u@example.com",
-                "firebase": {"sign_in_provider": "google.com"}}
+        user = {
+            "uid": "expired-user",
+            "email": "u@example.com",
+            "firebase": {"sign_in_provider": "google.com"},
+        }
         # _fetch_license returns False for expired licenses
         with (
             patch("web.backend.auth._fetch_license", return_value=False),
