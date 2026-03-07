@@ -86,7 +86,7 @@ class TestCompare:
             files={"file": ("revision.dxf", revision_bytes, "application/octet-stream")},
         )
         assert resp.status_code == 200
-        data = resp.json()
+        data = resp.json()["data"]
         assert data["total_changes"] == 0
 
     def test_compare_moved_entity(self, client, master_and_moved_revision):
@@ -103,7 +103,7 @@ class TestCompare:
             files={"file": ("revision.dxf", revision_bytes, "application/octet-stream")},
         )
         assert resp.status_code == 200
-        data = resp.json()
+        data = resp.json()["data"]
         # At least one change detected (moved, or removed+added fallback)
         assert data["total_changes"] > 0
         summary = data["summary"]
@@ -117,7 +117,7 @@ class TestCompare:
             files={"file": ("revision.dxf", revision_bytes, "application/octet-stream")},
         )
         assert resp.status_code == 200
-        data = resp.json()
+        data = resp.json()["data"]
         assert data["summary"]["added"] > 0
         assert data["summary"]["removed"] > 0
 
@@ -129,7 +129,7 @@ class TestCompare:
             files={"file": ("revision.dxf", revision_bytes, "application/octet-stream")},
         )
         assert resp.status_code == 200
-        data = resp.json()
+        data = resp.json()["data"]
         assert "changelog" in data
         # Must be a non-empty JSON string that parses cleanly
         changelog = json.loads(data["changelog"])
@@ -144,7 +144,7 @@ class TestCompare:
             files={"file": ("revision.dxf", revision_bytes, "application/octet-stream")},
         )
         assert resp.status_code == 200
-        data = resp.json()
+        data = resp.json()["data"]
         assert "render_available" in data
         assert isinstance(data["render_available"], bool)
 
@@ -156,7 +156,7 @@ class TestCompare:
             files={"file": ("revision.dxf", revision_bytes, "application/octet-stream")},
         )
         assert resp.status_code == 200
-        data = resp.json()
+        data = resp.json()["data"]
         assert "summary" in data
         assert "total_changes" in data
         assert "changelog" in data
@@ -170,7 +170,7 @@ class TestCompare:
             files={"file": ("revision.dxf", revision_bytes, "application/octet-stream")},
         )
         assert resp.status_code == 200
-        summary = resp.json()["summary"]
+        summary = resp.json()["data"]["summary"]
         for key in ("added", "removed", "modified", "moved"):
             assert key in summary
             assert isinstance(summary[key], int)
@@ -286,7 +286,7 @@ class TestCompare:
             files={"file": ("revision.dxf", revision_bytes, "application/octet-stream")},
         )
         assert resp.status_code == 200
-        data = resp.json()
+        data = resp.json()["data"]
         # Complex pair has multiple change types — total must be > 0
         assert data["total_changes"] > 0
 
@@ -312,9 +312,88 @@ class TestCompare:
             files={"file": ("revision.dxf", revision_bytes, "application/octet-stream")},
         )
         assert resp.status_code == 200
-        changelog = json.loads(resp.json()["changelog"])
+        data = resp.json()
+        changelog = json.loads(data["data"]["changelog"])
         for entry in changelog["entries"]:
             assert entry["category"] in ("added", "removed", "modified", "moved")
             assert "entity_type" in entry
             assert "layer" in entry
             assert "description" in entry
+
+    # ------------------------------------------------------------------
+    # Typed response shape tests (EPIC-CAD-06)
+    # ------------------------------------------------------------------
+
+    def test_compare_returns_platform_response_shape(self, client, master_and_moved_revision):
+        """Compare must return PlatformResponse with task_family and response_type."""
+        session_id, revision_bytes = master_and_moved_revision
+        resp = client.post(
+            f"/api/compare?session_id={session_id}",
+            files={"file": ("revision.dxf", revision_bytes, "application/octet-stream")},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["task_family"] == "compare"
+        assert data["response_type"] == "comparison_result"
+        assert "data" in data
+        assert "message" in data
+
+    def test_compare_data_has_match_summary(self, client, master_and_moved_revision):
+        """data dict must include match_summary with expected fields."""
+        session_id, revision_bytes = master_and_moved_revision
+        resp = client.post(
+            f"/api/compare?session_id={session_id}",
+            files={"file": ("revision.dxf", revision_bytes, "application/octet-stream")},
+        )
+        assert resp.status_code == 200
+        match_summary = resp.json()["data"]["match_summary"]
+        assert match_summary is not None
+        assert "total_pairs" in match_summary
+        assert "avg_confidence" in match_summary
+        assert "ambiguous_count" in match_summary
+        assert "method_distribution" in match_summary
+
+    def test_compare_data_has_diff_summary(self, client, master_and_moved_revision):
+        """data dict must include diff_summary with headline."""
+        session_id, revision_bytes = master_and_moved_revision
+        resp = client.post(
+            f"/api/compare?session_id={session_id}",
+            files={"file": ("revision.dxf", revision_bytes, "application/octet-stream")},
+        )
+        assert resp.status_code == 200
+        diff_summary = resp.json()["data"]["diff_summary"]
+        assert "headline" in diff_summary
+        assert isinstance(diff_summary["headline"], str)
+
+    def test_v2_prompt_compare_returns_typed_response(self, tmp_path, client):
+        """v2 prompt with compare intent returns typed response."""
+        from tests.helpers.comparison_factory import make_moved_entity_pair
+
+        master_path, revision_path = make_moved_entity_pair(tmp_path, dx=10.0, dy=5.0)
+        master_bytes = master_path.read_bytes()
+        revision_bytes = revision_path.read_bytes()
+
+        # Upload master
+        upload_resp = client.post(
+            "/api/upload",
+            files={"file": ("master.dxf", master_bytes, "application/octet-stream")},
+        )
+        assert upload_resp.status_code == 200
+        session_id = upload_resp.json()["session_id"]
+
+        # Run compare to populate session.comparison_result
+        compare_resp = client.post(
+            f"/api/compare?session_id={session_id}",
+            files={"file": ("revision.dxf", revision_bytes, "application/octet-stream")},
+        )
+        assert compare_resp.status_code == 200
+
+        # Now prompt with compare-like text
+        prompt_resp = client.post(
+            "/api/v2/prompt",
+            json={"session_id": session_id, "prompt": "compare these drawings"},
+        )
+        assert prompt_resp.status_code == 200
+        data = prompt_resp.json()
+        # Should return a typed comparison response or clarification
+        assert data["task_family"] in ("compare", "needs_clarification")

@@ -438,7 +438,29 @@ async def v2_prompt(body: PromptRequest, user: dict = Depends(get_user)):
                     family=TaskFamily.COMPARE,
                     audit=audit,
                 ).model_dump()
-            # Full compare pipeline would go here; for now return clarification
+
+            # Use cached comparison result if available, else run pipeline
+            if session.comparison_result is not None and session.comparison_changelog is not None:
+                from cad_dxf_agent.core.comparison.engine import ComparisonEngine, ComparisonOutputs
+
+                outputs = ComparisonOutputs(
+                    result=session.comparison_result,
+                    changelog=session.comparison_changelog,
+                    diff_overlay_path=session.diff_overlay_path,
+                    master_path=session.original_path or Path(),
+                    revision_path=session.revision_path,
+                )
+                compare_data = ComparisonEngine.build_compare_response(
+                    session.comparison_result, outputs
+                )
+                total = session.comparison_result.total_changes
+                audit.total_request_time_ms = (_time.monotonic() - total_start) * 1000
+                return ResponseBuilder.comparison_result(
+                    message=f"{total} change{'s' if total != 1 else ''} detected",
+                    data=compare_data,
+                    audit=audit,
+                ).model_dump()
+
             audit.total_request_time_ms = (_time.monotonic() - total_start) * 1000
             return ResponseBuilder.needs_clarification(
                 message="Use /api/compare for full comparison workflow.",
@@ -712,15 +734,19 @@ async def compare(
 
             s.set_attribute("cad.compare.total_changes", result.total_changes)
 
-            response: dict = {
-                "summary": result.summary,
-                "total_changes": result.total_changes,
-                "changelog": outputs.changelog.to_json(),
-                "render_available": session.diff_overlay_render is not None,
-            }
-            if result.warnings:
-                response["warnings"] = result.warnings
-            return response
+            from cad_dxf_agent.llm.response_builder import ResponseBuilder
+
+            compare_data = engine.build_compare_response(result, outputs)
+            compare_data["changelog"] = outputs.changelog.to_json()
+            compare_data["render_available"] = session.diff_overlay_render is not None
+
+            total = result.total_changes
+            message = f"{total} change{'s' if total != 1 else ''} detected"
+            resp = ResponseBuilder.comparison_result(
+                message=message,
+                data=compare_data,
+            )
+            return resp.model_dump()
 
         except FileNotFoundError as e:
             raise HTTPException(status_code=400, detail=str(e)) from None

@@ -31,6 +31,9 @@ class ChangeLogEntry(BaseModel):
     description: str
     from_point: dict[str, float] | None = None
     to_point: dict[str, float] | None = None
+    master_handle: str | None = None
+    revision_handle: str | None = None
+    confidence: float | None = None
 
 
 class ChangeLog(BaseModel):
@@ -151,6 +154,9 @@ def _build_entry(change: EntityChange) -> ChangeLogEntry:
         description=desc,
         from_point=from_point,
         to_point=to_point,
+        master_handle=change.master_snapshot.handle if change.master_snapshot else None,
+        revision_handle=change.revision_snapshot.handle if change.revision_snapshot else None,
+        confidence=change.confidence if change.confidence < 1.0 else None,
     )
 
 

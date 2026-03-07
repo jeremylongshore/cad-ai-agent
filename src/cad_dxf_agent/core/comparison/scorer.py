@@ -282,13 +282,23 @@ def score_text(
     score += text_contribution
     notes.append(f"text similarity: {sim:.4f}")
 
-    # Position proximity
+    # Position proximity — reduce weight when text_geometry has low positional confidence
+    effective_pos_weight = _TEXT_POSITION_WEIGHT
+    text_trust = 1.0
+    for snap in (master, revision):
+        if snap.text_geometry is not None and snap.text_geometry.confidence_position < 0.5:
+            text_trust = min(text_trust, snap.text_geometry.confidence_position / 0.5)
+    effective_pos_weight *= text_trust
+    features["text_trust"] = round(text_trust, 6)
+
     prox = _proximity_score(master.centroid, revision.centroid, tolerance)
-    pos_contribution = _TEXT_POSITION_WEIGHT * prox
+    pos_contribution = effective_pos_weight * prox
     features["position"] = round(pos_contribution, 6)
     score += pos_contribution
     dist = _centroid_distance(master.centroid, revision.centroid)
     notes.append(f"within {dist:.4f} units")
+    if text_trust < 1.0:
+        notes.append(f"text trust: {text_trust:.4f}")
 
     final_score = min(1.0, score)
     explanation = MatchExplanation(
