@@ -67,7 +67,13 @@ class ResponseBuilder:
     @staticmethod
     def needs_clarification(
         *,
-        message: str = "Could you be more specific about what you'd like to do?",
+        message: str = (
+            "I'm not sure what you'd like to do. Try asking something like:\n"
+            "\u2022 \"summarize this drawing\"\n"
+            "\u2022 \"how many doors are there\"\n"
+            "\u2022 \"what text is in this drawing\"\n"
+            "\u2022 \"suggest layout improvements\""
+        ),
         family: TaskFamily = TaskFamily.NEEDS_CLARIFICATION,
         audit: AuditMetadata | None = None,
     ) -> PlatformResponse:

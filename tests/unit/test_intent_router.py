@@ -111,7 +111,9 @@ class TestHeuristicClassification:
         assert result.family == TaskFamily.QNA
 
     def test_qna_how_many(self, router):
-        result = router.classify("how many entities are on layer WALLS")
+        # "how many layers" has no element-type word, so it routes to QNA.
+        # (Prompts containing door/window/room/wall/etc. route to TAKEOFF_ESTIMATE.)
+        result = router.classify("how many layers are there")
         assert result.family == TaskFamily.QNA
 
 
@@ -278,6 +280,174 @@ class TestGoldenRouting:
                 f"prompt={case['prompt']!r}: expected source={case['expected_source']} "
                 f"got={result.source}"
             )
+
+
+# ---------------------------------------------------------------------------
+# New QNA patterns
+# ---------------------------------------------------------------------------
+
+
+class TestNewQNAPatterns:
+    """Verify new natural-question patterns added to the QNA rule."""
+
+    def test_are_there_bedrooms(self, router):
+        result = router.classify("are there bedrooms")
+        assert result.family == TaskFamily.QNA
+
+    def test_is_there_a_stairwell(self, router):
+        result = router.classify("is there a stairwell")
+        assert result.family == TaskFamily.QNA
+
+    def test_do_you_see_any_walls(self, router):
+        result = router.classify("do you see any walls")
+        assert result.family == TaskFamily.QNA
+
+    def test_can_you_see_any_text(self, router):
+        result = router.classify("can you see any text")
+        assert result.family == TaskFamily.QNA
+
+    def test_tell_me_about_this_plan(self, router):
+        # "tell me" matches QNA; "tell me about" is also a QNA pattern
+        result = router.classify("tell me about this plan")
+        assert result.family == TaskFamily.QNA
+
+    def test_find_the_kitchen(self, router):
+        # bare "find" (without "all") routes to QNA, not REPEATED_CONDITION
+        result = router.classify("find the kitchen")
+        assert result.family == TaskFamily.QNA
+
+    def test_search_for_exit_signs(self, router):
+        result = router.classify("search for the exit signs")
+        assert result.family == TaskFamily.QNA
+
+    def test_look_for_annotations(self, router):
+        result = router.classify("look for annotations")
+        assert result.family == TaskFamily.QNA
+
+    def test_identify_load_bearing_walls(self, router):
+        result = router.classify("identify the load-bearing walls")
+        assert result.family == TaskFamily.QNA
+
+    def test_what_do_you_see_in_this_drawing(self, router):
+        # "what...this drawing" matches the SUMMARY pattern before QNA's
+        # "what do you see" pattern — SUMMARY takes higher priority.
+        result = router.classify("what do you see in this drawing")
+        assert result.family == TaskFamily.SUMMARY
+
+    def test_what_rooms_are_in_this_blueprint(self, router):
+        # "what...this blueprint" hits the SUMMARY pattern at priority 7
+        # before QNA patterns are evaluated.
+        result = router.classify("what rooms are in this blueprint")
+        assert result.family == TaskFamily.SUMMARY
+
+    def test_what_does_this_plan_show(self, router):
+        result = router.classify("what does this plan show")
+        assert result.family == TaskFamily.SUMMARY
+
+    def test_what_do_you_see_no_drawing_keyword(self, router):
+        # Without "drawing/plan/blueprint", "what do you see" routes to QNA
+        result = router.classify("what do you see")
+        assert result.family == TaskFamily.QNA
+
+    def test_are_there_case_insensitive(self, router):
+        result = router.classify("ARE THERE any columns")
+        assert result.family == TaskFamily.QNA
+
+    def test_find_not_find_all(self, router):
+        # "find" alone is QNA; "find all" is REPEATED_CONDITION
+        result = router.classify("find the exit")
+        assert result.family == TaskFamily.QNA
+
+    def test_find_all_still_repeated_condition(self, router):
+        result = router.classify("find all instances of the sprinkler head")
+        assert result.family == TaskFamily.REPEATED_CONDITION
+
+
+# ---------------------------------------------------------------------------
+# New TAKEOFF_ESTIMATE patterns
+# ---------------------------------------------------------------------------
+
+
+class TestNewTakeoffPatterns:
+    """Verify new count/how-many patterns for specific element types."""
+
+    def test_how_many_doors_are_there(self, router):
+        result = router.classify("how many doors are there")
+        assert result.family == TaskFamily.TAKEOFF_ESTIMATE
+
+    def test_how_many_windows(self, router):
+        result = router.classify("how many windows does this plan have")
+        assert result.family == TaskFamily.TAKEOFF_ESTIMATE
+
+    def test_count_the_windows(self, router):
+        result = router.classify("count the windows")
+        assert result.family == TaskFamily.TAKEOFF_ESTIMATE
+
+    def test_count_doors(self, router):
+        result = router.classify("count doors on this floor")
+        assert result.family == TaskFamily.TAKEOFF_ESTIMATE
+
+    def test_how_many_rooms(self, router):
+        result = router.classify("how many rooms are on this level")
+        assert result.family == TaskFamily.TAKEOFF_ESTIMATE
+
+    def test_count_columns(self, router):
+        result = router.classify("count the columns in the structural plan")
+        assert result.family == TaskFamily.TAKEOFF_ESTIMATE
+
+    def test_how_many_fixtures(self, router):
+        result = router.classify("how many fixtures are in the bathroom")
+        assert result.family == TaskFamily.TAKEOFF_ESTIMATE
+
+    def test_count_windows_case_insensitive(self, router):
+        result = router.classify("COUNT THE WINDOWS")
+        assert result.family == TaskFamily.TAKEOFF_ESTIMATE
+
+    def test_how_many_without_element_type_routes_qna(self, router):
+        # "how many layers" contains no element-type word (door/window/room/wall/
+        # column/beam/fixture), so the TAKEOFF pattern does not match and it
+        # falls through to QNA's \bhow\s+many\b pattern.
+        result = router.classify("how many layers are there")
+        assert result.family == TaskFamily.QNA
+
+
+# ---------------------------------------------------------------------------
+# New SUMMARY patterns
+# ---------------------------------------------------------------------------
+
+
+class TestNewSummaryPatterns:
+    """Verify new summary-intent patterns added to the SUMMARY rule."""
+
+    def test_what_is_this_drawing(self, router):
+        result = router.classify("what is this drawing")
+        assert result.family == TaskFamily.SUMMARY
+
+    def test_break_down_this_drawing(self, router):
+        result = router.classify("break down this drawing")
+        assert result.family == TaskFamily.SUMMARY
+
+    def test_breakdown_no_space(self, router):
+        # Pattern uses \bbreak\s*down\b so zero or more spaces both match
+        result = router.classify("breakdown this floor plan")
+        assert result.family == TaskFamily.SUMMARY
+
+    def test_what_is_this_plan(self, router):
+        result = router.classify("what is this plan")
+        assert result.family == TaskFamily.SUMMARY
+
+    def test_what_is_this_blueprint(self, router):
+        result = router.classify("what is this blueprint")
+        assert result.family == TaskFamily.SUMMARY
+
+    def test_break_down_case_insensitive(self, router):
+        result = router.classify("BREAK DOWN this drawing")
+        assert result.family == TaskFamily.SUMMARY
+
+    def test_what_drawing_general(self, router):
+        # "what...drawing" matches the SUMMARY pattern
+        result = router.classify("what does this drawing represent")
+        assert result.family == TaskFamily.SUMMARY
 
 
 # ---------------------------------------------------------------------------

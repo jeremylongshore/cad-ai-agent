@@ -49,7 +49,7 @@
   {"prompt": "which layer has the doors", "expected_family": "qna", "expected_source": "heuristic"},
   {"prompt": "where is the stairwell located", "expected_family": "qna", "expected_source": "heuristic"},
   {"prompt": "show me the entities on layer ELECTRICAL", "expected_family": "qna", "expected_source": "heuristic"},
-  {"prompt": "how many entities are on layer WALLS", "expected_family": "qna", "expected_source": "heuristic"},
+  {"prompt": "how many entities are on layer WALLS", "expected_family": "takeoff_estimate", "expected_source": "heuristic"},
   {"prompt": "tell me about the HVAC layer", "expected_family": "qna", "expected_source": "heuristic"},
 
   {"prompt": "", "expected_family": "needs_clarification", "expected_source": "heuristic"},

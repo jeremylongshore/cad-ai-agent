@@ -48,6 +48,9 @@ async function request(path, options = {}) {
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
+    if (res.status === 404 || /not found/i.test(body.detail || '')) {
+      throw new Error("Your session has expired. Please click 'New File' and re-upload your drawing.");
+    }
     throw new Error(body.detail || `API error: ${res.status}`);
   }
 

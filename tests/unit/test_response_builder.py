@@ -77,7 +77,7 @@ class TestNeedsClarification:
     def test_default_message(self):
         resp = ResponseBuilder.needs_clarification()
         assert resp.response_type == ResponseType.NEEDS_CLARIFICATION
-        assert "more specific" in resp.message
+        assert "not sure what" in resp.message
 
     def test_custom_message(self):
         resp = ResponseBuilder.needs_clarification(message="Upload a file first.")
