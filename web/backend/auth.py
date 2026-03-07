@@ -14,6 +14,17 @@ logger = logging.getLogger(__name__)
 _license_cache: dict[str, tuple[bool, float]] = {}
 _LICENSE_CACHE_TTL = 300  # 5 minutes
 
+# Beta allowlist: parsed once from CAD_BETA_ALLOWLIST env var
+_BETA_ALLOWLIST: set[str] | None = None
+
+
+def _get_allowlist() -> set[str]:
+    global _BETA_ALLOWLIST
+    if _BETA_ALLOWLIST is None:
+        raw = os.getenv("CAD_BETA_ALLOWLIST", "")
+        _BETA_ALLOWLIST = {e.strip().lower() for e in raw.split(",") if e.strip()}
+    return _BETA_ALLOWLIST
+
 # Lazy-init firebase admin
 _firebase_app = None
 
@@ -77,11 +88,10 @@ async def check_license(user: dict) -> None:
     if os.getenv("CAD_WEB_DEV_MODE", "").lower() in ("1", "true"):
         return
 
-    # Anonymous Firebase users (signInAnonymously) have no email.
-    # Let them use the app without a license — gating is for paid accounts.
+    # Reject anonymous users — Google sign-in required
     provider = user.get("firebase", {}).get("sign_in_provider", "")
     if provider == "anonymous" or not user.get("email"):
-        return
+        raise HTTPException(status_code=403, detail="Google sign-in required")
 
     uid = user.get("uid")
     if not uid:
@@ -104,10 +114,19 @@ async def check_license(user: dict) -> None:
         from starlette.concurrency import run_in_threadpool
 
         active = await run_in_threadpool(_fetch_license, uid)
-        _license_cache[uid] = (active, now)
 
         if not active:
+            # Check allowlist for auto-provisioning
+            email = user.get("email", "").lower()
+            if email and email in _get_allowlist():
+                await run_in_threadpool(_provision_license, uid, email)
+                _license_cache[uid] = (True, now)
+                logger.info("Auto-provisioned license for %s via allowlist", email)
+                return
+            _license_cache[uid] = (False, now)
             raise HTTPException(status_code=403, detail="License inactive")
+
+        _license_cache[uid] = (active, now)
 
     except HTTPException:
         raise
@@ -126,6 +145,19 @@ def _fetch_license(uid: str) -> bool:
     if not doc.exists:
         return False
     return doc.to_dict().get("active", False)
+
+
+def _provision_license(uid: str, email: str) -> None:
+    """Create a license doc for an allowlisted user — called via run_in_threadpool."""
+    from google.cloud import firestore
+
+    db = firestore.Client()
+    db.collection("licenses").document(uid).set({
+        "active": True,
+        "email": email,
+        "provisioned_by": "allowlist",
+        "created_at": firestore.SERVER_TIMESTAMP,
+    })
 
 
 async def get_licensed_user(request: Request) -> dict:

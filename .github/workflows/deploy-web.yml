@@ -79,6 +79,7 @@ jobs:
             CAD_LLM_PROVIDER=gemini
             CAD_GCP_PROJECT=${{ env.GCP_PROJECT }}
             CAD_WEB_CORS_ORIGIN=https://cad-dxf-agent.web.app
+            CAD_BETA_ALLOWLIST=${{ vars.CAD_BETA_ALLOWLIST }}
             OTEL_ENABLED=1
             OTEL_EXPORTER=gcp-trace
           flags: |
@@ -124,6 +125,10 @@ jobs:
         with:
           workload_identity_provider: ${{ vars.WIF_PROVIDER }}
           service_account: ${{ vars.WIF_SERVICE_ACCOUNT }}
+
+      - name: Deploy Firestore rules
+        working-directory: web
+        run: npx firebase-tools deploy --only firestore:rules --project ${{ env.GCP_PROJECT }} --non-interactive
 
       - name: Deploy to Firebase Hosting
         working-directory: web
