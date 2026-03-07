@@ -196,6 +196,29 @@ class ResponseBuilder:
         )
 
     @staticmethod
+    def markup_redline(
+        *,
+        message: str,
+        data: dict[str, Any],
+        evidence: list[Any] | None = None,
+        confidence: float | None = None,
+        ambiguity_flags: list[str] | None = None,
+        audit: AuditMetadata | None = None,
+    ) -> PlatformResponse:
+        """Build a markup_interpretation response (redline report)."""
+        return PlatformResponse(
+            task_family=TaskFamily.MARKUP_INTERPRETATION,
+            response_type=ResponseType.ANSWER_ONLY,
+            message=message,
+            evidence=evidence or [],
+            confidence=confidence,
+            data=data,
+            ambiguity_flags=ambiguity_flags or [],
+            risk_level=RiskLevel.NONE,
+            audit=audit or AuditMetadata(),
+        )
+
+    @staticmethod
     def repeated_condition(
         *,
         message: str,

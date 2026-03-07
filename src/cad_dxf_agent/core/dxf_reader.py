@@ -135,10 +135,13 @@ def _parse_entity(
     if dxf_type == "LINE":
         start = entity.dxf.start
         insert_point = Point2D(x=start.x, y=start.y)
+        end = entity.dxf.end
+        attributes["end_point"] = (end.x, end.y)
     elif dxf_type == "LWPOLYLINE":
         points = list(entity.get_points(format="xy"))  # type: ignore[attr-defined]
         if points:
             insert_point = Point2D(x=points[0][0], y=points[0][1])
+            attributes["vertices"] = [(p[0], p[1]) for p in points]
     elif dxf_type == "TEXT":
         insert = entity.dxf.insert
         insert_point = Point2D(x=insert.x, y=insert.y)

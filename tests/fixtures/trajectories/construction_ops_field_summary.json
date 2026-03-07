@@ -1,0 +1,10 @@
+{
+  "prompt": "Generate a field summary for this construction drawing",
+  "description": "Construction-ops returns field summary combining grid, takeoff, conditions, and layout analysis",
+  "task_family": "design_assist",
+  "response_type": "answer_only",
+  "expected_data_keys": ["title", "sections", "generated_at", "aggregate_confidence", "omitted_sections"],
+  "must_not_produce_ops": true,
+  "must_have_evidence": false,
+  "risk_level": "none"
+}

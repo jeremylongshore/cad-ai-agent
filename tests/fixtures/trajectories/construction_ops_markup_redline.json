@@ -1,0 +1,10 @@
+{
+  "prompt": "Show me what's inside the revision clouds",
+  "description": "Construction-ops returns markup-to-redline report with cloud bounds and affected entities",
+  "task_family": "markup_interpretation",
+  "response_type": "answer_only",
+  "expected_data_keys": ["entries", "total_clouds", "total_affected_entities", "methodology", "aggregate_confidence"],
+  "must_not_produce_ops": true,
+  "must_have_evidence": false,
+  "risk_level": "none"
+}
