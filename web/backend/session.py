@@ -1,24 +1,35 @@
-"""Session management — temp directories for uploaded files and edits."""
+"""Session management — wraps SessionStore ABC for web backend.
+
+The Session dataclass holds runtime objects (context, changeset, etc.)
+that cannot be serialized. SessionMetadata (from core.session_store)
+holds the durable, serializable subset. SessionManager bridges the two.
+"""
 
 from __future__ import annotations
 
 import logging
-import shutil
 import time
-import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 from threading import Lock
 
-logger = logging.getLogger(__name__)
+from cad_dxf_agent.core.session_store import (
+    SESSION_TTL_SECONDS,
+    InMemorySessionStore,
+    SessionMetadata,
+    SessionStore,
+)
 
-SESSION_DIR = Path("/tmp/cad-sessions")
-SESSION_TTL_SECONDS = 2 * 60 * 60  # 2 hours
+logger = logging.getLogger(__name__)
 
 
 @dataclass
 class Session:
-    """A user editing session tied to one uploaded file."""
+    """A user editing session tied to one uploaded file.
+
+    Combines durable metadata (survives restart via SessionStore)
+    with transient runtime state (objects, loaded contexts, etc.).
+    """
 
     session_id: str
     user_id: str
@@ -41,7 +52,7 @@ class Session:
     # Revision pipeline state
     revision_path: Path | None = None
     alignment_result: object | None = None  # AlignmentResult
-    alignment_control_points: list | None = None  # parsed control points from align step
+    alignment_control_points: list | None = None
     revision_ops: list | None = None  # list[RevisionOp]
     approval_set: object | None = None  # ApprovalSet
     apply_result: object | None = None  # ApplyResult
@@ -53,32 +64,83 @@ class Session:
     edit_apply_result: object | None = None
     audit_events: list = field(default_factory=list)
 
+    def to_metadata(self) -> SessionMetadata:
+        """Extract durable metadata from this runtime session."""
+        return SessionMetadata(
+            session_id=self.session_id,
+            user_id=self.user_id,
+            created_at=self.created_at,
+            file_info=self.file_info,
+            conversation_history=self.conversation_history,
+            audit_events=self.audit_events,
+            original_path=str(self.original_path) if self.original_path else "",
+            working_path=str(self.working_path) if self.working_path else "",
+            edited_path=str(self.edited_path) if self.edited_path else "",
+            original_render=str(self.original_render) if self.original_render else "",
+            edited_render=str(self.edited_render) if self.edited_render else "",
+            diff_render=str(self.diff_render) if self.diff_render else "",
+            diff_overlay_path=str(self.diff_overlay_path) if self.diff_overlay_path else "",
+            diff_overlay_render=str(self.diff_overlay_render) if self.diff_overlay_render else "",
+            revision_path=str(self.revision_path) if self.revision_path else "",
+            bundle_dir=str(self.bundle_dir) if self.bundle_dir else "",
+        )
+
+    @classmethod
+    def from_metadata(cls, meta: SessionMetadata) -> Session:
+        """Restore a Session from durable metadata.
+
+        Runtime objects (context, changeset, etc.) will be None and must
+        be re-loaded from DXF files on the filesystem.
+        """
+        return cls(
+            session_id=meta.session_id,
+            user_id=meta.user_id,
+            created_at=meta.created_at,
+            original_path=Path(meta.original_path) if meta.original_path else Path(),
+            working_path=Path(meta.working_path) if meta.working_path else None,
+            edited_path=Path(meta.edited_path) if meta.edited_path else None,
+            original_render=Path(meta.original_render) if meta.original_render else None,
+            edited_render=Path(meta.edited_render) if meta.edited_render else None,
+            diff_render=Path(meta.diff_render) if meta.diff_render else None,
+            diff_overlay_path=Path(meta.diff_overlay_path) if meta.diff_overlay_path else None,
+            diff_overlay_render=(
+                Path(meta.diff_overlay_render) if meta.diff_overlay_render else None
+            ),
+            revision_path=Path(meta.revision_path) if meta.revision_path else None,
+            bundle_dir=Path(meta.bundle_dir) if meta.bundle_dir else None,
+            file_info=meta.file_info,
+            conversation_history=meta.conversation_history,
+            audit_events=meta.audit_events,
+        )
+
 
 class SessionManager:
-    """In-memory session store with temp-dir backing."""
+    """Session manager backed by a SessionStore.
 
-    def __init__(self):
+    Maintains runtime Session objects in-memory while delegating
+    durable metadata to the underlying SessionStore. API is unchanged
+    from the original implementation for backward compatibility.
+    """
+
+    def __init__(self, store: SessionStore | None = None):
+        self._store = store or InMemorySessionStore()
         self._sessions: dict[str, Session] = {}
         self._lock = Lock()
-        SESSION_DIR.mkdir(parents=True, exist_ok=True)
+
+    @property
+    def store(self) -> SessionStore:
+        """Access the underlying session store."""
+        return self._store
 
     def create(self, user_id: str) -> Session:
         """Create a new session with a temp directory."""
-        session_id = uuid.uuid4().hex[:16]
-        session_dir = SESSION_DIR / session_id
-        session_dir.mkdir(parents=True, exist_ok=True)
+        metadata = self._store.create(user_id)
 
-        session = Session(
-            session_id=session_id,
-            user_id=user_id,
-            created_at=time.time(),
-            original_path=session_dir / "original.dxf",
-        )
-
+        session = Session.from_metadata(metadata)
         with self._lock:
-            self._sessions[session_id] = session
+            self._sessions[session.session_id] = session
 
-        logger.info("Created session %s for user %s", session_id, user_id)
+        logger.info("Created session %s for user %s", session.session_id, user_id)
         return session
 
     def get(self, session_id: str, user_id: str) -> Session:
@@ -97,11 +159,7 @@ class SessionManager:
         return session
 
     def get_by_id(self, session_id: str) -> Session:
-        """Get a session by ID without ownership check.
-
-        Used for read-only endpoints (render, download) where the
-        session UUID itself serves as the access credential.
-        """
+        """Get a session by ID without ownership check."""
         with self._lock:
             session = self._sessions.get(session_id)
 
@@ -116,13 +174,14 @@ class SessionManager:
     def delete(self, session_id: str) -> None:
         """Delete a session and its temp directory."""
         with self._lock:
-            session = self._sessions.pop(session_id, None)
+            self._sessions.pop(session_id, None)
 
-        if session:
-            session_dir = SESSION_DIR / session_id
-            if session_dir.exists():
-                shutil.rmtree(session_dir, ignore_errors=True)
-            logger.info("Deleted session %s", session_id)
+        self._store.delete(session_id)
+        logger.info("Deleted session %s", session_id)
+
+    def save_metadata(self, session: Session) -> None:
+        """Persist the durable metadata for a session."""
+        self._store.save(session.to_metadata())
 
     def cleanup_expired(self) -> int:
         """Remove all expired sessions. Returns count removed."""
