@@ -88,6 +88,17 @@ export async function planEdit(sessionId, prompt) {
   return res.json();
 }
 
+export async function v2Prompt(sessionId, prompt, selectedRegions = null) {
+  const body = { session_id: sessionId, prompt };
+  if (selectedRegions) body.selected_regions = selectedRegions;
+  const res = await request('/api/v2/prompt', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  return res.json();
+}
+
 export async function applyChanges(sessionId, selectedOps = null) {
   const res = await request('/api/apply', {
     method: 'POST',

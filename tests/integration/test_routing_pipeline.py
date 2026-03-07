@@ -72,8 +72,8 @@ class TestRoutingPipelineIntegration:
         assert data["audit"]["trace_id"]
         assert data["audit"]["total_request_time_ms"] > 0
 
-    def test_unsupported_never_reaches_planner(self, client, uploaded_session):
-        """Q&A prompt should return unsupported without calling the planner."""
+    def test_qna_returns_answer_without_planner(self, client, uploaded_session):
+        """Q&A prompt should return answer_only without calling the planner."""
         session_id, _ = uploaded_session
 
         resp = client.post(
@@ -83,8 +83,23 @@ class TestRoutingPipelineIntegration:
         data = resp.json()
 
         assert data["task_family"] == "qna"
-        assert data["response_type"] == "unsupported_operation"
+        assert data["response_type"] == "answer_only"
         # No LLM or validation timing — planner was never called
+        assert data["audit"]["llm_time_ms"] is None
+        assert data["audit"]["validation_time_ms"] is None
+
+    def test_unsupported_never_reaches_planner(self, client, uploaded_session):
+        """Summary prompt should return unsupported without calling the planner."""
+        session_id, _ = uploaded_session
+
+        resp = client.post(
+            "/api/v2/prompt",
+            json={"session_id": session_id, "prompt": "summarize this drawing"},
+        )
+        data = resp.json()
+
+        assert data["task_family"] == "summary"
+        assert data["response_type"] == "unsupported_operation"
         assert data["audit"]["llm_time_ms"] is None
         assert data["audit"]["validation_time_ms"] is None
 

@@ -1,0 +1,10 @@
+{
+  "name": "qna_dimension_query",
+  "task_family": "qna",
+  "prompt": "What dimensions are here?",
+  "region": null,
+  "expected_response_type": "answer_only",
+  "expected_confidence_min": 0.5,
+  "expected_evidence_min": 0,
+  "answer_must_contain": ["dimension"]
+}

@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
 import {
-  uploadFile, planEdit, applyChanges, downloadFile, getRenderBlob, getDxfBlob,
+  uploadFile, planEdit, v2Prompt, applyChanges, downloadFile, getRenderBlob, getDxfBlob,
   clearHistory, compareFiles, revisionUpload, revisionAlign, revisionDiff,
   revisionApprove, revisionApply, revisionDownloadUrl,
 } from '../lib/api';
@@ -75,7 +75,7 @@ export function useSession() {
     }
   }, []);
 
-  const sendPrompt = useCallback(async (prompt) => {
+  const sendPrompt = useCallback(async (prompt, selectedRegions = null) => {
     if (!sessionId) return;
     const startTime = Date.now();
     setLoading(true);
@@ -85,8 +85,39 @@ export function useSession() {
     setMessages((prev) => [...prev, msg('user', prompt)]);
 
     try {
-      const data = await planEdit(sessionId, prompt);
+      // Route through v2 endpoint first for intent classification
+      const v2Data = await v2Prompt(sessionId, prompt, selectedRegions);
       const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+
+      // Handle Q&A responses directly (no operations)
+      if (v2Data.response_type === 'answer_only' || v2Data.task_family === 'qna') {
+        setOperations([]);
+        setSelectedOps([]);
+        setValidation(null);
+        setMessages((prev) => [...prev, msg('ai', v2Data.message, { elapsed, qnaData: v2Data })]);
+        return;
+      }
+
+      // Handle needs_clarification from v2
+      if (v2Data.response_type === 'needs_clarification') {
+        setOperations([]);
+        setSelectedOps([]);
+        setValidation(null);
+        setMessages((prev) => [...prev, msg('ai', v2Data.message, { elapsed })]);
+        return;
+      }
+
+      // Handle unsupported_operation from v2
+      if (v2Data.response_type === 'unsupported_operation') {
+        setOperations([]);
+        setSelectedOps([]);
+        setValidation(null);
+        setMessages((prev) => [...prev, msg('ai', v2Data.message, { elapsed })]);
+        return;
+      }
+
+      // For edit_plan: v2 returns plan_only — use v2 response directly
+      const data = v2Data;
       const ops = data.operations || [];
       setOperations(ops);
       setSelectedOps(ops.map((_, i) => i));
@@ -101,7 +132,6 @@ export function useSession() {
       } else if (ops.length === 0) {
         aiText = NO_CHANGES_MESSAGE;
       } else {
-        // Include operation descriptions, not just count
         const opLines = ops.map((op, i) =>
           `${i + 1}. ${op.description || op.summary || op.op_type}`
         );

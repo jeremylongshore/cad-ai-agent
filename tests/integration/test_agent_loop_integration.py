@@ -106,11 +106,14 @@ class TestGoldenTrajectories:
 
     @staticmethod
     def _load_trajectories():
-        """Load all trajectory JSON files."""
+        """Load edit trajectory JSON files (skip Q&A fixtures)."""
         trajectories = []
         for path in sorted(TRAJECTORY_DIR.glob("*.json")):
             with open(path) as f:
                 data = json.load(f)
+            # Skip Q&A fixtures (different format, no expected_turns)
+            if data.get("task_family") == "qna":
+                continue
             data["_file"] = path.name
             trajectories.append(data)
         return trajectories
