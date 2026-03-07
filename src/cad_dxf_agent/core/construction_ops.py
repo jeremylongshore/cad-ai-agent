@@ -46,6 +46,7 @@ _GRID_LAYER_PATTERN = re.compile(r"(GRID|COLUMN|AXIS)", re.IGNORECASE)
 _CLOUD_LAYER_PATTERN = re.compile(r"(CLOUD|MARKUP|REVISION|REDLINE)", re.IGNORECASE)
 _TEXT_TYPES = frozenset({EntityType.TEXT, EntityType.MTEXT})
 _LINE_TYPES = frozenset({EntityType.LINE, EntityType.LWPOLYLINE})
+_MAX_LABEL_PROXIMITY = 50.0
 
 
 # ---------------------------------------------------------------------------
@@ -199,7 +200,7 @@ class GridAnalyzer:
 
         gx, gy = grid_entity.insert_point.x, grid_entity.insert_point.y
         best_text = ""
-        best_dist = 50.0  # max proximity threshold
+        best_dist = _MAX_LABEL_PROXIMITY
 
         for te in text_entities:
             if not te.insert_point or not te.text_content:
@@ -507,6 +508,10 @@ class FieldSummaryBuilder:
         comparison_result: ComparisonResult | None = None,
         changeset: ChangeSet | None = None,
     ) -> FieldSummary:
+        # Deferred imports to avoid circular dependency with design_ops
+        from ..models.design_ops_schema import TakeoffConfidence
+        from .design_ops import LayoutRecommender, RevisionSummarizer, TakeoffGenerator
+
         sections: list[FieldSection] = []
         omitted: list[str] = []
         all_caveats: list[str] = []
@@ -530,12 +535,8 @@ class FieldSummaryBuilder:
             omitted.append("grid_summary")
 
         # Takeoff candidates (from EPIC-09)
-        from .design_ops import TakeoffGenerator
-
         takeoff_result = TakeoffGenerator().generate(context, prompt, region)
         if takeoff_result.items:
-            from ..models.design_ops_schema import TakeoffConfidence
-
             _conf_to_float = {
                 TakeoffConfidence.HIGH: 0.95,
                 TakeoffConfidence.MEDIUM: 0.7,
@@ -558,8 +559,6 @@ class FieldSummaryBuilder:
 
         # Revision changes (if comparison data available)
         if comparison_result is not None or changeset is not None:
-            from .design_ops import RevisionSummarizer
-
             rev_result = RevisionSummarizer().summarize(
                 comparison_result=comparison_result,
                 changeset=changeset,
@@ -599,8 +598,6 @@ class FieldSummaryBuilder:
             omitted.append("condition_report")
 
         # Layout notes (from EPIC-09)
-        from .design_ops import LayoutRecommender
-
         layout_result = LayoutRecommender().recommend(context, prompt, region)
         if layout_result.recommendations:
             sections.append(
