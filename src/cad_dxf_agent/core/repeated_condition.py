@@ -614,12 +614,16 @@ class ConditionDetector:
         """Apply confidence caps for edge cases."""
         confidence = match.confidence
 
-        # Single-entity matches need higher confidence
+        # Single-entity block matches need higher confidence. If below threshold,
+        # reject by zeroing confidence so it gets filtered in find_repeated.
+        # Only applied to block-based matches where 0.70 is achievable;
+        # text-only matches use the regular min_confidence threshold.
         if (
             len(match.entity_handles) == 1
+            and profile.has_blocks
             and confidence < self._config.single_entity_min_confidence
         ):
-            return match.model_copy(update={"confidence": confidence})
+            confidence = 0.0
 
         # Block-only matches (no text overlap) capped
         if profile.has_blocks and profile.has_text:
