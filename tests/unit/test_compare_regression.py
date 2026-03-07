@@ -161,6 +161,68 @@ class TestMatchSummaryPopulated:
             assert result.match_summary.avg_confidence > 0.5
 
 
+class TestCompareEditIsolation:
+    """Anti-regression: compare intent must never enter the edit planner path."""
+
+    def test_compare_intent_does_not_route_to_edit(self):
+        from cad_dxf_agent.llm.intent_router import IntentRouter
+        from cad_dxf_agent.models.response_schema import TaskFamily
+
+        router = IntentRouter()
+        result = router.classify("compare these two drawings")
+        assert result.family == TaskFamily.COMPARE
+        assert result.family != TaskFamily.EDIT_PLAN
+
+    def test_diff_intent_does_not_route_to_edit(self):
+        from cad_dxf_agent.llm.intent_router import IntentRouter
+        from cad_dxf_agent.models.response_schema import TaskFamily
+
+        router = IntentRouter()
+        result = router.classify("show me the differences between revisions")
+        assert result.family == TaskFamily.COMPARE
+        assert result.family != TaskFamily.EDIT_PLAN
+
+
+class TestOcrTextPriority:
+    """Anti-regression: low-confidence OCR text must not outscore native CAD text."""
+
+    def test_low_confidence_reduces_position_contribution(self):
+        from cad_dxf_agent.core.comparison.scorer import score_text
+        from cad_dxf_agent.models.cad_schema import EntityType, Point2D, TextGeometry
+        from cad_dxf_agent.models.comparison_schema import GeometrySnapshot
+
+        base_kwargs = dict(
+            handle="A1",
+            entity_type=EntityType.TEXT,
+            layer="0",
+            points=[Point2D(x=10.0, y=20.0)],
+            text_content="DETAIL A",
+        )
+        revision = GeometrySnapshot(
+            **{**base_kwargs, "handle": "B1", "points": [Point2D(x=10.5, y=20.5)]}
+        )
+
+        # Native CAD text: confidence_position = 1.0
+        native = GeometrySnapshot(
+            **base_kwargs,
+            text_geometry=TextGeometry(height=2.5, confidence_position=1.0),
+        )
+        score_native, expl_native = score_text(native, revision, tolerance=50.0)
+
+        # Simulated OCR text: confidence_position = 0.3
+        ocr = GeometrySnapshot(
+            **base_kwargs,
+            text_geometry=TextGeometry(height=2.5, confidence_position=0.3),
+        )
+        score_ocr, expl_ocr = score_text(ocr, revision, tolerance=50.0)
+
+        # Position contribution must be strictly less for low-confidence OCR
+        assert expl_ocr.features["position"] < expl_native.features["position"]
+        # text_trust must reflect the reduced confidence
+        assert expl_ocr.features["text_trust"] < 1.0
+        assert expl_native.features["text_trust"] == 1.0
+
+
 class TestBuildCompareResponse:
     def test_returns_expected_keys(self, tmp_path, engine):
         from tests.helpers.comparison_factory import make_moved_entity_pair

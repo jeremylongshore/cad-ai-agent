@@ -16,7 +16,7 @@
 | 04 | Region Q&A Vertical Slice | cad-grx | DONE | `feature/epic-cad-04-region-qna` | #78 | `qna_pipeline.py`, `region_context.py`, `qna_schema.py`, `/api/v2/qna`, QnaPanel frontend | 509 tests — unit (356 pipeline + 133 schema), integration (126 qna), 6 golden trajectories (qna family) |
 | — | SIDEQUEST-CAD-67: Text Positional Accuracy | cad-xiw | DONE | `feature/sidequest-cad-67-text-accuracy` | #79 | `TextProvenance` enum, `TextGeometry` model, trust hierarchy, enhanced TEXT/MTEXT/INSERT extraction, downstream wiring (selection, Q&A, compare, planner) | 788+ unit tests (test_text_geometry.py) + 534 e2e tests (test_text_accuracy_e2e.py) |
 | 05 | Repeated-Condition Detection | cad-ccd | DONE | `feature/epic-cad-05-repeated-conditions` | #81 | `repeated_condition_schema.py`, `repeated_condition.py`, web endpoint, 4 golden trajectories | 63 tests — unit (38 detection + 19 schema), integration (6 factory DXF) |
-| 06 | Compare + Diff Service Hardening | cad-3e4 | NOT STARTED | — | — | Typed compare schema, alignment diagnostics, regression fixtures | TBD — unit (typed schema), regression fixtures, integration (alignment diagnostics) |
+| 06 | Compare + Diff Service Hardening | cad-3e4 | DONE | `feature/epic-cad-06-compare-diff` | #82 | `comparison_schema.py` (MatchSummary, DiffSummaryData, ComparePackage), scorer text-trust, changelog enrichment, `export_compare_package()`, web endpoint hardening | 15 tests — unit (9 schema + 2 anti-regression), regression (13 comparison pipeline) |
 | — | ARCH-REVIEW-01 | cad-sfw | NOT STARTED | — | — | Post-EPIC-06 quality/scalability review; ADR with keep/change/remove decisions per module | N/A (review output is ADR document) |
 | 07 | Structured Edit Planning | cad-9ug | NOT STARTED | — | — | `models/plan_schema.py` (EditPlan), `llm/plan_builder.py`, constraint validation | TBD — unit (plan schema, constraint validation), golden trajectories (structured_edit family) |
 | 08 | Preview + Apply Workflow | cad-6zz | NOT STARTED | — | — | `web/backend/routes/preview.py`, `web/frontend/src/components/PreviewPanel.jsx`, audit trail | TBD — unit (preview generation, audit trail), integration (preview→apply round-trip), web API tests |
@@ -32,7 +32,7 @@
 | Phase | Epics | Status | Gate |
 |-------|-------|--------|------|
 | **Phase 1: Foundation** | 01, 02, 03 | 3/3 COMPLETE | Contracts locked, regions normalized, `make check` green |
-| **Phase 2: Core Intelligence** | 04, 05, 06 | 2/3 complete (+ SQ67 done) | Golden trajectories pass per family |
+| **Phase 2: Core Intelligence** | 04, 05, 06 | 3/3 COMPLETE (+ SQ67 done) | Golden trajectories pass per family |
 | **Architecture Review** | ARCH-REVIEW-01 | Not started | ADR document with keep/change/remove decisions per module |
 | **Phase 3: Structured Editing** | 07, 08 | 0/2 complete | Edit plan + apply produce audit metadata. Key files: `src/cad_dxf_agent/llm/plan_builder.py`, `src/cad_dxf_agent/models/plan_schema.py`, `web/frontend/src/components/PreviewPanel.jsx`, `web/backend/routes/preview.py` |
 | **Phase 4: Workflow Packs** | 09, 10 | 0/2 complete | Domain scorecard entries pass. Key files: `src/cad_dxf_agent/workflows/design_ops.py`, `src/cad_dxf_agent/workflows/construction.py`, domain-specific prompt templates |
@@ -44,8 +44,8 @@
 
 ```
 EPIC-01 (DONE) → EPIC-02 (DONE)
-                    ├──> EPIC-03 (DONE) → EPIC-04 (DONE) + SQ67 (DONE) → EPIC-05 (IN PROGRESS)
-                    └──> EPIC-06
+                    ├──> EPIC-03 (DONE) → EPIC-04 (DONE) + SQ67 (DONE) → EPIC-05 (DONE)
+                    └──> EPIC-06 (DONE)
               EPIC-04 + 05 + 06 → ARCH-REVIEW-01
                                     ├──> EPIC-07 → EPIC-08
                                     └──> EPIC-11
@@ -54,8 +54,8 @@ EPIC-01 (DONE) → EPIC-02 (DONE)
               EPIC-04..10 → EPIC-12
 ```
 
-**Critical path:** Phase 1 COMPLETE. EPIC-04 + SQ67 + EPIC-05 DONE.
-EPIC-06 (Compare + Diff Hardening) is the last Phase 2 epic before ARCH-REVIEW-01.
+**Critical path:** Phase 1 COMPLETE. Phase 2 COMPLETE (EPIC-04 + SQ67 + EPIC-05 + EPIC-06 all DONE).
+Next: ARCH-REVIEW-01 (post-Phase 2 architecture review gate).
 
 ---
 
@@ -115,7 +115,7 @@ EPIC-06 (Compare + Diff Hardening) is the last Phase 2 epic before ARCH-REVIEW-0
 | 04 | Region Q&A Vertical Slice | DONE — PR #78 merged. Deterministic Q&A pipeline, region context builder, 6 golden trajectories, QnaPanel frontend. |
 | — | SIDEQUEST-CAD-67 | DONE — PR #79 merged. TextGeometry + TextProvenance models, enhanced extraction, trust hierarchy, downstream wiring, 788+ tests. Doc: [044-AT-SPEC](044-AT-SPEC-sidequest-cad-67-text-accuracy.md) |
 | 05 | Repeated-Condition Detection | DONE — PR #81. Similarity scoring model (6 signals, text-trust weighting), ConditionDetector with spatial clustering, preview/approval workflow, web endpoint, 63 tests, 4 golden trajectories. Doc: [045-AT-SPEC](045-AT-SPEC-repeated-condition-scoring.md) |
-| 06 | Compare + Diff Service Hardening | Audit existing `core/comparison/` for untyped returns; define typed `CompareResult` schema |
+| 06 | Compare + Diff Service Hardening | DONE — PR #82 merged. Typed compare schema, scorer text-trust, changelog enrichment, export package, web endpoint hardening. 15 tests. Compliance audit: 2 anti-regression tests added. |
 | — | ARCH-REVIEW-01 | Collect module-level metrics (coupling, test coverage, API surface); draft ADR template with keep/change/remove columns |
 | 07 | Structured Edit Planning | Define `EditPlan` schema in `plan_schema.py`; implement plan builder with constraint pre-checks |
 | 08 | Preview + Apply Workflow | Wire preview generation into web backend route; implement frontend `PreviewPanel` component |
@@ -128,9 +128,9 @@ EPIC-06 (Compare + Diff Hardening) is the last Phase 2 epic before ARCH-REVIEW-0
 
 ## 8. Global Next Actions
 
-1. **Begin EPIC-06** — Compare + Diff Service Hardening (last Phase 2 epic)
-2. **Prep ARCH-REVIEW-01** — After EPIC-06 complete
-3. **Begin Phase 3** — EPIC-07 (Structured Edit Planning) after architecture review
+1. **Begin ARCH-REVIEW-01** — Post-Phase 2 architecture review gate
+2. **Begin Phase 3** — EPIC-07 (Structured Edit Planning) after architecture review
+3. **Begin EPIC-08** — Preview + Apply Workflow after EPIC-07
 
 ---
 
