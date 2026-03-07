@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from cad_dxf_agent.models.plan_schema import EditPlan
 from cad_dxf_agent.models.response_schema import (
     AuditMetadata,
     PlatformResponse,
@@ -143,6 +144,58 @@ class ResponseBuilder:
         )
 
     @staticmethod
+    def structured_plan(
+        *,
+        plan: EditPlan,
+        message: str | None = None,
+        audit: AuditMetadata | None = None,
+    ) -> PlatformResponse:
+        """Build a plan_only response from a structured EditPlan."""
+        operations = [
+            {
+                "action_id": a.action_id,
+                "action_type": a.action_type.value,
+                "target_handle": a.target_handle,
+                "target_layer": a.target_layer,
+                "params": a.params,
+                "confidence": a.confidence,
+                "risk_level": a.risk_level.value,
+                "rationale": a.rationale,
+                "validation_status": a.validation.status.value,
+            }
+            for a in plan.actions
+        ]
+        plan_message = message or plan.rationale or "Structured edit plan generated."
+        return PlatformResponse(
+            task_family=TaskFamily.EDIT_PLAN,
+            response_type=ResponseType.PLAN_ONLY,
+            message=plan_message,
+            operations=operations,
+            risk_level=plan.risk_level,
+            evidence=plan.evidence,
+            confidence=plan.confidence,
+            ambiguity_flags=plan.ambiguity_flags,
+            validation={
+                "status": plan.validation_status.value,
+                "blocked_reasons": plan.blocked_reasons,
+                "approval_requirements": [
+                    {
+                        "description": r.description,
+                        "category": r.category,
+                        "satisfied": r.satisfied,
+                    }
+                    for r in plan.approval_requirements
+                ],
+            },
+            data={
+                "plan_id": plan.plan_id,
+                "schema_version": plan.schema_version,
+                "action_count": plan.action_count,
+            },
+            audit=audit or AuditMetadata(),
+        )
+
+    @staticmethod
     def preview_edit(
         *,
         operations: list[dict[str, Any]],
@@ -176,6 +229,90 @@ class ResponseBuilder:
             message=message,
             operations=operations,
             risk_level=RiskLevel.NONE,
+            audit=audit or AuditMetadata(),
+        )
+
+    @staticmethod
+    def structured_preview(
+        *,
+        preview: Any,
+        message: str | None = None,
+        audit: AuditMetadata | None = None,
+    ) -> PlatformResponse:
+        """Build a preview_edit response from a structured EditPreview."""
+        preview_dict = preview.model_dump() if hasattr(preview, "model_dump") else preview
+        actions = preview_dict.get("actions", [])
+        operations = [
+            {
+                "action_id": a.get("action_id"),
+                "action_type": a.get("action_type"),
+                "description": a.get("description", ""),
+                "target_handle": a.get("target_handle"),
+                "target_layer": a.get("target_layer"),
+                "before_state": a.get("before_state", {}),
+                "after_state": a.get("after_state", {}),
+                "confidence": a.get("confidence"),
+                "risk_level": a.get("risk_level"),
+                "is_destructive": a.get("is_destructive", False),
+                "warnings": a.get("warnings", []),
+            }
+            for a in actions
+        ]
+        return PlatformResponse(
+            task_family=TaskFamily.EDIT_PLAN,
+            response_type=ResponseType.PREVIEW_EDIT,
+            message=message or preview_dict.get("summary", "Preview ready."),
+            operations=operations,
+            risk_level=RiskLevel(preview_dict.get("risk_level", "low")),
+            confidence=preview_dict.get("confidence"),
+            data={
+                "preview_id": preview_dict.get("preview_id"),
+                "plan_id": preview_dict.get("plan_id"),
+                "status": preview_dict.get("status"),
+                "total_actions": preview_dict.get("total_actions", 0),
+                "destructive_count": preview_dict.get("destructive_count", 0),
+                "blocked_count": preview_dict.get("blocked_count", 0),
+                "requires_approval": preview_dict.get("requires_approval", True),
+            },
+            audit=audit or AuditMetadata(),
+        )
+
+    @staticmethod
+    def structured_apply_result(
+        *,
+        result: Any,
+        message: str | None = None,
+        audit: AuditMetadata | None = None,
+    ) -> PlatformResponse:
+        """Build an applied_edit response from a structured ApplyResult."""
+        result_dict = result.model_dump() if hasattr(result, "model_dump") else result
+        action_results = result_dict.get("action_results", [])
+        operations = [
+            {
+                "action_id": ar.get("action_id"),
+                "action_type": ar.get("action_type"),
+                "success": ar.get("success"),
+                "entity_handle": ar.get("entity_handle"),
+                "description": ar.get("description", ""),
+                "error": ar.get("error"),
+            }
+            for ar in action_results
+        ]
+        return PlatformResponse(
+            task_family=TaskFamily.APPLY_EDIT,
+            response_type=ResponseType.APPLIED_EDIT,
+            message=message or result_dict.get("summary", "Applied."),
+            operations=operations,
+            risk_level=RiskLevel.NONE,
+            data={
+                "apply_id": result_dict.get("apply_id"),
+                "plan_id": result_dict.get("plan_id"),
+                "status": result_dict.get("status"),
+                "success_count": result_dict.get("success_count", 0),
+                "failure_count": result_dict.get("failure_count", 0),
+                "output_path": result_dict.get("output_path"),
+                "revision_note": result_dict.get("revision_note"),
+            },
             audit=audit or AuditMetadata(),
         )
 

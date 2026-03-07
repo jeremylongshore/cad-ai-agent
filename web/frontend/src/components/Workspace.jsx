@@ -168,6 +168,12 @@ export default function Workspace({ user, onSignOut }) {
               onRevisionApply={session.handleRevisionApply}
               onBundleDownload={session.handleBundleDownload}
               onRealign={session.handleRealign}
+              editPreview={session.editPreview}
+              editApplyResult={session.editApplyResult}
+              onPreviewPlan={session.previewPlan}
+              onApprovePlan={session.approvePlan}
+              onApproveAndApplyPlan={session.approveAndApplyPlan}
+              onApplyPlan={session.applyPlan}
             />
           </section>
 

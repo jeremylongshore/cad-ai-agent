@@ -232,3 +232,32 @@ export async function revisionApply(sessionId) {
 export function revisionDownloadUrl(sessionId) {
   return `${API_BASE}/api/revision/download?session_id=${sessionId}`;
 }
+
+// --- v2 Preview / Approve / Apply (EPIC-CAD-08) ---
+
+export async function v2Preview(sessionId) {
+  const res = await request('/api/v2/preview', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ session_id: sessionId }),
+  });
+  return res.json();
+}
+
+export async function v2Approve(sessionId, planId, approved, notes = '') {
+  const res = await request('/api/v2/approve', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ session_id: sessionId, plan_id: planId, approved, notes }),
+  });
+  return res.json();
+}
+
+export async function v2Apply(sessionId) {
+  const res = await request('/api/v2/apply', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ session_id: sessionId }),
+  });
+  return res.json();
+}

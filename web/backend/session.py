@@ -46,6 +46,12 @@ class Session:
     approval_set: object | None = None  # ApprovalSet
     apply_result: object | None = None  # ApplyResult
     bundle_dir: Path | None = None
+    # EPIC-CAD-08: Structured edit plan preview + apply state
+    edit_plan: object | None = None
+    edit_preview: object | None = None
+    edit_approval: object | None = None
+    edit_apply_result: object | None = None
+    audit_events: list = field(default_factory=list)
 
 
 class SessionManager:

@@ -163,6 +163,21 @@ class RevisionApplyRequest(BaseModel):
     session_id: str
 
 
+class V2PreviewRequest(BaseModel):
+    session_id: str
+
+
+class V2ApproveRequest(BaseModel):
+    session_id: str
+    plan_id: str
+    approved: bool
+    notes: str = ""
+
+
+class V2ApplyRequest(BaseModel):
+    session_id: str
+
+
 # ---------------------------------------------------------------------------
 # Dependency: get authenticated user
 # ---------------------------------------------------------------------------
@@ -237,9 +252,15 @@ async def upload(
     session = session_mgr.create(user_id=user["uid"])
     session_dir = Path("/tmp/cad-sessions") / session.session_id
 
-    # Save uploaded file
+    # Save uploaded file — enforce size limit (ARCH-REVIEW-CAD-01 P0)
+    MAX_UPLOAD_SIZE = 25 * 1024 * 1024  # 25 MB
     upload_path = session_dir / f"upload{ext}"
     content = await file.read()
+    if len(content) > MAX_UPLOAD_SIZE:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File too large ({len(content) / 1024 / 1024:.1f} MB). Maximum is 25 MB.",
+        )
     upload_path.write_bytes(content)
 
     # Convert if needed
@@ -545,6 +566,25 @@ async def v2_prompt(body: PromptRequest, user: dict = Depends(get_user)):
                 session.changeset = changeset
                 audit.llm_time_ms = (_time.monotonic() - llm_start) * 1000
 
+                # Build structured EditPlan for preview/apply workflow (EPIC-CAD-08)
+                try:
+                    from cad_dxf_agent.llm.plan_builder import EditPlanBuilder, PlanRequest as PlanReq
+
+                    plan_req = PlanReq(
+                        prompt=body.prompt,
+                        drawing_context=session.context,
+                        request_id=getattr(body, "request_id", ""),
+                        target_handles=[
+                            op.target_handle
+                            for op in changeset.operations
+                            if op.target_handle
+                        ] or None,
+                    )
+                    edit_plan = EditPlanBuilder().build(plan_req)
+                    session.edit_plan = edit_plan
+                except Exception as plan_err:
+                    logger.warning("EditPlan build failed (non-fatal): %s", plan_err)
+
                 val_start = _time.monotonic()
                 validation = validate_changeset(changeset, session.context, rule_config)
                 audit.validation_time_ms = (_time.monotonic() - val_start) * 1000
@@ -598,6 +638,158 @@ async def v2_prompt(body: PromptRequest, user: dict = Depends(get_user)):
         return ResponseBuilder.unsupported_operation(
             family=intent.family, audit=audit,
         ).model_dump()
+
+
+# ---------------------------------------------------------------------------
+# v2 Preview / Approve / Apply (EPIC-CAD-08)
+# ---------------------------------------------------------------------------
+
+
+@app.post("/api/v2/preview")
+async def v2_preview(body: V2PreviewRequest, user: dict = Depends(get_user)):
+    """Build a structured preview from the session's edit plan."""
+    try:
+        session = session_mgr.get(body.session_id, user["uid"])
+    except (KeyError, PermissionError) as e:
+        raise HTTPException(status_code=404, detail=str(e)) from None
+
+    if session.edit_plan is None:
+        raise HTTPException(status_code=400, detail="No edit plan in session. Send a prompt first.")
+
+    from cad_dxf_agent.core.preview_builder import EditPreviewBuilder
+    from cad_dxf_agent.llm.response_builder import ResponseBuilder
+    from cad_dxf_agent.models.apply_schema import AuditEvent
+    from cad_dxf_agent.models.response_schema import AuditMetadata
+
+    builder = EditPreviewBuilder(session.context)
+    preview = builder.build(session.edit_plan)
+    session.edit_preview = preview
+
+    # Record audit event
+    session.audit_events.append(
+        AuditEvent(
+            event_type="preview_generated",
+            plan_id=session.edit_plan.plan_id,
+            preview_id=preview.preview_id,
+            actor=user["uid"],
+            details={"total_actions": preview.total_actions, "status": preview.status.value},
+        ).model_dump()
+    )
+
+    audit = AuditMetadata()
+    return ResponseBuilder.structured_preview(
+        preview=preview,
+        audit=audit,
+    ).model_dump()
+
+
+@app.post("/api/v2/approve")
+async def v2_approve(body: V2ApproveRequest, user: dict = Depends(get_user)):
+    """Record an approval or rejection decision for an edit plan."""
+    try:
+        session = session_mgr.get(body.session_id, user["uid"])
+    except (KeyError, PermissionError) as e:
+        raise HTTPException(status_code=404, detail=str(e)) from None
+
+    if session.edit_plan is None:
+        raise HTTPException(status_code=400, detail="No edit plan in session.")
+
+    if session.edit_plan.plan_id != body.plan_id:
+        raise HTTPException(status_code=400, detail="Plan ID mismatch.")
+
+    from cad_dxf_agent.models.apply_schema import ApprovalDecision, AuditEvent
+
+    decision = ApprovalDecision(
+        plan_id=body.plan_id,
+        approved=body.approved,
+        approved_by=user["uid"],
+        notes=body.notes,
+    )
+    session.edit_approval = decision
+
+    event_type = "approval_granted" if body.approved else "approval_rejected"
+    session.audit_events.append(
+        AuditEvent(
+            event_type=event_type,
+            plan_id=body.plan_id,
+            actor=user["uid"],
+            details={"approved": body.approved, "notes": body.notes},
+        ).model_dump()
+    )
+
+    return {
+        "plan_id": body.plan_id,
+        "approved": body.approved,
+        "event_type": event_type,
+    }
+
+
+@app.post("/api/v2/apply")
+async def v2_apply(body: V2ApplyRequest, user: dict = Depends(get_user)):
+    """Apply the approved edit plan to the DXF file."""
+    try:
+        session = session_mgr.get(body.session_id, user["uid"])
+    except (KeyError, PermissionError) as e:
+        raise HTTPException(status_code=404, detail=str(e)) from None
+
+    if session.edit_plan is None:
+        raise HTTPException(status_code=400, detail="No edit plan in session.")
+
+    if session.context is None:
+        raise HTTPException(status_code=400, detail="No drawing context in session.")
+
+    from cad_dxf_agent.core.apply_pipeline import ApplyPipeline
+    from cad_dxf_agent.llm.response_builder import ResponseBuilder
+    from cad_dxf_agent.models.apply_schema import AuditEvent
+    from cad_dxf_agent.models.config_schema import RevisionNoteConfig
+    from cad_dxf_agent.models.response_schema import AuditMetadata
+
+    session_dir = Path("/tmp/cad-sessions") / session.session_id
+    output_path = session_dir / "edited.dxf"
+
+    pipeline = ApplyPipeline(session.context)
+    result = pipeline.apply(
+        plan=session.edit_plan,
+        dxf_path=session.working_path or session.original_path,
+        output_path=output_path,
+        approval=session.edit_approval,
+        revision_config=RevisionNoteConfig(enabled=True),
+    )
+
+    session.edit_apply_result = result
+    if result.output_path:
+        session.edited_path = Path(result.output_path)
+
+    # Render edited preview
+    try:
+        from cad_dxf_agent.core.renderer import render_dxf_to_png
+
+        render_result = render_dxf_to_png(output_path, session_dir / "edited.png")
+        if render_result.success:
+            session.edited_render = render_result.output_path
+    except Exception as render_err:
+        logger.warning("Edited render failed (non-fatal): %s", render_err)
+
+    # Record audit event
+    session.audit_events.append(
+        AuditEvent(
+            event_type="apply_executed",
+            plan_id=session.edit_plan.plan_id,
+            apply_id=result.apply_id,
+            actor=user["uid"],
+            details={
+                "status": result.status.value,
+                "success_count": result.success_count,
+                "failure_count": result.failure_count,
+            },
+        ).model_dump()
+    )
+
+    audit = AuditMetadata()
+    return ResponseBuilder.structured_apply_result(
+        result=result,
+        audit=audit,
+    ).model_dump()
 
 
 @app.post("/api/apply")

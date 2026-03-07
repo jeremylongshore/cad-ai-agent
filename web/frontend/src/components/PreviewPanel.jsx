@@ -44,6 +44,12 @@ export default function PreviewPanel({
   onRevisionApply,
   onBundleDownload,
   onRealign,
+  editPreview,
+  editApplyResult: structuredApplyResult,
+  onPreviewPlan,
+  onApprovePlan,
+  onApproveAndApplyPlan,
+  onApplyPlan,
 }) {
   const [activeTab, setActiveTab] = useState('original');
   const hasEdited = !!previewUrls.edited;
@@ -598,8 +604,89 @@ export default function PreviewPanel({
         </>
       )}
 
+      {/* ===== STRUCTURED PREVIEW (EPIC-CAD-08) ===== */}
+      {editPreview && activeTab !== 'comparison' && (
+        <div className="preview__controls">
+          <div className="op-list">
+            <h4 className="op-list__title">
+              Edit Preview
+              {editPreview.data?.status === 'blocked' && (
+                <span className="comparison-badge comparison-badge--removed" style={{ marginLeft: 'var(--space-2)' }}>Blocked</span>
+              )}
+            </h4>
+            {editPreview.operations?.map((op, i) => (
+              <div key={op.action_id || i} className="revision-op-item">
+                <div className="revision-op-item__header">
+                  <span className={`op-item__type op-item__type--${opTypeClass(op.action_type)}`}>
+                    {op.action_type}
+                  </span>
+                  <span className="revision-op-item__confidence" title="Confidence">
+                    {((op.confidence || 1) * 100).toFixed(0)}%
+                  </span>
+                  {op.is_destructive && (
+                    <span className="comparison-badge comparison-badge--removed">destructive</span>
+                  )}
+                </div>
+                <p className="revision-op-item__desc">{op.description}</p>
+                {op.before_state && Object.keys(op.before_state).length > 0 && (
+                  <div className="text-xs text-secondary">Before: {JSON.stringify(op.before_state)}</div>
+                )}
+                {op.after_state && Object.keys(op.after_state).length > 0 && (
+                  <div className="text-xs text-secondary">After: {JSON.stringify(op.after_state)}</div>
+                )}
+                {op.warnings?.length > 0 && (
+                  <div className="text-xs" style={{ color: 'var(--color-warning)' }}>
+                    {op.warnings.join('; ')}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {editPreview.data?.status !== 'blocked' && !structuredApplyResult && (
+            <div className="flex gap-2" style={{ marginTop: 'var(--space-2)' }}>
+              <button
+                className="btn btn--primary btn--full"
+                onClick={() => onApproveAndApplyPlan?.()}
+                disabled={loading}
+              >
+                {loading ? <span className="spinner" aria-hidden="true" /> : 'Approve & Apply'}
+              </button>
+              <button
+                className="btn btn--ghost"
+                onClick={() => onApprovePlan?.(false)}
+                disabled={loading}
+              >
+                Reject
+              </button>
+            </div>
+          )}
+
+          {structuredApplyResult && (
+            <div className="bundle-download" style={{ marginTop: 'var(--space-2)' }}>
+              <p className="bundle-download__status">
+                {structuredApplyResult.data?.status === 'success' ? 'Applied successfully' : `Status: ${structuredApplyResult.data?.status || 'unknown'}`}
+                {' '}{structuredApplyResult.data?.success_count || 0} succeeded
+                {structuredApplyResult.data?.failure_count > 0 && (
+                  <span className="comparison-badge comparison-badge--removed" style={{ marginLeft: 'var(--space-2)' }}>
+                    {structuredApplyResult.data.failure_count} failed
+                  </span>
+                )}
+              </p>
+              <button
+                className="btn btn--secondary btn--full"
+                onClick={onDownload}
+                disabled={loading}
+              >
+                Download Edited DXF
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ===== EDIT TAB CONTENT ===== */}
-      {(hasOperations || hasEdited) && activeTab !== 'comparison' && (
+      {!editPreview && (hasOperations || hasEdited) && activeTab !== 'comparison' && (
         <div className="preview__controls">
           {hasOperations && (
             <div className="op-list">
