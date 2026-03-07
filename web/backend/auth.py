@@ -14,17 +14,6 @@ logger = logging.getLogger(__name__)
 _license_cache: dict[str, tuple[bool, float]] = {}
 _LICENSE_CACHE_TTL = 300  # 5 minutes
 
-# Beta allowlist: parsed once from CAD_BETA_ALLOWLIST env var
-_BETA_ALLOWLIST: set[str] | None = None
-
-
-def _get_allowlist() -> set[str]:
-    global _BETA_ALLOWLIST
-    if _BETA_ALLOWLIST is None:
-        raw = os.getenv("CAD_BETA_ALLOWLIST", "")
-        _BETA_ALLOWLIST = {e.strip().lower() for e in raw.split(",") if e.strip()}
-    return _BETA_ALLOWLIST
-
 # Lazy-init firebase admin
 _firebase_app = None
 
@@ -116,15 +105,12 @@ async def check_license(user: dict) -> None:
         active = await run_in_threadpool(_fetch_license, uid)
 
         if not active:
-            # Check allowlist for auto-provisioning
+            # Auto-provision 30-day trial for any Google sign-in
             email = user.get("email", "").lower()
-            if email and email in _get_allowlist():
-                await run_in_threadpool(_provision_license, uid, email)
-                _license_cache[uid] = (True, now)
-                logger.info("Auto-provisioned license for %s via allowlist", email)
-                return
-            _license_cache[uid] = (False, now)
-            raise HTTPException(status_code=403, detail="License inactive")
+            await run_in_threadpool(_provision_license, uid, email)
+            _license_cache[uid] = (True, now)
+            logger.info("Auto-provisioned 30-day trial for %s", email)
+            return
 
         _license_cache[uid] = (active, now)
 
@@ -138,25 +124,35 @@ async def check_license(user: dict) -> None:
 
 def _fetch_license(uid: str) -> bool:
     """Synchronous Firestore lookup — called via run_in_threadpool."""
+    import datetime
+
     from google.cloud import firestore
 
     db = firestore.Client()
     doc = db.collection("licenses").document(uid).get()
     if not doc.exists:
         return False
-    return doc.to_dict().get("active", False)
+    data = doc.to_dict()
+    if not data.get("active", False):
+        return False
+    expires_at = data.get("expires_at")
+    return not (expires_at and expires_at < datetime.datetime.now(datetime.UTC))
 
 
 def _provision_license(uid: str, email: str) -> None:
-    """Create a license doc for an allowlisted user — called via run_in_threadpool."""
+    """Auto-provision a 30-day trial license — called via run_in_threadpool."""
+    import datetime
+
     from google.cloud import firestore
 
     db = firestore.Client()
     db.collection("licenses").document(uid).set({
         "active": True,
         "email": email,
-        "provisioned_by": "allowlist",
+        "plan": "trial",
+        "provisioned_by": "auto",
         "created_at": firestore.SERVER_TIMESTAMP,
+        "expires_at": datetime.datetime.now(datetime.UTC) + datetime.timedelta(days=30),
     })
 
 

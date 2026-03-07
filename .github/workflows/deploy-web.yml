@@ -79,7 +79,6 @@ jobs:
             CAD_LLM_PROVIDER=gemini
             CAD_GCP_PROJECT=${{ env.GCP_PROJECT }}
             CAD_WEB_CORS_ORIGIN=https://cad-dxf-agent.web.app
-            CAD_BETA_ALLOWLIST=${{ vars.CAD_BETA_ALLOWLIST }}
             OTEL_ENABLED=1
             OTEL_EXPORTER=gcp-trace
           flags: |

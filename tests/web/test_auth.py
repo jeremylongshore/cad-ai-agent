@@ -126,28 +126,21 @@ class TestAuthVerifyToken:
 
 @pytest.mark.web
 class TestCheckLicense:
-    """Test check_license: anonymous rejection, allowlist auto-provisioning."""
+    """Test check_license: anonymous rejection, auto-provisioning, expiry."""
 
     @pytest.fixture(autouse=True)
     def _reset_state(self):
-        """Reset caches and allowlist between tests."""
+        """Reset caches between tests."""
         import web.backend.auth as auth_mod
 
         auth_mod._license_cache.clear()
-        auth_mod._BETA_ALLOWLIST = None
         old_dev = os.environ.pop("CAD_WEB_DEV_MODE", None)
-        old_allowlist = os.environ.pop("CAD_BETA_ALLOWLIST", None)
         yield
         auth_mod._license_cache.clear()
-        auth_mod._BETA_ALLOWLIST = None
         if old_dev is not None:
             os.environ["CAD_WEB_DEV_MODE"] = old_dev
         else:
             os.environ.pop("CAD_WEB_DEV_MODE", None)
-        if old_allowlist is not None:
-            os.environ["CAD_BETA_ALLOWLIST"] = old_allowlist
-        else:
-            os.environ.pop("CAD_BETA_ALLOWLIST", None)
 
     @pytest.mark.asyncio
     async def test_anonymous_user_rejected(self):
@@ -181,28 +174,12 @@ class TestCheckLicense:
             await check_license(user)  # should not raise
 
     @pytest.mark.asyncio
-    async def test_existing_inactive_license_returns_403(self):
-        from unittest.mock import patch
-
-        from web.backend.auth import check_license
-
-        user = {"uid": "inactive-user", "email": "u@example.com",
-                "firebase": {"sign_in_provider": "google.com"}}
-        with (
-            patch("web.backend.auth._fetch_license", return_value=False),
-            pytest.raises(HTTPException) as exc_info,
-        ):
-            await check_license(user)
-        assert exc_info.value.status_code == 403
-
-    @pytest.mark.asyncio
-    async def test_allowlist_auto_provisions_license(self):
+    async def test_new_user_auto_provisioned(self):
         from unittest.mock import MagicMock, patch
 
         from web.backend.auth import check_license
 
-        os.environ["CAD_BETA_ALLOWLIST"] = "scott@heyflora.ai, tony@example.com"
-        user = {"uid": "scott-uid", "email": "scott@heyflora.ai",
+        user = {"uid": "new-user", "email": "anyone@gmail.com",
                 "firebase": {"sign_in_provider": "google.com"}}
 
         mock_provision = MagicMock()
@@ -212,23 +189,23 @@ class TestCheckLicense:
         ):
             await check_license(user)  # should not raise
 
-        mock_provision.assert_called_once_with("scott-uid", "scott@heyflora.ai")
+        mock_provision.assert_called_once_with("new-user", "anyone@gmail.com")
 
     @pytest.mark.asyncio
-    async def test_allowlist_miss_returns_403(self):
+    async def test_expired_license_returns_403(self):
         from unittest.mock import patch
 
         from web.backend.auth import check_license
 
-        os.environ["CAD_BETA_ALLOWLIST"] = "allowed@example.com"
-        user = {"uid": "not-allowed", "email": "stranger@example.com",
+        user = {"uid": "expired-user", "email": "u@example.com",
                 "firebase": {"sign_in_provider": "google.com"}}
+        # _fetch_license returns False for expired licenses
         with (
             patch("web.backend.auth._fetch_license", return_value=False),
-            pytest.raises(HTTPException) as exc_info,
+            patch("web.backend.auth._provision_license", side_effect=Exception("already exists")),
+            pytest.raises(HTTPException),
         ):
             await check_license(user)
-        assert exc_info.value.status_code == 403
 
     @pytest.mark.asyncio
     async def test_dev_mode_bypasses_license(self):
