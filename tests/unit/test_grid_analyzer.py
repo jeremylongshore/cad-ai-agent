@@ -14,7 +14,6 @@ from cad_dxf_agent.models.cad_schema import (
 )
 from cad_dxf_agent.models.construction_ops_schema import GridDirection
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

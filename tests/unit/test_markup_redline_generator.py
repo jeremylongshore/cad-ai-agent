@@ -13,7 +13,6 @@ from cad_dxf_agent.models.cad_schema import (
     Point2D,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -120,7 +119,10 @@ class TestNonCloudFiltering:
         assert result.total_clouds == 0
 
     def test_text_on_cloud_layer_ignored(self):
-        text = _entity("T1", layer="CLOUD", entity_type=EntityType.TEXT, x=50, y=50, text_content="NOTE")
+        text = _entity(
+            "T1", layer="CLOUD", entity_type=EntityType.TEXT,
+            x=50, y=50, text_content="NOTE",
+        )
         ctx = _context([text])
         result = MarkupRedlineGenerator().generate(ctx, "redline")
         assert result.total_clouds == 0
@@ -349,7 +351,10 @@ class TestConfidence:
         ctx1 = _context([cloud1, e1])
         result1 = MarkupRedlineGenerator().generate(ctx1, "redline")
 
-        cloud2 = _cloud("C2", layer="REVISION_MARKS", vertices=[(0, 0), (100, 0), (100, 100), (0, 100)])
+        cloud2 = _cloud(
+            "C2", layer="REVISION_MARKS",
+            vertices=[(0, 0), (100, 0), (100, 100), (0, 100)],
+        )
         e2 = _entity("E2", x=50, y=50)
         ctx2 = _context([cloud2, e2])
         result2 = MarkupRedlineGenerator().generate(ctx2, "redline")

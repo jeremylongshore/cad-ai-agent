@@ -13,7 +13,6 @@ from cad_dxf_agent.models.cad_schema import (
     Point2D,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -159,7 +158,11 @@ class TestTextGrouping:
         ctx = _context(entities)
         result = BatchConditionPlanner().plan(ctx, "batch")
         # These are all dissimilar, so no text group
-        text_groups = [g for g in result.groups if "text" in str(g.model_dump()).lower() or getattr(g, "group_type", "") == "text"]
+        text_groups = [
+            g for g in result.groups
+            if "text" in str(g.model_dump()).lower()
+            or getattr(g, "group_type", "") == "text"
+        ]
         assert len(text_groups) == 0
 
     def test_two_identical_texts_below_threshold(self):
@@ -354,7 +357,12 @@ class TestResultStructure:
         result = BatchConditionPlanner().plan(ctx, "batch")
         group = result.groups[0]
         for inst in group.instances:
-            inst_dict = inst if isinstance(inst, dict) else inst.model_dump() if hasattr(inst, "model_dump") else vars(inst)
+            if isinstance(inst, dict):
+                inst_dict = inst
+            elif hasattr(inst, "model_dump"):
+                inst_dict = inst.model_dump()
+            else:
+                inst_dict = vars(inst)
             assert "handle" in inst_dict
             assert "layer" in inst_dict
             assert "position" in inst_dict or "x" in str(inst_dict)

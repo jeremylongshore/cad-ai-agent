@@ -14,7 +14,6 @@ from cad_dxf_agent.models.cad_schema import (
 )
 from cad_dxf_agent.models.construction_ops_schema import FieldSectionType
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -181,12 +180,14 @@ class TestMissingSectionHandling:
         ctx = _rich_context()  # no GRID layer lines
         builder = FieldSummaryBuilder()
         result = builder.build(ctx, prompt="Summarize")
-        assert "GRID_SUMMARY" in result.omitted_sections or FieldSectionType.GRID_SUMMARY.value in result.omitted_sections
+        omitted = result.omitted_sections
+        assert "GRID_SUMMARY" in omitted or FieldSectionType.GRID_SUMMARY.value in omitted
 
     def test_no_comparison_omits_revision_changes(self):
         builder = FieldSummaryBuilder()
         result = builder.build(_rich_context(), prompt="Summarize")
-        assert "REVISION_CHANGES" in result.omitted_sections or FieldSectionType.REVISION_CHANGES.value in result.omitted_sections
+        omitted = result.omitted_sections
+        assert "REVISION_CHANGES" in omitted or FieldSectionType.REVISION_CHANGES.value in omitted
 
     def test_handles_missing_comparison_result_gracefully(self):
         builder = FieldSummaryBuilder()
