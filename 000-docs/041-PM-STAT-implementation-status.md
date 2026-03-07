@@ -15,7 +15,7 @@
 | 03 | Selection + Markup Interpretation Foundation | cad-wd2 | DONE | `feature/epic-cad-03-selection-markup` | #77 | `region_schema.py`, `markup_parser.py`, `region_associator.py`, `selection_debug.py` | 93 tests — unit (27 schema + 31 parser + 19 associator + 16 debug) |
 | 04 | Region Q&A Vertical Slice | cad-grx | DONE | `feature/epic-cad-04-region-qna` | #78 | `qna_pipeline.py`, `region_context.py`, `qna_schema.py`, `/api/v2/qna`, QnaPanel frontend | 509 tests — unit (356 pipeline + 133 schema), integration (126 qna), 6 golden trajectories (qna family) |
 | — | SIDEQUEST-CAD-67: Text Positional Accuracy | cad-xiw | DONE | `feature/sidequest-cad-67-text-accuracy` | #79 | `TextProvenance` enum, `TextGeometry` model, trust hierarchy, enhanced TEXT/MTEXT/INSERT extraction, downstream wiring (selection, Q&A, compare, planner) | 788+ unit tests (test_text_geometry.py) + 534 e2e tests (test_text_accuracy_e2e.py) |
-| 05 | Repeated-Condition Detection | cad-ccd | IN PROGRESS | `feature/epic-cad-05-repeated-conditions` | — | Similarity scoring, candidate search, preview/approval workflow | TBD — unit (similarity scoring), golden trajectories (repeated_condition family), scorecard entries |
+| 05 | Repeated-Condition Detection | cad-ccd | DONE | `feature/epic-cad-05-repeated-conditions` | #81 | `repeated_condition_schema.py`, `repeated_condition.py`, web endpoint, 4 golden trajectories | 63 tests — unit (38 detection + 19 schema), integration (6 factory DXF) |
 | 06 | Compare + Diff Service Hardening | cad-3e4 | NOT STARTED | — | — | Typed compare schema, alignment diagnostics, regression fixtures | TBD — unit (typed schema), regression fixtures, integration (alignment diagnostics) |
 | — | ARCH-REVIEW-01 | cad-sfw | NOT STARTED | — | — | Post-EPIC-06 quality/scalability review; ADR with keep/change/remove decisions per module | N/A (review output is ADR document) |
 | 07 | Structured Edit Planning | cad-9ug | NOT STARTED | — | — | `models/plan_schema.py` (EditPlan), `llm/plan_builder.py`, constraint validation | TBD — unit (plan schema, constraint validation), golden trajectories (structured_edit family) |
@@ -32,7 +32,7 @@
 | Phase | Epics | Status | Gate |
 |-------|-------|--------|------|
 | **Phase 1: Foundation** | 01, 02, 03 | 3/3 COMPLETE | Contracts locked, regions normalized, `make check` green |
-| **Phase 2: Core Intelligence** | 04, 05, 06 | 1/3 complete (+ SQ67 done) | Golden trajectories pass per family |
+| **Phase 2: Core Intelligence** | 04, 05, 06 | 2/3 complete (+ SQ67 done) | Golden trajectories pass per family |
 | **Architecture Review** | ARCH-REVIEW-01 | Not started | ADR document with keep/change/remove decisions per module |
 | **Phase 3: Structured Editing** | 07, 08 | 0/2 complete | Edit plan + apply produce audit metadata. Key files: `src/cad_dxf_agent/llm/plan_builder.py`, `src/cad_dxf_agent/models/plan_schema.py`, `web/frontend/src/components/PreviewPanel.jsx`, `web/backend/routes/preview.py` |
 | **Phase 4: Workflow Packs** | 09, 10 | 0/2 complete | Domain scorecard entries pass. Key files: `src/cad_dxf_agent/workflows/design_ops.py`, `src/cad_dxf_agent/workflows/construction.py`, domain-specific prompt templates |
@@ -54,8 +54,8 @@ EPIC-01 (DONE) → EPIC-02 (DONE)
               EPIC-04..10 → EPIC-12
 ```
 
-**Critical path:** Phase 1 COMPLETE. EPIC-04 + SQ67 DONE. EPIC-05 IN PROGRESS.
-EPIC-06 (Compare + Diff Hardening) can start in parallel with EPIC-05.
+**Critical path:** Phase 1 COMPLETE. EPIC-04 + SQ67 + EPIC-05 DONE.
+EPIC-06 (Compare + Diff Hardening) is the last Phase 2 epic before ARCH-REVIEW-01.
 
 ---
 
@@ -78,11 +78,11 @@ EPIC-06 (Compare + Diff Hardening) can start in parallel with EPIC-05.
 
 | Metric | Current (post-SQ67) | Target (all epics) |
 |--------|-------------------|-------------------|
-| Total tests | ~1760 | 2000+ |
+| Total tests | ~1823 | 2000+ |
 | Coverage | 65% | 70%+ |
-| Golden trajectories | 11 (edit_plan 5 + qna 6) | 25+ (all 9 families) |
+| Golden trajectories | 15 (edit_plan 5 + qna 6 + repeated_condition 4) | 25+ (all 9 families) |
 | Scorecard entries | 0 | 32+ |
-| Task families tested | 3 (edit_plan + compare + qna) | 9 |
+| Task families tested | 4 (edit_plan + compare + qna + repeated_condition) | 9 |
 | Scorecard pass rate (mock) | N/A | 100% |
 | Scorecard pass rate (live) | N/A | >= 95% |
 
@@ -114,7 +114,7 @@ EPIC-06 (Compare + Diff Hardening) can start in parallel with EPIC-05.
 | 03 | Selection + Markup Interpretation Foundation | DONE — PR merged, bead closed. AAR: [043-PM-AAR](043-PM-AAR-epic-cad-03-aar.md) |
 | 04 | Region Q&A Vertical Slice | DONE — PR #78 merged. Deterministic Q&A pipeline, region context builder, 6 golden trajectories, QnaPanel frontend. |
 | — | SIDEQUEST-CAD-67 | DONE — PR #79 merged. TextGeometry + TextProvenance models, enhanced extraction, trust hierarchy, downstream wiring, 788+ tests. Doc: [044-AT-SPEC](044-AT-SPEC-sidequest-cad-67-text-accuracy.md) |
-| 05 | Repeated-Condition Detection | IN PROGRESS — Define similarity scoring model with text-trust weighting; implement candidate search and preview/approval workflow |
+| 05 | Repeated-Condition Detection | DONE — PR #81. Similarity scoring model (6 signals, text-trust weighting), ConditionDetector with spatial clustering, preview/approval workflow, web endpoint, 63 tests, 4 golden trajectories. Doc: [045-AT-SPEC](045-AT-SPEC-repeated-condition-scoring.md) |
 | 06 | Compare + Diff Service Hardening | Audit existing `core/comparison/` for untyped returns; define typed `CompareResult` schema |
 | — | ARCH-REVIEW-01 | Collect module-level metrics (coupling, test coverage, API surface); draft ADR template with keep/change/remove columns |
 | 07 | Structured Edit Planning | Define `EditPlan` schema in `plan_schema.py`; implement plan builder with constraint pre-checks |
@@ -128,9 +128,9 @@ EPIC-06 (Compare + Diff Hardening) can start in parallel with EPIC-05.
 
 ## 8. Global Next Actions
 
-1. **Complete EPIC-05** — Repeated-Condition Detection (in progress)
-2. **Begin EPIC-06** — Compare + Diff Service Hardening (can start in parallel)
-3. **Prep ARCH-REVIEW-01** — After EPIC-05 + 06 complete
+1. **Begin EPIC-06** — Compare + Diff Service Hardening (last Phase 2 epic)
+2. **Prep ARCH-REVIEW-01** — After EPIC-06 complete
+3. **Begin Phase 3** — EPIC-07 (Structured Edit Planning) after architecture review
 
 ---
 
@@ -155,3 +155,4 @@ EPIC-06 (Compare + Diff Hardening) can start in parallel with EPIC-05.
 | 2026-03-06 | SIDEQUEST-CAD-67 DONE: PR #79 merged. TextGeometry + TextProvenance models, enhanced TEXT/MTEXT/INSERT extraction, trust hierarchy, downstream wiring to selection/Q&A/compare/planner. 788+ unit tests + 534 e2e tests. Doc 044 added. |
 | 2026-03-06 | Test count: ~1462 → ~1760. Golden trajectories: 5 → 11. Task families tested: 2 → 3 (added qna). |
 | 2026-03-06 | EPIC-05 started: Repeated-Condition Detection (in progress). |
+| 2026-03-06 | EPIC-05 DONE: PR #81. Similarity scoring model (6 weighted signals), ConditionDetector with spatial clustering, preview/approval workflow, web endpoint. 63 new tests (38 unit + 19 schema + 6 integration). 4 golden trajectories. Doc 045 added. Test count: ~1760→~1823. Golden trajectories: 11→15. Task families: 3→4. Phase 2: 2/3 complete. |
