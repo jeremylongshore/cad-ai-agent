@@ -43,6 +43,7 @@
 | 042 | AAR | [042-PM-AAR-epic-cad-02-aar.md](042-PM-AAR-epic-cad-02-aar.md) |
 | 043 | AAR | [043-PM-AAR-epic-cad-03-aar.md](043-PM-AAR-epic-cad-03-aar.md) |
 | 048 | AAR | [048-PM-AAR-epic-cad-07-aar.md](048-PM-AAR-epic-cad-07-aar.md) |
+| 049 | AAR | [049-PM-AAR-epic-cad-08-aar.md](049-PM-AAR-epic-cad-08-aar.md) |
 
 ### DR — Documentation & Reference
 | # | Type | File |
@@ -134,6 +135,7 @@
 | 046 | AT | AUDT | Post-EPIC-06 architecture review (ARCH-REVIEW-CAD-01) |
 | 047 | RL | REPT | Release v0.6.0 report (Phase 2 complete) |
 | 048 | PM | AAR | EPIC-CAD-07 end-of-phase report (Structured Edit Planning) |
+| 049 | PM | AAR | EPIC-CAD-08 end-of-phase report (Preview + Apply Workflow) |
 
 ## Quick Reference
 
