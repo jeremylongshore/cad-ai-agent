@@ -2,7 +2,7 @@ import { auth } from './firebase';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
 const DEFAULT_TIMEOUT_MS = 60_000;   // 60s for most requests
-const UPLOAD_TIMEOUT_MS = 120_000;   // 120s for file uploads
+const UPLOAD_TIMEOUT_MS = 300_000;   // 5min for large PDF uploads
 
 async function getToken() {
   const user = auth.currentUser;

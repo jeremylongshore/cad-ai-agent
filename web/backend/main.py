@@ -310,16 +310,32 @@ async def upload(
         raise HTTPException(status_code=422, detail=f"Failed to read DXF: {e}") from None
 
     # Render original preview
-    try:
-        from cad_dxf_agent.core.renderer import render_dxf_to_png
+    # For PDF uploads: render first page directly (fast, no entity limit concern)
+    # For DXF uploads: use ezdxf renderer (skip if too many entities — OOM risk)
+    RENDER_ENTITY_LIMIT = 100_000
+    if ext == ".pdf":
+        try:
+            preview_path = session_dir / "original.png"
+            _render_pdf_page(upload_path, preview_path)
+            session.original_render = preview_path
+        except Exception as e:
+            logger.warning("PDF preview render failed (non-fatal): %s", e, exc_info=True)
+    elif context.entity_count <= RENDER_ENTITY_LIMIT:
+        try:
+            from cad_dxf_agent.core.renderer import render_dxf_to_png
 
-        render_result = render_dxf_to_png(dxf_path, session_dir / "original.png")
-        if render_result.success:
-            session.original_render = render_result.output_path
-        else:
-            logger.warning("Original render returned failure: %s", render_result.error)
-    except Exception as e:
-        logger.warning("Original render failed (non-fatal): %s", e, exc_info=True)
+            render_result = render_dxf_to_png(dxf_path, session_dir / "original.png")
+            if render_result.success:
+                session.original_render = render_result.output_path
+            else:
+                logger.warning("Original render returned failure: %s", render_result.error)
+        except Exception as e:
+            logger.warning("Original render failed (non-fatal): %s", e, exc_info=True)
+    else:
+        logger.info(
+            "Skipping render for large drawing (%d entities > %d limit)",
+            context.entity_count, RENDER_ENTITY_LIMIT,
+        )
 
     response: dict = {
         "session_id": session.session_id,
@@ -1541,6 +1557,19 @@ async def revision_download(session_id: str = Query(...)):
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+
+def _render_pdf_page(pdf_path: Path, output_path: Path, *, dpi: int = 150) -> None:
+    """Render first page of a PDF to PNG using PyMuPDF. Fast, no entity limit."""
+    import fitz
+
+    doc = fitz.open(str(pdf_path))
+    page = doc[0]
+    mat = fitz.Matrix(dpi / 72, dpi / 72)
+    pix = page.get_pixmap(matrix=mat)
+    pix.save(str(output_path))
+    doc.close()
+    logger.info("Rendered PDF page 1 → %s (%d dpi)", output_path.name, dpi)
 
 
 def _convert_dwg_to_dxf(dwg_path: Path, output_dir: Path, dest_path: Path) -> list[str]:
