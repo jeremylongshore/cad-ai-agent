@@ -1,0 +1,14 @@
+{
+  "name": "repeated_condition_labeled_regions",
+  "description": "Find repeated labeled regions (bay with block + text label)",
+  "task_family": "repeated_condition",
+  "prompt": "Find all bays like this one",
+  "exemplar_handles": ["B1", "T1"],
+  "expected_behavior": {
+    "total_found_min": 2,
+    "signals_present": ["block_name", "text_content", "layer_context"],
+    "confidence_min": 0.5,
+    "exemplar_excluded": true,
+    "text_trust_respected": true
+  }
+}

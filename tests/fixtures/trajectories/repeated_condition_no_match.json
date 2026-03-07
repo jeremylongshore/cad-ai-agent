@@ -1,0 +1,11 @@
+{
+  "name": "repeated_condition_no_match",
+  "description": "Unique element with no repeated instances",
+  "task_family": "repeated_condition",
+  "prompt": "Find similar elements",
+  "exemplar_handles": ["UNIQUE_1"],
+  "expected_behavior": {
+    "total_found": 0,
+    "summary_contains": "No"
+  }
+}

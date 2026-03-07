@@ -118,6 +118,29 @@ class ResponseBuilder:
         )
 
     @staticmethod
+    def repeated_condition(
+        *,
+        message: str,
+        data: dict[str, Any],
+        evidence: list[Any] | None = None,
+        confidence: float | None = None,
+        ambiguity_flags: list[str] | None = None,
+        audit: AuditMetadata | None = None,
+    ) -> PlatformResponse:
+        """Build a repeated_condition response (preview of found conditions)."""
+        return PlatformResponse(
+            task_family=TaskFamily.REPEATED_CONDITION,
+            response_type=ResponseType.ANSWER_ONLY,
+            message=message,
+            evidence=evidence or [],
+            confidence=confidence,
+            data=data,
+            ambiguity_flags=ambiguity_flags or [],
+            risk_level=RiskLevel.NONE,
+            audit=audit or AuditMetadata(),
+        )
+
+    @staticmethod
     def preview_edit(
         *,
         operations: list[dict[str, Any]],

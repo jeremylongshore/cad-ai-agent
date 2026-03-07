@@ -1,0 +1,13 @@
+{
+  "name": "repeated_condition_text_only",
+  "description": "Find repeated text labels (SECTION A-A, B-B, C-C pattern)",
+  "task_family": "repeated_condition",
+  "prompt": "Find all section labels like this one",
+  "exemplar_handles": ["S0"],
+  "expected_behavior": {
+    "total_found_min": 2,
+    "signals_present": ["text_content"],
+    "confidence_min": 0.5,
+    "exemplar_excluded": true
+  }
+}

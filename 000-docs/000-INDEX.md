@@ -127,6 +127,7 @@
 | 042 | PM | AAR | EPIC-CAD-02 after action report (end-of-phase) |
 | 043 | PM | AAR | EPIC-CAD-03 after action report (Phase 1 complete) |
 | 044 | AT | SPEC | SIDEQUEST-CAD-67: Text / label positional accuracy |
+| 045 | AT | SPEC | Repeated-condition scoring model (EPIC-CAD-05) |
 
 ## Quick Reference
 
