@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import QnaPanel from './QnaPanel';
+import DesignOpsPanel from './DesignOpsPanel';
 
 const SUGGESTIONS = [
   'Move column A1 24 feet east',
@@ -231,10 +232,20 @@ export default function ChatPanel({
               : msg.role === 'warning' ? 'warning'
               : msg.role;
             const isQna = msg.qnaData && msg.qnaData.task_family === 'qna';
+            const isDesignOps = msg.qnaData && (
+              msg.qnaData.task_family === 'design_assist' ||
+              msg.qnaData.task_family === 'summary' ||
+              msg.qnaData.task_family === 'takeoff_estimate'
+            );
 
             return (
               <div key={msg.id} className={`message-wrapper message-wrapper--${roleClass}`}>
-                {isQna ? (
+                {isDesignOps ? (
+                  <>
+                    <div className={`message message--${roleClass}`}>{msg.text}</div>
+                    <DesignOpsPanel data={msg.qnaData} />
+                  </>
+                ) : isQna ? (
                   <QnaPanel data={msg.qnaData} />
                 ) : (
                   <div className={`message message--${roleClass}`}>

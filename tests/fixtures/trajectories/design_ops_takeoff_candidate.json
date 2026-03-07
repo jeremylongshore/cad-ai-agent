@@ -1,0 +1,11 @@
+{
+  "prompt": "Generate a takeoff estimate for all blocks",
+  "description": "Design-ops counts blocks and text quantities, OCR text is caveated",
+  "task_family": "takeoff_estimate",
+  "response_type": "answer_only",
+  "expected_data_keys": ["items", "methodology", "total_items", "total_quantity_items", "aggregate_confidence"],
+  "must_not_produce_ops": true,
+  "must_have_evidence": false,
+  "risk_level": "none",
+  "ocr_must_be_estimate_only": true
+}

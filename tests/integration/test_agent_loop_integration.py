@@ -112,7 +112,7 @@ class TestGoldenTrajectories:
             with open(path) as f:
                 data = json.load(f)
             # Skip non-agent-loop fixtures (different format, no expected_turns)
-            if data.get("task_family") in ("qna", "repeated_condition"):
+            if "expected_turns" not in data:
                 continue
             data["_file"] = path.name
             trajectories.append(data)

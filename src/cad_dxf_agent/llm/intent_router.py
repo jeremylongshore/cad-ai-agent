@@ -120,6 +120,13 @@ _RULES: list[HeuristicRule] = [
             r"\boptimize\b",
             r"\brecommend\b",
             r"\bbetter\s+layout\b",
+            r"\blayout\b",
+            r"\bplacement\b",
+            r"\bspacing\b",
+            r"\barrangement\b",
+            r"\bscope\s+of\s+work\b",
+            r"\bfull\s+report\b",
+            r"\bdesign\s+summary\b",
         ),
     ),
     # Priority 7: Summary
@@ -131,6 +138,9 @@ _RULES: list[HeuristicRule] = [
             r"\bdescribe\b",
             r"\bstatistics\b",
             r"\bstats\b",
+            r"\brevision\s+summary\b",
+            r"\bexplain\s+changes\b",
+            r"\bwhat\s+was\s+updated\b",
         ),
     ),
     # Priority 8: Q&A

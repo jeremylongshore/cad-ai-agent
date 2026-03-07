@@ -1,0 +1,10 @@
+{
+  "prompt": "Summarize what changed in the revision",
+  "description": "Design-ops returns customer-facing revision summary in plain language",
+  "task_family": "summary",
+  "response_type": "answer_only",
+  "expected_data_keys": ["headline", "key_changes", "overall_assessment", "change_count", "areas_affected"],
+  "must_not_produce_ops": true,
+  "must_have_evidence": false,
+  "risk_level": "none"
+}

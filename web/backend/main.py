@@ -310,16 +310,32 @@ async def upload(
         raise HTTPException(status_code=422, detail=f"Failed to read DXF: {e}") from None
 
     # Render original preview
-    try:
-        from cad_dxf_agent.core.renderer import render_dxf_to_png
+    # For PDF uploads: render first page directly (fast, no entity limit concern)
+    # For DXF uploads: use ezdxf renderer (skip if too many entities — OOM risk)
+    RENDER_ENTITY_LIMIT = 100_000
+    if ext == ".pdf":
+        try:
+            preview_path = session_dir / "original.png"
+            _render_pdf_page(upload_path, preview_path)
+            session.original_render = preview_path
+        except Exception as e:
+            logger.warning("PDF preview render failed (non-fatal): %s", e, exc_info=True)
+    elif context.entity_count <= RENDER_ENTITY_LIMIT:
+        try:
+            from cad_dxf_agent.core.renderer import render_dxf_to_png
 
-        render_result = render_dxf_to_png(dxf_path, session_dir / "original.png")
-        if render_result.success:
-            session.original_render = render_result.output_path
-        else:
-            logger.warning("Original render returned failure: %s", render_result.error)
-    except Exception as e:
-        logger.warning("Original render failed (non-fatal): %s", e, exc_info=True)
+            render_result = render_dxf_to_png(dxf_path, session_dir / "original.png")
+            if render_result.success:
+                session.original_render = render_result.output_path
+            else:
+                logger.warning("Original render returned failure: %s", render_result.error)
+        except Exception as e:
+            logger.warning("Original render failed (non-fatal): %s", e, exc_info=True)
+    else:
+        logger.info(
+            "Skipping render for large drawing (%d entities > %d limit)",
+            context.entity_count, RENDER_ENTITY_LIMIT,
+        )
 
     response: dict = {
         "session_id": session.session_id,
@@ -538,6 +554,116 @@ async def v2_prompt(body: PromptRequest, user: dict = Depends(get_user)):
                 data=result.model_dump(),
                 evidence=[ev.model_dump() for c in result.candidates for ev in c.evidence[:3]],
                 confidence=result.candidates[0].confidence if result.candidates else 0.0,
+                ambiguity_flags=result.ambiguity_flags,
+                audit=audit,
+            ).model_dump()
+
+        # Handle design_assist — deterministic layout analysis, no LLM
+        if intent.family == TaskFamily.DESIGN_ASSIST:
+            from cad_dxf_agent.core.design_ops import LayoutRecommender, ScopeBuilder
+            from cad_dxf_agent.core.region_context import RegionContextBuilder
+
+            ctx_start = _time.monotonic()
+            region = None
+            parsed_region = _parse_selected_region(body.selected_regions)
+            if parsed_region:
+                region = RegionContextBuilder().build(session.context, parsed_region)
+
+            # Detect scope workflow
+            prompt_lower = body.prompt.lower()
+            is_scope = any(
+                kw in prompt_lower
+                for kw in ("scope of work", "full report", "design summary", "scope summary")
+            )
+
+            if is_scope:
+                result = ScopeBuilder().build(
+                    context=session.context,
+                    prompt=body.prompt,
+                    region=region,
+                    comparison_result=session.comparison_result,
+                    changeset=session.changeset,
+                )
+                data = result.model_dump()
+                message = f"Scope summary: {len(result.sections)} section(s) available."
+                confidence = result.aggregate_confidence
+                flags = result.ambiguity_flags
+            else:
+                result = LayoutRecommender().recommend(
+                    session.context, body.prompt, region,
+                )
+                data = result.model_dump()
+                message = (
+                    f"{result.total_recommendations} recommendation(s). "
+                    f"{result.drawing_summary}"
+                )
+                confidence = result.aggregate_confidence
+                flags = result.ambiguity_flags
+
+            audit.context_build_time_ms = (_time.monotonic() - ctx_start) * 1000
+            audit.total_request_time_ms = (_time.monotonic() - total_start) * 1000
+
+            return ResponseBuilder.design_assist(
+                message=message,
+                data=data,
+                confidence=confidence,
+                ambiguity_flags=flags,
+                audit=audit,
+            ).model_dump()
+
+        # Handle summary — deterministic revision summary, no LLM
+        if intent.family == TaskFamily.SUMMARY:
+            from cad_dxf_agent.core.design_ops import RevisionSummarizer
+
+            ctx_start = _time.monotonic()
+            result = RevisionSummarizer().summarize(
+                comparison_result=session.comparison_result,
+                changeset=session.changeset,
+                context=session.context,
+            )
+            audit.context_build_time_ms = (_time.monotonic() - ctx_start) * 1000
+            audit.total_request_time_ms = (_time.monotonic() - total_start) * 1000
+
+            return ResponseBuilder.summary_result(
+                message=result.headline,
+                data=result.model_dump(),
+                confidence=min(
+                    (e.confidence for e in result.key_changes), default=0.5,
+                ),
+                ambiguity_flags=result.ambiguity_flags,
+                audit=audit,
+            ).model_dump()
+
+        # Handle takeoff_estimate — deterministic counting, no LLM
+        if intent.family == TaskFamily.TAKEOFF_ESTIMATE:
+            from cad_dxf_agent.core.design_ops import TakeoffGenerator
+            from cad_dxf_agent.core.region_context import RegionContextBuilder
+
+            ctx_start = _time.monotonic()
+            region = None
+            parsed_region = _parse_selected_region(body.selected_regions)
+            if parsed_region:
+                region = RegionContextBuilder().build(session.context, parsed_region)
+
+            result = TakeoffGenerator().generate(
+                session.context, body.prompt, region,
+            )
+            audit.context_build_time_ms = (_time.monotonic() - ctx_start) * 1000
+            audit.total_request_time_ms = (_time.monotonic() - total_start) * 1000
+
+            _conf_labels = {
+                "high": 0.95,
+                "medium": 0.7,
+                "low": 0.4,
+                "estimate_only": 0.2,
+            }
+            return ResponseBuilder.takeoff_result(
+                message=(
+                    f"{result.total_items} takeoff item(s), "
+                    f"{result.total_quantity_items} total quantity."
+                ),
+                data=result.model_dump(),
+                confidence=_conf_labels.get(result.aggregate_confidence.value, 0.5),
                 ambiguity_flags=result.ambiguity_flags,
                 audit=audit,
             ).model_dump()
@@ -1431,6 +1557,19 @@ async def revision_download(session_id: str = Query(...)):
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+
+def _render_pdf_page(pdf_path: Path, output_path: Path, *, dpi: int = 150) -> None:
+    """Render first page of a PDF to PNG using PyMuPDF. Fast, no entity limit."""
+    import fitz
+
+    doc = fitz.open(str(pdf_path))
+    page = doc[0]
+    mat = fitz.Matrix(dpi / 72, dpi / 72)
+    pix = page.get_pixmap(matrix=mat)
+    pix.save(str(output_path))
+    doc.close()
+    logger.info("Rendered PDF page 1 → %s (%d dpi)", output_path.name, dpi)
 
 
 def _convert_dwg_to_dxf(dwg_path: Path, output_dir: Path, dest_path: Path) -> list[str]:

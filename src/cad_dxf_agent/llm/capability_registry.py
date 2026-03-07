@@ -17,6 +17,9 @@ _DEFAULT_ENABLED: frozenset[TaskFamily] = frozenset(
         TaskFamily.COMPARE,
         TaskFamily.QNA,
         TaskFamily.REPEATED_CONDITION,
+        TaskFamily.DESIGN_ASSIST,
+        TaskFamily.SUMMARY,
+        TaskFamily.TAKEOFF_ESTIMATE,
     }
 )
 

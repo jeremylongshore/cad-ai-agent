@@ -121,6 +121,75 @@ class ResponseBuilder:
         )
 
     @staticmethod
+    def design_assist(
+        *,
+        message: str,
+        data: dict[str, Any],
+        evidence: list[Any] | None = None,
+        confidence: float | None = None,
+        ambiguity_flags: list[str] | None = None,
+        audit: AuditMetadata | None = None,
+    ) -> PlatformResponse:
+        """Build a design_assist response (layout recommendations, scope summaries)."""
+        return PlatformResponse(
+            task_family=TaskFamily.DESIGN_ASSIST,
+            response_type=ResponseType.ANSWER_ONLY,
+            message=message,
+            evidence=evidence or [],
+            confidence=confidence,
+            data=data,
+            ambiguity_flags=ambiguity_flags or [],
+            risk_level=RiskLevel.NONE,
+            audit=audit or AuditMetadata(),
+        )
+
+    @staticmethod
+    def summary_result(
+        *,
+        message: str,
+        data: dict[str, Any],
+        evidence: list[Any] | None = None,
+        confidence: float | None = None,
+        ambiguity_flags: list[str] | None = None,
+        audit: AuditMetadata | None = None,
+    ) -> PlatformResponse:
+        """Build a summary response (revision summaries)."""
+        return PlatformResponse(
+            task_family=TaskFamily.SUMMARY,
+            response_type=ResponseType.ANSWER_ONLY,
+            message=message,
+            evidence=evidence or [],
+            confidence=confidence,
+            data=data,
+            ambiguity_flags=ambiguity_flags or [],
+            risk_level=RiskLevel.NONE,
+            audit=audit or AuditMetadata(),
+        )
+
+    @staticmethod
+    def takeoff_result(
+        *,
+        message: str,
+        data: dict[str, Any],
+        evidence: list[Any] | None = None,
+        confidence: float | None = None,
+        ambiguity_flags: list[str] | None = None,
+        audit: AuditMetadata | None = None,
+    ) -> PlatformResponse:
+        """Build a takeoff_estimate response."""
+        return PlatformResponse(
+            task_family=TaskFamily.TAKEOFF_ESTIMATE,
+            response_type=ResponseType.ANSWER_ONLY,
+            message=message,
+            evidence=evidence or [],
+            confidence=confidence,
+            data=data,
+            ambiguity_flags=ambiguity_flags or [],
+            risk_level=RiskLevel.NONE,
+            audit=audit or AuditMetadata(),
+        )
+
+    @staticmethod
     def repeated_condition(
         *,
         message: str,

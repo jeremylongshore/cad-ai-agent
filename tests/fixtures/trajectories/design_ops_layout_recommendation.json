@@ -1,0 +1,10 @@
+{
+  "prompt": "Suggest layout improvements for the structural grid",
+  "description": "Design-ops returns layout recommendations with evidence, no edit ops",
+  "task_family": "design_assist",
+  "response_type": "answer_only",
+  "expected_data_keys": ["recommendations", "drawing_summary", "methodology", "total_recommendations", "aggregate_confidence"],
+  "must_not_produce_ops": true,
+  "must_have_evidence": false,
+  "risk_level": "none"
+}
