@@ -62,6 +62,7 @@
 | 027 | REPT | [027-RL-REPT-release-v0.2.0.md](027-RL-REPT-release-v0.2.0.md) |
 | 028 | REPT | [028-RL-REPT-release-v0.3.0.md](028-RL-REPT-release-v0.3.0.md) |
 | 029 | REFC | [029-RM-REFC-appauditmini-quick-reference.md](029-RM-REFC-appauditmini-quick-reference.md) |
+| 047 | REPT | [047-RL-REPT-release-v0.6.0.md](047-RL-REPT-release-v0.6.0.md) |
 
 ### BL — Business & Legal
 | # | Type | File |
@@ -130,6 +131,7 @@
 | 044 | AT | SPEC | SIDEQUEST-CAD-67: Text / label positional accuracy |
 | 045 | AT | SPEC | Repeated-condition scoring model (EPIC-CAD-05) |
 | 046 | AT | AUDT | Post-EPIC-06 architecture review (ARCH-REVIEW-CAD-01) |
+| 047 | RL | REPT | Release v0.6.0 report (Phase 2 complete) |
 
 ## Quick Reference
 
