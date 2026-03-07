@@ -1,0 +1,10 @@
+{
+  "prompt": "Find all repeated conditions in this drawing - batch condition report",
+  "description": "Construction-ops returns batch repeated-condition groups without exemplar selection",
+  "task_family": "repeated_condition",
+  "response_type": "answer_only",
+  "expected_data_keys": ["groups", "total_groups", "total_instances", "methodology", "aggregate_confidence"],
+  "must_not_produce_ops": true,
+  "must_have_evidence": false,
+  "risk_level": "none"
+}

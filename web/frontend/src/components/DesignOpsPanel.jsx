@@ -1,7 +1,8 @@
 /**
- * DesignOpsPanel -- renders design operations results (layout recommendations,
- * revision summaries, takeoff candidates, scope summaries) with confidence
- * badges, caveats, and expand/collapse.
+ * DesignOpsPanel -- renders design and construction operations results (layout
+ * recommendations, revision summaries, takeoff candidates, scope summaries,
+ * grid analysis, redline reports, batch conditions, field summaries) with
+ * confidence badges, caveats, and expand/collapse.
  */
 
 import { useState } from 'react';
@@ -110,13 +111,128 @@ function ChangeSummaryList({ changes }) {
   );
 }
 
+function GridTable({ gridLines, bays }) {
+  return (
+    <div>
+      {gridLines && gridLines.length > 0 && (
+        <table style={{ width: '100%', fontSize: '0.8125rem', borderCollapse: 'collapse', marginBottom: 'var(--space-2)' }}>
+          <thead>
+            <tr style={{ borderBottom: '2px solid var(--border-primary)' }}>
+              <th style={{ textAlign: 'left', padding: 'var(--space-1)' }}>Label</th>
+              <th style={{ textAlign: 'left', padding: 'var(--space-1)' }}>Direction</th>
+              <th style={{ textAlign: 'right', padding: 'var(--space-1)' }}>Position</th>
+              <th style={{ textAlign: 'center', padding: 'var(--space-1)' }}>Confidence</th>
+            </tr>
+          </thead>
+          <tbody>
+            {gridLines.map((gl, i) => (
+              <tr key={i} style={{ borderBottom: '1px solid var(--border-secondary)' }}>
+                <td style={{ padding: 'var(--space-1)' }}>{gl.label || '(unlabeled)'}</td>
+                <td style={{ padding: 'var(--space-1)' }}>{gl.direction}</td>
+                <td style={{ textAlign: 'right', padding: 'var(--space-1)' }}>{gl.position?.toFixed(1)}</td>
+                <td style={{ textAlign: 'center', padding: 'var(--space-1)' }}><ConfidenceBadge value={gl.confidence} /></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      {bays && bays.length > 0 && (
+        <>
+          <p className="text-sm" style={{ fontWeight: 600, marginBottom: 'var(--space-1)' }}>Bays</p>
+          <table style={{ width: '100%', fontSize: '0.8125rem', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ borderBottom: '2px solid var(--border-primary)' }}>
+                <th style={{ textAlign: 'left', padding: 'var(--space-1)' }}>Bay</th>
+                <th style={{ textAlign: 'left', padding: 'var(--space-1)' }}>Direction</th>
+                <th style={{ textAlign: 'right', padding: 'var(--space-1)' }}>Dimension</th>
+              </tr>
+            </thead>
+            <tbody>
+              {bays.map((bay, i) => (
+                <tr key={i} style={{ borderBottom: '1px solid var(--border-secondary)' }}>
+                  <td style={{ padding: 'var(--space-1)' }}>{bay.label}</td>
+                  <td style={{ padding: 'var(--space-1)' }}>{bay.direction}</td>
+                  <td style={{ textAlign: 'right', padding: 'var(--space-1)' }}>{bay.dimension?.toFixed(1)} {bay.unit || ''}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </>
+      )}
+    </div>
+  );
+}
+
+function RedlineList({ entries }) {
+  if (!entries || entries.length === 0) return <p className="text-sm text-secondary">No revision clouds found.</p>;
+  return (
+    <div>
+      {entries.map((entry, i) => (
+        <div key={i} style={{ marginBottom: 'var(--space-2)', paddingBottom: 'var(--space-2)', borderBottom: '1px solid var(--border-secondary)' }}>
+          <div className="flex items-center gap-2">
+            <span className="badge">cloud</span>
+            <span className="text-sm" style={{ fontWeight: 600 }}>{entry.cloud?.layer}</span>
+            <ConfidenceBadge value={entry.confidence} />
+          </div>
+          <p className="text-sm text-secondary">{entry.description}</p>
+          <p className="text-xs text-tertiary">{entry.entity_count} affected entity(ies) on {entry.affected_layers?.join(', ')}</p>
+          <CaveatList caveats={entry.caveats} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ConditionGroupList({ groups }) {
+  if (!groups || groups.length === 0) return <p className="text-sm text-secondary">No repeated conditions found.</p>;
+  return (
+    <div>
+      {groups.map((group, i) => (
+        <div key={i} style={{ marginBottom: 'var(--space-2)', paddingBottom: 'var(--space-2)', borderBottom: '1px solid var(--border-secondary)' }}>
+          <div className="flex items-center gap-2">
+            <span className="text-sm" style={{ fontWeight: 600 }}>{group.name}</span>
+            <span className="badge">{group.total_instances} instances</span>
+            <ConfidenceBadge value={group.confidence} />
+          </div>
+          <CaveatList caveats={group.caveats} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function renderSection(section) {
+  const st = section.section_type;
+  // Design-ops section types (EPIC-09)
+  if (st === 'layout_recommendations' || st === 'layout_notes') {
+    return <RecommendationList recommendations={section.content?.recommendations} />;
+  }
+  if (st === 'takeoff_candidates' || st === 'takeoff_summary') {
+    return <TakeoffTable items={section.content?.items} />;
+  }
+  if (st === 'revision_summary' || st === 'revision_changes') {
+    return <ChangeSummaryList changes={section.content?.key_changes} />;
+  }
+  // Construction-ops section types (EPIC-10)
+  if (st === 'grid_summary') {
+    return <GridTable gridLines={section.content?.grid_lines} bays={section.content?.bays} />;
+  }
+  if (st === 'condition_report') {
+    return <ConditionGroupList groups={section.content?.groups} />;
+  }
+  if (st === 'general_notes') {
+    return <pre className="text-sm">{JSON.stringify(section.content, null, 2)}</pre>;
+  }
+  return <pre className="text-sm">{JSON.stringify(section.content, null, 2)}</pre>;
+}
+
 export default function DesignOpsPanel({ data }) {
   if (!data) return null;
 
   const taskFamily = data.task_family;
   const payload = data.data || {};
 
-  // Scope summary (has sections array)
+  // Scope / field summary (has sections array)
   if (payload.sections) {
     return (
       <div className="design-ops-panel">
@@ -128,21 +244,56 @@ export default function DesignOpsPanel({ data }) {
         )}
         {payload.sections.map((section, i) => (
           <CollapsibleSection key={i} title={section.title} confidence={section.confidence} defaultOpen={i === 0}>
-            {section.section_type === 'layout_recommendations' && (
-              <RecommendationList recommendations={section.content?.recommendations} />
-            )}
-            {section.section_type === 'takeoff_candidates' && (
-              <TakeoffTable items={section.content?.items} />
-            )}
-            {section.section_type === 'revision_summary' && (
-              <ChangeSummaryList changes={section.content?.key_changes} />
-            )}
-            {section.section_type === 'general_notes' && (
-              <pre className="text-sm">{JSON.stringify(section.content, null, 2)}</pre>
-            )}
+            {renderSection(section)}
             <CaveatList caveats={section.caveats} />
           </CollapsibleSection>
         ))}
+        <CaveatList caveats={payload.caveats} />
+      </div>
+    );
+  }
+
+  // Grid analysis (standalone)
+  if (payload.grid_lines) {
+    return (
+      <div className="design-ops-panel">
+        <div className="flex items-center gap-2" style={{ marginBottom: 'var(--space-2)' }}>
+          <h4>Grid Analysis</h4>
+          <ConfidenceBadge value={payload.aggregate_confidence} />
+        </div>
+        <p className="text-sm text-secondary">{payload.drawing_summary}</p>
+        <p className="text-xs text-tertiary">{payload.grid_pattern_description}</p>
+        <GridTable gridLines={payload.grid_lines} bays={payload.bays} />
+        <CaveatList caveats={payload.caveats} />
+      </div>
+    );
+  }
+
+  // Redline report (standalone)
+  if (payload.entries && payload.total_clouds != null) {
+    return (
+      <div className="design-ops-panel">
+        <div className="flex items-center gap-2" style={{ marginBottom: 'var(--space-2)' }}>
+          <h4>{payload.total_clouds} Revision Cloud(s)</h4>
+          <ConfidenceBadge value={payload.aggregate_confidence} />
+        </div>
+        <p className="text-sm text-secondary">{payload.total_affected_entities} affected entity(ies)</p>
+        <RedlineList entries={payload.entries} />
+        <CaveatList caveats={payload.caveats} />
+      </div>
+    );
+  }
+
+  // Batch condition groups (standalone)
+  if (payload.groups) {
+    return (
+      <div className="design-ops-panel">
+        <div className="flex items-center gap-2" style={{ marginBottom: 'var(--space-2)' }}>
+          <h4>{payload.total_groups} Condition Group(s)</h4>
+          <ConfidenceBadge value={payload.aggregate_confidence} />
+        </div>
+        <p className="text-sm text-secondary">{payload.total_instances} total instance(s)</p>
+        <ConditionGroupList groups={payload.groups} />
         <CaveatList caveats={payload.caveats} />
       </div>
     );

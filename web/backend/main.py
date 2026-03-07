@@ -530,11 +530,58 @@ async def v2_prompt(body: PromptRequest, user: dict = Depends(get_user)):
                 audit=audit,
             ).model_dump()
 
+        # Handle markup_interpretation — deterministic redline report, no LLM
+        if intent.family == TaskFamily.MARKUP_INTERPRETATION:
+            from cad_dxf_agent.core.construction_ops import MarkupRedlineGenerator
+
+            ctx_start = _time.monotonic()
+            result = MarkupRedlineGenerator().generate(session.context, body.prompt)
+            audit.context_build_time_ms = (_time.monotonic() - ctx_start) * 1000
+            audit.total_request_time_ms = (_time.monotonic() - total_start) * 1000
+
+            return ResponseBuilder.markup_redline(
+                message=(
+                    f"{result.total_clouds} revision cloud(s) found, "
+                    f"{result.total_affected_entities} affected entity(ies)."
+                ),
+                data=result.model_dump(),
+                confidence=result.aggregate_confidence,
+                ambiguity_flags=result.ambiguity_flags,
+                audit=audit,
+            ).model_dump()
+
         # Handle repeated_condition — deterministic, no LLM
         if intent.family == TaskFamily.REPEATED_CONDITION:
             from cad_dxf_agent.core.repeated_condition import ConditionDetector
 
             exemplar_handles = body.selected_regions[0].get("handles", []) if body.selected_regions else []
+            prompt_lower = body.prompt.lower()
+            is_batch = not exemplar_handles and any(
+                kw in prompt_lower for kw in (
+                    "batch", "all conditions", "condition report",
+                    "condition plan", "find all patterns",
+                )
+            )
+
+            if is_batch:
+                from cad_dxf_agent.core.construction_ops import BatchConditionPlanner
+
+                ctx_start = _time.monotonic()
+                result = BatchConditionPlanner().plan(session.context, body.prompt)
+                audit.context_build_time_ms = (_time.monotonic() - ctx_start) * 1000
+                audit.total_request_time_ms = (_time.monotonic() - total_start) * 1000
+
+                return ResponseBuilder.repeated_condition(
+                    message=(
+                        f"{result.total_groups} condition group(s), "
+                        f"{result.total_instances} total instance(s)."
+                    ),
+                    data=result.model_dump(),
+                    confidence=result.aggregate_confidence,
+                    ambiguity_flags=result.ambiguity_flags,
+                    audit=audit,
+                ).model_dump()
+
             if not exemplar_handles:
                 audit.total_request_time_ms = (_time.monotonic() - total_start) * 1000
                 return ResponseBuilder.needs_clarification(
@@ -569,14 +616,52 @@ async def v2_prompt(body: PromptRequest, user: dict = Depends(get_user)):
             if parsed_region:
                 region = RegionContextBuilder().build(session.context, parsed_region)
 
-            # Detect scope workflow
             prompt_lower = body.prompt.lower()
-            is_scope = any(
+
+            # Field summary sub-dispatch
+            is_field = any(
+                kw in prompt_lower for kw in (
+                    "field summary", "field report",
+                    "construction summary", "site report",
+                )
+            )
+            if is_field:
+                from cad_dxf_agent.core.construction_ops import FieldSummaryBuilder
+
+                result = FieldSummaryBuilder().build(
+                    context=session.context,
+                    prompt=body.prompt,
+                    region=region,
+                    comparison_result=session.comparison_result,
+                    changeset=session.changeset,
+                )
+                data = result.model_dump()
+                message = f"Field summary: {len(result.sections)} section(s) available."
+                confidence = result.aggregate_confidence
+                flags = result.ambiguity_flags
+
+            # Grid summary sub-dispatch
+            elif any(
+                kw in prompt_lower for kw in (
+                    "grid", "bay", "column grid", "structural grid",
+                )
+            ):
+                from cad_dxf_agent.core.construction_ops import GridAnalyzer
+
+                result = GridAnalyzer().analyze(session.context, body.prompt, region)
+                data = result.model_dump()
+                message = (
+                    f"{len(result.grid_lines)} grid line(s), "
+                    f"{len(result.bays)} bay(s). {result.drawing_summary}"
+                )
+                confidence = result.aggregate_confidence
+                flags = result.ambiguity_flags
+
+            # Detect scope workflow
+            elif any(
                 kw in prompt_lower
                 for kw in ("scope of work", "full report", "design summary", "scope summary")
-            )
-
-            if is_scope:
+            ):
                 result = ScopeBuilder().build(
                     context=session.context,
                     prompt=body.prompt,

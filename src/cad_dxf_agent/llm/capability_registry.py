@@ -20,6 +20,7 @@ _DEFAULT_ENABLED: frozenset[TaskFamily] = frozenset(
         TaskFamily.DESIGN_ASSIST,
         TaskFamily.SUMMARY,
         TaskFamily.TAKEOFF_ESTIMATE,
+        TaskFamily.MARKUP_INTERPRETATION,
     }
 )
 

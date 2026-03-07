@@ -1,0 +1,10 @@
+{
+  "prompt": "Show me the structural grid and bay dimensions",
+  "description": "Construction-ops returns grid analysis with grid lines, bays, and confidence",
+  "task_family": "design_assist",
+  "response_type": "answer_only",
+  "expected_data_keys": ["grid_lines", "bays", "drawing_summary", "grid_pattern_description", "methodology", "aggregate_confidence"],
+  "must_not_produce_ops": true,
+  "must_have_evidence": false,
+  "risk_level": "none"
+}
