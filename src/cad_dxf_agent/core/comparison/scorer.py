@@ -341,5 +341,4 @@ def _proximity_score(a: Point2D, b: Point2D, tolerance: float) -> float:
     return max(0.0, 1.0 - d / tolerance)
 
 
-
 # _levenshtein_similarity and _levenshtein_distance moved to core/text_utils.py

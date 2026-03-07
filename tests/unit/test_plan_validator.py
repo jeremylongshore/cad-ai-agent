@@ -20,7 +20,7 @@ from cad_dxf_agent.models.plan_schema import (
     EditPlan,
     PlanValidationStatus,
 )
-from cad_dxf_agent.models.response_schema import EvidenceRef, RiskLevel
+from cad_dxf_agent.models.response_schema import EvidenceRef
 
 
 @pytest.fixture

@@ -159,10 +159,7 @@ class TestDeleteRequests:
         plan = builder.build(req)
         assert plan.action_count >= 1
         assert plan.risk_level in (RiskLevel.MEDIUM, RiskLevel.HIGH)
-        assert any(
-            req.category == "destructive_confirmation"
-            for req in plan.approval_requirements
-        )
+        assert any(req.category == "destructive_confirmation" for req in plan.approval_requirements)
 
     def test_delete_no_target_returns_clarification(self, builder, drawing_context):
         req = PlanRequest(
@@ -287,9 +284,7 @@ class TestBatchPlans:
         )
         plan = builder.build(req)
         assert plan.action_count == 2
-        assert all(
-            a.action_type == EditActionType.REPLICATE_NOTE for a in plan.actions
-        )
+        assert all(a.action_type == EditActionType.REPLICATE_NOTE for a in plan.actions)
 
     def test_batch_with_pending_matches_blocked(self, builder, drawing_context):
         rc_result = RepeatedConditionResult(

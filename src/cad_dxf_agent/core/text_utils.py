@@ -70,10 +70,6 @@ def entity_to_evidence(entity: EntityRef) -> EvidenceRef:
         layer=entity.layer,
         entity_type=entity.entity_type.value,
         description=describe_entity(entity),
-        location=(
-            (entity.insert_point.x, entity.insert_point.y) if entity.insert_point else None
-        ),
-        text_excerpt=(
-            entity.text_content[:100] if entity.text_content else None
-        ),
+        location=((entity.insert_point.x, entity.insert_point.y) if entity.insert_point else None),
+        text_excerpt=(entity.text_content[:100] if entity.text_content else None),
     )

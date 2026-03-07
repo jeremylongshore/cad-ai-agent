@@ -55,9 +55,7 @@ class PlanValidator:
         self._context = context
         self._rules = rules or RuleConfig()
         self._index = EntityIndex(context)
-        self._protected_upper = [
-            layer.upper() for layer in self._rules.protected_layers
-        ]
+        self._protected_upper = [layer.upper() for layer in self._rules.protected_layers]
 
     def validate(self, plan: EditPlan) -> EditPlan:
         """Validate all actions in a plan. Mutates and returns the plan.
@@ -110,26 +108,18 @@ class PlanValidator:
         else:
             # All other actions need a target entity
             if not action.target_handle:
-                blockers.append(
-                    f"{action.action_type.value} requires a target entity handle"
-                )
+                blockers.append(f"{action.action_type.value} requires a target entity handle")
             else:
                 entity = self._index.get_by_handle(action.target_handle)
                 if entity is None:
-                    blockers.append(
-                        f"Target entity not found: {action.target_handle}"
-                    )
+                    blockers.append(f"Target entity not found: {action.target_handle}")
                 else:
                     # Protected layer check
                     if entity.layer.upper() in self._protected_upper:
-                        blockers.append(
-                            f"Cannot edit entity on protected layer: {entity.layer}"
-                        )
+                        blockers.append(f"Cannot edit entity on protected layer: {entity.layer}")
 
                     # Entity/action compatibility
-                    allowed_types = _ACTION_ENTITY_CONSTRAINTS.get(
-                        action.action_type
-                    )
+                    allowed_types = _ACTION_ENTITY_CONSTRAINTS.get(action.action_type)
                     if allowed_types is not None and entity.entity_type not in allowed_types:
                         blockers.append(
                             f"{action.action_type.value} not supported on "
@@ -158,8 +148,7 @@ class PlanValidator:
         # Low confidence check
         if action.confidence < 0.5:
             warnings.append(
-                f"Low confidence ({action.confidence:.2f}) — "
-                "result may not match intent"
+                f"Low confidence ({action.confidence:.2f}) — result may not match intent"
             )
 
         # Missing evidence check
@@ -181,9 +170,7 @@ class PlanValidator:
 
         return detail
 
-    def _validate_move_params(
-        self, action: EditAction, warnings: list[str]
-    ) -> None:
+    def _validate_move_params(self, action: EditAction, warnings: list[str]) -> None:
         """Validate move_entity params."""
         dx = action.params.get("dx")
         dy = action.params.get("dy")
@@ -199,13 +186,10 @@ class PlanValidator:
                 dist = math.sqrt(dx**2 + dy**2)
                 if dist > self._rules.max_move_distance:
                     warnings.append(
-                        f"Move distance {dist:.1f} exceeds max "
-                        f"{self._rules.max_move_distance}"
+                        f"Move distance {dist:.1f} exceeds max {self._rules.max_move_distance}"
                     )
 
-    def _validate_edit_text_params(
-        self, action: EditAction, blockers: list[str]
-    ) -> None:
+    def _validate_edit_text_params(self, action: EditAction, blockers: list[str]) -> None:
         """Validate edit_text params."""
         new_text = action.params.get("new_text")
         if new_text is None:
@@ -217,16 +201,12 @@ class PlanValidator:
         self, action: EditAction, blockers: list[str], warnings: list[str]
     ) -> None:
         """Validate add_block action."""
-        if not action.params.get("block_name") and not action.params.get(
-            "insert_point"
-        ):
+        if not action.params.get("block_name") and not action.params.get("insert_point"):
             warnings.append("Block name and insert point not fully specified")
 
         target_layer = action.target_layer
         if target_layer and target_layer.upper() in self._protected_upper:
-            blockers.append(
-                f"Cannot insert on protected layer: {target_layer}"
-            )
+            blockers.append(f"Cannot insert on protected layer: {target_layer}")
 
     def _validate_replicate(
         self, action: EditAction, blockers: list[str], warnings: list[str]
@@ -248,9 +228,7 @@ class PlanValidator:
         """Check plan-level constraints."""
         # Batch replication requires prior approval evidence
         replicate_actions = [
-            a
-            for a in plan.actions
-            if a.action_type == EditActionType.REPLICATE_NOTE
+            a for a in plan.actions if a.action_type == EditActionType.REPLICATE_NOTE
         ]
         if replicate_actions:
             has_approval = any(
@@ -258,8 +236,7 @@ class PlanValidator:
                 for req in plan.approval_requirements
             )
             if not has_approval and not any(
-                req.category == "batch_confirmation"
-                for req in plan.approval_requirements
+                req.category == "batch_confirmation" for req in plan.approval_requirements
             ):
                 plan.approval_requirements.append(
                     ApprovalRequirement(
@@ -270,6 +247,4 @@ class PlanValidator:
 
         # Too many actions warning
         if len(plan.actions) > 20:
-            warnings.append(
-                f"Large plan ({len(plan.actions)} actions) — review carefully"
-            )
+            warnings.append(f"Large plan ({len(plan.actions)} actions) — review carefully")

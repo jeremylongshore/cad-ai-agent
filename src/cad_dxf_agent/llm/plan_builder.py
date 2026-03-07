@@ -106,20 +106,14 @@ class EditPlanBuilder:
 
     # --- Request classification ---
 
-    _MOVE_PATTERN = re.compile(
-        r"\b(move|shift|relocate|reposition)\b", re.IGNORECASE
-    )
-    _DELETE_PATTERN = re.compile(
-        r"\b(delete|remove|erase|clear)\b", re.IGNORECASE
-    )
+    _MOVE_PATTERN = re.compile(r"\b(move|shift|relocate|reposition)\b", re.IGNORECASE)
+    _DELETE_PATTERN = re.compile(r"\b(delete|remove|erase|clear)\b", re.IGNORECASE)
     _TEXT_EDIT_PATTERN = re.compile(
         r"\b(change\s+text|rename|update\s+text|edit\s+text|"
         r"replace\s+text|set\s+text|change\s+.*\s+to)\b",
         re.IGNORECASE,
     )
-    _ADD_PATTERN = re.compile(
-        r"\b(add|insert|place|create|replicate|copy\s+to)\b", re.IGNORECASE
-    )
+    _ADD_PATTERN = re.compile(r"\b(add|insert|place|create|replicate|copy\s+to)\b", re.IGNORECASE)
 
     def _is_move_request(self, prompt: str) -> bool:
         return bool(self._MOVE_PATTERN.search(prompt))
@@ -155,9 +149,7 @@ class EditPlanBuilder:
                 target_layer=entity.layer,
                 target_entity_type=entity.entity_type.value,
                 region_id=(
-                    request.selected_regions[0].region_id
-                    if request.selected_regions
-                    else None
+                    request.selected_regions[0].region_id if request.selected_regions else None
                 ),
                 params={"dx": dx, "dy": dy},
                 evidence=[entity_to_evidence(entity)],
@@ -196,9 +188,7 @@ class EditPlanBuilder:
                 target_layer=entity.layer,
                 target_entity_type=entity.entity_type.value,
                 region_id=(
-                    request.selected_regions[0].region_id
-                    if request.selected_regions
-                    else None
+                    request.selected_regions[0].region_id if request.selected_regions else None
                 ),
                 params={},
                 evidence=[entity_to_evidence(entity)],
@@ -217,9 +207,7 @@ class EditPlanBuilder:
             )
         )
 
-    def _build_text_edit_plan(
-        self, plan: EditPlan, request: PlanRequest
-    ) -> None:
+    def _build_text_edit_plan(self, plan: EditPlan, request: PlanRequest) -> None:
         """Build a text edit plan for TEXT/MTEXT entities."""
         targets = self._resolve_targets(request)
         text_targets = [t for t in targets if t.entity_type in _TEXT_TYPES]
@@ -227,9 +215,7 @@ class EditPlanBuilder:
         if not text_targets:
             if targets:
                 plan.validation_status = PlanValidationStatus.BLOCKED
-                plan.blocked_reasons.append(
-                    "Target entities are not text (TEXT/MTEXT)"
-                )
+                plan.blocked_reasons.append("Target entities are not text (TEXT/MTEXT)")
                 plan.rationale = "Cannot edit text on non-text entities."
             else:
                 plan.validation_status = PlanValidationStatus.NEEDS_CLARIFICATION
@@ -298,8 +284,7 @@ class EditPlanBuilder:
             },
             evidence=[],
             rationale=(
-                f"Add element at region center"
-                f" ({region.center.x:.1f}, {region.center.y:.1f})"
+                f"Add element at region center ({region.center.x:.1f}, {region.center.y:.1f})"
             ),
             confidence=0.7,
             ambiguity=["block_name_not_specified"],
@@ -321,12 +306,8 @@ class EditPlanBuilder:
         if rc_result is None:
             return
 
-        approved = [
-            c for c in rc_result.candidates if c.approval_state == ApprovalState.APPROVED
-        ]
-        pending = [
-            c for c in rc_result.candidates if c.approval_state == ApprovalState.PENDING
-        ]
+        approved = [c for c in rc_result.candidates if c.approval_state == ApprovalState.APPROVED]
+        pending = [c for c in rc_result.candidates if c.approval_state == ApprovalState.PENDING]
 
         if not approved and pending:
             plan.validation_status = PlanValidationStatus.BLOCKED
@@ -353,11 +334,7 @@ class EditPlanBuilder:
         for candidate in approved:
             action = EditAction(
                 action_type=EditActionType.REPLICATE_NOTE,
-                target_handle=(
-                    candidate.entity_handles[0]
-                    if candidate.entity_handles
-                    else None
-                ),
+                target_handle=(candidate.entity_handles[0] if candidate.entity_handles else None),
                 params={
                     "source_handles": list(rc_result.exemplar_handles),
                     "target_centroid": {
@@ -386,9 +363,7 @@ class EditPlanBuilder:
             )
         )
 
-    def _build_unsupported_plan(
-        self, plan: EditPlan, request: PlanRequest
-    ) -> None:
+    def _build_unsupported_plan(self, plan: EditPlan, request: PlanRequest) -> None:
         """Return a needs_clarification plan for unrecognized requests."""
         plan.validation_status = PlanValidationStatus.NEEDS_CLARIFICATION
         plan.blocked_reasons.append("Request does not map to a supported edit action")
@@ -502,9 +477,7 @@ class EditPlanBuilder:
         plan.risk_level = max_risk.risk_level
 
         # Override if many deletes
-        delete_count = sum(
-            1 for a in plan.actions if a.action_type == EditActionType.DELETE_ENTITY
-        )
+        delete_count = sum(1 for a in plan.actions if a.action_type == EditActionType.DELETE_ENTITY)
         if delete_count > 5 or len(plan.actions) > 20:
             plan.risk_level = RiskLevel.HIGH
 

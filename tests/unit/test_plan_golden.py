@@ -90,9 +90,7 @@ class TestGoldenConstructionEdit:
             blocks=[],
         )
 
-    def test_move_callout_produces_valid_plan(
-        self, builder, construction_context, rules
-    ):
+    def test_move_callout_produces_valid_plan(self, builder, construction_context, rules):
         req = PlanRequest(
             prompt="move this callout right 25",
             drawing_context=construction_context,
@@ -183,9 +181,7 @@ class TestGoldenAnnotationReview:
             center=Point2D(x=15, y=15),
         )
 
-    def test_delete_annotations_in_region(
-        self, builder, review_context, annotation_region, rules
-    ):
+    def test_delete_annotations_in_region(self, builder, review_context, annotation_region, rules):
         req = PlanRequest(
             prompt="remove all items in this area",
             drawing_context=review_context,
@@ -201,10 +197,7 @@ class TestGoldenAnnotationReview:
         assert "KEEP" not in handles
 
         assert plan.risk_level in (RiskLevel.MEDIUM, RiskLevel.HIGH)
-        assert any(
-            r.category == "destructive_confirmation"
-            for r in plan.approval_requirements
-        )
+        assert any(r.category == "destructive_confirmation" for r in plan.approval_requirements)
 
         # Validate
         validator = PlanValidator(review_context, rules)
@@ -304,9 +297,7 @@ class TestGoldenBatchReplication:
             blocks=[],
         )
 
-    def test_approved_batch_generates_replication_plan(
-        self, builder, batch_context, rules
-    ):
+    def test_approved_batch_generates_replication_plan(self, builder, batch_context, rules):
         rc_result = RepeatedConditionResult(
             exemplar_handles=["EX1"],
             exemplar_centroid=Point2D(x=10, y=20),
@@ -333,9 +324,7 @@ class TestGoldenBatchReplication:
         plan = builder.build(req)
 
         assert plan.action_count == 2
-        assert all(
-            a.action_type == EditActionType.REPLICATE_NOTE for a in plan.actions
-        )
+        assert all(a.action_type == EditActionType.REPLICATE_NOTE for a in plan.actions)
         # Confidences from match scores
         assert plan.actions[0].confidence == 0.88
         assert plan.actions[1].confidence == 0.82

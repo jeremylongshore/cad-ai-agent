@@ -714,5 +714,4 @@ def _describe_entity(entity: EntityRef) -> str:
     return " ".join(parts)
 
 
-
 # _levenshtein_similarity and _levenshtein_distance moved to core/text_utils.py

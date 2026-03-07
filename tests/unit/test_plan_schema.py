@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pytest
+from pydantic import ValidationError
 
 from cad_dxf_agent.models.plan_schema import (
     ActionValidationDetail,
@@ -77,9 +78,9 @@ class TestEditAction:
         assert action.confidence == 0.9
 
     def test_confidence_bounds(self):
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             EditAction(action_type=EditActionType.MOVE_ENTITY, confidence=1.5)
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             EditAction(action_type=EditActionType.MOVE_ENTITY, confidence=-0.1)
 
     def test_action_serialization(self):

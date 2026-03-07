@@ -55,14 +55,10 @@ class EditAction(BaseModel):
 
     action_id: str = Field(default_factory=lambda: uuid.uuid4().hex[:12])
     action_type: EditActionType
-    target_handle: str | None = Field(
-        default=None, description="Handle of the entity to act on"
-    )
+    target_handle: str | None = Field(default=None, description="Handle of the entity to act on")
     target_layer: str | None = None
     target_entity_type: str | None = None
-    region_id: str | None = Field(
-        default=None, description="Source region for this action"
-    )
+    region_id: str | None = Field(default=None, description="Source region for this action")
     params: dict = Field(
         default_factory=dict,
         description="Action-specific parameters (dx/dy, new_text, block_name, etc.)",
@@ -70,19 +66,13 @@ class EditAction(BaseModel):
     evidence: list[EvidenceRef] = Field(
         default_factory=list, description="Supporting evidence for this action"
     )
-    rationale: str = Field(
-        default="", description="Why this action was planned"
-    )
-    confidence: float = Field(
-        default=1.0, ge=0.0, le=1.0, description="Confidence in this action"
-    )
+    rationale: str = Field(default="", description="Why this action was planned")
+    confidence: float = Field(default=1.0, ge=0.0, le=1.0, description="Confidence in this action")
     ambiguity: list[str] = Field(
         default_factory=list, description="Ambiguity flags for this action"
     )
     risk_level: RiskLevel = RiskLevel.LOW
-    validation: ActionValidationDetail = Field(
-        default_factory=ActionValidationDetail
-    )
+    validation: ActionValidationDetail = Field(default_factory=ActionValidationDetail)
 
 
 class ApprovalRequirement(BaseModel):
@@ -121,9 +111,7 @@ class EditPlan(BaseModel):
     task_family: str = "edit_plan"
 
     # Drawing references
-    source_drawing: str | None = Field(
-        default=None, description="Path or ID of the source drawing"
-    )
+    source_drawing: str | None = Field(default=None, description="Path or ID of the source drawing")
     target_drawing: str | None = Field(
         default=None, description="Path or ID of the target drawing (if different)"
     )
@@ -142,9 +130,7 @@ class EditPlan(BaseModel):
     )
 
     # Aggregate assessment
-    confidence: float = Field(
-        default=1.0, ge=0.0, le=1.0, description="Overall plan confidence"
-    )
+    confidence: float = Field(default=1.0, ge=0.0, le=1.0, description="Overall plan confidence")
     ambiguity_flags: list[str] = Field(
         default_factory=list, description="Plan-level ambiguity flags"
     )
@@ -158,9 +144,7 @@ class EditPlan(BaseModel):
     evidence: list[EvidenceRef] = Field(
         default_factory=list, description="Plan-level evidence references"
     )
-    rationale: str = Field(
-        default="", description="Top-level explanation of the plan"
-    )
+    rationale: str = Field(default="", description="Top-level explanation of the plan")
 
     # Approval
     approval_requirements: list[ApprovalRequirement] = Field(

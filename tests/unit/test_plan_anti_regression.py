@@ -230,8 +230,7 @@ class TestRepeatedConditionApprovalRequired:
         plan = builder.build(req)
         assert plan.validation_status == PlanValidationStatus.BLOCKED
         assert any(
-            req.category == "repeated_condition_approval"
-            for req in plan.approval_requirements
+            req.category == "repeated_condition_approval" for req in plan.approval_requirements
         )
 
     def test_approved_candidates_proceed(self, builder, drawing_context):
