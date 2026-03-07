@@ -6,7 +6,6 @@ import pytest
 from pydantic import ValidationError
 
 from cad_dxf_agent.models.cad_schema import Point2D
-from cad_dxf_agent.models.response_schema import EvidenceRef
 from cad_dxf_agent.models.construction_ops_schema import (
     BatchConditionResult,
     Bay,
@@ -21,7 +20,7 @@ from cad_dxf_agent.models.construction_ops_schema import (
     RedlineReportResult,
     RevisionCloudInfo,
 )
-
+from cad_dxf_agent.models.response_schema import EvidenceRef
 
 # ---------------------------------------------------------------------------
 # GridDirection enum

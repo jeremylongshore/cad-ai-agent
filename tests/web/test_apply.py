@@ -100,3 +100,4 @@ class TestApply:
         )
         # 401 (missing token) or 404 (session not found after auth bypass)
         assert resp.status_code in (401, 404)
+>>>>>>> 3ba2349 (feat(eval): add capability scorecard evaluation harness)
