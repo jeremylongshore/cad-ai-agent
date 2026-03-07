@@ -114,6 +114,87 @@ Future epics (EPIC-CAD-07/08) will use approved candidates for batch edit operat
 | `llm/response_builder.py` | Build PlatformResponse for repeated_condition |
 | `web/backend/main.py` | Wire endpoint (or extend /api/v2/prompt) |
 
+## Example Payloads
+
+### Request (POST /api/v2/prompt)
+
+```json
+{
+  "session_id": "abc-123",
+  "prompt": "find all repeated instances",
+  "selected_regions": [
+    {
+      "handles": ["A1", "A2"]
+    }
+  ]
+}
+```
+
+### Response (200 OK)
+
+```json
+{
+  "task_family": "repeated_condition",
+  "response_type": "answer_only",
+  "message": "Found 3 repeated conditions matching blocks: COLUMN_MARK with text like \"A\".",
+  "data": {
+    "exemplar_handles": ["A1", "A2"],
+    "exemplar_centroid": {"x": 0.0, "y": 0.0},
+    "candidates": [
+      {
+        "entity_handles": ["B5", "B6"],
+        "confidence": 0.92,
+        "signals": [
+          {"signal_type": "block_name", "score": 1.0, "weight": 0.30, "detail": "matching blocks: COLUMN_MARK", "trust_level": 1.0},
+          {"signal_type": "text_content", "score": 0.85, "weight": 0.25, "detail": "1/1 texts matched", "trust_level": 1.0},
+          {"signal_type": "geometry_shape", "score": 1.0, "weight": 0.20, "detail": "type overlap: 2/2", "trust_level": 1.0},
+          {"signal_type": "layer_context", "score": 1.0, "weight": 0.10, "detail": "common layers: NOTES, STRUCTURAL", "trust_level": 1.0},
+          {"signal_type": "spatial_pattern", "score": 1.0, "weight": 0.10, "detail": "count ratio: 2/2", "trust_level": 1.0},
+          {"signal_type": "text_geometry", "score": 0.95, "weight": 0.05, "detail": "height ratio: 0.95 (ex=3.0, cl=3.0)", "trust_level": 1.0}
+        ],
+        "centroid": {"x": 30.0, "y": 0.0},
+        "evidence": [
+          {"entity_handle": "B5", "layer": "STRUCTURAL", "entity_type": "INSERT", "location": [30.0, 0.0], "description": "INSERT block=COLUMN_MARK at (30.0, 0.0)"}
+        ],
+        "explanation": "block_name: matching blocks: COLUMN_MARK; text_content: 1/1 texts matched; geometry_shape: type overlap: 2/2",
+        "approval_state": "pending"
+      }
+    ],
+    "total_found": 3,
+    "search_radius": 0.0,
+    "summary": "Found 3 repeated conditions matching blocks: COLUMN_MARK with text like \"A\".",
+    "ambiguity_flags": [],
+    "config": {
+      "min_confidence": 0.5,
+      "max_results": 50,
+      "search_radius_multiplier": 1.5,
+      "block_name_weight": 0.30,
+      "text_content_weight": 0.25,
+      "geometry_shape_weight": 0.20,
+      "layer_context_weight": 0.10,
+      "spatial_pattern_weight": 0.10,
+      "text_geometry_weight": 0.05,
+      "single_entity_min_confidence": 0.70,
+      "block_only_cap": 0.80,
+      "ambiguity_threshold": 0.05
+    }
+  },
+  "confidence": 0.92,
+  "ambiguity_flags": [],
+  "audit": {
+    "trace_id": "d4f3...",
+    "timestamp": "2026-03-06T12:00:00Z",
+    "router_source": "heuristic",
+    "router_time_ms": 0.5,
+    "context_build_time_ms": 12.3,
+    "total_request_time_ms": 13.1
+  }
+}
+```
+
+Only the first candidate is shown; additional candidates follow the same structure.
+The `evidence` array is truncated to 3 entries per candidate in the response.
+
 ## Known Limitations
 
 1. No spatial index (quadtree/R-tree) -- O(n) scan acceptable for < 5000 entities
