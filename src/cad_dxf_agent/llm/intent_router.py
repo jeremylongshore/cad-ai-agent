@@ -97,6 +97,8 @@ _RULES: list[HeuristicRule] = [
             r"\bcount\s+all\b",
             r"\bbill\s+of\b",
             r"\bmaterial\s+list\b",
+            r"\bcount\b.*\b(door|window|room|wall|column|beam|fixture)s?\b",
+            r"\bhow\s+many\b.*\b(door|window|room|wall|column|beam|fixture)s?\b",
         ),
     ),
     # Priority 5: Repeated condition
@@ -141,9 +143,11 @@ _RULES: list[HeuristicRule] = [
             r"\brevision\s+summary\b",
             r"\bexplain\s+changes\b",
             r"\bwhat\s+was\s+updated\b",
+            r"\bwhat.+this\s+(drawing|plan|blueprint)\b",
+            r"\bbreak\s*down\b",
         ),
     ),
-    # Priority 8: Q&A
+    # Priority 8: Q&A (broad — catches natural questions)
     HeuristicRule(
         family=TaskFamily.QNA,
         patterns=(
@@ -155,6 +159,23 @@ _RULES: list[HeuristicRule] = [
             r"\blist\s+all\b",
             r"\btell\s+me\b",
             r"\bwhat\s+are\b",
+            r"\bwhat\s+text\b",
+            r"\bwhat\s+do\s+you\s+see\b",
+            r"\bwhat.+in\s+this\b",
+            r"\bare\s+there\b",
+            r"\bis\s+there\b",
+            r"\bdo\s+you\s+see\b",
+            r"\bcan\s+you\s+see\b",
+            r"\bhow\s+big\b",
+            r"\bwhat.+drawing\b",
+            r"\bwhat.+plan\b",
+            r"\bwhat.+blueprint\b",
+            r"\btell\s+me\s+about\b",
+            r"\bwhat\s+does\b",
+            r"\bfind\b",
+            r"\bsearch\b",
+            r"\blook\s+for\b",
+            r"\bidentify\b",
         ),
     ),
 ]
