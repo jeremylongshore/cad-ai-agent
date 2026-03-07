@@ -13,6 +13,7 @@ Validates EditPlan actions against:
 from __future__ import annotations
 
 import logging
+import math
 
 from ..models.cad_schema import DrawingContext, EntityType
 from ..models.config_schema import RuleConfig
@@ -179,15 +180,16 @@ class PlanValidator:
         elif dx == 0 and dy == 0:
             warnings.append("Zero displacement — entity won't move")
 
-        if self._rules.max_move_distance is not None:
-            import math
-
-            if isinstance(dx, (int, float)) and isinstance(dy, (int, float)):
-                dist = math.sqrt(dx**2 + dy**2)
-                if dist > self._rules.max_move_distance:
-                    warnings.append(
-                        f"Move distance {dist:.1f} exceeds max {self._rules.max_move_distance}"
-                    )
+        if (
+            self._rules.max_move_distance is not None
+            and isinstance(dx, (int, float))
+            and isinstance(dy, (int, float))
+        ):
+            dist = math.sqrt(dx**2 + dy**2)
+            if dist > self._rules.max_move_distance:
+                warnings.append(
+                    f"Move distance {dist:.1f} exceeds max {self._rules.max_move_distance}"
+                )
 
     def _validate_edit_text_params(self, action: EditAction, blockers: list[str]) -> None:
         """Validate edit_text params."""

@@ -48,6 +48,7 @@ export default function PreviewPanel({
   editApplyResult: structuredApplyResult,
   onPreviewPlan,
   onApprovePlan,
+  onApproveAndApplyPlan,
   onApplyPlan,
 }) {
   const [activeTab, setActiveTab] = useState('original');
@@ -646,7 +647,7 @@ export default function PreviewPanel({
             <div className="flex gap-2" style={{ marginTop: 'var(--space-2)' }}>
               <button
                 className="btn btn--primary btn--full"
-                onClick={() => { onApprovePlan?.(true); setTimeout(() => onApplyPlan?.(), 100); }}
+                onClick={() => onApproveAndApplyPlan?.()}
                 disabled={loading}
               >
                 {loading ? <span className="spinner" aria-hidden="true" /> : 'Approve & Apply'}

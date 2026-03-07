@@ -502,6 +502,39 @@ export function useSession() {
     }
   }, [sessionId, currentPlanId]);
 
+  const approveAndApplyPlan = useCallback(async (notes = '') => {
+    if (!sessionId || !currentPlanId) return;
+    setLoading(true);
+    setError(null);
+    try {
+      await v2Approve(sessionId, currentPlanId, true, notes);
+      setEditApproval({ approved: true, plan_id: currentPlanId });
+      setMessages((prev) => [...prev, msg('system', 'Plan approved.')]);
+
+      const data = await v2Apply(sessionId);
+      setEditApplyResult(data);
+      const status = data.data?.status || 'unknown';
+      const successCount = data.data?.success_count || 0;
+      const failCount = data.data?.failure_count || 0;
+      setMessages((prev) => [...prev, msg('system', `Apply ${status}: ${successCount} succeeded, ${failCount} failed`)]);
+
+      const [renderRes, dxfRes] = await Promise.allSettled([
+        getRenderBlob(sessionId, 'edited'),
+        getDxfBlob(sessionId, 'edited'),
+      ]);
+      if (renderRes.status === 'fulfilled') {
+        setPreviewUrls((prev) => ({ ...prev, edited: URL.createObjectURL(renderRes.value) }));
+      }
+      if (dxfRes.status === 'fulfilled') {
+        setDxfUrls((prev) => ({ ...prev, edited: URL.createObjectURL(dxfRes.value) }));
+      }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [sessionId, currentPlanId]);
+
   const applyPlan = useCallback(async () => {
     if (!sessionId) return;
     setLoading(true);
@@ -606,6 +639,7 @@ export function useSession() {
     currentPlanId,
     previewPlan,
     approvePlan,
+    approveAndApplyPlan,
     applyPlan,
     reset,
   };
