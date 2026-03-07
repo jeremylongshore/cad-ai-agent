@@ -237,9 +237,15 @@ async def upload(
     session = session_mgr.create(user_id=user["uid"])
     session_dir = Path("/tmp/cad-sessions") / session.session_id
 
-    # Save uploaded file
+    # Save uploaded file — enforce size limit (ARCH-REVIEW-CAD-01 P0)
+    MAX_UPLOAD_SIZE = 25 * 1024 * 1024  # 25 MB
     upload_path = session_dir / f"upload{ext}"
     content = await file.read()
+    if len(content) > MAX_UPLOAD_SIZE:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File too large ({len(content) / 1024 / 1024:.1f} MB). Maximum is 25 MB.",
+        )
     upload_path.write_bytes(content)
 
     # Convert if needed

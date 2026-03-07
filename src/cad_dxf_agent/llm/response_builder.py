@@ -8,8 +8,10 @@ from __future__ import annotations
 
 from typing import Any
 
+from cad_dxf_agent.models.plan_schema import EditPlan
 from cad_dxf_agent.models.response_schema import (
     AuditMetadata,
+    EvidenceRef,
     PlatformResponse,
     ResponseType,
     RiskLevel,
@@ -139,6 +141,58 @@ class ResponseBuilder:
             data=data,
             ambiguity_flags=ambiguity_flags or [],
             risk_level=RiskLevel.NONE,
+            audit=audit or AuditMetadata(),
+        )
+
+    @staticmethod
+    def structured_plan(
+        *,
+        plan: EditPlan,
+        message: str | None = None,
+        audit: AuditMetadata | None = None,
+    ) -> PlatformResponse:
+        """Build a plan_only response from a structured EditPlan."""
+        operations = [
+            {
+                "action_id": a.action_id,
+                "action_type": a.action_type.value,
+                "target_handle": a.target_handle,
+                "target_layer": a.target_layer,
+                "params": a.params,
+                "confidence": a.confidence,
+                "risk_level": a.risk_level.value,
+                "rationale": a.rationale,
+                "validation_status": a.validation.status.value,
+            }
+            for a in plan.actions
+        ]
+        plan_message = message or plan.rationale or "Structured edit plan generated."
+        return PlatformResponse(
+            task_family=TaskFamily.EDIT_PLAN,
+            response_type=ResponseType.PLAN_ONLY,
+            message=plan_message,
+            operations=operations,
+            risk_level=plan.risk_level,
+            evidence=plan.evidence,
+            confidence=plan.confidence,
+            ambiguity_flags=plan.ambiguity_flags,
+            validation={
+                "status": plan.validation_status.value,
+                "blocked_reasons": plan.blocked_reasons,
+                "approval_requirements": [
+                    {
+                        "description": r.description,
+                        "category": r.category,
+                        "satisfied": r.satisfied,
+                    }
+                    for r in plan.approval_requirements
+                ],
+            },
+            data={
+                "plan_id": plan.plan_id,
+                "schema_version": plan.schema_version,
+                "action_count": plan.action_count,
+            },
             audit=audit or AuditMetadata(),
         )
 

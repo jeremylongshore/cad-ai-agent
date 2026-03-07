@@ -6,6 +6,7 @@ import math
 
 from ...models.cad_schema import EntityType, Point2D
 from ...models.comparison_schema import GeometrySnapshot, MatchExplanation, MatchMethod
+from ..text_utils import levenshtein_similarity as _levenshtein_similarity
 from .canonical import GeometrySignature, QuantizationConfig, compute_signature
 
 # --- Weight constants (alignment.py pattern) ---
@@ -340,36 +341,5 @@ def _proximity_score(a: Point2D, b: Point2D, tolerance: float) -> float:
     return max(0.0, 1.0 - d / tolerance)
 
 
-def _levenshtein_similarity(s1: str, s2: str) -> float:
-    """Levenshtein similarity ratio (0-1, where 1 = identical)."""
-    if s1 == s2:
-        return 1.0
-    if not s1 or not s2:
-        return 0.0
 
-    max_len = max(len(s1), len(s2))
-    distance = _levenshtein_distance(s1, s2)
-    return 1.0 - distance / max_len
-
-
-def _levenshtein_distance(s1: str, s2: str) -> int:
-    """Compute Levenshtein edit distance between two strings."""
-    if len(s1) < len(s2):
-        return _levenshtein_distance(s2, s1)
-
-    prev_row = list(range(len(s2) + 1))
-    for i, c1 in enumerate(s1):
-        curr_row = [i + 1]
-        for j, c2 in enumerate(s2):
-            # Insert, delete, or substitute
-            cost = 0 if c1 == c2 else 1
-            curr_row.append(
-                min(
-                    curr_row[j] + 1,  # insert
-                    prev_row[j + 1] + 1,  # delete
-                    prev_row[j] + cost,  # substitute
-                )
-            )
-        prev_row = curr_row
-
-    return prev_row[-1]
+# _levenshtein_similarity and _levenshtein_distance moved to core/text_utils.py

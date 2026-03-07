@@ -90,11 +90,12 @@ class RegionContextBuilder:
         ambiguity_flags: list[str],
         bounds: BoundingBox | None,
     ) -> RegionContext:
-        # Cap entities
+        # Cap entities — reduce confidence when truncating (ARCH-REVIEW-CAD-01 P1)
         truncated = len(entities) > self._max_entities
         if truncated:
             entities = entities[: self._max_entities]
             ambiguity_flags.append("context_truncated")
+            confidence = max(0.0, confidence - 0.2)
 
         # Categorize by type
         text_entities = [e for e in entities if e.entity_type in _TEXT_TYPES]
