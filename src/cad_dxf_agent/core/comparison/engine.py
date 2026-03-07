@@ -8,11 +8,11 @@ from pathlib import Path
 
 import ezdxf
 
-from ...models.comparison_schema import ComparisonConfig, ComparisonResult
+from ...models.comparison_schema import ComparisonConfig, ComparisonResult, MatchSummary
 from ...otel import get_tracer
 from .alignment import align_drawings, apply_alignment
 from .canonical import assign_stable_ids, sort_changes, sort_snapshots
-from .changelog import ChangeLog, generate_changelog
+from .changelog import ChangeLog, generate_changelog, generate_summary
 from .classifier import classify_changes
 from .diff_overlay import write_diff_overlay
 from .geometry import detect_titleblock_region, extract_snapshots
@@ -146,6 +146,19 @@ class ComparisonEngine:
             )
             classified = classify_changes(match_result, config)
 
+            # Build match summary
+            method_dist: dict[str, int] = {}
+            for p in match_result.pairs:
+                key = p.method.value
+                method_dist[key] = method_dist.get(key, 0) + 1
+
+            match_summary = MatchSummary(
+                total_pairs=len(match_result.pairs),
+                avg_confidence=avg_conf,
+                ambiguous_count=ambiguous_count,
+                method_distribution=method_dist,
+            )
+
             # Build final result: sort if canonical, attach alignment
             final_changes = classified.changes
             if config.use_canonical:
@@ -156,6 +169,7 @@ class ComparisonEngine:
                 summary=classified.summary,
                 config=classified.config,
                 alignment_result=alignment_result,
+                match_summary=match_summary,
                 warnings=profile_warnings,
             )
 
@@ -219,3 +233,26 @@ class ComparisonEngine:
                 master_path=Path(master_path),
                 revision_path=Path(revision_path),
             )
+
+    @staticmethod
+    def build_compare_response(
+        result: ComparisonResult,
+        outputs: ComparisonOutputs,
+    ) -> dict:
+        """Build a typed data dict suitable for PlatformResponse.data.
+
+        Keys: summary, total_changes, match_summary, diff_summary,
+              changelog_entry_count, render_available.
+        """
+        diff_summary = generate_summary(result)
+        data: dict = {
+            "summary": result.summary,
+            "total_changes": result.total_changes,
+            "match_summary": (result.match_summary.model_dump() if result.match_summary else None),
+            "diff_summary": diff_summary.model_dump(),
+            "changelog_entry_count": len(outputs.changelog.entries),
+            "render_available": outputs.diff_overlay_path is not None,
+        }
+        if result.warnings:
+            data["warnings"] = result.warnings
+        return data

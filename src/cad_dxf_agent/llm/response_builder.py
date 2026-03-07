@@ -83,6 +83,7 @@ class ResponseBuilder:
         *,
         message: str,
         operations: list[dict[str, Any]] | None = None,
+        data: dict[str, Any] | None = None,
         audit: AuditMetadata | None = None,
     ) -> PlatformResponse:
         """Build a comparison_result response."""
@@ -91,6 +92,7 @@ class ResponseBuilder:
             response_type=ResponseType.COMPARISON_RESULT,
             message=message,
             operations=operations or [],
+            data=data or {},
             audit=audit or AuditMetadata(),
         )
 

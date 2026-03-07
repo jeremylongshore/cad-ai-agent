@@ -15,6 +15,7 @@ from ...models.comparison_schema import (
     AlignmentResult,
     ApplyResult,
     ApprovalSet,
+    ComparePackage,
     ComparisonResult,
     RevisionOp,
     RunBundle,
@@ -137,4 +138,58 @@ def export_bundle(
         alignment_result_path=alignment_result_path_str,
         bundle_dir=str(output_dir),
         metadata=metadata,
+    )
+
+
+def export_compare_package(
+    master_path: str | Path,
+    revision_path: str | Path,
+    comparison_result: ComparisonResult,
+    output_dir: str | Path,
+) -> ComparePackage:
+    """Export a compare-only package (no apply step required).
+
+    Writes:
+      - changelog.json / .txt
+      - diff_overlay.dxf
+      - compare_metadata.json
+
+    Returns:
+        ComparePackage manifest.
+    """
+    output_dir = Path(output_dir)
+    outputs = _engine.generate_outputs(master_path, revision_path, comparison_result, output_dir)
+    now = datetime.now(UTC).isoformat()
+
+    try:
+        pipeline_version = importlib.metadata.version("cad-dxf-agent")
+    except importlib.metadata.PackageNotFoundError:
+        pipeline_version = "unknown"
+
+    metadata = {
+        "created_at": now,
+        "master_path": str(master_path),
+        "revision_path": str(revision_path),
+        "total_changes": comparison_result.total_changes,
+        "summary": comparison_result.summary,
+        "master_hash": _file_hash(master_path),
+        "revision_hash": _file_hash(revision_path),
+        "ezdxf_version": ezdxf.version,
+        "pipeline_version": pipeline_version,
+    }
+    metadata_path = output_dir / "compare_metadata.json"
+    metadata_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
+
+    changelog_json_path = output_dir / "changelog.json"
+    changelog_text_path = output_dir / "changelog.txt"
+
+    return ComparePackage(
+        master_path=str(master_path),
+        revision_path=str(revision_path),
+        overlay_path=str(outputs.diff_overlay_path) if outputs.diff_overlay_path else None,
+        changelog_json_path=str(changelog_json_path),
+        changelog_text_path=str(changelog_text_path),
+        metadata_path=str(metadata_path),
+        created_at=now,
+        total_changes=comparison_result.total_changes,
     )

@@ -173,6 +173,37 @@ async def get_user(request: Request) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Shared helpers
+# ---------------------------------------------------------------------------
+
+
+def _build_typed_compare_response(
+    result: "ComparisonResult",  # noqa: F821 — forward ref, imported at call site
+    outputs: "ComparisonOutputs",  # noqa: F821
+    *,
+    audit: "AuditMetadata | None" = None,  # noqa: F821
+) -> dict:
+    """Build a PlatformResponse dict for a comparison result.
+
+    Shared between /api/compare and /api/v2/prompt compare handler.
+    """
+    from cad_dxf_agent.core.comparison.engine import ComparisonEngine
+    from cad_dxf_agent.llm.response_builder import ResponseBuilder
+
+    compare_data = ComparisonEngine.build_compare_response(result, outputs)
+    compare_data["changelog"] = outputs.changelog.to_json()
+
+    total = result.total_changes
+    message = f"{total} change{'s' if total != 1 else ''} detected"
+    resp = ResponseBuilder.comparison_result(
+        message=message,
+        data=compare_data,
+        audit=audit,
+    )
+    return resp.model_dump()
+
+
+# ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
 
@@ -438,7 +469,23 @@ async def v2_prompt(body: PromptRequest, user: dict = Depends(get_user)):
                     family=TaskFamily.COMPARE,
                     audit=audit,
                 ).model_dump()
-            # Full compare pipeline would go here; for now return clarification
+
+            # Use cached comparison result if available, else run pipeline
+            if session.comparison_result is not None and session.comparison_changelog is not None:
+                from cad_dxf_agent.core.comparison.engine import ComparisonOutputs
+
+                outputs = ComparisonOutputs(
+                    result=session.comparison_result,
+                    changelog=session.comparison_changelog,
+                    diff_overlay_path=session.diff_overlay_path,
+                    master_path=session.original_path or Path(),
+                    revision_path=session.revision_path,
+                )
+                audit.total_request_time_ms = (_time.monotonic() - total_start) * 1000
+                return _build_typed_compare_response(
+                    session.comparison_result, outputs, audit=audit
+                )
+
             audit.total_request_time_ms = (_time.monotonic() - total_start) * 1000
             return ResponseBuilder.needs_clarification(
                 message="Use /api/compare for full comparison workflow.",
@@ -712,15 +759,7 @@ async def compare(
 
             s.set_attribute("cad.compare.total_changes", result.total_changes)
 
-            response: dict = {
-                "summary": result.summary,
-                "total_changes": result.total_changes,
-                "changelog": outputs.changelog.to_json(),
-                "render_available": session.diff_overlay_render is not None,
-            }
-            if result.warnings:
-                response["warnings"] = result.warnings
-            return response
+            return _build_typed_compare_response(result, outputs)
 
         except FileNotFoundError as e:
             raise HTTPException(status_code=400, detail=str(e)) from None

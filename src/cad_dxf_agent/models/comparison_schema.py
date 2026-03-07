@@ -350,6 +350,26 @@ class MatchResult(BaseModel):
     )
 
 
+class MatchSummary(BaseModel):
+    """Aggregate statistics from the entity matching step."""
+
+    total_pairs: int = Field(default=0, description="Number of matched pairs")
+    avg_confidence: float = Field(default=0.0, description="Mean confidence across all pairs")
+    ambiguous_count: int = Field(default=0, description="Pairs with ambiguous=True")
+    method_distribution: dict[str, int] = Field(
+        default_factory=dict,
+        description="Count of pairs per MatchMethod value",
+    )
+
+
+class DiffSummaryData(BaseModel):
+    """Pydantic mirror of DiffSummary for inclusion in API responses."""
+
+    headline: str = Field(default="No changes detected")
+    by_layer: dict[str, dict[str, int]] = Field(default_factory=dict)
+    warnings: list[str] = Field(default_factory=list)
+
+
 class ComparisonResult(BaseModel):
     """Full result of comparing two DXF files."""
 
@@ -366,6 +386,9 @@ class ComparisonResult(BaseModel):
     config: ComparisonConfig = Field(default_factory=ComparisonConfig)
     alignment_result: AlignmentResult | None = Field(
         default=None, description="Alignment result, if alignment was enabled"
+    )
+    match_summary: MatchSummary | None = Field(
+        default=None, description="Match statistics (populated by ComparisonEngine)"
     )
     warnings: list[str] = Field(
         default_factory=list,
@@ -546,3 +569,16 @@ class RunBundle(BaseModel):
     alignment_result_path: str | None = None
     bundle_dir: str = ""
     metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class ComparePackage(BaseModel):
+    """Manifest of a compare-only export (no apply step required)."""
+
+    master_path: str
+    revision_path: str
+    overlay_path: str | None = None
+    changelog_json_path: str | None = None
+    changelog_text_path: str | None = None
+    metadata_path: str | None = None
+    created_at: str = Field(description="ISO-8601 timestamp")
+    total_changes: int = Field(default=0)

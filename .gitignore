@@ -69,3 +69,7 @@ test-results/
 # bv (beads viewer) local config and caches
 .bv/
 .firebase/
+
+# Dolt database files (added by bd init)
+.dolt/
+*.db
