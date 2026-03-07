@@ -1,20 +1,13 @@
-import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './hooks/useAuth';
-import { auth, signInAnonymously } from './lib/firebase';
 import Workspace from './components/Workspace';
+import LoginPage from './components/LoginPage';
 import Privacy from './components/Privacy';
 import Terms from './components/Terms';
 import NotFound from './components/NotFound';
 
-function AutoAuth({ user, loading, children, onSignOut }) {
-  useEffect(() => {
-    if (!loading && !user) {
-      signInAnonymously(auth).catch(() => {});
-    }
-  }, [user, loading]);
-
-  if (loading || !user) {
+function AuthGate({ user, loading, authState }) {
+  if (loading) {
     return (
       <div className="flex items-center justify-center" style={{ height: '100vh' }}>
         <div className="spinner spinner--lg" role="status">
@@ -24,7 +17,17 @@ function AutoAuth({ user, loading, children, onSignOut }) {
     );
   }
 
-  return <Workspace user={user} onSignOut={onSignOut} />;
+  if (!user) {
+    return (
+      <LoginPage
+        onSignInWithGoogle={authState.signInWithGoogle}
+        error={authState.error}
+        clearError={authState.clearError}
+      />
+    );
+  }
+
+  return <Workspace user={user} onSignOut={authState.signOut} />;
 }
 
 export default function App() {
@@ -36,7 +39,7 @@ export default function App() {
       <Routes>
         <Route
           path="/"
-          element={<AutoAuth user={user} loading={loading} onSignOut={authState.signOut} />}
+          element={<AuthGate user={user} loading={loading} authState={authState} />}
         />
         <Route path="/app" element={<Navigate to="/" replace />} />
         <Route path="/login" element={<Navigate to="/" replace />} />
