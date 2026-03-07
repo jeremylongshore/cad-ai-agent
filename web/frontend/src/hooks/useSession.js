@@ -3,6 +3,7 @@ import {
   uploadFile, planEdit, v2Prompt, applyChanges, downloadFile, getRenderBlob, getDxfBlob,
   clearHistory, compareFiles, revisionUpload, revisionAlign, revisionDiff,
   revisionApprove, revisionApply, revisionDownloadUrl,
+  v2Preview, v2Approve, v2Apply,
 } from '../lib/api';
 
 const NO_CHANGES_MESSAGE = "I couldn't plan any changes. Try being more specific about which element to edit.";
@@ -28,6 +29,12 @@ export function useSession() {
   const [loading, setLoading] = useState(false);
   const [loadingStartTime, setLoadingStartTime] = useState(null);
   const [error, setError] = useState(null);
+
+  // Structured edit plan preview/apply state (EPIC-CAD-08)
+  const [editPreview, setEditPreview] = useState(null);
+  const [editApproval, setEditApproval] = useState(null);
+  const [editApplyResult, setEditApplyResult] = useState(null);
+  const [currentPlanId, setCurrentPlanId] = useState(null);
 
   // Revision pipeline state
   const [revisionFile, setRevisionFile] = useState(null);
@@ -465,6 +472,66 @@ export function useSession() {
     a.remove();
   }, [sessionId]);
 
+  // --- Structured edit plan preview/approve/apply (EPIC-CAD-08) ---
+
+  const previewPlan = useCallback(async () => {
+    if (!sessionId) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await v2Preview(sessionId);
+      setEditPreview(data);
+      if (data.data?.plan_id) setCurrentPlanId(data.data.plan_id);
+      setMessages((prev) => [...prev, msg('system', `Preview ready: ${data.data?.total_actions || 0} action(s)`)]);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [sessionId]);
+
+  const approvePlan = useCallback(async (approved, notes = '') => {
+    if (!sessionId || !currentPlanId) return;
+    setError(null);
+    try {
+      const data = await v2Approve(sessionId, currentPlanId, approved, notes);
+      setEditApproval(data);
+      setMessages((prev) => [...prev, msg('system', approved ? 'Plan approved.' : 'Plan rejected.')]);
+    } catch (err) {
+      setError(err.message);
+    }
+  }, [sessionId, currentPlanId]);
+
+  const applyPlan = useCallback(async () => {
+    if (!sessionId) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await v2Apply(sessionId);
+      setEditApplyResult(data);
+      const status = data.data?.status || 'unknown';
+      const successCount = data.data?.success_count || 0;
+      const failCount = data.data?.failure_count || 0;
+      setMessages((prev) => [...prev, msg('system', `Apply ${status}: ${successCount} succeeded, ${failCount} failed`)]);
+
+      // Fetch edited render and DXF
+      const [renderRes, dxfRes] = await Promise.allSettled([
+        getRenderBlob(sessionId, 'edited'),
+        getDxfBlob(sessionId, 'edited'),
+      ]);
+      if (renderRes.status === 'fulfilled') {
+        setPreviewUrls((prev) => ({ ...prev, edited: URL.createObjectURL(renderRes.value) }));
+      }
+      if (dxfRes.status === 'fulfilled') {
+        setDxfUrls((prev) => ({ ...prev, edited: URL.createObjectURL(dxfRes.value) }));
+      }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [sessionId]);
+
   const reset = useCallback(() => {
     // Revoke blob URLs to free memory
     Object.values(previewUrls).forEach((url) => {
@@ -491,6 +558,10 @@ export function useSession() {
     setAlignmentResult(null);
     setDiffSummary(null);
     setWizardStep(1);
+    setEditPreview(null);
+    setEditApproval(null);
+    setEditApplyResult(null);
+    setCurrentPlanId(null);
     lastPromptRef.current = null;
   }, [previewUrls, dxfUrls]);
 
@@ -529,6 +600,13 @@ export function useSession() {
     handleRevisionApply,
     handleBundleDownload,
     handleRealign,
+    editPreview,
+    editApproval,
+    editApplyResult,
+    currentPlanId,
+    previewPlan,
+    approvePlan,
+    applyPlan,
     reset,
   };
 }
