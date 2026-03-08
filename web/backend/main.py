@@ -783,7 +783,7 @@ async def upload(
         session.edit_history = EditHistory(
             session.working_path, max_snapshots=cad_settings.max_undo_snapshots
         )
-    except Exception as hist_err:
+    except (ImportError, OSError) as hist_err:
         logger.warning("Edit history init failed (non-fatal): %s", hist_err)
 
     # Load and analyze
@@ -1688,8 +1688,7 @@ async def undo(body: UndoRedoRequest, user: dict = Depends(get_user)):
     doc = history.undo()
     if doc is not None:
         # Save the restored document as the current edited file
-        session_dir = Path("/tmp/cad-sessions") / session.session_id
-        restored_path = session_dir / "edited.dxf"
+        restored_path = session.session_dir / "edited.dxf"
         doc.saveas(str(restored_path))
         session.edited_path = restored_path
 
@@ -1719,8 +1718,7 @@ async def redo(body: UndoRedoRequest, user: dict = Depends(get_user)):
 
     doc = history.redo()
     if doc is not None:
-        session_dir = Path("/tmp/cad-sessions") / session.session_id
-        restored_path = session_dir / "edited.dxf"
+        restored_path = session.session_dir / "edited.dxf"
         doc.saveas(str(restored_path))
         session.edited_path = restored_path
 
