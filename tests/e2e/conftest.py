@@ -4,6 +4,9 @@ Sourced DXF tests skip gracefully when files are not downloaded.
 Factory tests always run (even in CI without downloads).
 
 Download fixtures: bash scripts/download_e2e_fixtures.sh
+
+Skip visibility: When sourced tests skip, a terminal summary warns about
+the gap. This prevents silent attrition where green CI hides untested code.
 """
 
 from __future__ import annotations
@@ -28,6 +31,24 @@ def pytest_collection_modifyitems(config, items):
     for item in items:
         if "tests/e2e" in str(item.fspath) or "tests\\e2e" in str(item.fspath):
             item.add_marker(pytest.mark.e2e)
+
+
+def pytest_terminal_summary(terminalreporter, config):
+    """Warn loudly when E2E sourced-DXF tests were skipped."""
+    skipped = terminalreporter.stats.get("skipped", [])
+    sourced_skips = [
+        s for s in skipped if hasattr(s, "longrepr") and "e2e_fixtures" in str(s.longrepr)
+    ]
+    if sourced_skips:
+        terminalreporter.section("E2E sourced fixture warning")
+        terminalreporter.write_line(
+            f"  {len(sourced_skips)} E2E test(s) skipped — sourced DXF fixtures not downloaded.",
+            yellow=True,
+        )
+        terminalreporter.write_line(
+            "  Run: bash scripts/download_e2e_fixtures.sh",
+            yellow=True,
+        )
 
 
 # ── Sourced DXF accessor ────────────────────────────────────────────

@@ -35,7 +35,7 @@ jobs:
       - name: Install dependencies
         run: pip install -e ".[dev]"
       - name: Run pip-audit
-        run: pip-audit
+        run: pip-audit --local
 
   # dependency-review requires GitHub Advanced Security (paid for private repos).
   # Re-enable if repo goes public or plan is upgraded.

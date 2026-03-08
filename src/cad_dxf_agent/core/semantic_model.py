@@ -1,4 +1,8 @@
-"""Semantic model — builds context summaries for the LLM planner."""
+"""Semantic model — builds context summaries for the LLM planner.
+
+Includes family-aware context building (EPIC-CAD-13 Area 1) that enriches
+the planner context with document family hint and shared primitives.
+"""
 
 from __future__ import annotations
 
@@ -145,3 +149,59 @@ def build_compact_context(context: DrawingContext) -> str:
     lines.append("Do NOT guess entity handles — always search first.")
 
     return "\n".join(lines)
+
+
+def build_enriched_context(context: DrawingContext) -> dict:
+    """Build family-aware enriched context for the objective pipeline.
+
+    Extends the standard planner context with:
+    - document_family: detected DocumentFamilyHint with confidence
+    - primitives: shared primitive summary (symbols, labels, layer classification)
+
+    This is used by the stage pipeline executor, not the legacy planner.
+    """
+    from ..core.family_detector import detect_document_family
+    from ..core.primitive_extractors import extract_primitives
+
+    with tracer.start_as_current_span("cad.build_enriched_context") as span:
+        # Base planner context
+        base = build_planner_context(context)
+
+        # Document family detection
+        family_result = detect_document_family(context)
+        base["document_family"] = {
+            "family": family_result.family.value,
+            "confidence": family_result.confidence,
+            "signal_count": family_result.signal_count,
+            "top_signals": family_result.top_signals,
+            "runner_up": (family_result.runner_up.value if family_result.runner_up else None),
+        }
+
+        # Shared primitives
+        primitives = extract_primitives(context)
+        base["primitives"] = {
+            "symbols": {
+                "total_inserts": primitives.symbols.total_inserts,
+                "unique_blocks": primitives.symbols.unique_blocks,
+                "top_blocks": dict(list(primitives.symbols.counts_by_block.items())[:10]),
+            },
+            "labels": {
+                "total_labels": primitives.labels.total_labels,
+                "unique_texts": primitives.labels.unique_texts,
+                "sample_texts": primitives.labels.sample_texts[:10],
+            },
+            "layer_classification": {
+                "structural": primitives.layer_classification.structural,
+                "annotation": primitives.layer_classification.annotation,
+                "dimension": primitives.layer_classification.dimension,
+                "title_border": primitives.layer_classification.title_border,
+                "mep": primitives.layer_classification.mep,
+                "other_count": len(primitives.layer_classification.other),
+            },
+            "entity_counts": primitives.entity_counts,
+        }
+
+        span.set_attribute("cad.document_family", family_result.family.value)
+        span.set_attribute("cad.family_confidence", family_result.confidence)
+
+        return base
