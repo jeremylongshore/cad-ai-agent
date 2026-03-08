@@ -553,6 +553,154 @@ ADD_TEXT_TOOL = {
 }
 
 # ---------------------------------------------------------------------------
+# Batch filter schema (shared across batch tools)
+# ---------------------------------------------------------------------------
+
+_BATCH_FILTER_PROPERTIES = {
+    "layer": {
+        "type": "string",
+        "description": "Filter: only entities on this layer",
+    },
+    "entity_type": {
+        "type": "string",
+        "description": (
+            "Filter: only entities of this type "
+            "(LINE, LWPOLYLINE, TEXT, MTEXT, INSERT, CIRCLE, ARC)"
+        ),
+    },
+    "text_contains": {
+        "type": "string",
+        "description": "Filter: only TEXT/MTEXT containing this substring",
+    },
+    "center_x": {
+        "type": "number",
+        "description": "Filter: center X for radius search",
+    },
+    "center_y": {
+        "type": "number",
+        "description": "Filter: center Y for radius search",
+    },
+    "radius": {
+        "type": "number",
+        "description": "Filter: search radius from (center_x, center_y)",
+    },
+}
+
+BATCH_MOVE = {
+    "name": "batch_move",
+    "description": (
+        "Move all entities matching the filter criteria by a displacement "
+        "vector (dx, dy). At least one filter (layer, entity_type, "
+        "text_contains, or radius) is required."
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            **_BATCH_FILTER_PROPERTIES,
+            "dx": {
+                "type": "number",
+                "description": "Displacement in X direction (drawing units)",
+            },
+            "dy": {
+                "type": "number",
+                "description": "Displacement in Y direction (drawing units)",
+            },
+        },
+        "required": ["dx", "dy"],
+    },
+}
+
+BATCH_ROTATE = {
+    "name": "batch_rotate",
+    "description": (
+        "Rotate all entities matching the filter criteria by a given angle. "
+        "At least one filter is required."
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            **_BATCH_FILTER_PROPERTIES,
+            "angle": {
+                "type": "number",
+                "description": "Rotation angle in degrees (counter-clockwise)",
+            },
+            "cx": {
+                "type": "number",
+                "description": "Rotation center X (default: each entity's own center)",
+            },
+            "cy": {
+                "type": "number",
+                "description": "Rotation center Y (default: each entity's own center)",
+            },
+        },
+        "required": ["angle"],
+    },
+}
+
+BATCH_SCALE = {
+    "name": "batch_scale",
+    "description": (
+        "Scale all entities matching the filter criteria by a uniform "
+        "factor. At least one filter is required."
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            **_BATCH_FILTER_PROPERTIES,
+            "factor": {
+                "type": "number",
+                "description": "Scale factor (>1 enlarges, <1 shrinks)",
+            },
+            "cx": {
+                "type": "number",
+                "description": "Scale center X (default: each entity's own center)",
+            },
+            "cy": {
+                "type": "number",
+                "description": "Scale center Y (default: each entity's own center)",
+            },
+        },
+        "required": ["factor"],
+    },
+}
+
+BATCH_DELETE = {
+    "name": "batch_delete",
+    "description": (
+        "Delete all entities matching the filter criteria. "
+        "At least one filter is required. Use with caution."
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": _BATCH_FILTER_PROPERTIES,
+        "required": [],
+    },
+}
+
+BATCH_EDIT_TEXT = {
+    "name": "batch_edit_text",
+    "description": (
+        "Find-and-replace text content across all TEXT/MTEXT entities "
+        "matching the filter criteria."
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            **_BATCH_FILTER_PROPERTIES,
+            "find": {
+                "type": "string",
+                "description": "Text substring to find",
+            },
+            "replace": {
+                "type": "string",
+                "description": "Replacement text",
+            },
+        },
+        "required": ["find", "replace"],
+    },
+}
+
+# ---------------------------------------------------------------------------
 # Query tools (read-only) vs. edit tools (produce operations)
 # ---------------------------------------------------------------------------
 
@@ -574,6 +722,12 @@ EDIT_TOOLS = [
     ADD_CIRCLE,
     ADD_ARC,
     ADD_TEXT_TOOL,
+    # V3 batch operations
+    BATCH_MOVE,
+    BATCH_ROTATE,
+    BATCH_SCALE,
+    BATCH_DELETE,
+    BATCH_EDIT_TEXT,
 ]
 ALL_TOOLS = QUERY_TOOLS + EDIT_TOOLS
 

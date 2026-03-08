@@ -69,6 +69,12 @@ class ToolExecutor:
             "add_circle": self._add_circle,
             "add_arc": self._add_arc,
             "add_text": self._add_text,
+            # V3 batch tools
+            "batch_move": self._batch_move,
+            "batch_rotate": self._batch_rotate,
+            "batch_scale": self._batch_scale,
+            "batch_delete": self._batch_delete,
+            "batch_edit_text": self._batch_edit_text,
         }
 
         handler = dispatch.get(tool_name)
@@ -490,6 +496,231 @@ class ToolExecutor:
             "operation": "add_text",
             "text": args["text"],
             "insert": insert,
+        }
+
+
+    # --- V3 batch tools ---
+
+    def _resolve_batch_filter(
+        self, args: dict[str, Any]
+    ) -> list[EntityRef] | dict[str, Any]:
+        """Apply filter criteria and return matching entities.
+
+        Returns list[EntityRef] on success, or error dict if no filters
+        or no matches.
+        """
+        layer = args.get("layer")
+        entity_type = args.get("entity_type")
+        text_contains = args.get("text_contains")
+        center_x = args.get("center_x")
+        center_y = args.get("center_y")
+        radius = args.get("radius")
+
+        has_filter = any([
+            layer, entity_type, text_contains,
+            (center_x is not None and center_y is not None and radius),
+        ])
+        if not has_filter:
+            return {
+                "error": (
+                    "At least one filter is required (layer, entity_type, "
+                    "text_contains, or center_x/center_y/radius)"
+                )
+            }
+
+        # Spatial filter first if specified
+        if (
+            center_x is not None
+            and center_y is not None
+            and radius is not None
+        ):
+            candidates = self._index.find_in_radius(
+                float(center_x),
+                float(center_y),
+                float(radius),
+                entity_type=entity_type,
+                layer=layer,
+            )
+        else:
+            candidates = self._index.filter(
+                layer=layer, entity_type=entity_type
+            )
+
+        # Text filter
+        if text_contains:
+            text_matches = self._index.search_text(text_contains)
+            match_handles = {e.handle for e in text_matches}
+            candidates = [
+                e for e in candidates if e.handle in match_handles
+            ]
+
+        # Exclude protected layers
+        candidates = [
+            e for e in candidates
+            if e.layer.upper() not in self._protected
+        ]
+
+        if not candidates:
+            return {"error": "No matching entities found"}
+
+        return candidates
+
+    def _batch_move(self, args: dict[str, Any]) -> dict[str, Any]:
+        result = self._resolve_batch_filter(args)
+        if isinstance(result, dict):
+            return result
+
+        dx, dy = args["dx"], args["dy"]
+        for entity in result:
+            op = EditOperation(
+                op_type=OpType.MOVE_ENTITY,
+                target_handle=entity.handle,
+                target_layer=entity.layer,
+                target_space=entity.space,
+                params={"dx": dx, "dy": dy},
+            )
+            self._operations.append(op)
+
+        return {
+            "status": "queued",
+            "operation": "batch_move",
+            "matched": len(result),
+            "dx": dx,
+            "dy": dy,
+        }
+
+    def _batch_rotate(self, args: dict[str, Any]) -> dict[str, Any]:
+        result = self._resolve_batch_filter(args)
+        if isinstance(result, dict):
+            return result
+
+        angle = args["angle"]
+        # If cx/cy given, use shared center; otherwise each entity rotates
+        # around its own insert_point (cx=cy=0 means use entity center)
+        cx = args.get("cx")
+        cy = args.get("cy")
+
+        for entity in result:
+            params: dict[str, Any] = {"angle": angle}
+            if cx is not None and cy is not None:
+                params["cx"] = cx
+                params["cy"] = cy
+            elif entity.insert_point:
+                params["cx"] = entity.insert_point.x
+                params["cy"] = entity.insert_point.y
+            else:
+                params["cx"] = 0
+                params["cy"] = 0
+
+            op = EditOperation(
+                op_type=OpType.ROTATE_ENTITY,
+                target_handle=entity.handle,
+                target_layer=entity.layer,
+                target_space=entity.space,
+                params=params,
+            )
+            self._operations.append(op)
+
+        return {
+            "status": "queued",
+            "operation": "batch_rotate",
+            "matched": len(result),
+            "angle": angle,
+        }
+
+    def _batch_scale(self, args: dict[str, Any]) -> dict[str, Any]:
+        result = self._resolve_batch_filter(args)
+        if isinstance(result, dict):
+            return result
+
+        factor = args["factor"]
+        cx = args.get("cx")
+        cy = args.get("cy")
+
+        for entity in result:
+            params: dict[str, Any] = {"factor": factor}
+            if cx is not None and cy is not None:
+                params["cx"] = cx
+                params["cy"] = cy
+            elif entity.insert_point:
+                params["cx"] = entity.insert_point.x
+                params["cy"] = entity.insert_point.y
+            else:
+                params["cx"] = 0
+                params["cy"] = 0
+
+            op = EditOperation(
+                op_type=OpType.SCALE_ENTITY,
+                target_handle=entity.handle,
+                target_layer=entity.layer,
+                target_space=entity.space,
+                params=params,
+            )
+            self._operations.append(op)
+
+        return {
+            "status": "queued",
+            "operation": "batch_scale",
+            "matched": len(result),
+            "factor": factor,
+        }
+
+    def _batch_delete(self, args: dict[str, Any]) -> dict[str, Any]:
+        result = self._resolve_batch_filter(args)
+        if isinstance(result, dict):
+            return result
+
+        for entity in result:
+            op = EditOperation(
+                op_type=OpType.DELETE_ENTITY,
+                target_handle=entity.handle,
+                target_layer=entity.layer,
+                target_space=entity.space,
+            )
+            self._operations.append(op)
+
+        return {
+            "status": "queued",
+            "operation": "batch_delete",
+            "matched": len(result),
+        }
+
+    def _batch_edit_text(self, args: dict[str, Any]) -> dict[str, Any]:
+        find_str = args["find"]
+        replace_str = args["replace"]
+
+        result = self._resolve_batch_filter(args)
+        if isinstance(result, dict):
+            return result
+
+        # Further filter: only TEXT/MTEXT with the find string
+        text_entities = [
+            e for e in result
+            if e.entity_type.value in ("TEXT", "MTEXT")
+            and e.text_content
+            and find_str in e.text_content
+        ]
+
+        if not text_entities:
+            return {"error": f"No text entities contain '{find_str}'"}
+
+        for entity in text_entities:
+            new_text = entity.text_content.replace(find_str, replace_str)
+            op = EditOperation(
+                op_type=OpType.EDIT_TEXT,
+                target_handle=entity.handle,
+                target_layer=entity.layer,
+                target_space=entity.space,
+                params={"new_text": new_text},
+            )
+            self._operations.append(op)
+
+        return {
+            "status": "queued",
+            "operation": "batch_edit_text",
+            "matched": len(text_entities),
+            "find": find_str,
+            "replace": replace_str,
         }
 
 
