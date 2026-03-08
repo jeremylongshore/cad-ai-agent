@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import time
-
 from cad_dxf_agent.models.document_schema import UserDocument
 
 

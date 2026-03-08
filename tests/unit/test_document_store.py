@@ -13,7 +13,6 @@ from cad_dxf_agent.core.document_store import (
     InMemoryDocumentStore,
     StorageLimitError,
 )
-from cad_dxf_agent.models.document_schema import UserDocument
 
 
 @pytest.fixture
