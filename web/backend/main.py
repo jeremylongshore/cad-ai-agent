@@ -340,7 +340,10 @@ async def drawing_compliance_check(
                 f"Unknown profile: {req.profile}. Available: {', '.join(BUILTIN_PROFILES)}",
             )
 
-        context = load_dxf(str(dxf_path))
+        # Cache parsed DrawingContext on session for repeated compliance checks
+        if session.context is None:
+            session.context = load_dxf(str(dxf_path))
+        context = session.context
         report = check_compliance(context, profile=req.profile)
 
         span.set_attribute("cad.compliance.score", report.score)

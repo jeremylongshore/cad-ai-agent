@@ -295,16 +295,15 @@ def _check_overlapping_entities(
         for key, handles in list(overlap_groups.items())[:5]:
             parts = key.split(",")
             for handle in handles[:3]:
-                found_entity = index.get_by_handle(handle)
-                if found_entity is not None:
-                    entity = found_entity
+                found = index.get_by_handle(handle)
+                if found is not None:
                     evidence.append(
                         EvidenceRef(
                             entity_handle=handle,
-                            layer=entity.layer,
-                            entity_type=entity.entity_type.value,
-                            location=(entity.insert_point.x, entity.insert_point.y)
-                            if entity.insert_point
+                            layer=found.layer,
+                            entity_type=found.entity_type.value,
+                            location=(found.insert_point.x, found.insert_point.y)
+                            if found.insert_point
                             else None,
                             description=(
                                 f"Overlaps with {len(handles) - 1} other "

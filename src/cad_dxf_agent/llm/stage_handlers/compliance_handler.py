@@ -10,6 +10,7 @@ from typing import Any
 
 from cad_dxf_agent.core.compliance_rules import check_compliance
 from cad_dxf_agent.models.cad_schema import DrawingContext
+from cad_dxf_agent.models.compliance_schema import ComplianceReport
 from cad_dxf_agent.models.objective_schema import ObjectiveClassification
 from cad_dxf_agent.models.zone_schema import ZoneDetectionResult
 
@@ -68,8 +69,14 @@ class ComplianceHandler:
 
 
 def _detect_profile(prompt: str) -> str:
-    """Detect compliance profile from prompt keywords."""
+    """Detect compliance profile from prompt keywords.
+
+    Order matters: ADA/accessibility is checked first because it is the
+    most stringent profile and should win when the prompt contains keywords
+    for multiple profiles (e.g. "check residential accessibility").
+    """
     lower = prompt.lower()
+    # Most stringent first — ADA wins over residential/commercial
     if "ada" in lower or "accessib" in lower:
         return "ada"
     if "residential" in lower or "irc" in lower:
@@ -78,7 +85,7 @@ def _detect_profile(prompt: str) -> str:
     return "ibc-2021"
 
 
-def _build_summary(report) -> str:
+def _build_summary(report: ComplianceReport) -> str:
     """Build a human-readable summary of compliance results."""
     status = "PASSED" if report.passed else f"FAILED — {report.violation_count} violation(s)"
     warnings = f" with {report.warning_count} warning(s)" if report.warning_count else ""
