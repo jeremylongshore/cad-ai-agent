@@ -1,7 +1,5 @@
 """Tests for document family heuristic detector."""
 
-import pytest
-
 from cad_dxf_agent.core.family_detector import (
     FamilyDetectionResult,
     detect_document_family,
