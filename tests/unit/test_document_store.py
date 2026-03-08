@@ -162,10 +162,7 @@ class TestInMemoryDocumentStore:
             except Exception as e:
                 errors.append(e)
 
-        threads = [
-            threading.Thread(target=save_batch, args=("u1", i * 10))
-            for i in range(3)
-        ]
+        threads = [threading.Thread(target=save_batch, args=("u1", i * 10)) for i in range(3)]
         for t in threads:
             t.start()
         for t in threads:

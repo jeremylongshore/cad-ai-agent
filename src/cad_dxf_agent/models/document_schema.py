@@ -23,12 +23,8 @@ class UserDocument(BaseModel):
     user_id: str
     doc_id: str = Field(default_factory=lambda: uuid.uuid4().hex[:16])
     filename: str
-    upload_time: str = Field(
-        default_factory=lambda: datetime.now(UTC).isoformat()
-    )
-    last_accessed: str = Field(
-        default_factory=lambda: datetime.now(UTC).isoformat()
-    )
+    upload_time: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
+    last_accessed: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
     gcs_path: str = ""
     file_size_bytes: int = 0
     status: Literal["active", "deleted"] = "active"

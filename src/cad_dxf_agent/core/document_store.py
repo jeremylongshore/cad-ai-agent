@@ -33,7 +33,11 @@ class DocumentStore(abc.ABC):
 
     @abc.abstractmethod
     def save_document(
-        self, user_id: str, filename: str, data: bytes, metadata: dict[str, Any] | None = None,
+        self,
+        user_id: str,
+        filename: str,
+        data: bytes,
+        metadata: dict[str, Any] | None = None,
     ) -> UserDocument:
         """Upload and persist a document. Returns the created UserDocument."""
 
@@ -58,7 +62,10 @@ class DocumentStore(abc.ABC):
         return False  # Default no-op; subclasses override for persistence
 
     def _check_limits(
-        self, user_id: str, file_size: int, existing_docs: list[UserDocument],
+        self,
+        user_id: str,
+        file_size: int,
+        existing_docs: list[UserDocument],
     ) -> None:
         """Validate storage limits before upload. Raises StorageLimitError."""
         if file_size > MAX_FILE_SIZE_BYTES:
@@ -68,9 +75,7 @@ class DocumentStore(abc.ABC):
 
         active_docs = [d for d in existing_docs if d.status == "active"]
         if len(active_docs) >= MAX_DOCUMENTS_PER_USER:
-            raise StorageLimitError(
-                f"Document limit reached ({MAX_DOCUMENTS_PER_USER} documents)"
-            )
+            raise StorageLimitError(f"Document limit reached ({MAX_DOCUMENTS_PER_USER} documents)")
 
         total_storage = sum(d.file_size_bytes for d in active_docs)
         if total_storage + file_size > MAX_TOTAL_STORAGE_BYTES:
@@ -96,7 +101,11 @@ class InMemoryDocumentStore(DocumentStore):
         self._lock = Lock()
 
     def save_document(
-        self, user_id: str, filename: str, data: bytes, metadata: dict[str, Any] | None = None,
+        self,
+        user_id: str,
+        filename: str,
+        data: bytes,
+        metadata: dict[str, Any] | None = None,
     ) -> UserDocument:
         with self._lock:
             existing = list((self._documents.get(user_id) or {}).values())
@@ -181,6 +190,7 @@ class GCSDocumentStore(DocumentStore):
     def _get_client(self):
         if self._client is None:
             from google.cloud import storage
+
             self._client = storage.Client()
         return self._client
 
@@ -191,7 +201,11 @@ class GCSDocumentStore(DocumentStore):
         return f"{self._prefix}{user_id}/{doc_id}/"
 
     def save_document(
-        self, user_id: str, filename: str, data: bytes, metadata: dict[str, Any] | None = None,
+        self,
+        user_id: str,
+        filename: str,
+        data: bytes,
+        metadata: dict[str, Any] | None = None,
     ) -> UserDocument:
         existing = self.list_documents(user_id)
         self._check_limits(user_id, len(data), existing)
@@ -215,7 +229,8 @@ class GCSDocumentStore(DocumentStore):
             # Upload metadata
             meta_blob = bucket.blob(f"{self._doc_prefix(user_id, doc.doc_id)}metadata.json")
             meta_blob.upload_from_string(
-                doc.model_dump_json(), content_type="application/json",
+                doc.model_dump_json(),
+                content_type="application/json",
             )
 
             logger.info("Stored document %s (%s) to GCS for user %s", doc.doc_id, filename, user_id)
@@ -227,9 +242,7 @@ class GCSDocumentStore(DocumentStore):
 
     def get_document(self, user_id: str, doc_id: str) -> UserDocument | None:
         try:
-            meta_blob = self._bucket().blob(
-                f"{self._doc_prefix(user_id, doc_id)}metadata.json"
-            )
+            meta_blob = self._bucket().blob(f"{self._doc_prefix(user_id, doc_id)}metadata.json")
             if not meta_blob.exists():
                 return None
             doc = UserDocument.model_validate_json(meta_blob.download_as_text())
@@ -264,11 +277,10 @@ class GCSDocumentStore(DocumentStore):
 
         doc.status = "deleted"
         try:
-            meta_blob = self._bucket().blob(
-                f"{self._doc_prefix(user_id, doc_id)}metadata.json"
-            )
+            meta_blob = self._bucket().blob(f"{self._doc_prefix(user_id, doc_id)}metadata.json")
             meta_blob.upload_from_string(
-                doc.model_dump_json(), content_type="application/json",
+                doc.model_dump_json(),
+                content_type="application/json",
             )
             return True
         except Exception as exc:
@@ -281,11 +293,10 @@ class GCSDocumentStore(DocumentStore):
             return False
         doc.touch()
         try:
-            meta_blob = self._bucket().blob(
-                f"{self._doc_prefix(user_id, doc_id)}metadata.json"
-            )
+            meta_blob = self._bucket().blob(f"{self._doc_prefix(user_id, doc_id)}metadata.json")
             meta_blob.upload_from_string(
-                doc.model_dump_json(), content_type="application/json",
+                doc.model_dump_json(),
+                content_type="application/json",
             )
             return True
         except Exception as exc:
@@ -297,9 +308,7 @@ class GCSDocumentStore(DocumentStore):
         if doc is None:
             return None
         try:
-            file_blob = self._bucket().blob(
-                f"{self._doc_prefix(user_id, doc_id)}original.dxf"
-            )
+            file_blob = self._bucket().blob(f"{self._doc_prefix(user_id, doc_id)}original.dxf")
             if not file_blob.exists():
                 return None
             return bytes(file_blob.download_as_bytes())
