@@ -141,3 +141,9 @@ class PlatformResponse(BaseModel):
     ambiguity_flags: list[str] = Field(default_factory=list)
     data: dict[str, Any] = Field(default_factory=dict)  # task-specific payload
     session_id: str | None = None
+
+    # Objective intelligence metadata (EPIC-CAD-13)
+    request_class: str | None = None  # RequestClass value
+    objective_tag: str | None = None  # ObjectiveTag value
+    document_family: str | None = None  # DocumentFamilyHint value
+    stage_pipeline: dict[str, Any] | None = None  # stage execution metadata
