@@ -180,7 +180,11 @@ def _check_inconsistent_text_heights(
             # More than 2 distinct heights on one layer = likely inconsistency
             height_counts = Counter(round(h, 2) for h in heights)
             dominant = height_counts.most_common(1)[0]
-            outliers = [(handle, h) for handle, h in entries if round(h, 2) != dominant[0]]
+            outliers = [
+                (handle, h)
+                for handle, h in entries
+                if round(h, 2) != dominant[0]
+            ]
 
             issues.append(
                 HealthIssue(
@@ -281,9 +285,16 @@ def _check_overlapping_entities(
             overlap_threshold,
         )
         # Filter to same-layer neighbors (excluding self)
-        same_layer = [n for n in nearby if n.handle != entity.handle and n.layer == entity.layer]
+        same_layer = [
+            n for n in nearby
+            if n.handle != entity.handle and n.layer == entity.layer
+        ]
         if same_layer:
-            key = f"{entity.insert_point.x:.2f},{entity.insert_point.y:.2f},{entity.layer}"
+            key = (
+                f"{entity.insert_point.x:.2f},"
+                f"{entity.insert_point.y:.2f},"
+                f"{entity.layer}"
+            )
             handles = [entity.handle] + [n.handle for n in same_layer]
             overlap_groups[key] = handles
             checked.update(n.handle for n in same_layer)
@@ -295,9 +306,9 @@ def _check_overlapping_entities(
         for key, handles in list(overlap_groups.items())[:5]:
             parts = key.split(",")
             for handle in handles[:3]:
-                found = index.get_by_handle(handle)
-                if found is not None:
-                    entity = found
+                found_entity = index.get_by_handle(handle)
+                if found_entity is not None:
+                    entity = found_entity
                     evidence.append(
                         EvidenceRef(
                             entity_handle=handle,
@@ -351,7 +362,8 @@ def _check_missing_text_content(
                 severity=HealthSeverity.WARNING,
                 category=HealthCategory.TEXT,
                 title=(
-                    f"{len(empty_texts)} empty text entit{'y' if len(empty_texts) == 1 else 'ies'}"
+                    f"{len(empty_texts)} empty text "
+                    f"entit{'y' if len(empty_texts) == 1 else 'ies'}"
                 ),
                 description=(
                     f"{len(empty_texts)} TEXT/MTEXT "
@@ -364,7 +376,9 @@ def _check_missing_text_content(
                         entity_handle=e.handle,
                         layer=e.layer,
                         entity_type=e.entity_type.value,
-                        location=(e.insert_point.x, e.insert_point.y) if e.insert_point else None,
+                        location=(e.insert_point.x, e.insert_point.y)
+                        if e.insert_point
+                        else None,
                         description="Empty text content",
                     )
                     for e in empty_texts[:10]
