@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-03-07
+
+### Added
+- **EPIC-CAD-08: Preview + Apply Workflow**: Structured edit preview with approve/reject, session-scoped audit trail, 3 new endpoints (#86)
+- **EPIC-CAD-09: Design Operations Workflow Pack**: Layout recommendations, revision summaries, takeoff candidates, scope summaries (#88)
+- **EPIC-CAD-10: Construction Drawing Workflow Pack**: Grid/bay analysis, markup-to-redline reports, batch condition detection, field summaries (#89)
+- **EPIC-CAD-11: Session Durability + Scale Readiness**: SessionStore ABC with InMemory + GCS implementations, durable metadata model (#90)
+- **EPIC-CAD-12: Evaluation Harness + Quality Governance**: 32-entry capability scorecard, intent classification tests, eval runner script (#91)
+- Drawing rotation controls in preview panel
+- All 12 epics across 5 phases now COMPLETE
+
+### Fixed
+- Session UX improvements and clarification message handling
+- Intent router patterns widened for natural language questions
+- Cloud Run resources bumped to 8GB/4CPU/600s for large PDF uploads
+
+### Changed
+- Test count: 1924 → 2468+ tests
+- Golden trajectories: 15 → 27 (all 9 task families)
+- Scorecard entries: 0 → 32
+- Intent classification accuracy: 96.9%
+
+### Documentation
+- After-action reports for EPIC-CAD-08 through EPIC-CAD-12
+- Implementation status tracker updated for Phase 5 completion
+
 ## [0.6.0] - 2026-03-07
 
 ### Added
