@@ -47,11 +47,12 @@ from pydantic import BaseModel
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
+from cad_dxf_agent.core.edit_history import EditHistory  # noqa: E402
 from cad_dxf_agent.otel import span as otel_span  # noqa: E402
 
-from .api_v1 import router as v1_router
-from .auth import get_licensed_user
-from .session import SessionManager
+from .api_v1 import router as v1_router  # noqa: E402
+from .auth import get_licensed_user  # noqa: E402
+from .session import Session, SessionManager  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -119,12 +120,18 @@ async def log_requests(request: Request, call_next):
     if response.status_code >= 400:
         logger.warning(
             "%s %s → %d (%.0fms)",
-            request.method, request.url.path, response.status_code, elapsed_ms,
+            request.method,
+            request.url.path,
+            response.status_code,
+            elapsed_ms,
         )
     else:
         logger.info(
             "%s %s → %d (%.0fms)",
-            request.method, request.url.path, response.status_code, elapsed_ms,
+            request.method,
+            request.url.path,
+            response.status_code,
+            elapsed_ms,
         )
     return response
 
@@ -460,9 +467,9 @@ async def upload_document(
                 "document_count": len(docs),
                 "max_documents": MAX_DOCUMENTS_PER_USER,
                 "max_file_size_bytes": MAX_FILE_SIZE_BYTES,
-                "usage_percent": round(
-                    used_bytes / MAX_TOTAL_STORAGE_BYTES * 100, 2
-                ) if MAX_TOTAL_STORAGE_BYTES else 0.0,
+                "usage_percent": round(used_bytes / MAX_TOTAL_STORAGE_BYTES * 100, 2)
+                if MAX_TOTAL_STORAGE_BYTES
+                else 0.0,
             },
         ) from e
 
@@ -776,14 +783,12 @@ async def upload(
 
     # Initialize edit history for undo/redo (EPIC-CAD-27)
     try:
-        from cad_dxf_agent.core.edit_history import EditHistory
-
         from cad_dxf_agent.settings import settings as cad_settings
 
         session.edit_history = EditHistory(
             session.working_path, max_snapshots=cad_settings.max_undo_snapshots
         )
-    except (ImportError, OSError) as hist_err:
+    except OSError as hist_err:
         logger.warning("Edit history init failed (non-fatal): %s", hist_err)
 
     # Load and analyze
@@ -829,7 +834,8 @@ async def upload(
     else:
         logger.info(
             "Skipping render for large drawing (%d entities > %d limit)",
-            context.entity_count, RENDER_ENTITY_LIMIT,
+            context.entity_count,
+            RENDER_ENTITY_LIMIT,
         )
 
     response: dict = {
@@ -963,7 +969,9 @@ async def v2_prompt(body: PromptRequest, user: dict = Depends(get_user)):
         # Pass DrawingContext so family detection runs on real drawing data
         objective_cls = ObjectiveClassifier()
         objective = objective_cls.classify_with_family(
-            body.prompt, intent.family, context=session.context,
+            body.prompt,
+            intent.family,
+            context=session.context,
         )
 
         audit = AuditMetadata(
@@ -980,9 +988,12 @@ async def v2_prompt(body: PromptRequest, user: dict = Depends(get_user)):
         registry = CapabilityRegistry()
         if not registry.is_implemented(intent.family):
             audit.total_request_time_ms = (_time.monotonic() - total_start) * 1000
-            return _enrich(ResponseBuilder.unsupported_operation(
-                family=intent.family, audit=audit,
-            ).model_dump())
+            return _enrich(
+                ResponseBuilder.unsupported_operation(
+                    family=intent.family,
+                    audit=audit,
+                ).model_dump()
+            )
 
         # Handle needs_clarification
         if intent.family == TaskFamily.NEEDS_CLARIFICATION:
@@ -997,7 +1008,9 @@ async def v2_prompt(body: PromptRequest, user: dict = Depends(get_user)):
             region = _parse_selected_region(body.selected_regions)
             ctx_start = _time.monotonic()
             result = pipeline.answer(
-                prompt=body.prompt, context=session.context, region=region,
+                prompt=body.prompt,
+                context=session.context,
+                region=region,
             )
             audit.context_build_time_ms = (_time.monotonic() - ctx_start) * 1000
             audit.total_request_time_ms = (_time.monotonic() - total_start) * 1000
@@ -1008,11 +1021,13 @@ async def v2_prompt(body: PromptRequest, user: dict = Depends(get_user)):
         if intent.family == TaskFamily.COMPARE:
             if session.revision_path is None or not session.revision_path.exists():
                 audit.total_request_time_ms = (_time.monotonic() - total_start) * 1000
-                return _enrich(ResponseBuilder.needs_clarification(
-                    message="Upload a revision file first to compare drawings.",
-                    family=TaskFamily.COMPARE,
-                    audit=audit,
-                ).model_dump())
+                return _enrich(
+                    ResponseBuilder.needs_clarification(
+                        message="Upload a revision file first to compare drawings.",
+                        family=TaskFamily.COMPARE,
+                        audit=audit,
+                    ).model_dump()
+                )
 
             # Use cached comparison result if available, else run pipeline
             if session.comparison_result is not None and session.comparison_changelog is not None:
@@ -1026,16 +1041,18 @@ async def v2_prompt(body: PromptRequest, user: dict = Depends(get_user)):
                     revision_path=session.revision_path,
                 )
                 audit.total_request_time_ms = (_time.monotonic() - total_start) * 1000
-                return _enrich(_build_typed_compare_response(
-                    session.comparison_result, outputs, audit=audit
-                ))
+                return _enrich(
+                    _build_typed_compare_response(session.comparison_result, outputs, audit=audit)
+                )
 
             audit.total_request_time_ms = (_time.monotonic() - total_start) * 1000
-            return _enrich(ResponseBuilder.needs_clarification(
-                message="Use /api/compare for full comparison workflow.",
-                family=TaskFamily.COMPARE,
-                audit=audit,
-            ).model_dump())
+            return _enrich(
+                ResponseBuilder.needs_clarification(
+                    message="Use /api/compare for full comparison workflow.",
+                    family=TaskFamily.COMPARE,
+                    audit=audit,
+                ).model_dump()
+            )
 
         # Handle markup_interpretation — deterministic redline report, no LLM
         if intent.family == TaskFamily.MARKUP_INTERPRETATION:
@@ -1046,27 +1063,35 @@ async def v2_prompt(body: PromptRequest, user: dict = Depends(get_user)):
             audit.context_build_time_ms = (_time.monotonic() - ctx_start) * 1000
             audit.total_request_time_ms = (_time.monotonic() - total_start) * 1000
 
-            return _enrich(ResponseBuilder.markup_redline(
-                message=(
-                    f"{result.total_clouds} revision cloud(s) found, "
-                    f"{result.total_affected_entities} affected entity(ies)."
-                ),
-                data=result.model_dump(),
-                confidence=result.aggregate_confidence,
-                ambiguity_flags=result.ambiguity_flags,
-                audit=audit,
-            ).model_dump())
+            return _enrich(
+                ResponseBuilder.markup_redline(
+                    message=(
+                        f"{result.total_clouds} revision cloud(s) found, "
+                        f"{result.total_affected_entities} affected entity(ies)."
+                    ),
+                    data=result.model_dump(),
+                    confidence=result.aggregate_confidence,
+                    ambiguity_flags=result.ambiguity_flags,
+                    audit=audit,
+                ).model_dump()
+            )
 
         # Handle repeated_condition — deterministic, no LLM
         if intent.family == TaskFamily.REPEATED_CONDITION:
             from cad_dxf_agent.core.repeated_condition import ConditionDetector
 
-            exemplar_handles = body.selected_regions[0].get("handles", []) if body.selected_regions else []
+            exemplar_handles = (
+                body.selected_regions[0].get("handles", []) if body.selected_regions else []
+            )
             prompt_lower = body.prompt.lower()
             is_batch = not exemplar_handles and any(
-                kw in prompt_lower for kw in (
-                    "batch", "all conditions", "condition report",
-                    "condition plan", "find all patterns",
+                kw in prompt_lower
+                for kw in (
+                    "batch",
+                    "all conditions",
+                    "condition report",
+                    "condition plan",
+                    "find all patterns",
                 )
             )
 
@@ -1078,24 +1103,28 @@ async def v2_prompt(body: PromptRequest, user: dict = Depends(get_user)):
                 audit.context_build_time_ms = (_time.monotonic() - ctx_start) * 1000
                 audit.total_request_time_ms = (_time.monotonic() - total_start) * 1000
 
-                return _enrich(ResponseBuilder.repeated_condition(
-                    message=(
-                        f"{result.total_groups} condition group(s), "
-                        f"{result.total_instances} total instance(s)."
-                    ),
-                    data=result.model_dump(),
-                    confidence=result.aggregate_confidence,
-                    ambiguity_flags=result.ambiguity_flags,
-                    audit=audit,
-                ).model_dump())
+                return _enrich(
+                    ResponseBuilder.repeated_condition(
+                        message=(
+                            f"{result.total_groups} condition group(s), "
+                            f"{result.total_instances} total instance(s)."
+                        ),
+                        data=result.model_dump(),
+                        confidence=result.aggregate_confidence,
+                        ambiguity_flags=result.ambiguity_flags,
+                        audit=audit,
+                    ).model_dump()
+                )
 
             if not exemplar_handles:
                 audit.total_request_time_ms = (_time.monotonic() - total_start) * 1000
-                return _enrich(ResponseBuilder.needs_clarification(
-                    message="Select entities to use as the exemplar for repeated-condition search.",
-                    family=TaskFamily.REPEATED_CONDITION,
-                    audit=audit,
-                ).model_dump())
+                return _enrich(
+                    ResponseBuilder.needs_clarification(
+                        message="Select entities to use as the exemplar for repeated-condition search.",
+                        family=TaskFamily.REPEATED_CONDITION,
+                        audit=audit,
+                    ).model_dump()
+                )
 
             ctx_start = _time.monotonic()
             detector = ConditionDetector(session.context)
@@ -1103,14 +1132,16 @@ async def v2_prompt(body: PromptRequest, user: dict = Depends(get_user)):
             audit.context_build_time_ms = (_time.monotonic() - ctx_start) * 1000
             audit.total_request_time_ms = (_time.monotonic() - total_start) * 1000
 
-            return _enrich(ResponseBuilder.repeated_condition(
-                message=result.summary,
-                data=result.model_dump(),
-                evidence=[ev.model_dump() for c in result.candidates for ev in c.evidence[:3]],
-                confidence=result.candidates[0].confidence if result.candidates else 0.0,
-                ambiguity_flags=result.ambiguity_flags,
-                audit=audit,
-            ).model_dump())
+            return _enrich(
+                ResponseBuilder.repeated_condition(
+                    message=result.summary,
+                    data=result.model_dump(),
+                    evidence=[ev.model_dump() for c in result.candidates for ev in c.evidence[:3]],
+                    confidence=result.candidates[0].confidence if result.candidates else 0.0,
+                    ambiguity_flags=result.ambiguity_flags,
+                    audit=audit,
+                ).model_dump()
+            )
 
         # Handle design_assist — deterministic layout analysis, no LLM
         if intent.family == TaskFamily.DESIGN_ASSIST:
@@ -1127,9 +1158,12 @@ async def v2_prompt(body: PromptRequest, user: dict = Depends(get_user)):
 
             # Field summary sub-dispatch
             is_field = any(
-                kw in prompt_lower for kw in (
-                    "field summary", "field report",
-                    "construction summary", "site report",
+                kw in prompt_lower
+                for kw in (
+                    "field summary",
+                    "field report",
+                    "construction summary",
+                    "site report",
                 )
             )
             if is_field:
@@ -1149,8 +1183,12 @@ async def v2_prompt(body: PromptRequest, user: dict = Depends(get_user)):
 
             # Grid summary sub-dispatch
             elif any(
-                kw in prompt_lower for kw in (
-                    "grid", "bay", "column grid", "structural grid",
+                kw in prompt_lower
+                for kw in (
+                    "grid",
+                    "bay",
+                    "column grid",
+                    "structural grid",
                 )
             ):
                 from cad_dxf_agent.core.construction_ops import GridAnalyzer
@@ -1182,12 +1220,13 @@ async def v2_prompt(body: PromptRequest, user: dict = Depends(get_user)):
                 flags = result.ambiguity_flags
             else:
                 result = LayoutRecommender().recommend(
-                    session.context, body.prompt, region,
+                    session.context,
+                    body.prompt,
+                    region,
                 )
                 data = result.model_dump()
                 message = (
-                    f"{result.total_recommendations} recommendation(s). "
-                    f"{result.drawing_summary}"
+                    f"{result.total_recommendations} recommendation(s). {result.drawing_summary}"
                 )
                 confidence = result.aggregate_confidence
                 flags = result.ambiguity_flags
@@ -1195,13 +1234,15 @@ async def v2_prompt(body: PromptRequest, user: dict = Depends(get_user)):
             audit.context_build_time_ms = (_time.monotonic() - ctx_start) * 1000
             audit.total_request_time_ms = (_time.monotonic() - total_start) * 1000
 
-            return _enrich(ResponseBuilder.design_assist(
-                message=message,
-                data=data,
-                confidence=confidence,
-                ambiguity_flags=flags,
-                audit=audit,
-            ).model_dump())
+            return _enrich(
+                ResponseBuilder.design_assist(
+                    message=message,
+                    data=data,
+                    confidence=confidence,
+                    ambiguity_flags=flags,
+                    audit=audit,
+                ).model_dump()
+            )
 
         # Handle summary — deterministic revision summary, no LLM
         if intent.family == TaskFamily.SUMMARY:
@@ -1216,15 +1257,18 @@ async def v2_prompt(body: PromptRequest, user: dict = Depends(get_user)):
             audit.context_build_time_ms = (_time.monotonic() - ctx_start) * 1000
             audit.total_request_time_ms = (_time.monotonic() - total_start) * 1000
 
-            return _enrich(ResponseBuilder.summary_result(
-                message=result.headline,
-                data=result.model_dump(),
-                confidence=min(
-                    (e.confidence for e in result.key_changes), default=0.5,
-                ),
-                ambiguity_flags=result.ambiguity_flags,
-                audit=audit,
-            ).model_dump())
+            return _enrich(
+                ResponseBuilder.summary_result(
+                    message=result.headline,
+                    data=result.model_dump(),
+                    confidence=min(
+                        (e.confidence for e in result.key_changes),
+                        default=0.5,
+                    ),
+                    ambiguity_flags=result.ambiguity_flags,
+                    audit=audit,
+                ).model_dump()
+            )
 
         # Handle takeoff_estimate — deterministic counting, no LLM
         if intent.family == TaskFamily.TAKEOFF_ESTIMATE:
@@ -1238,7 +1282,9 @@ async def v2_prompt(body: PromptRequest, user: dict = Depends(get_user)):
                 region = RegionContextBuilder().build(session.context, parsed_region)
 
             result = TakeoffGenerator().generate(
-                session.context, body.prompt, region,
+                session.context,
+                body.prompt,
+                region,
             )
             audit.context_build_time_ms = (_time.monotonic() - ctx_start) * 1000
             audit.total_request_time_ms = (_time.monotonic() - total_start) * 1000
@@ -1249,16 +1295,18 @@ async def v2_prompt(body: PromptRequest, user: dict = Depends(get_user)):
                 "low": 0.4,
                 "estimate_only": 0.2,
             }
-            return _enrich(ResponseBuilder.takeoff_result(
-                message=(
-                    f"{result.total_items} takeoff item(s), "
-                    f"{result.total_quantity_items} total quantity."
-                ),
-                data=result.model_dump(),
-                confidence=_conf_labels.get(result.aggregate_confidence.value, 0.5),
-                ambiguity_flags=result.ambiguity_flags,
-                audit=audit,
-            ).model_dump())
+            return _enrich(
+                ResponseBuilder.takeoff_result(
+                    message=(
+                        f"{result.total_items} takeoff item(s), "
+                        f"{result.total_quantity_items} total quantity."
+                    ),
+                    data=result.model_dump(),
+                    confidence=_conf_labels.get(result.aggregate_confidence.value, 0.5),
+                    ambiguity_flags=result.ambiguity_flags,
+                    audit=audit,
+                ).model_dump()
+            )
 
         # Handle edit_plan — dispatch to existing planner
         if intent.family == TaskFamily.EDIT_PLAN:
@@ -1294,10 +1342,9 @@ async def v2_prompt(body: PromptRequest, user: dict = Depends(get_user)):
                         drawing_context=session.context,
                         request_id=getattr(body, "request_id", ""),
                         target_handles=[
-                            op.target_handle
-                            for op in changeset.operations
-                            if op.target_handle
-                        ] or None,
+                            op.target_handle for op in changeset.operations if op.target_handle
+                        ]
+                        or None,
                     )
                     edit_plan = EditPlanBuilder().build(plan_req)
                     session.edit_plan = edit_plan
@@ -1340,38 +1387,45 @@ async def v2_prompt(body: PromptRequest, user: dict = Depends(get_user)):
                 precision_action_details = None
                 try:
                     precision_candidates, precision_action_details = _enrich_with_precision(
-                        changeset, session.context, validation, body.client_metadata,
+                        changeset,
+                        session.context,
+                        validation,
+                        body.client_metadata,
                     )
                     if precision_action_details is not None:
                         # Re-serialize operations from potentially modified changeset
                         operations = []
                         for op in changeset.operations:
-                            operations.append({
-                                "op_type": op.op_type.value
-                                if hasattr(op.op_type, "value")
-                                else str(op.op_type),
-                                "target_handle": op.target_handle,
-                                "target_layer": op.target_layer,
-                                "description": _describe_op(op),
-                                "params": op.params,
-                            })
+                            operations.append(
+                                {
+                                    "op_type": op.op_type.value
+                                    if hasattr(op.op_type, "value")
+                                    else str(op.op_type),
+                                    "target_handle": op.target_handle,
+                                    "target_layer": op.target_layer,
+                                    "description": _describe_op(op),
+                                    "params": op.params,
+                                }
+                            )
                 except (ValueError, KeyError, TypeError) as prec_err:
                     logger.warning("Precision enrichment failed (non-fatal): %s", prec_err)
 
                 audit.total_request_time_ms = (_time.monotonic() - total_start) * 1000
 
-                return _enrich(ResponseBuilder.plan_only(
-                    operations=operations,
-                    message=llm_message or summary,
-                    validation={
-                        "blockers": [{"message": b.message} for b in validation.blockers],
-                        "warnings": [{"message": w.message} for w in validation.warnings],
-                        "is_valid": len(validation.blockers) == 0,
-                    },
-                    audit=audit,
-                    ambiguity_candidates=precision_candidates,
-                    precision_actions=precision_action_details,
-                ).model_dump())
+                return _enrich(
+                    ResponseBuilder.plan_only(
+                        operations=operations,
+                        message=llm_message or summary,
+                        validation={
+                            "blockers": [{"message": b.message} for b in validation.blockers],
+                            "warnings": [{"message": w.message} for w in validation.warnings],
+                            "is_valid": len(validation.blockers) == 0,
+                        },
+                        audit=audit,
+                        ambiguity_candidates=precision_candidates,
+                        precision_actions=precision_action_details,
+                    ).model_dump()
+                )
 
             except Exception as e:
                 logger.error("v2 plan failed: %s", e, exc_info=True)
@@ -1379,9 +1433,12 @@ async def v2_prompt(body: PromptRequest, user: dict = Depends(get_user)):
 
         # Catch-all for families that are "implemented" but not yet wired
         audit.total_request_time_ms = (_time.monotonic() - total_start) * 1000
-        return _enrich(ResponseBuilder.unsupported_operation(
-            family=intent.family, audit=audit,
-        ).model_dump())
+        return _enrich(
+            ResponseBuilder.unsupported_operation(
+                family=intent.family,
+                audit=audit,
+            ).model_dump()
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -1651,15 +1708,16 @@ class SnapshotRequest(BaseModel):
 
 
 def _get_session_history(
-    session_id: str, user: dict, *, require: bool = True,
-) -> tuple:
+    session_id: str,
+    user: dict,
+    *,
+    require: bool = True,
+) -> tuple[Session, EditHistory | None]:
     """Shared helper: resolve session + edit history, raise on error.
 
     Returns (session, history). If require=True and no history exists,
     raises 400. If require=False, history may be None.
     """
-    from cad_dxf_agent.core.edit_history import EditHistory
-
     try:
         session = session_mgr.get(session_id, user["uid"])
     except (KeyError, PermissionError) as e:
@@ -1669,6 +1727,16 @@ def _get_session_history(
     if require and history is None:
         raise HTTPException(status_code=400, detail="No edit history in session.")
     return session, history
+
+
+def _save_restored_dxf(session: Session, doc: object) -> None:
+    """Save a restored ezdxf document as the current edited file.
+
+    Called after undo/redo to persist the restored state to disk.
+    """
+    restored_path = session.session_dir / "edited.dxf"
+    doc.saveas(str(restored_path))  # type: ignore[union-attr]
+    session.edited_path = restored_path
 
 
 @app.post("/api/undo")
@@ -1687,10 +1755,7 @@ async def undo(body: UndoRedoRequest, user: dict = Depends(get_user)):
 
     doc = history.undo()
     if doc is not None:
-        # Save the restored document as the current edited file
-        restored_path = session.session_dir / "edited.dxf"
-        doc.saveas(str(restored_path))
-        session.edited_path = restored_path
+        _save_restored_dxf(session, doc)
 
     return {
         "undone": True,
@@ -1718,9 +1783,7 @@ async def redo(body: UndoRedoRequest, user: dict = Depends(get_user)):
 
     doc = history.redo()
     if doc is not None:
-        restored_path = session.session_dir / "edited.dxf"
-        doc.saveas(str(restored_path))
-        session.edited_path = restored_path
+        _save_restored_dxf(session, doc)
 
     return {
         "redone": True,
@@ -1767,10 +1830,12 @@ async def get_history(session_id: str = Query(...), user: dict = Depends(get_use
     entries = [{"index": -1, "label": "initial"}]
     labels = history.labels
     for i in range(history.depth):
-        entries.append({
-            "index": i,
-            "label": labels[i],
-        })
+        entries.append(
+            {
+                "index": i,
+                "label": labels[i],
+            }
+        )
 
     return {
         "entries": entries,
