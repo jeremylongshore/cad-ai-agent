@@ -22,7 +22,7 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 SESSION_TTL_SECONDS = 2 * 60 * 60  # 2 hours
-DEFAULT_SESSION_DIR = Path("/tmp/cad-sessions")  # noqa: S108
+DEFAULT_SESSION_DIR = Path("/tmp/cad-sessions")  # noqa: S108  # nosec B108
 
 
 # ---------------------------------------------------------------------------
@@ -68,10 +68,7 @@ class SessionMetadata:
 
     @property
     def is_expired(self) -> bool:
-        return (
-            self.state == "expired"
-            or time.time() - self.created_at > SESSION_TTL_SECONDS
-        )
+        return self.state == "expired" or time.time() - self.created_at > SESSION_TTL_SECONDS
 
 
 # ---------------------------------------------------------------------------
@@ -354,9 +351,7 @@ class GCSSessionStore(SessionStore):
                 try:
                     data = json.loads(blob.download_as_text())
                     meta = SessionMetadata.from_dict(data)
-                    if not meta.is_expired and (
-                        user_id is None or meta.user_id == user_id
-                    ):
+                    if not meta.is_expired and (user_id is None or meta.user_id == user_id):
                         results.append(meta)
                 except (json.JSONDecodeError, KeyError, TypeError) as exc:
                     logger.debug("Skipping unreadable blob %s: %s", blob.name, exc)

@@ -2,10 +2,7 @@
 
 import pytest
 
-from cad_dxf_agent.llm.stage_executor import (
-    StagePipelineExecutor,
-    StageExecutionResult,
-)
+from cad_dxf_agent.llm.stage_executor import StagePipelineExecutor
 from cad_dxf_agent.models.objective_schema import (
     ObjectiveClassification,
     RequestClass,
