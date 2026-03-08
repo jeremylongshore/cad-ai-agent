@@ -23,6 +23,10 @@
 | 040 | AUDT | [040-AT-AUDT-scale-readiness.md](040-AT-AUDT-scale-readiness.md) |
 | 044 | SPEC | [044-AT-SPEC-sidequest-cad-67-text-accuracy.md](044-AT-SPEC-sidequest-cad-67-text-accuracy.md) |
 | 046 | AUDT | [046-AT-AUDT-arch-review-cad-01.md](046-AT-AUDT-arch-review-cad-01.md) |
+| 055 | SPEC | [055-AT-SPEC-epic-cad-13-objective-intelligence.md](055-AT-SPEC-epic-cad-13-objective-intelligence.md) |
+| 056 | SPEC | [056-AT-SPEC-epic-cad-14-precision-controls.md](056-AT-SPEC-epic-cad-14-precision-controls.md) |
+| 057 | SPEC | [057-AT-SPEC-epic-cad-15-document-persistence.md](057-AT-SPEC-epic-cad-15-document-persistence.md) |
+| 058 | ARCH | [058-AT-ARCH-v080-ui-ux-design-strategy.md](058-AT-ARCH-v080-ui-ux-design-strategy.md) |
 
 ### PP — Product & Planning
 | # | Type | File |
@@ -69,6 +73,7 @@
 | 028 | REPT | [028-RL-REPT-release-v0.3.0.md](028-RL-REPT-release-v0.3.0.md) |
 | 029 | REFC | [029-RM-REFC-appauditmini-quick-reference.md](029-RM-REFC-appauditmini-quick-reference.md) |
 | 047 | REPT | [047-RL-REPT-release-v0.6.0.md](047-RL-REPT-release-v0.6.0.md) |
+| 054 | REPT | [054-RL-REPT-release-v0.7.0.md](054-RL-REPT-release-v0.7.0.md) |
 
 ### BL — Business & Legal
 | # | Type | File |
@@ -144,6 +149,11 @@
 | 051 | PM | AAR | EPIC-CAD-10 end-of-phase report (Construction Drawing Workflow Pack) |
 | 052 | PM | AAR | EPIC-CAD-11 end-of-phase report (Session Durability + Scale Readiness) |
 | 053 | PM | AAR | EPIC-CAD-12 end-of-phase report (Evaluation Harness + Quality Governance) |
+| 054 | RL | REPT | Release v0.7.0 report (Phase 5 complete) |
+| 055 | AT | SPEC | EPIC-CAD-13: Objective Intelligence spec |
+| 056 | AT | SPEC | EPIC-CAD-14: Professional Precision Controls spec |
+| 057 | AT | SPEC | EPIC-CAD-15: Document Persistence spec |
+| 058 | AT | ARCH | IntentCAD v0.8.0 UI/UX design strategy |
 
 ## Quick Reference
 
