@@ -270,18 +270,13 @@ async def compliance_check(
 
         report = check_compliance(context, profile=profile)
 
-        return {
-            "profile": report.profile_name,
-            "passed": report.passed,
-            "score": report.score,
-            "findings": [f.model_dump() for f in report.findings],
-            "checks_run": report.checks_run,
-            "violation_count": report.violation_count,
-            "warning_count": report.warning_count,
-            "pass_count": report.pass_count,
-            "zone_count": report.zone_count,
-            "entity_count": report.entity_count,
-        }
+        # model_dump() + computed properties (passed/score are @property)
+        # + rename profile_name → profile for API consistency
+        result = report.model_dump()
+        result["profile"] = result.pop("profile_name")
+        result["passed"] = report.passed
+        result["score"] = report.score
+        return result
 
 
 # ---------------------------------------------------------------------------
@@ -340,13 +335,4 @@ async def rfi_check(file: UploadFile = File(...)):
         context = _load_context(file)
         report = generate_rfi(context)
 
-        return {
-            "total_items": report.total_items,
-            "critical_count": report.critical_count,
-            "major_count": report.major_count,
-            "minor_count": report.minor_count,
-            "items": [item.model_dump() for item in report.items],
-            "checks_run": report.checks_run,
-            "entity_count": report.entity_count,
-            "zone_count": report.zone_count,
-        }
+        return report.model_dump()
