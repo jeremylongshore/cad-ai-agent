@@ -142,6 +142,7 @@ def _parse_entity(
         if points:
             insert_point = Point2D(x=points[0][0], y=points[0][1])
             attributes["vertices"] = [(p[0], p[1]) for p in points]
+            attributes["is_closed"] = entity.closed  # type: ignore[attr-defined]
     elif dxf_type == "TEXT":
         insert = entity.dxf.insert
         insert_point = Point2D(x=insert.x, y=insert.y)

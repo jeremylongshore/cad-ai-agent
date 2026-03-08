@@ -1,20 +1,31 @@
 """CAD DXF Agent — Web Backend (FastAPI on Cloud Run).
 
 Routes:
-    GET  /api/health            — Health check
-    POST /api/upload            — Upload DXF/PDF, get session + file info
-    POST /api/plan              — Send prompt, get planned operations + preview
-    POST /api/apply             — Apply selected operations
-    POST /api/compare           — Upload revision DXF, compare against master
-    GET  /api/dxf               — Get raw DXF file (original/edited/comparison)
-    GET  /api/render            — Get PNG render (original/edited/diff/comparison)
-    GET  /api/download          — Download edited DXF
-    POST /api/revision/upload   — Upload revision DXF to existing session
-    POST /api/revision/align    — Run alignment (auto or manual control points)
-    POST /api/revision/diff     — Run comparison + generate revision ops
-    POST /api/revision/approve  — Approve/reject individual revision ops
-    POST /api/revision/apply    — Apply approved ops + export bundle
-    GET  /api/revision/download — Download bundle as zip
+    GET  /api/health                  — Health check
+    POST /api/upload                  — Upload DXF/PDF, get session + file info
+    POST /api/plan                    — Send prompt, get planned operations + preview
+    POST /api/apply                   — Apply selected operations
+    POST /api/compare                 — Upload revision DXF, compare against master
+    GET  /api/dxf                     — Get raw DXF file (original/edited/comparison)
+    GET  /api/render                  — Get PNG render (original/edited/diff/comparison)
+    GET  /api/download                — Download edited DXF
+    POST /api/revision/upload         — Upload revision DXF to existing session
+    POST /api/revision/align          — Run alignment (auto or manual control points)
+    POST /api/revision/diff           — Run comparison + generate revision ops
+    POST /api/revision/approve        — Approve/reject individual revision ops
+    POST /api/revision/apply          — Apply approved ops + export bundle
+    GET  /api/revision/download       — Download bundle as zip
+
+    # Document Library (EPIC-CAD-15)
+    GET  /api/documents               — List user's document library
+    POST /api/documents               — Upload DXF to library
+    GET  /api/documents/usage         — Storage usage stats
+    GET  /api/documents/{id}          — Get document metadata
+    DELETE /api/documents/{id}        — Delete document
+    POST /api/documents/{id}/load     — Load document into session (deduplicates)
+    POST /api/documents/compare       — Compare two library documents
+    GET  /api/sessions/active         — List active sessions with document bindings
+    POST /api/session/reconnect       — Reconnect to or recreate session for a document
 """
 
 from __future__ import annotations
@@ -179,6 +190,17 @@ class V2ApplyRequest(BaseModel):
     session_id: str
 
 
+class ReconnectRequest(BaseModel):
+    document_id: str
+    session_id: str | None = None
+
+
+class CompareLibraryRequest(BaseModel):
+    master_doc_id: str
+    revision_doc_id: str
+    profile: str | None = None
+
+
 # ---------------------------------------------------------------------------
 # Dependency: get authenticated user
 # ---------------------------------------------------------------------------
@@ -294,9 +316,54 @@ async def upload_document(
     try:
         doc = store.save_document(user["uid"], file.filename, data)
     except StorageLimitError as e:
-        raise HTTPException(status_code=413, detail=str(e)) from e
+        from cad_dxf_agent.core.document_store import (
+            MAX_DOCUMENTS_PER_USER,
+            MAX_FILE_SIZE_BYTES,
+            MAX_TOTAL_STORAGE_BYTES,
+        )
+
+        docs = store.list_documents(user["uid"])
+        used_bytes = sum(d.file_size_bytes for d in docs)
+        raise HTTPException(
+            status_code=413,
+            detail={
+                "message": str(e),
+                "used_bytes": used_bytes,
+                "max_bytes": MAX_TOTAL_STORAGE_BYTES,
+                "document_count": len(docs),
+                "max_documents": MAX_DOCUMENTS_PER_USER,
+                "max_file_size_bytes": MAX_FILE_SIZE_BYTES,
+                "usage_percent": round(
+                    used_bytes / MAX_TOTAL_STORAGE_BYTES * 100, 2
+                ) if MAX_TOTAL_STORAGE_BYTES else 0.0,
+            },
+        ) from e
 
     return {"document": doc.model_dump()}
+
+
+@app.get("/api/documents/usage")
+async def get_storage_usage(user: dict = Depends(get_user)):
+    """Return storage usage stats for the current user's document library."""
+    from cad_dxf_agent.core.document_store import (
+        MAX_DOCUMENTS_PER_USER,
+        MAX_FILE_SIZE_BYTES,
+        MAX_TOTAL_STORAGE_BYTES,
+    )
+
+    store = _get_document_store()
+    docs = store.list_documents(user["uid"])
+    used_bytes = sum(d.file_size_bytes for d in docs)
+    usage_percent = (used_bytes / MAX_TOTAL_STORAGE_BYTES * 100) if MAX_TOTAL_STORAGE_BYTES else 0.0
+
+    return {
+        "used_bytes": used_bytes,
+        "max_bytes": MAX_TOTAL_STORAGE_BYTES,
+        "document_count": len(docs),
+        "max_documents": MAX_DOCUMENTS_PER_USER,
+        "max_file_size_bytes": MAX_FILE_SIZE_BYTES,
+        "usage_percent": round(usage_percent, 2),
+    }
 
 
 @app.get("/api/documents/{doc_id}")
@@ -322,13 +389,25 @@ async def delete_document(doc_id: str, user: dict = Depends(get_user)):
 async def load_document(doc_id: str, user: dict = Depends(get_user)):
     """Load a library document into a working session.
 
-    Copies the stored DXF to a session directory so the existing pipeline
-    can work with it. Returns session_id + file_info just like /api/upload.
+    If the user already has an active session for this document, returns
+    that existing session instead of creating a duplicate. Otherwise, copies
+    the stored DXF to a new session directory. Returns session_id + file_info
+    just like /api/upload.
     """
     store = _get_document_store()
     doc = store.get_document(user["uid"], doc_id)
     if doc is None:
         raise HTTPException(status_code=404, detail="Document not found")
+
+    # Return existing session if one is already bound to this document
+    existing = session_mgr.find_by_document(user["uid"], doc_id)
+    if existing is not None:
+        store.touch_document(user["uid"], doc_id)
+        return {
+            "session_id": existing.session_id,
+            "file_info": existing.file_info,
+            "document_id": doc_id,
+        }
 
     file_data = store.get_file_data(user["uid"], doc_id)
     if file_data is None:
@@ -336,12 +415,11 @@ async def load_document(doc_id: str, user: dict = Depends(get_user)):
 
     # Create a session linked to this document
     session = session_mgr.create(user["uid"])
+    session.document_id = doc_id
     Path(session.original_path).write_bytes(file_data)
 
-    # Update session with document binding
-    meta = session.to_metadata()
-    meta.document_id = doc_id
-    session_mgr.store.save(meta)
+    # Persist document binding in durable metadata
+    session_mgr.save_metadata(session)
 
     # Touch the document's last_accessed (persists to GCS in production)
     store.touch_document(user["uid"], doc_id)
@@ -368,6 +446,150 @@ async def load_document(doc_id: str, user: dict = Depends(get_user)):
         "file_info": file_info,
         "document_id": doc_id,
     }
+
+
+@app.get("/api/sessions/active")
+async def list_active_sessions(user: dict = Depends(get_user)):
+    """List all active sessions with their document bindings for the current user."""
+    sessions = session_mgr.list_user_sessions(user["uid"])
+    return {
+        "sessions": [
+            {
+                "session_id": s.session_id,
+                "document_id": s.document_id,
+                "file_info": s.file_info,
+                "created_at": s.created_at,
+            }
+            for s in sessions
+        ]
+    }
+
+
+@app.post("/api/session/reconnect")
+async def reconnect_session(body: ReconnectRequest, user: dict = Depends(get_user)):
+    """Reconnect to an existing session for a library document, or create a new one.
+
+    First tries to find an active session already bound to this document.
+    If found, returns it (reconnected=True). If not found but the document
+    exists, creates a fresh session from the library (reconnected=False).
+    Returns 404 if the document does not exist or belongs to another user.
+    """
+    store = _get_document_store()
+    doc = store.get_document(user["uid"], body.document_id)
+    if doc is None:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    # Try to find existing active session bound to this document
+    existing = session_mgr.find_by_document(user["uid"], body.document_id)
+    if existing is not None:
+        store.touch_document(user["uid"], body.document_id)
+        return {
+            "session_id": existing.session_id,
+            "file_info": existing.file_info,
+            "document_id": body.document_id,
+            "reconnected": True,
+        }
+
+    # No existing session — create one from the library document
+    file_data = store.get_file_data(user["uid"], body.document_id)
+    if file_data is None:
+        raise HTTPException(status_code=404, detail="Document file not found")
+
+    session = session_mgr.create(user["uid"])
+    session.document_id = body.document_id
+    Path(session.original_path).write_bytes(file_data)
+    session_mgr.save_metadata(session)
+    store.touch_document(user["uid"], body.document_id)
+
+    try:
+        from cad_dxf_agent.core.dxf_reader import load_dxf
+
+        ctx = load_dxf(str(session.original_path))
+        session.context = ctx
+        file_info = {
+            "filename": doc.filename,
+            "entity_count": len(ctx.entities),
+            "layers": list({e.layer for e in ctx.entities}),
+            "drawing_units": ctx.metadata.get("units", "unknown"),
+        }
+        session.file_info = file_info
+    except Exception as e:
+        logger.warning("Failed to load DXF for reconnect (doc %s): %s", body.document_id, e)
+        file_info = {"filename": doc.filename, "error": str(e)}
+
+    return {
+        "session_id": session.session_id,
+        "file_info": file_info,
+        "document_id": body.document_id,
+        "reconnected": False,
+    }
+
+
+@app.post("/api/documents/compare")
+async def compare_library_documents(
+    body: CompareLibraryRequest,
+    user: dict = Depends(get_user),
+):
+    """Compare two library documents without uploading files.
+
+    Fetches both documents from the store, validates ownership, then runs
+    the same comparison pipeline as /api/compare. The master document is
+    used as the baseline; the revision document is compared against it.
+    """
+    store = _get_document_store()
+
+    master_doc = store.get_document(user["uid"], body.master_doc_id)
+    if master_doc is None:
+        raise HTTPException(status_code=404, detail="Master document not found")
+
+    revision_doc = store.get_document(user["uid"], body.revision_doc_id)
+    if revision_doc is None:
+        raise HTTPException(status_code=404, detail="Revision document not found")
+
+    master_data = store.get_file_data(user["uid"], body.master_doc_id)
+    if master_data is None:
+        raise HTTPException(status_code=404, detail="Master document file not found")
+
+    revision_data = store.get_file_data(user["uid"], body.revision_doc_id)
+    if revision_data is None:
+        raise HTTPException(status_code=404, detail="Revision document file not found")
+
+    # Create a temporary session to hold the files during comparison
+    session = session_mgr.create(user["uid"])
+    session_dir = Path("/tmp/cad-sessions") / session.session_id
+
+    master_path = session.original_path
+    revision_path = session_dir / "revision.dxf"
+    Path(master_path).write_bytes(master_data)
+    revision_path.write_bytes(revision_data)
+    session.revision_path = revision_path
+
+    try:
+        from cad_dxf_agent.core.comparison.engine import ComparisonEngine
+        from cad_dxf_agent.models.comparison_schema import ComparisonConfig
+
+        config = ComparisonConfig()
+        if body.profile:
+            from cad_dxf_agent.core.profiles import load_profile
+
+            config = ComparisonConfig(profile=load_profile(body.profile))
+
+        engine = ComparisonEngine()
+        result = engine.compare(master_path, revision_path, config)
+
+        output_dir = session_dir / "comparison"
+        outputs = engine.generate_outputs(master_path, revision_path, result, output_dir)
+
+        store.touch_document(user["uid"], body.master_doc_id)
+        store.touch_document(user["uid"], body.revision_doc_id)
+
+        return _build_typed_compare_response(result, outputs)
+
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from None
+    except Exception as e:
+        logger.error("Library comparison failed: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Comparison failed: {e}") from None
 
 
 @app.post("/api/upload")
@@ -1867,6 +2089,18 @@ def _user_friendly_conversion_error(raw_error: str | None, ext: str) -> str:
             "Please export as DXF from your CAD software."
         )
     return f"Could not convert your {ext} file. Please try exporting as DXF from your CAD software."
+
+
+def _get_stage_executor():
+    """Create a StagePipelineExecutor with all registered handlers."""
+    from cad_dxf_agent.llm.stage_executor import StagePipelineExecutor
+    from cad_dxf_agent.llm.stage_handlers.analyze_handler import AnalyzeHandler
+    from cad_dxf_agent.llm.stage_handlers.detect_zones_handler import DetectZonesHandler
+
+    executor = StagePipelineExecutor()
+    executor.register("analyze", AnalyzeHandler())
+    executor.register("detect_zones", DetectZonesHandler())
+    return executor
 
 
 def _enrich_with_objective(

@@ -6,6 +6,7 @@ import {
   v2Preview, v2Approve, v2Apply,
 } from '../lib/api';
 
+
 const NO_CHANGES_MESSAGE = "I couldn't plan any changes. Try being more specific about which element to edit.";
 
 /** Create a message object with a unique ID and timestamp */
@@ -15,6 +16,7 @@ function msg(role, text, extra = {}) {
 
 export function useSession() {
   const [sessionId, setSessionId] = useState(null);
+  const [documentId, setDocumentId] = useState(null);
   const [fileInfo, setFileInfo] = useState(null);
   const [messages, setMessages] = useState([]);
   const [operations, setOperations] = useState([]);
@@ -577,6 +579,51 @@ export function useSession() {
     }
   }, [sessionId]);
 
+  /**
+   * Hydrate session state from a library load response.
+   * Called when a document is loaded from the document library.
+   * The backend returns a session_id and file_info just like /api/upload,
+   * so we reuse the same fetch pattern.
+   */
+  const loadFromLibraryData = useCallback(async (data, docId) => {
+    setLoading(true);
+    setLoadingStartTime(Date.now());
+    setError(null);
+    try {
+      setDocumentId(docId);
+      setSessionId(data.session_id);
+      setFileInfo({ ...data.file_info, page_classifications: data.page_classifications || null });
+
+      const [renderResult, dxfResult] = await Promise.allSettled([
+        getRenderBlob(data.session_id, 'original'),
+        getDxfBlob(data.session_id, 'original'),
+      ]);
+      if (renderResult.status === 'fulfilled') {
+        setPreviewUrls((prev) => ({ ...prev, original: URL.createObjectURL(renderResult.value) }));
+      } else {
+        console.warn('[cad] Library load render fetch failed:', renderResult.reason?.message);
+      }
+      if (dxfResult.status === 'fulfilled') {
+        setDxfUrls((prev) => ({ ...prev, original: URL.createObjectURL(dxfResult.value) }));
+      } else {
+        console.warn('[cad] Library load DXF fetch failed:', dxfResult.reason?.message);
+      }
+
+      const filename = data.file_info?.filename || 'document';
+      setMessages([
+        msg('system', `Loaded ${filename} (${data.file_info?.entity_count ?? '?'} entities, ${data.file_info?.layer_count ?? '?'} layers) from library`),
+      ]);
+      setOperations([]);
+      setSelectedOps([]);
+      setValidation(null);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+      setLoadingStartTime(null);
+    }
+  }, []);
+
   const reset = useCallback(() => {
     // Revoke blob URLs to free memory
     Object.values(previewUrls).forEach((url) => {
@@ -586,6 +633,8 @@ export function useSession() {
       if (url) URL.revokeObjectURL(url);
     });
     setSessionId(null);
+    setDocumentId(null);
+    localStorage.removeItem('intentcad_active_document_id');
     setFileInfo(null);
     setMessages([]);
     setOperations([]);
@@ -615,6 +664,9 @@ export function useSession() {
 
   return {
     sessionId,
+    documentId,
+    setDocumentId,
+    loadFromLibraryData,
     fileInfo,
     messages,
     operations,

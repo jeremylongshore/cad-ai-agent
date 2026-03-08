@@ -1,19 +1,58 @@
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState, useEffect, useCallback } from 'react';
 import { useSession } from '../hooks/useSession';
+import { useDocumentLibrary } from '../hooks/useDocumentLibrary';
 import FileUpload from './FileUpload';
 import ChatPanel from './ChatPanel';
 import PreviewPanel from './PreviewPanel';
+import DocumentLibrary from './DocumentLibrary';
+import ActiveDrawingBadge from './ActiveDrawingBadge';
+import CompareFromLibrary from './CompareFromLibrary';
 
 export default function Workspace({ user, onSignOut }) {
   const session = useSession();
   const { fileInfo, sessionId, messages, operations, selectedOps, previewUrls, dxfUrls, comparisonResult, loading, loadingStartTime, error } = session;
   const replaceInputRef = useRef(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [compareLibraryOpen, setCompareLibraryOpen] = useState(false);
+
+  const isAuthenticated = !!user;
+  const library = useDocumentLibrary(isAuthenticated);
+
+  // Attempt to reconnect a previously active library session on mount
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    library.tryReconnect().then((data) => {
+      if (data && data.session_id) {
+        const savedDocId = localStorage.getItem('intentcad_active_document_id');
+        session.loadFromLibraryData(data, savedDocId);
+      }
+    });
+    // Intentionally omit library and session from deps — run once on auth
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated]);
 
   // Auto-collapse sidebar when file is uploaded (compact bar already shows info)
   useEffect(() => {
     if (fileInfo) setSidebarCollapsed(true);
   }, [fileInfo]);
+
+  // Load a document from the library into the active session
+  const handleLibraryLoad = useCallback(async (docId) => {
+    try {
+      const data = await library.loadFromLibrary(docId);
+      await session.loadFromLibraryData(data, docId);
+    } catch (err) {
+      // error is surfaced via library.libraryError
+    }
+  }, [library, session]);
+
+  // Compare two library documents (result flows into session's comparisonResult)
+  const handleLibraryCompare = useCallback(async (masterDocId, revisionDocId, profile) => {
+    const data = await library.compareDocuments(masterDocId, revisionDocId, profile);
+    // Surface the result in the session's comparison UI
+    session.compareRevision && console.info('[cad] Library compare result:', data);
+    return data;
+  }, [library, session]);
 
   return (
     <div className="page" style={{ height: '100vh', overflow: 'hidden' }}>
@@ -51,14 +90,43 @@ export default function Workspace({ user, onSignOut }) {
       )}
 
       {!sessionId ? (
-        <main className="flex items-center justify-center" style={{ flex: 1 }}>
-          <div className="container container--narrow">
-            <h2 style={{ textAlign: 'center', marginBottom: 'var(--space-5)' }}>
-              Upload a drawing to get started
-            </h2>
-            <FileUpload onUpload={session.upload} loading={loading} />
-          </div>
-        </main>
+        <div style={{ display: 'flex', flex: 1, overflow: 'hidden', height: 'calc(100vh - 57px)' }}>
+          {/* Library sidebar on the empty state too */}
+          <aside
+            style={{
+              width: 240,
+              borderRight: '1px solid var(--border-default)',
+              background: 'var(--bg-primary)',
+              flexShrink: 0,
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+            }}
+            aria-label="Document library"
+          >
+            <DocumentLibrary
+              documents={library.documents}
+              activeDocumentId={library.activeDocumentId}
+              storageUsage={library.storageUsage}
+              loading={library.libraryLoading}
+              error={library.libraryError}
+              onUpload={library.uploadToLibrary}
+              onLoad={handleLibraryLoad}
+              onDelete={library.deleteFromLibrary}
+              onClearError={library.clearLibraryError}
+              onCompareOpen={library.documents.length >= 2 ? () => setCompareLibraryOpen(true) : null}
+            />
+          </aside>
+
+          <main className="flex items-center justify-center" style={{ flex: 1 }}>
+            <div className="container container--narrow">
+              <h2 style={{ textAlign: 'center', marginBottom: 'var(--space-5)' }}>
+                Upload a drawing to get started
+              </h2>
+              <FileUpload onUpload={session.upload} loading={loading} />
+            </div>
+          </main>
+        </div>
       ) : (
         <div className={`workspace${sidebarCollapsed ? ' workspace--sidebar-collapsed' : ''}`}>
           <div className={`workspace__upload-bar${fileInfo ? ' workspace__upload-bar--compact' : ''}`}>
@@ -68,16 +136,22 @@ export default function Workspace({ user, onSignOut }) {
                 <span className="upload-bar-compact__meta">
                   {fileInfo.entity_count} entities &middot; {fileInfo.layer_count} layers
                 </span>
+                {/* Show badge when document came from library */}
+                {session.documentId && (
+                  <ActiveDrawingBadge filename={fileInfo.filename} />
+                )}
                 <button
                   className="btn btn--ghost btn--sm"
                   onClick={() => setSidebarCollapsed((c) => !c)}
                   title={sidebarCollapsed ? 'Show file info' : 'Hide file info'}
+                  style={{ cursor: 'pointer' }}
                 >
                   {sidebarCollapsed ? 'Info' : 'Hide Info'}
                 </button>
                 <button
                   className="btn btn--ghost btn--sm"
                   onClick={() => replaceInputRef.current?.click()}
+                  style={{ cursor: 'pointer' }}
                 >
                   Replace file
                 </button>
@@ -99,9 +173,36 @@ export default function Workspace({ user, onSignOut }) {
             )}
           </div>
 
-          <aside className="workspace__sidebar" aria-label="File information">
+          <aside className="workspace__sidebar" aria-label="Document library and file information">
+            {/* Document library always visible in the sidebar.
+                Negative margins cancel the sidebar's padding so the library
+                can own its full-bleed layout (header border, scroll area, footer). */}
+            <div style={{
+              height: fileInfo ? '50%' : '100%',
+              minHeight: 0,
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+              margin: 'calc(-1 * var(--space-4)) calc(-1 * var(--space-4)) 0',
+              borderBottom: fileInfo ? '1px solid var(--border-default)' : 'none',
+            }}>
+              <DocumentLibrary
+                documents={library.documents}
+                activeDocumentId={library.activeDocumentId}
+                storageUsage={library.storageUsage}
+                loading={library.libraryLoading}
+                error={library.libraryError}
+                onUpload={library.uploadToLibrary}
+                onLoad={handleLibraryLoad}
+                onDelete={library.deleteFromLibrary}
+                onClearError={library.clearLibraryError}
+                onCompareOpen={library.documents.length >= 2 ? () => setCompareLibraryOpen(true) : null}
+              />
+            </div>
+
+            {/* File metadata — shown below the library when a file is active */}
             {fileInfo && (
-              <div className="file-info">
+              <div className="file-info" style={{ marginTop: 'var(--space-4)', paddingTop: 'var(--space-3)' }}>
                 <div className="file-info__header">
                   <span className="file-info__name">{fileInfo.filename}</span>
                 </div>
@@ -191,6 +292,15 @@ export default function Workspace({ user, onSignOut }) {
             />
           </aside>
         </div>
+      )}
+
+      {/* Compare from Library modal */}
+      {compareLibraryOpen && (
+        <CompareFromLibrary
+          documents={library.documents}
+          onCompare={handleLibraryCompare}
+          onClose={() => setCompareLibraryOpen(false)}
+        />
       )}
     </div>
   );
