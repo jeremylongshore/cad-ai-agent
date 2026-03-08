@@ -123,6 +123,7 @@ class PromptRequest(BaseModel):
     session_id: str
     prompt: str
     selected_regions: list[dict] | None = None
+    client_metadata: dict | None = None
 
 
 class PlanRequest(BaseModel):
@@ -972,6 +973,29 @@ async def v2_prompt(body: PromptRequest, user: dict = Depends(get_user)):
                         -MAX_CONVERSATION_HISTORY:
                     ]
 
+                # Apply precision controls (EPIC-CAD-14)
+                precision_candidates = None
+                precision_action_details = None
+                try:
+                    precision_candidates, precision_action_details = _enrich_with_precision(
+                        changeset, session.context, validation, body.client_metadata,
+                    )
+                    if precision_action_details is not None:
+                        # Re-serialize operations from potentially modified changeset
+                        operations = []
+                        for op in changeset.operations:
+                            operations.append({
+                                "op_type": op.op_type.value
+                                if hasattr(op.op_type, "value")
+                                else str(op.op_type),
+                                "target_handle": op.target_handle,
+                                "target_layer": op.target_layer,
+                                "description": _describe_op(op),
+                                "params": op.params,
+                            })
+                except Exception as prec_err:
+                    logger.warning("Precision enrichment failed (non-fatal): %s", prec_err)
+
                 audit.total_request_time_ms = (_time.monotonic() - total_start) * 1000
 
                 return _enrich(ResponseBuilder.plan_only(
@@ -983,6 +1007,8 @@ async def v2_prompt(body: PromptRequest, user: dict = Depends(get_user)):
                         "is_valid": len(validation.blockers) == 0,
                     },
                     audit=audit,
+                    ambiguity_candidates=precision_candidates,
+                    precision_actions=precision_action_details,
                 ).model_dump())
 
             except Exception as e:
@@ -1876,6 +1902,45 @@ def _enrich_with_objective(
         logger.debug("Strategy lookup failed, skipping stage_pipeline", exc_info=True)
 
     return response
+
+
+def _enrich_with_precision(
+    changeset: "ChangeSet",
+    context: "DrawingContext",
+    validation: Any,
+    client_metadata: dict | None,
+) -> tuple[list[dict] | None, list[dict] | None]:
+    """Build precision enrichment data from client_metadata.
+
+    Returns (ambiguity_candidates, precision_actions) — both None if no
+    precision controls are present.
+    """
+    from cad_dxf_agent.core.precision_filter import (
+        apply_entity_filter,
+        apply_exact_delta,
+        build_action_details,
+        build_match_candidates,
+        parse_precision_controls,
+    )
+
+    controls = parse_precision_controls(client_metadata)
+    if controls is None:
+        return None, None
+
+    # Apply exact delta overrides to move operations
+    if controls.exact_delta:
+        changeset.operations = apply_exact_delta(changeset.operations, controls.exact_delta)
+
+    # Build match candidates for ambiguity reporting
+    filtered = apply_entity_filter(list(context.entities), controls)
+    candidates = build_match_candidates(filtered, controls)
+    candidates_dicts = [c.model_dump() for c in candidates] if candidates else None
+
+    # Build action details
+    details = build_action_details(changeset, context, validation)
+    details_dicts = [d.model_dump() for d in details] if details else None
+
+    return candidates_dicts, details_dicts
 
 
 def _parse_selected_region(selected_regions: list[dict] | None):

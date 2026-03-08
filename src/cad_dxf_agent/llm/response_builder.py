@@ -29,6 +29,8 @@ class ResponseBuilder:
         validation: dict[str, Any] | None = None,
         audit: AuditMetadata | None = None,
         risk_level: RiskLevel | None = None,
+        ambiguity_candidates: list[dict[str, Any]] | None = None,
+        precision_actions: list[dict[str, Any]] | None = None,
     ) -> PlatformResponse:
         """Build a plan_only response (edit operations planned, not yet applied)."""
         return PlatformResponse(
@@ -39,6 +41,8 @@ class ResponseBuilder:
             validation=validation,
             risk_level=_infer_risk(operations, risk_level),
             audit=audit or AuditMetadata(),
+            ambiguity_candidates=ambiguity_candidates or [],
+            precision_actions=precision_actions or [],
         )
 
     @staticmethod
@@ -301,6 +305,8 @@ class ResponseBuilder:
         validation: dict[str, Any] | None = None,
         audit: AuditMetadata | None = None,
         risk_level: RiskLevel | None = None,
+        ambiguity_candidates: list[dict[str, Any]] | None = None,
+        precision_actions: list[dict[str, Any]] | None = None,
     ) -> PlatformResponse:
         """Build a preview_edit response (proposed edit with diff preview)."""
         return PlatformResponse(
@@ -311,6 +317,8 @@ class ResponseBuilder:
             validation=validation,
             risk_level=_infer_risk(operations, risk_level),
             audit=audit or AuditMetadata(),
+            ambiguity_candidates=ambiguity_candidates or [],
+            precision_actions=precision_actions or [],
         )
 
     @staticmethod

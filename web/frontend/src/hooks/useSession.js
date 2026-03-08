@@ -36,6 +36,11 @@ export function useSession() {
   const [editApplyResult, setEditApplyResult] = useState(null);
   const [currentPlanId, setCurrentPlanId] = useState(null);
 
+  // Precision controls state (EPIC-CAD-14)
+  const [precisionControls, setPrecisionControls] = useState(null);
+  const [ambiguityCandidates, setAmbiguityCandidates] = useState([]);
+  const [precisionActions, setPrecisionActions] = useState([]);
+
   // Revision pipeline state
   const [revisionFile, setRevisionFile] = useState(null);
   const [alignmentResult, setAlignmentResult] = useState(null);
@@ -92,9 +97,16 @@ export function useSession() {
     setMessages((prev) => [...prev, msg('user', prompt)]);
 
     try {
+      // Build client metadata from precision controls if set (EPIC-CAD-14)
+      const clientMetadata = precisionControls ? precisionControls : null;
+
       // Route through v2 endpoint first for intent classification
-      const v2Data = await v2Prompt(sessionId, prompt, selectedRegions);
+      const v2Data = await v2Prompt(sessionId, prompt, selectedRegions, clientMetadata);
       const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+
+      // Extract precision-specific response data (EPIC-CAD-14)
+      if (v2Data.ambiguity_candidates) setAmbiguityCandidates(v2Data.ambiguity_candidates);
+      if (v2Data.precision_actions) setPrecisionActions(v2Data.precision_actions);
 
       // Handle Q&A responses directly (no operations)
       if (v2Data.response_type === 'answer_only' || v2Data.task_family === 'qna') {
@@ -175,7 +187,7 @@ export function useSession() {
       setLoading(false);
       setLoadingStartTime(null);
     }
-  }, [sessionId]);
+  }, [sessionId, precisionControls]);
 
   const retryLastAi = useCallback((messageId) => {
     // Remove the AI message (and any validation messages after it) then re-send
@@ -595,6 +607,9 @@ export function useSession() {
     setEditApproval(null);
     setEditApplyResult(null);
     setCurrentPlanId(null);
+    setPrecisionControls(null);
+    setAmbiguityCandidates([]);
+    setPrecisionActions([]);
     lastPromptRef.current = null;
   }, [previewUrls, dxfUrls]);
 
@@ -641,6 +656,10 @@ export function useSession() {
     approvePlan,
     approveAndApplyPlan,
     applyPlan,
+    precisionControls,
+    setPrecisionControls,
+    ambiguityCandidates,
+    precisionActions,
     reset,
   };
 }

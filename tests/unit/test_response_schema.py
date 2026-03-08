@@ -393,3 +393,63 @@ class TestPlatformResponse:
         )
         assert resp.response_type == ResponseType.APPLIED_EDIT
         assert resp.task_family == TaskFamily.APPLY_EDIT
+
+    def test_ambiguity_candidates_default_empty(self):
+        resp = PlatformResponse(
+            task_family=TaskFamily.EDIT_PLAN,
+            response_type=ResponseType.PLAN_ONLY,
+            message="test",
+        )
+        assert resp.ambiguity_candidates == []
+
+    def test_ambiguity_candidates_populated(self):
+        candidates = [
+            {
+                "handle": "A1",
+                "layer": "WALLS",
+                "entity_type": "LINE",
+                "confidence": 0.9,
+                "match_reason": "exact_handle",
+                "location": None,
+            }
+        ]
+        resp = PlatformResponse(
+            task_family=TaskFamily.EDIT_PLAN,
+            response_type=ResponseType.PLAN_ONLY,
+            message="test",
+            ambiguity_candidates=candidates,
+        )
+        assert len(resp.ambiguity_candidates) == 1
+        assert resp.ambiguity_candidates[0]["handle"] == "A1"
+
+    def test_precision_actions_default_empty(self):
+        resp = PlatformResponse(
+            task_family=TaskFamily.EDIT_PLAN,
+            response_type=ResponseType.PLAN_ONLY,
+            message="test",
+        )
+        assert resp.precision_actions == []
+
+    def test_precision_actions_populated(self):
+        actions = [
+            {
+                "entity_handle": "B2",
+                "entity_type": "TEXT",
+                "layer": "NOTES",
+                "action": "edit_text",
+                "before": {},
+                "after": {"text": "new"},
+                "status": "planned",
+                "skip_reason": None,
+                "confidence": 1.0,
+                "evidence": [],
+            }
+        ]
+        resp = PlatformResponse(
+            task_family=TaskFamily.EDIT_PLAN,
+            response_type=ResponseType.PLAN_ONLY,
+            message="test",
+            precision_actions=actions,
+        )
+        assert len(resp.precision_actions) == 1
+        assert resp.precision_actions[0]["action"] == "edit_text"
