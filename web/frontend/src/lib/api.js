@@ -236,6 +236,67 @@ export function revisionDownloadUrl(sessionId) {
   return `${API_BASE}/api/revision/download?session_id=${sessionId}`;
 }
 
+// --- Document Library (EPIC-CAD-15) ---
+
+export async function listDocuments() {
+  const res = await request('/api/documents');
+  return res.json();
+}
+
+export async function uploadDocument(file) {
+  const formData = new FormData();
+  formData.append('file', file);
+  const res = await request('/api/documents', {
+    method: 'POST',
+    body: formData,
+    _timeout: UPLOAD_TIMEOUT_MS,
+  });
+  return res.json();
+}
+
+export async function getDocumentInfo(docId) {
+  const res = await request(`/api/documents/${docId}`);
+  return res.json();
+}
+
+export async function deleteDocument(docId) {
+  const res = await request(`/api/documents/${docId}`, { method: 'DELETE' });
+  return res.json();
+}
+
+export async function loadDocument(docId) {
+  const res = await request(`/api/documents/${docId}/load`, { method: 'POST' });
+  return res.json();
+}
+
+export async function listActiveSessions() {
+  const res = await request('/api/sessions/active');
+  return res.json();
+}
+
+export async function reconnectSession(documentId) {
+  const res = await request('/api/session/reconnect', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ document_id: documentId }),
+  });
+  return res.json();
+}
+
+export async function getStorageUsage() {
+  const res = await request('/api/documents/usage');
+  return res.json();
+}
+
+export async function compareLibraryDocuments(masterDocId, revisionDocId, profile = null) {
+  const res = await request('/api/documents/compare', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ master_doc_id: masterDocId, revision_doc_id: revisionDocId, profile }),
+  });
+  return res.json();
+}
+
 // --- v2 Preview / Approve / Apply (EPIC-CAD-08) ---
 
 export async function v2Preview(sessionId) {
