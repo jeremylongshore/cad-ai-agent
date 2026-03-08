@@ -251,6 +251,53 @@ async def health():
     return {"status": "ok", "service": "cad-dxf-web"}
 
 
+class DrawingHealthRequest(BaseModel):
+    session_id: str
+
+
+@app.post("/api/drawing-health")
+async def drawing_health_check(
+    req: DrawingHealthRequest,
+    user=Depends(get_licensed_user),
+):
+    """Run drawing health analysis on the uploaded DXF in a session.
+
+    Returns a structured health report with score, issues, and evidence.
+    """
+    with otel_span("api.drawing_health") as span:
+        try:
+            session = session_mgr.get(req.session_id, user["uid"])
+        except (KeyError, PermissionError) as e:
+            raise HTTPException(404, str(e))
+
+        span.set_attribute("cad.session_id", req.session_id)
+
+        dxf_path = session.original_path
+        if dxf_path is None or not dxf_path.exists():
+            raise HTTPException(400, "No DXF file in session")
+
+        from cad_dxf_agent.core.dxf_reader import load_dxf
+        from cad_dxf_agent.core.health_checker import check_drawing_health
+
+        context = load_dxf(str(dxf_path))
+        report = check_drawing_health(context)
+
+        span.set_attribute("cad.health.score", report.score)
+        span.set_attribute("cad.health.issues", len(report.issues))
+
+        return {
+            "score": report.score,
+            "summary": report.summary,
+            "issues": [issue.model_dump() for issue in report.issues],
+            "checks_run": report.checks_run,
+            "entity_count": report.entity_count,
+            "layer_count": report.layer_count,
+            "critical_count": report.critical_count,
+            "warning_count": report.warning_count,
+            "info_count": report.info_count,
+        }
+
+
 @app.get("/api/profiles")
 async def get_profiles():
     """List available comparison profiles (builtins only)."""
