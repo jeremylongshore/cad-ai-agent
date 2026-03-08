@@ -46,6 +46,7 @@ class SessionMetadata:
     conversation_history: list[dict] = field(default_factory=list)
     audit_events: list = field(default_factory=list)
     # Paths stored as strings for serialization
+    document_id: str = ""  # Links session to a stored document (EPIC-CAD-15)
     original_path: str = ""
     working_path: str = ""
     edited_path: str = ""
