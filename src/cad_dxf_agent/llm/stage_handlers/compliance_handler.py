@@ -81,12 +81,7 @@ def _detect_profile(prompt: str) -> str:
 
 def _build_summary(report) -> str:
     """Build a human-readable summary of compliance results."""
-    parts = [f"Compliance check ({report.profile_name}):"]
-    if report.passed:
-        parts.append("PASSED")
-    else:
-        parts.append(f"FAILED — {report.violation_count} violation(s)")
-    if report.warning_count:
-        parts.append(f", {report.warning_count} warning(s)")
-    parts.append(f". Score: {report.score:.0f}/100.")
-    return " ".join(parts)
+    status = "PASSED" if report.passed else f"FAILED — {report.violation_count} violation(s)"
+    warnings = f" with {report.warning_count} warning(s)" if report.warning_count else ""
+    score = f". Score: {report.score:.0f}/100."
+    return f"Compliance check ({report.profile_name}): {status}{warnings}{score}"

@@ -337,8 +337,7 @@ async def drawing_compliance_check(
         if req.profile not in BUILTIN_PROFILES:
             raise HTTPException(
                 422,
-                f"Unknown profile: {req.profile}. "
-                f"Available: {', '.join(BUILTIN_PROFILES)}",
+                f"Unknown profile: {req.profile}. Available: {', '.join(BUILTIN_PROFILES)}",
             )
 
         context = load_dxf(str(dxf_path))
