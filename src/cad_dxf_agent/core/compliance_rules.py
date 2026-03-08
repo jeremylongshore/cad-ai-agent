@@ -68,8 +68,7 @@ def check_compliance(
         prof = BUILTIN_PROFILES.get(profile)
         if prof is None:
             raise ValueError(
-                f"Unknown profile: {profile}. "
-                f"Available: {', '.join(BUILTIN_PROFILES)}"
+                f"Unknown profile: {profile}. Available: {', '.join(BUILTIN_PROFILES)}"
             )
     else:
         prof = profile
@@ -91,15 +90,9 @@ def check_compliance(
             results = check_fn(context, zones, index, thresholds)
             findings.extend(results)
 
-    violation_count = sum(
-        1 for f in findings if f.severity == ComplianceSeverity.VIOLATION
-    )
-    warning_count = sum(
-        1 for f in findings if f.severity == ComplianceSeverity.WARNING
-    )
-    pass_count = sum(
-        1 for f in findings if f.severity == ComplianceSeverity.PASS
-    )
+    violation_count = sum(1 for f in findings if f.severity == ComplianceSeverity.VIOLATION)
+    warning_count = sum(1 for f in findings if f.severity == ComplianceSeverity.WARNING)
+    pass_count = sum(1 for f in findings if f.severity == ComplianceSeverity.PASS)
 
     return ComplianceReport(
         profile_name=prof.name,
@@ -138,36 +131,40 @@ def _check_door_widths(
         width = _extract_dimension_from_attributes(entity.attributes)
 
         if width is not None and width < thresholds.min_door_width:
-            findings.append(ComplianceFinding(
-                rule_id="DOOR-WIDTH-001",
-                category=ComplianceCategory.DOOR,
-                severity=ComplianceSeverity.VIOLATION,
-                title="Door width below minimum",
-                description=(
-                    f"Door '{entity.block_name}' has width {width:.1f} "
-                    f"but minimum is {thresholds.min_door_width:.1f}"
-                ),
-                code_reference="ADA 404.2.3 / IBC 1010.1.1",
-                entity_handles=[entity.handle],
-                measured_value=width,
-                required_value=thresholds.min_door_width,
-                unit="drawing_units",
-            ))
+            findings.append(
+                ComplianceFinding(
+                    rule_id="DOOR-WIDTH-001",
+                    category=ComplianceCategory.DOOR,
+                    severity=ComplianceSeverity.VIOLATION,
+                    title="Door width below minimum",
+                    description=(
+                        f"Door '{entity.block_name}' has width {width:.1f} "
+                        f"but minimum is {thresholds.min_door_width:.1f}"
+                    ),
+                    code_reference="ADA 404.2.3 / IBC 1010.1.1",
+                    entity_handles=[entity.handle],
+                    measured_value=width,
+                    required_value=thresholds.min_door_width,
+                    unit="drawing_units",
+                )
+            )
         elif width is not None and width >= thresholds.min_door_width:
-            findings.append(ComplianceFinding(
-                rule_id="DOOR-WIDTH-001",
-                category=ComplianceCategory.DOOR,
-                severity=ComplianceSeverity.PASS,
-                title="Door width meets minimum",
-                description=(
-                    f"Door '{entity.block_name}' width {width:.1f} "
-                    f"meets minimum {thresholds.min_door_width:.1f}"
-                ),
-                entity_handles=[entity.handle],
-                measured_value=width,
-                required_value=thresholds.min_door_width,
-                unit="drawing_units",
-            ))
+            findings.append(
+                ComplianceFinding(
+                    rule_id="DOOR-WIDTH-001",
+                    category=ComplianceCategory.DOOR,
+                    severity=ComplianceSeverity.PASS,
+                    title="Door width meets minimum",
+                    description=(
+                        f"Door '{entity.block_name}' width {width:.1f} "
+                        f"meets minimum {thresholds.min_door_width:.1f}"
+                    ),
+                    entity_handles=[entity.handle],
+                    measured_value=width,
+                    required_value=thresholds.min_door_width,
+                    unit="drawing_units",
+                )
+            )
 
     return findings
 
@@ -185,48 +182,49 @@ def _check_hallway_widths(
     """
     findings: list[ComplianceFinding] = []
 
-    hallways = [
-        z for z in zones.zones
-        if z.inferred_type in ("hallway", "corridor")
-    ]
+    hallways = [z for z in zones.zones if z.inferred_type in ("hallway", "corridor")]
 
     for zone in hallways:
         min_dim = _zone_min_dimension(zone)
         if min_dim < thresholds.min_hallway_width:
-            findings.append(ComplianceFinding(
-                rule_id="CORRIDOR-WIDTH-001",
-                category=ComplianceCategory.CORRIDOR,
-                severity=ComplianceSeverity.VIOLATION,
-                title="Corridor width below minimum",
-                description=(
-                    f"Corridor (zone {zone.zone_id[:8]}) has width "
-                    f"{min_dim:.1f} but minimum is "
-                    f"{thresholds.min_hallway_width:.1f}"
-                ),
-                code_reference="IBC 1020.2 / ADA 403.5.1",
-                zone_id=zone.zone_id,
-                entity_handles=zone.source_handles,
-                measured_value=min_dim,
-                required_value=thresholds.min_hallway_width,
-                unit="drawing_units",
-            ))
+            findings.append(
+                ComplianceFinding(
+                    rule_id="CORRIDOR-WIDTH-001",
+                    category=ComplianceCategory.CORRIDOR,
+                    severity=ComplianceSeverity.VIOLATION,
+                    title="Corridor width below minimum",
+                    description=(
+                        f"Corridor (zone {zone.zone_id[:8]}) has width "
+                        f"{min_dim:.1f} but minimum is "
+                        f"{thresholds.min_hallway_width:.1f}"
+                    ),
+                    code_reference="IBC 1020.2 / ADA 403.5.1",
+                    zone_id=zone.zone_id,
+                    entity_handles=zone.source_handles,
+                    measured_value=min_dim,
+                    required_value=thresholds.min_hallway_width,
+                    unit="drawing_units",
+                )
+            )
         else:
-            findings.append(ComplianceFinding(
-                rule_id="CORRIDOR-WIDTH-001",
-                category=ComplianceCategory.CORRIDOR,
-                severity=ComplianceSeverity.PASS,
-                title="Corridor width meets minimum",
-                description=(
-                    f"Corridor (zone {zone.zone_id[:8]}) width "
-                    f"{min_dim:.1f} meets minimum "
-                    f"{thresholds.min_hallway_width:.1f}"
-                ),
-                zone_id=zone.zone_id,
-                entity_handles=zone.source_handles,
-                measured_value=min_dim,
-                required_value=thresholds.min_hallway_width,
-                unit="drawing_units",
-            ))
+            findings.append(
+                ComplianceFinding(
+                    rule_id="CORRIDOR-WIDTH-001",
+                    category=ComplianceCategory.CORRIDOR,
+                    severity=ComplianceSeverity.PASS,
+                    title="Corridor width meets minimum",
+                    description=(
+                        f"Corridor (zone {zone.zone_id[:8]}) width "
+                        f"{min_dim:.1f} meets minimum "
+                        f"{thresholds.min_hallway_width:.1f}"
+                    ),
+                    zone_id=zone.zone_id,
+                    entity_handles=zone.source_handles,
+                    measured_value=min_dim,
+                    required_value=thresholds.min_hallway_width,
+                    unit="drawing_units",
+                )
+            )
 
     return findings
 
@@ -244,8 +242,14 @@ def _check_room_areas(
     findings: list[ComplianceFinding] = []
 
     habitable_types = {
-        "bedroom", "living_room", "family_room", "dining_room",
-        "kitchen", "office", "room", "large_room",
+        "bedroom",
+        "living_room",
+        "family_room",
+        "dining_room",
+        "kitchen",
+        "office",
+        "room",
+        "large_room",
     }
     bathroom_types = {"bathroom"}
 
@@ -256,63 +260,67 @@ def _check_room_areas(
                 min_area = thresholds.min_bedroom_area
 
             if zone.area < min_area:
-                findings.append(ComplianceFinding(
-                    rule_id="ROOM-AREA-001",
-                    category=ComplianceCategory.ROOM_SIZE,
-                    severity=ComplianceSeverity.VIOLATION,
-                    title=f"{zone.inferred_type.replace('_', ' ').title()} "
-                          f"area below minimum",
-                    description=(
-                        f"Zone {zone.zone_id[:8]} "
-                        f"({zone.inferred_type}) has area {zone.area:.1f} "
-                        f"but minimum is {min_area:.1f}"
-                    ),
-                    code_reference="IBC 1208.1 / IRC R304.1",
-                    zone_id=zone.zone_id,
-                    entity_handles=zone.source_handles,
-                    measured_value=zone.area,
-                    required_value=min_area,
-                    unit="drawing_units²",
-                ))
+                findings.append(
+                    ComplianceFinding(
+                        rule_id="ROOM-AREA-001",
+                        category=ComplianceCategory.ROOM_SIZE,
+                        severity=ComplianceSeverity.VIOLATION,
+                        title=f"{zone.inferred_type.replace('_', ' ').title()} area below minimum",
+                        description=(
+                            f"Zone {zone.zone_id[:8]} "
+                            f"({zone.inferred_type}) has area {zone.area:.1f} "
+                            f"but minimum is {min_area:.1f}"
+                        ),
+                        code_reference="IBC 1208.1 / IRC R304.1",
+                        zone_id=zone.zone_id,
+                        entity_handles=zone.source_handles,
+                        measured_value=zone.area,
+                        required_value=min_area,
+                        unit="drawing_units²",
+                    )
+                )
             else:
-                findings.append(ComplianceFinding(
-                    rule_id="ROOM-AREA-001",
-                    category=ComplianceCategory.ROOM_SIZE,
-                    severity=ComplianceSeverity.PASS,
-                    title=f"{zone.inferred_type.replace('_', ' ').title()} "
-                          f"area meets minimum",
-                    description=(
-                        f"Zone {zone.zone_id[:8]} "
-                        f"({zone.inferred_type}) area {zone.area:.1f} "
-                        f"meets minimum {min_area:.1f}"
-                    ),
-                    zone_id=zone.zone_id,
-                    entity_handles=zone.source_handles,
-                    measured_value=zone.area,
-                    required_value=min_area,
-                    unit="drawing_units²",
-                ))
+                findings.append(
+                    ComplianceFinding(
+                        rule_id="ROOM-AREA-001",
+                        category=ComplianceCategory.ROOM_SIZE,
+                        severity=ComplianceSeverity.PASS,
+                        title=f"{zone.inferred_type.replace('_', ' ').title()} area meets minimum",
+                        description=(
+                            f"Zone {zone.zone_id[:8]} "
+                            f"({zone.inferred_type}) area {zone.area:.1f} "
+                            f"meets minimum {min_area:.1f}"
+                        ),
+                        zone_id=zone.zone_id,
+                        entity_handles=zone.source_handles,
+                        measured_value=zone.area,
+                        required_value=min_area,
+                        unit="drawing_units²",
+                    )
+                )
 
         elif zone.inferred_type in bathroom_types:
             min_area = thresholds.min_bathroom_area
             if zone.area < min_area:
-                findings.append(ComplianceFinding(
-                    rule_id="ROOM-AREA-002",
-                    category=ComplianceCategory.ROOM_SIZE,
-                    severity=ComplianceSeverity.WARNING,
-                    title="Bathroom area below recommended minimum",
-                    description=(
-                        f"Zone {zone.zone_id[:8]} (bathroom) has area "
-                        f"{zone.area:.1f} but recommended minimum is "
-                        f"{min_area:.1f}"
-                    ),
-                    code_reference="IRC R304",
-                    zone_id=zone.zone_id,
-                    entity_handles=zone.source_handles,
-                    measured_value=zone.area,
-                    required_value=min_area,
-                    unit="drawing_units²",
-                ))
+                findings.append(
+                    ComplianceFinding(
+                        rule_id="ROOM-AREA-002",
+                        category=ComplianceCategory.ROOM_SIZE,
+                        severity=ComplianceSeverity.WARNING,
+                        title="Bathroom area below recommended minimum",
+                        description=(
+                            f"Zone {zone.zone_id[:8]} (bathroom) has area "
+                            f"{zone.area:.1f} but recommended minimum is "
+                            f"{min_area:.1f}"
+                        ),
+                        code_reference="IRC R304",
+                        zone_id=zone.zone_id,
+                        entity_handles=zone.source_handles,
+                        measured_value=zone.area,
+                        required_value=min_area,
+                        unit="drawing_units²",
+                    )
+                )
 
     return findings
 
@@ -331,8 +339,14 @@ def _check_egress(
     findings: list[ComplianceFinding] = []
 
     habitable_types = {
-        "bedroom", "living_room", "family_room", "dining_room",
-        "kitchen", "office", "room", "large_room",
+        "bedroom",
+        "living_room",
+        "family_room",
+        "dining_room",
+        "kitchen",
+        "office",
+        "room",
+        "large_room",
     }
 
     doors = _find_blocks_by_pattern(context, _DOOR_PATTERNS)
@@ -358,35 +372,39 @@ def _check_egress(
                 break
 
         if not has_egress:
-            findings.append(ComplianceFinding(
-                rule_id="EGRESS-001",
-                category=ComplianceCategory.EGRESS,
-                severity=ComplianceSeverity.WARNING,
-                title="Room may lack egress",
-                description=(
-                    f"Zone {zone.zone_id[:8]} "
-                    f"({zone.inferred_type}) has no door or window "
-                    f"detected within {search_radius:.0f} units of "
-                    f"its centroid"
-                ),
-                code_reference="IBC 1030.1 / IRC R310.1",
-                zone_id=zone.zone_id,
-                entity_handles=zone.source_handles,
-            ))
+            findings.append(
+                ComplianceFinding(
+                    rule_id="EGRESS-001",
+                    category=ComplianceCategory.EGRESS,
+                    severity=ComplianceSeverity.WARNING,
+                    title="Room may lack egress",
+                    description=(
+                        f"Zone {zone.zone_id[:8]} "
+                        f"({zone.inferred_type}) has no door or window "
+                        f"detected within {search_radius:.0f} units of "
+                        f"its centroid"
+                    ),
+                    code_reference="IBC 1030.1 / IRC R310.1",
+                    zone_id=zone.zone_id,
+                    entity_handles=zone.source_handles,
+                )
+            )
         else:
-            findings.append(ComplianceFinding(
-                rule_id="EGRESS-001",
-                category=ComplianceCategory.EGRESS,
-                severity=ComplianceSeverity.PASS,
-                title="Room has egress",
-                description=(
-                    f"Zone {zone.zone_id[:8]} "
-                    f"({zone.inferred_type}) has door/window "
-                    f"within {search_radius:.0f} units"
-                ),
-                zone_id=zone.zone_id,
-                entity_handles=zone.source_handles,
-            ))
+            findings.append(
+                ComplianceFinding(
+                    rule_id="EGRESS-001",
+                    category=ComplianceCategory.EGRESS,
+                    severity=ComplianceSeverity.PASS,
+                    title="Room has egress",
+                    description=(
+                        f"Zone {zone.zone_id[:8]} "
+                        f"({zone.inferred_type}) has door/window "
+                        f"within {search_radius:.0f} units"
+                    ),
+                    zone_id=zone.zone_id,
+                    entity_handles=zone.source_handles,
+                )
+            )
 
     return findings
 
@@ -408,27 +426,31 @@ def _check_door_count(
 
     doors = _find_blocks_by_pattern(context, _DOOR_PATTERNS)
     if not doors:
-        findings.append(ComplianceFinding(
-            rule_id="DOOR-COUNT-001",
-            category=ComplianceCategory.DOOR,
-            severity=ComplianceSeverity.WARNING,
-            title="No doors detected in drawing",
-            description=(
-                "Drawing has rooms but no door blocks detected. "
-                "Verify door symbols use standard block names "
-                "(DOOR, DR-, ENTRY, EXIT)."
-            ),
-            code_reference="IBC 1010.1",
-        ))
+        findings.append(
+            ComplianceFinding(
+                rule_id="DOOR-COUNT-001",
+                category=ComplianceCategory.DOOR,
+                severity=ComplianceSeverity.WARNING,
+                title="No doors detected in drawing",
+                description=(
+                    "Drawing has rooms but no door blocks detected. "
+                    "Verify door symbols use standard block names "
+                    "(DOOR, DR-, ENTRY, EXIT)."
+                ),
+                code_reference="IBC 1010.1",
+            )
+        )
     else:
-        findings.append(ComplianceFinding(
-            rule_id="DOOR-COUNT-001",
-            category=ComplianceCategory.DOOR,
-            severity=ComplianceSeverity.PASS,
-            title=f"{len(doors)} door(s) detected",
-            description=f"Drawing has {len(doors)} door block(s).",
-            entity_handles=[d.handle for d in doors[:10]],
-        ))
+        findings.append(
+            ComplianceFinding(
+                rule_id="DOOR-COUNT-001",
+                category=ComplianceCategory.DOOR,
+                severity=ComplianceSeverity.PASS,
+                title=f"{len(doors)} door(s) detected",
+                description=f"Drawing has {len(doors)} door block(s).",
+                entity_handles=[d.handle for d in doors[:10]],
+            )
+        )
 
     return findings
 
@@ -445,31 +467,30 @@ def _check_dead_end_corridors(
     """
     findings: list[ComplianceFinding] = []
 
-    hallways = [
-        z for z in zones.zones
-        if z.inferred_type in ("hallway", "corridor")
-    ]
+    hallways = [z for z in zones.zones if z.inferred_type in ("hallway", "corridor")]
 
     for zone in hallways:
         max_dim = _zone_max_dimension(zone)
         if max_dim > thresholds.max_dead_end_corridor_length:
-            findings.append(ComplianceFinding(
-                rule_id="CORRIDOR-LENGTH-001",
-                category=ComplianceCategory.CORRIDOR,
-                severity=ComplianceSeverity.WARNING,
-                title="Corridor may exceed dead-end limit",
-                description=(
-                    f"Corridor (zone {zone.zone_id[:8]}) has length "
-                    f"{max_dim:.1f} which exceeds dead-end limit of "
-                    f"{thresholds.max_dead_end_corridor_length:.1f}"
-                ),
-                code_reference="IBC 1020.4",
-                zone_id=zone.zone_id,
-                entity_handles=zone.source_handles,
-                measured_value=max_dim,
-                required_value=thresholds.max_dead_end_corridor_length,
-                unit="drawing_units",
-            ))
+            findings.append(
+                ComplianceFinding(
+                    rule_id="CORRIDOR-LENGTH-001",
+                    category=ComplianceCategory.CORRIDOR,
+                    severity=ComplianceSeverity.WARNING,
+                    title="Corridor may exceed dead-end limit",
+                    description=(
+                        f"Corridor (zone {zone.zone_id[:8]}) has length "
+                        f"{max_dim:.1f} which exceeds dead-end limit of "
+                        f"{thresholds.max_dead_end_corridor_length:.1f}"
+                    ),
+                    code_reference="IBC 1020.4",
+                    zone_id=zone.zone_id,
+                    entity_handles=zone.source_handles,
+                    measured_value=max_dim,
+                    required_value=thresholds.max_dead_end_corridor_length,
+                    unit="drawing_units",
+                )
+            )
 
     return findings
 
