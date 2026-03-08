@@ -169,7 +169,14 @@ def _summarize_change(change: AppliedChange) -> str:
 
     elif op.op_type == OpType.ADD_ARC:
         center = op.params.get("center", {})
-        return f"Added arc at ({center.get('x', 0)}, {center.get('y', 0)})"
+        radius = op.params.get("radius", 0)
+        start_angle = op.params.get("start_angle", 0)
+        end_angle = op.params.get("end_angle", 0)
+        return (
+            f"Added arc r={radius:.2f} "
+            f"@({center.get('x', 0):.2f}, {center.get('y', 0):.2f}) "
+            f"{start_angle:.1f}\u00b0-{end_angle:.1f}\u00b0"
+        )
 
     elif op.op_type == OpType.ADD_TEXT:
         text = op.params.get("text", "")

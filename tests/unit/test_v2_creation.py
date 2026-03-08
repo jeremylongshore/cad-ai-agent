@@ -1227,8 +1227,8 @@ class TestAddTextToolExecutor:
     def test_result_contains_text_and_position(self, executor):
         result = executor.execute("add_text", {"text": "CHECK", "x": 11, "y": 22})
         assert result["text"] == "CHECK"
-        assert result["x"] == 11
-        assert result["y"] == 22
+        assert result["insert"]["x"] == 11
+        assert result["insert"]["y"] == 22
 
     def test_editable_layer_queued(self, executor):
         result = executor.execute(

@@ -384,34 +384,35 @@ MIRROR_ENTITY = {
 # V2 entity creation tools
 # ---------------------------------------------------------------------------
 
+_POINT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "x": {"type": "number"},
+        "y": {"type": "number"},
+    },
+    "required": ["x", "y"],
+}
+
 ADD_LINE = {
     "name": "add_line",
     "description": ("Draw a new line between two points. Cannot create on protected layers."),
     "parameters": {
         "type": "object",
         "properties": {
-            "start_x": {
-                "type": "number",
-                "description": "X coordinate of start point",
+            "start": {
+                **_POINT_SCHEMA,
+                "description": "Start point {x, y}",
             },
-            "start_y": {
-                "type": "number",
-                "description": "Y coordinate of start point",
-            },
-            "end_x": {
-                "type": "number",
-                "description": "X coordinate of end point",
-            },
-            "end_y": {
-                "type": "number",
-                "description": "Y coordinate of end point",
+            "end": {
+                **_POINT_SCHEMA,
+                "description": "End point {x, y}",
             },
             "layer": {
                 "type": "string",
                 "description": "Target layer name (optional)",
             },
         },
-        "required": ["start_x", "start_y", "end_x", "end_y"],
+        "required": ["start", "end"],
     },
 }
 
@@ -459,13 +460,9 @@ ADD_CIRCLE = {
     "parameters": {
         "type": "object",
         "properties": {
-            "center_x": {
-                "type": "number",
-                "description": "X coordinate of center",
-            },
-            "center_y": {
-                "type": "number",
-                "description": "Y coordinate of center",
+            "center": {
+                **_POINT_SCHEMA,
+                "description": "Center point {x, y}",
             },
             "radius": {
                 "type": "number",
@@ -476,7 +473,7 @@ ADD_CIRCLE = {
                 "description": "Target layer name (optional)",
             },
         },
-        "required": ["center_x", "center_y", "radius"],
+        "required": ["center", "radius"],
     },
 }
 
@@ -490,13 +487,9 @@ ADD_ARC = {
     "parameters": {
         "type": "object",
         "properties": {
-            "center_x": {
-                "type": "number",
-                "description": "X coordinate of arc center",
-            },
-            "center_y": {
-                "type": "number",
-                "description": "Y coordinate of arc center",
+            "center": {
+                **_POINT_SCHEMA,
+                "description": "Center point {x, y}",
             },
             "radius": {
                 "type": "number",
@@ -515,7 +508,7 @@ ADD_ARC = {
                 "description": "Target layer name (optional)",
             },
         },
-        "required": ["center_x", "center_y", "radius", "start_angle", "end_angle"],
+        "required": ["center", "radius", "start_angle", "end_angle"],
     },
 }
 
@@ -533,13 +526,9 @@ ADD_TEXT_TOOL = {
                 "type": "string",
                 "description": "The text content to add",
             },
-            "x": {
-                "type": "number",
-                "description": "X coordinate for text insertion point",
-            },
-            "y": {
-                "type": "number",
-                "description": "Y coordinate for text insertion point",
+            "insert": {
+                **_POINT_SCHEMA,
+                "description": "Insertion point {x, y}",
             },
             "height": {
                 "type": "number",
@@ -559,7 +548,7 @@ ADD_TEXT_TOOL = {
                 "description": "TEXT (single line) or MTEXT (multi-line). Default TEXT.",
             },
         },
-        "required": ["text", "x", "y"],
+        "required": ["text", "insert"],
     },
 }
 

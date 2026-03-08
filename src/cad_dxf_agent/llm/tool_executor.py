@@ -372,21 +372,21 @@ class ToolExecutor:
         if layer and layer.upper() in self._protected:
             return {"error": f"Cannot create entity on protected layer: {layer}"}
 
+        # Accept both Point2D objects and flat coordinates for backward compat
+        start = args.get("start") or {"x": args.get("start_x", 0), "y": args.get("start_y", 0)}
+        end = args.get("end") or {"x": args.get("end_x", 0), "y": args.get("end_y", 0)}
+
         op = EditOperation(
             op_type=OpType.ADD_LINE,
             target_layer=layer,
-            params={
-                "start": {"x": args["start_x"], "y": args["start_y"]},
-                "end": {"x": args["end_x"], "y": args["end_y"]},
-                "layer": layer,
-            },
+            params={"start": start, "end": end, "layer": layer},
         )
         self._operations.append(op)
         return {
             "status": "queued",
             "operation": "add_line",
-            "start": {"x": args["start_x"], "y": args["start_y"]},
-            "end": {"x": args["end_x"], "y": args["end_y"]},
+            "start": start,
+            "end": end,
         }
 
     def _add_polyline(self, args: dict[str, Any]) -> dict[str, Any]:
@@ -419,20 +419,19 @@ class ToolExecutor:
         if layer and layer.upper() in self._protected:
             return {"error": f"Cannot create entity on protected layer: {layer}"}
 
+        # Accept both Point2D object and flat coordinates
+        center = args.get("center") or {"x": args.get("center_x", 0), "y": args.get("center_y", 0)}
+
         op = EditOperation(
             op_type=OpType.ADD_CIRCLE,
             target_layer=layer,
-            params={
-                "center": {"x": args["center_x"], "y": args["center_y"]},
-                "radius": args["radius"],
-                "layer": layer,
-            },
+            params={"center": center, "radius": args["radius"], "layer": layer},
         )
         self._operations.append(op)
         return {
             "status": "queued",
             "operation": "add_circle",
-            "center": {"x": args["center_x"], "y": args["center_y"]},
+            "center": center,
             "radius": args["radius"],
         }
 
@@ -441,11 +440,14 @@ class ToolExecutor:
         if layer and layer.upper() in self._protected:
             return {"error": f"Cannot create entity on protected layer: {layer}"}
 
+        # Accept both Point2D object and flat coordinates
+        center = args.get("center") or {"x": args.get("center_x", 0), "y": args.get("center_y", 0)}
+
         op = EditOperation(
             op_type=OpType.ADD_ARC,
             target_layer=layer,
             params={
-                "center": {"x": args["center_x"], "y": args["center_y"]},
+                "center": center,
                 "radius": args["radius"],
                 "start_angle": args["start_angle"],
                 "end_angle": args["end_angle"],
@@ -456,7 +458,7 @@ class ToolExecutor:
         return {
             "status": "queued",
             "operation": "add_arc",
-            "center": {"x": args["center_x"], "y": args["center_y"]},
+            "center": center,
             "radius": args["radius"],
         }
 
@@ -467,12 +469,15 @@ class ToolExecutor:
 
         text_type = args.get("text_type", "TEXT")
 
+        # Accept both Point2D object and flat coordinates
+        insert = args.get("insert") or {"x": args.get("x", 0), "y": args.get("y", 0)}
+
         op = EditOperation(
             op_type=OpType.ADD_TEXT,
             target_layer=layer,
             params={
                 "text": args["text"],
-                "insert": {"x": args["x"], "y": args["y"]},
+                "insert": insert,
                 "height": args.get("height", 2.5),
                 "rotation": args.get("rotation", 0),
                 "text_type": text_type,
@@ -484,8 +489,7 @@ class ToolExecutor:
             "status": "queued",
             "operation": "add_text",
             "text": args["text"],
-            "x": args["x"],
-            "y": args["y"],
+            "insert": insert,
         }
 
 
