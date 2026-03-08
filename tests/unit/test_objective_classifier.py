@@ -3,7 +3,18 @@
 import pytest
 
 from cad_dxf_agent.llm.objective_classifier import ObjectiveClassifier
-from cad_dxf_agent.models.objective_schema import ObjectiveTag, RequestClass
+from cad_dxf_agent.models.cad_schema import (
+    DrawingContext,
+    EntityRef,
+    EntityType,
+    LayerRule,
+    Point2D,
+)
+from cad_dxf_agent.models.objective_schema import (
+    DocumentFamilyHint,
+    ObjectiveTag,
+    RequestClass,
+)
 from cad_dxf_agent.models.response_schema import TaskFamily
 
 
@@ -185,3 +196,69 @@ class TestClassificationMetadata:
     def test_source_is_heuristic(self, classifier):
         result = classifier.classify("count all doors")
         assert result.source == "heuristic"
+
+
+def _make_context(
+    *,
+    layers: list[str] | None = None,
+    blocks: list[str] | None = None,
+    texts: list[tuple[str, str]] | None = None,
+) -> DrawingContext:
+    """Build a minimal DrawingContext for family detection tests."""
+    layer_rules = [LayerRule(name=n) for n in (layers or ["0"])]
+    entities: list[EntityRef] = []
+    for i, (text, layer) in enumerate(texts or [], start=1):
+        entities.append(EntityRef(
+            handle=hex(i),
+            entity_type=EntityType.TEXT,
+            layer=layer,
+            text_content=text,
+            insert_point=Point2D(x=0, y=0),
+        ))
+    return DrawingContext(
+        file_path="test.dxf",
+        entities=entities,
+        layers=layer_rules,
+        blocks=blocks or [],
+    )
+
+
+class TestFamilyDetectionWiring:
+    """Test that classify() populates document_family when context is provided."""
+
+    def test_classify_without_context_is_unknown(self, classifier):
+        result = classifier.classify("count all columns")
+        assert result.document_family == DocumentFamilyHint.UNKNOWN
+
+    def test_classify_with_structural_context(self, classifier):
+        ctx = _make_context(
+            layers=["STRUCTURAL", "COLUMN_GRID", "BEAM", "NOTES"],
+            texts=[("Column C-4", "NOTES"), ("Foundation detail", "NOTES")],
+        )
+        result = classifier.classify("count all columns", context=ctx)
+        assert result.document_family == DocumentFamilyHint.STRUCTURAL
+
+    def test_classify_with_family_passes_context(self, classifier):
+        ctx = _make_context(
+            layers=["PLANTING", "IRRIGATION", "LANDSCAPE"],
+            texts=[("Tree Oak 24in", "PLANTING"), ("Shrub Boxwood", "PLANTING")],
+        )
+        result = classifier.classify_with_family(
+            "how many trees", TaskFamily.QNA, context=ctx,
+        )
+        assert result.document_family == DocumentFamilyHint.LANDSCAPE
+
+    def test_empty_prompt_with_context_still_detects_family(self, classifier):
+        ctx = _make_context(
+            layers=["ELECTRICAL", "LIGHTING", "PANEL"],
+            texts=[("Panel A", "PANEL"), ("Circuit 20A", "ELECTRICAL")],
+        )
+        result = classifier.classify("", context=ctx)
+        assert result.document_family == DocumentFamilyHint.ELECTRICAL
+        assert result.request_class == RequestClass.UNDERSTAND
+
+    def test_backward_compatible_no_context(self, classifier):
+        """Existing calls without context still work unchanged."""
+        result = classifier.classify("move the wall")
+        assert result.request_class == RequestClass.MODIFY
+        assert result.document_family == DocumentFamilyHint.UNKNOWN

@@ -133,6 +133,71 @@ class TestV2PromptAudit:
         assert audit["llm_time_ms"] is None
 
 
+class TestV2PromptObjectiveWiring:
+    """Verify that objective pipeline metadata flows through to API responses."""
+
+    def test_response_has_request_class(self, client, upload_dxf):
+        session_id, _ = upload_dxf
+        resp = client.post(
+            "/api/v2/prompt",
+            json={"session_id": session_id, "prompt": "move entity A1 by 10,0"},
+        )
+        data = resp.json()
+        assert data["request_class"] == "modify"
+
+    def test_response_has_objective_tag_when_matched(self, client, upload_dxf):
+        session_id, _ = upload_dxf
+        resp = client.post(
+            "/api/v2/prompt",
+            json={"session_id": session_id, "prompt": "how much does this cost"},
+        )
+        data = resp.json()
+        assert data["objective_tag"] == "cost_reduction"
+
+    def test_response_has_document_family(self, client, upload_dxf):
+        session_id, _ = upload_dxf
+        resp = client.post(
+            "/api/v2/prompt",
+            json={"session_id": session_id, "prompt": "what is on layer WALLS"},
+        )
+        data = resp.json()
+        # document_family should be present (value depends on test fixture content)
+        assert "document_family" in data
+        assert data["document_family"] is not None
+
+    def test_response_has_stage_pipeline(self, client, upload_dxf):
+        session_id, _ = upload_dxf
+        resp = client.post(
+            "/api/v2/prompt",
+            json={"session_id": session_id, "prompt": "move entity A1 by 10,0"},
+        )
+        data = resp.json()
+        assert data["stage_pipeline"] is not None
+        assert "stages" in data["stage_pipeline"]
+        assert "output_mode" in data["stage_pipeline"]
+
+    def test_modify_pipeline_has_plan_preview(self, client, upload_dxf):
+        session_id, _ = upload_dxf
+        resp = client.post(
+            "/api/v2/prompt",
+            json={"session_id": session_id, "prompt": "delete entity A1"},
+        )
+        data = resp.json()
+        pipeline = data["stage_pipeline"]
+        assert "plan" in pipeline["stages"]
+        assert "preview" in pipeline["stages"]
+
+    def test_estimate_pipeline_has_analyze(self, client, upload_dxf):
+        session_id, _ = upload_dxf
+        resp = client.post(
+            "/api/v2/prompt",
+            json={"session_id": session_id, "prompt": "how many windows are there"},
+        )
+        data = resp.json()
+        pipeline = data["stage_pipeline"]
+        assert "analyze" in pipeline["stages"]
+
+
 class TestV2PromptNoFile:
     def test_no_file_loaded(self, client, auth_user):
         from web.backend.main import session_mgr

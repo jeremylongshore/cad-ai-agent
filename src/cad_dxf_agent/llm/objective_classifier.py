@@ -17,6 +17,7 @@ import re
 import time
 from dataclasses import dataclass
 
+from cad_dxf_agent.models.cad_schema import DrawingContext
 from cad_dxf_agent.models.objective_schema import (
     ObjectiveClassification,
     ObjectiveTag,
@@ -374,20 +375,31 @@ class ObjectiveClassifier:
     TaskFamily classification.
     """
 
-    def classify(self, prompt: str) -> ObjectiveClassification:
-        """Classify a prompt into RequestClass + optional ObjectiveTag."""
+    def classify(
+        self,
+        prompt: str,
+        context: DrawingContext | None = None,
+    ) -> ObjectiveClassification:
+        """Classify a prompt into RequestClass + optional ObjectiveTag.
+
+        When a DrawingContext is provided, also runs family detection to
+        populate document_family on the result.
+        """
         start = time.monotonic()
         stripped = prompt.strip()
 
         if not stripped:
             elapsed = (time.monotonic() - start) * 1000
-            return ObjectiveClassification(
+            result = ObjectiveClassification(
                 request_class=RequestClass.UNDERSTAND,
                 confidence=1.0,
                 source="heuristic",
                 matched_patterns=["empty_prompt"],
                 classification_time_ms=elapsed,
             )
+            if context is not None:
+                self._apply_family_detection(result, context)
+            return result
 
         # Axis 1: RequestClass (priority-ordered, first match)
         request_class: RequestClass | None = None
@@ -457,7 +469,7 @@ class ObjectiveClassifier:
                 class_confidence = 0.50
 
         elapsed = (time.monotonic() - start) * 1000
-        return ObjectiveClassification(
+        result = ObjectiveClassification(
             request_class=request_class,
             objective_tag=objective_tag,
             confidence=class_confidence,
@@ -465,18 +477,22 @@ class ObjectiveClassifier:
             matched_patterns=class_patterns + tag_patterns,
             classification_time_ms=elapsed,
         )
+        if context is not None:
+            self._apply_family_detection(result, context)
+        return result
 
     def classify_with_family(
         self,
         prompt: str,
         task_family: TaskFamily,
+        context: DrawingContext | None = None,
     ) -> ObjectiveClassification:
         """Classify using both the objective heuristic and an existing TaskFamily.
 
         If the heuristic is confident, use it. Otherwise, infer RequestClass
         from the TaskFamily as a fallback.
         """
-        result = self.classify(prompt)
+        result = self.classify(prompt, context=context)
 
         # If heuristic confidence is low, use TaskFamily mapping
         if result.confidence < 0.70 and task_family in _FAMILY_TO_CLASS:
@@ -485,3 +501,20 @@ class ObjectiveClassifier:
             result.source = "family_fallback"
 
         return result
+
+    @staticmethod
+    def _apply_family_detection(
+        result: ObjectiveClassification,
+        context: DrawingContext,
+    ) -> None:
+        """Run family detection and set document_family on the classification."""
+        from cad_dxf_agent.core.family_detector import detect_document_family
+
+        detection = detect_document_family(context)
+        result.document_family = detection.family
+        logger.debug(
+            "Family detection: %s (confidence=%.2f, signals=%d)",
+            detection.family.value,
+            detection.confidence,
+            detection.signal_count,
+        )

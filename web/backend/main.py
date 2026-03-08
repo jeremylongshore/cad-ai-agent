@@ -598,8 +598,11 @@ async def v2_prompt(body: PromptRequest, user: dict = Depends(get_user)):
         intent = router.classify(body.prompt)
 
         # Objective classification (two-axis: RequestClass + ObjectiveTag)
+        # Pass DrawingContext so family detection runs on real drawing data
         objective_cls = ObjectiveClassifier()
-        objective = objective_cls.classify_with_family(body.prompt, intent.family)
+        objective = objective_cls.classify_with_family(
+            body.prompt, intent.family, context=session.context,
+        )
 
         audit = AuditMetadata(
             router_time_ms=intent.router_time_ms,
@@ -1842,10 +1845,12 @@ def _user_friendly_conversion_error(raw_error: str | None, ext: str) -> str:
 
 def _enrich_with_objective(
     response: dict,
-    objective: "ObjectiveClassification | None",  # noqa: F821
+    objective: ObjectiveClassification | None,
 ) -> dict:
     """Add objective classification metadata to a response dict.
 
+    Populates request_class, objective_tag, document_family, and stage_pipeline.
+    Strategy lookup runs here so every response carries pipeline metadata.
     Backward compatible — fields are additive. Existing clients ignore them.
     """
     if objective is None:
@@ -1857,6 +1862,19 @@ def _enrich_with_objective(
     response["objective_tag"] = str(tag) if tag is not None else None
     family = getattr(objective, "document_family", None)
     response["document_family"] = str(family) if family is not None else None
+
+    # Strategy lookup — populate stage_pipeline so consumers see which
+    # stages *would* run for this classification. Actual dispatch still
+    # uses the TaskFamily if/elif chain; stage execution comes later.
+    try:
+        from cad_dxf_agent.llm.strategy_registry import StrategyRegistry
+
+        registry = StrategyRegistry()
+        pipeline_def = registry.lookup(objective.request_class, objective.objective_tag)
+        response["stage_pipeline"] = pipeline_def.model_dump()
+    except Exception:
+        logger.debug("Strategy lookup failed, skipping stage_pipeline", exc_info=True)
+
     return response
 
 
