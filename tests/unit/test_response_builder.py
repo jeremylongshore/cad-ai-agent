@@ -116,6 +116,64 @@ class TestPreviewEdit:
         assert resp.risk_level == RiskLevel.MEDIUM
 
 
+class TestPrecisionEnrichment:
+    def test_plan_only_with_candidates(self):
+        candidates = [
+            {
+                "handle": "A1",
+                "layer": "WALLS",
+                "entity_type": "LINE",
+                "confidence": 0.9,
+                "match_reason": "exact_handle",
+                "location": None,
+            }
+        ]
+        resp = ResponseBuilder.plan_only(
+            operations=[{"op_type": "move_entity", "target_handle": "A1"}],
+            message="Move A1",
+            ambiguity_candidates=candidates,
+        )
+        assert resp.ambiguity_candidates == candidates
+
+    def test_plan_only_without_precision_defaults_empty(self):
+        resp = ResponseBuilder.plan_only(
+            operations=[],
+            message="No ops",
+        )
+        assert resp.ambiguity_candidates == []
+        assert resp.precision_actions == []
+
+    def test_preview_edit_with_precision_actions(self):
+        actions = [
+            {
+                "entity_handle": "B2",
+                "entity_type": "TEXT",
+                "layer": "NOTES",
+                "action": "edit_text",
+                "before": {"text": "old"},
+                "after": {"text": "new"},
+                "status": "planned",
+                "skip_reason": None,
+                "confidence": 1.0,
+                "evidence": [],
+            }
+        ]
+        resp = ResponseBuilder.preview_edit(
+            operations=[{"op_type": "edit_text", "target_handle": "B2"}],
+            message="Edit B2",
+            precision_actions=actions,
+        )
+        assert resp.precision_actions == actions
+
+    def test_preview_edit_without_precision_defaults_empty(self):
+        resp = ResponseBuilder.preview_edit(
+            operations=[],
+            message="Empty",
+        )
+        assert resp.ambiguity_candidates == []
+        assert resp.precision_actions == []
+
+
 class TestAppliedEdit:
     def test_basic_applied(self):
         resp = ResponseBuilder.applied_edit(

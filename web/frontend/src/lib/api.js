@@ -91,9 +91,10 @@ export async function planEdit(sessionId, prompt) {
   return res.json();
 }
 
-export async function v2Prompt(sessionId, prompt, selectedRegions = null) {
+export async function v2Prompt(sessionId, prompt, selectedRegions = null, clientMetadata = null) {
   const body = { session_id: sessionId, prompt };
   if (selectedRegions) body.selected_regions = selectedRegions;
+  if (clientMetadata) body.client_metadata = clientMetadata;
   const res = await request('/api/v2/prompt', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

@@ -147,3 +147,7 @@ class PlatformResponse(BaseModel):
     objective_tag: str | None = None  # ObjectiveTag value
     document_family: str | None = None  # DocumentFamilyHint value
     stage_pipeline: dict[str, Any] | None = None  # stage execution metadata
+
+    # Precision controls metadata (EPIC-CAD-14)
+    ambiguity_candidates: list[dict[str, Any]] = Field(default_factory=list)
+    precision_actions: list[dict[str, Any]] = Field(default_factory=list)
