@@ -440,13 +440,36 @@ def _polygon_perimeter(vertices: list[Point2D]) -> float:
 
 
 def _polygon_centroid(vertices: list[Point2D]) -> Point2D:
-    """Compute polygon centroid."""
+    """Compute polygon centroid using the signed-area formula.
+
+    This gives the true geometric centroid (center of mass) of the polygon,
+    not just the average of vertices. Falls back to vertex average for
+    degenerate cases where signed area is zero.
+    """
     n = len(vertices)
     if n == 0:
         return Point2D(x=0, y=0)
-    cx = sum(v.x for v in vertices) / n
-    cy = sum(v.y for v in vertices) / n
-    return Point2D(x=cx, y=cy)
+
+    # Signed area (2x) for centroid weighting
+    signed_area_2x = 0.0
+    cx = 0.0
+    cy = 0.0
+    for i in range(n):
+        j = (i + 1) % n
+        cross = vertices[i].x * vertices[j].y - vertices[j].x * vertices[i].y
+        signed_area_2x += cross
+        cx += (vertices[i].x + vertices[j].x) * cross
+        cy += (vertices[i].y + vertices[j].y) * cross
+
+    if abs(signed_area_2x) < 1e-12:
+        # Degenerate polygon — fall back to vertex average
+        return Point2D(
+            x=sum(v.x for v in vertices) / n,
+            y=sum(v.y for v in vertices) / n,
+        )
+
+    factor = 1.0 / (3.0 * signed_area_2x)
+    return Point2D(x=cx * factor, y=cy * factor)
 
 
 def _aspect_ratio(vertices: list[Point2D]) -> float:

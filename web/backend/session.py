@@ -213,6 +213,9 @@ class SessionManager:
 
         Returns the first active session that is bound to the given document,
         or None if no such session exists.
+
+        Note: Iterates all sessions. If session volume grows significantly,
+        add a (user_id, document_id) → session_id index.
         """
         now = time.time()
         with self._lock:
@@ -230,7 +233,11 @@ class SessionManager:
         return None
 
     def list_user_sessions(self, user_id: str) -> list[Session]:
-        """Return all non-expired sessions for this user."""
+        """Return all non-expired sessions for this user.
+
+        Note: Iterates all sessions. Add a user_id → session_ids index
+        if concurrent session volume grows significantly.
+        """
         now = time.time()
         with self._lock:
             sessions = list(self._sessions.values())

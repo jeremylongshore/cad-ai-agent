@@ -56,18 +56,37 @@ class TestDetectedZone:
         assert restored.inferred_type == "closet"
         assert len(restored.boundary) == 3
 
-    def test_unique_zone_ids(self):
+    def test_deterministic_zone_ids(self):
+        """Same boundary + handles → same ID (deterministic)."""
         z1 = DetectedZone(
-            boundary=[Point2D(x=0, y=0)],
-            area=0,
-            perimeter=0,
-            centroid=Point2D(x=0, y=0),
+            boundary=[Point2D(x=0, y=0), Point2D(x=10, y=0), Point2D(x=10, y=10)],
+            area=50.0,
+            perimeter=34.14,
+            centroid=Point2D(x=5, y=5),
+            source_handles=["A1"],
         )
         z2 = DetectedZone(
-            boundary=[Point2D(x=0, y=0)],
-            area=0,
-            perimeter=0,
-            centroid=Point2D(x=0, y=0),
+            boundary=[Point2D(x=0, y=0), Point2D(x=10, y=0), Point2D(x=10, y=10)],
+            area=50.0,
+            perimeter=34.14,
+            centroid=Point2D(x=5, y=5),
+            source_handles=["A1"],
+        )
+        assert z1.zone_id == z2.zone_id
+
+    def test_different_boundaries_different_ids(self):
+        """Different boundaries → different IDs."""
+        z1 = DetectedZone(
+            boundary=[Point2D(x=0, y=0), Point2D(x=10, y=0), Point2D(x=10, y=10)],
+            area=50.0,
+            perimeter=34.14,
+            centroid=Point2D(x=5, y=5),
+        )
+        z2 = DetectedZone(
+            boundary=[Point2D(x=0, y=0), Point2D(x=20, y=0), Point2D(x=20, y=20)],
+            area=200.0,
+            perimeter=68.28,
+            centroid=Point2D(x=10, y=10),
         )
         assert z1.zone_id != z2.zone_id
 
