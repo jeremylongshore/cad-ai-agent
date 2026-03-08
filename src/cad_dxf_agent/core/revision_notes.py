@@ -131,6 +131,58 @@ def _summarize_change(change: AppliedChange) -> str:
         block_name = op.params.get("block_name", "unknown")
         return f"Inserted block {block_name}"
 
+    elif op.op_type == OpType.ROTATE_ENTITY:
+        angle = op.params.get("angle", 0)
+        return f"Rotated entity {angle}\u00b0"
+
+    elif op.op_type == OpType.COPY_ENTITY:
+        dx = op.params.get("dx", 0)
+        dy = op.params.get("dy", 0)
+        return f"Copied entity with offset ({dx}, {dy})"
+
+    elif op.op_type == OpType.SCALE_ENTITY:
+        factor = op.params.get("factor", 1.0)
+        return f"Scaled entity {factor}x"
+
+    elif op.op_type == OpType.MIRROR_ENTITY:
+        axis = op.params.get("axis", "x")
+        value = op.params.get("value", 0)
+        return f"Mirrored entity across {axis}={value}"
+
+    elif op.op_type == OpType.ADD_LINE:
+        start = op.params.get("start", {})
+        end = op.params.get("end", {})
+        return (
+            f"Added line ({start.get('x', 0)}, {start.get('y', 0)}) "
+            f"to ({end.get('x', 0)}, {end.get('y', 0)})"
+        )
+
+    elif op.op_type == OpType.ADD_POLYLINE:
+        pts = op.params.get("points", [])
+        closed = op.params.get("closed", False)
+        return f"Added {'closed ' if closed else ''}polyline with {len(pts)} points"
+
+    elif op.op_type == OpType.ADD_CIRCLE:
+        center = op.params.get("center", {})
+        radius = op.params.get("radius", 0)
+        return f"Added circle at ({center.get('x', 0)}, {center.get('y', 0)}) r={radius}"
+
+    elif op.op_type == OpType.ADD_ARC:
+        center = op.params.get("center", {})
+        radius = op.params.get("radius", 0)
+        start_angle = op.params.get("start_angle", 0)
+        end_angle = op.params.get("end_angle", 0)
+        return (
+            f"Added arc r={radius:.2f} "
+            f"@({center.get('x', 0):.2f}, {center.get('y', 0):.2f}) "
+            f"{start_angle:.1f}\u00b0-{end_angle:.1f}\u00b0"
+        )
+
+    elif op.op_type == OpType.ADD_TEXT:
+        text = op.params.get("text", "")
+        truncated = text[:30] + "..." if len(text) > 30 else text
+        return f"Added text '{truncated}'"
+
     return ""
 
 

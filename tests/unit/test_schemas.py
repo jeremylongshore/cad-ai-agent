@@ -59,7 +59,7 @@ class TestEditOperation:
 
     def test_invalid_op_type(self):
         with pytest.raises(ValidationError):
-            EditOperation(op_type="scale_entity", target_handle="A1")
+            EditOperation(op_type="explode_entity", target_handle="A1")
 
 
 class TestChangeSet:

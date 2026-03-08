@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import logging
+import math
 from pathlib import Path
 
 import ezdxf
+from ezdxf.math import Matrix44
 
 from ..models.ops_schema import AppliedChange, ChangeSet, EditOperation, OpType
 from ..otel import get_tracer
@@ -68,24 +70,35 @@ class EditEngine:
 
     def _apply_operation(self, op: EditOperation) -> AppliedChange:
         """Apply a single operation. Assumes validation has already passed."""
-        if op.op_type == OpType.MOVE_ENTITY:
-            return self._apply_move(op)
-        elif op.op_type == OpType.EDIT_TEXT:
-            return self._apply_edit_text(op)
-        elif op.op_type == OpType.DELETE_ENTITY:
-            return self._apply_delete(op)
-        elif op.op_type == OpType.ADD_BLOCK:
-            return self._apply_add_block(op)
-        else:
+        handlers = {
+            OpType.MOVE_ENTITY: self._apply_move,
+            OpType.EDIT_TEXT: self._apply_edit_text,
+            OpType.DELETE_ENTITY: self._apply_delete,
+            OpType.ADD_BLOCK: self._apply_add_block,
+            OpType.ROTATE_ENTITY: self._apply_rotate,
+            OpType.COPY_ENTITY: self._apply_copy,
+            OpType.SCALE_ENTITY: self._apply_scale,
+            OpType.MIRROR_ENTITY: self._apply_mirror,
+            OpType.ADD_LINE: self._apply_add_line,
+            OpType.ADD_POLYLINE: self._apply_add_polyline,
+            OpType.ADD_CIRCLE: self._apply_add_circle,
+            OpType.ADD_ARC: self._apply_add_arc,
+            OpType.ADD_TEXT: self._apply_add_text,
+        }
+        handler = handlers.get(op.op_type)
+        if handler is None:
             return AppliedChange(
                 operation=op,
                 success=False,
                 description=f"Unknown op type: {op.op_type}",
             )
+        return handler(op)
 
     def _find_entity(self, handle: str):
         """Find entity by handle in model space."""
         return self.doc.entitydb.get(handle)
+
+    # --- V1 operations ---
 
     def _apply_move(self, op: EditOperation) -> AppliedChange:
         assert op.target_handle is not None
@@ -207,3 +220,311 @@ class EditEngine:
             )
         except Exception as e:
             return AppliedChange(operation=op, success=False, description=f"Add block failed: {e}")
+
+    # --- V2 transform operations ---
+
+    def _apply_rotate(self, op: EditOperation) -> AppliedChange:
+        assert op.target_handle is not None
+        entity = self._find_entity(op.target_handle)
+        if entity is None:
+            return AppliedChange(operation=op, success=False, description="Entity not found")
+
+        angle = op.params.get("angle", 0)
+        cx = op.params.get("cx", 0)
+        cy = op.params.get("cy", 0)
+
+        try:
+            # ezdxf rotation is around Z axis using a transformation matrix
+            m = Matrix44.z_rotate(math.radians(angle))
+            # Translate to origin, rotate, translate back
+            m = Matrix44.translate(-cx, -cy, 0) @ m @ Matrix44.translate(cx, cy, 0)
+            entity.transform(m)
+            return AppliedChange(
+                operation=op,
+                success=True,
+                entity_handle=op.target_handle,
+                description=f"Rotated entity {op.target_handle} by {angle}° around ({cx}, {cy})",
+            )
+        except Exception as e:
+            return AppliedChange(operation=op, success=False, description=f"Rotate failed: {e}")
+
+    def _apply_copy(self, op: EditOperation) -> AppliedChange:
+        assert op.target_handle is not None
+        entity = self._find_entity(op.target_handle)
+        if entity is None:
+            return AppliedChange(operation=op, success=False, description="Entity not found")
+
+        dx = op.params.get("dx", 0)
+        dy = op.params.get("dy", 0)
+
+        try:
+            layout = self._get_layout(op.target_space)
+            # Copy the entity within the same layout
+            new_entity = entity.copy()
+            layout.add_entity(new_entity)
+            new_entity.translate(dx, dy, 0)
+            return AppliedChange(
+                operation=op,
+                success=True,
+                entity_handle=new_entity.dxf.handle,
+                description=f"Copied entity {op.target_handle} with offset ({dx}, {dy})",
+            )
+        except KeyError:
+            return AppliedChange(
+                operation=op,
+                success=False,
+                description=f"Layout not found: {op.target_space}",
+            )
+        except Exception as e:
+            return AppliedChange(operation=op, success=False, description=f"Copy failed: {e}")
+
+    def _apply_scale(self, op: EditOperation) -> AppliedChange:
+        assert op.target_handle is not None
+        entity = self._find_entity(op.target_handle)
+        if entity is None:
+            return AppliedChange(operation=op, success=False, description="Entity not found")
+
+        factor = op.params.get("factor", 1.0)
+        cx = op.params.get("cx", 0)
+        cy = op.params.get("cy", 0)
+
+        try:
+            # Scale around a center point using transformation matrix
+            m = (
+                Matrix44.translate(-cx, -cy, 0)
+                @ Matrix44.scale(factor, factor, 1)
+                @ Matrix44.translate(cx, cy, 0)
+            )
+            entity.transform(m)
+            return AppliedChange(
+                operation=op,
+                success=True,
+                entity_handle=op.target_handle,
+                description=f"Scaled entity {op.target_handle} by {factor}x around ({cx}, {cy})",
+            )
+        except Exception as e:
+            return AppliedChange(operation=op, success=False, description=f"Scale failed: {e}")
+
+    def _apply_mirror(self, op: EditOperation) -> AppliedChange:
+        assert op.target_handle is not None
+        entity = self._find_entity(op.target_handle)
+        if entity is None:
+            return AppliedChange(operation=op, success=False, description="Entity not found")
+
+        axis = op.params.get("axis", "x")
+        value = op.params.get("value", 0)
+
+        try:
+            if axis == "x":
+                # Mirror across a horizontal line at y=value
+                # Translate so mirror line is at origin, flip Y, translate back
+                m = (
+                    Matrix44.translate(0, -value, 0)
+                    @ Matrix44.scale(1, -1, 1)
+                    @ Matrix44.translate(0, value, 0)
+                )
+            elif axis == "y":
+                # Mirror across a vertical line at x=value
+                m = (
+                    Matrix44.translate(-value, 0, 0)
+                    @ Matrix44.scale(-1, 1, 1)
+                    @ Matrix44.translate(value, 0, 0)
+                )
+            else:
+                return AppliedChange(
+                    operation=op,
+                    success=False,
+                    description=f"Invalid mirror axis: {axis}. Use 'x' or 'y'.",
+                )
+
+            entity.transform(m)
+            return AppliedChange(
+                operation=op,
+                success=True,
+                entity_handle=op.target_handle,
+                description=f"Mirrored entity {op.target_handle} across {axis}={value}",
+            )
+        except Exception as e:
+            return AppliedChange(operation=op, success=False, description=f"Mirror failed: {e}")
+
+    # --- V2 entity creation operations ---
+
+    def _apply_add_line(self, op: EditOperation) -> AppliedChange:
+        start = op.params.get("start", {})
+        end = op.params.get("end", {})
+        layer = op.params.get("layer") or op.target_layer
+
+        try:
+            layout = self._get_layout(op.target_space)
+            attribs = {}
+            if layer:
+                attribs["layer"] = layer
+
+            entity = layout.add_line(
+                (start.get("x", 0), start.get("y", 0)),
+                (end.get("x", 0), end.get("y", 0)),
+                dxfattribs=attribs,
+            )
+            return AppliedChange(
+                operation=op,
+                success=True,
+                entity_handle=entity.dxf.handle,
+                description=(
+                    f"Added line from ({start.get('x', 0)}, {start.get('y', 0)}) "
+                    f"to ({end.get('x', 0)}, {end.get('y', 0)})"
+                ),
+            )
+        except KeyError:
+            return AppliedChange(
+                operation=op,
+                success=False,
+                description=f"Layout not found: {op.target_space}",
+            )
+        except Exception as e:
+            return AppliedChange(operation=op, success=False, description=f"Add line failed: {e}")
+
+    def _apply_add_polyline(self, op: EditOperation) -> AppliedChange:
+        points = op.params.get("points", [])
+        closed = op.params.get("closed", False)
+        layer = op.params.get("layer") or op.target_layer
+
+        try:
+            layout = self._get_layout(op.target_space)
+            attribs = {}
+            if layer:
+                attribs["layer"] = layer
+
+            pts = [(p.get("x", 0), p.get("y", 0)) for p in points]
+            entity = layout.add_lwpolyline(pts, close=closed, dxfattribs=attribs)
+            return AppliedChange(
+                operation=op,
+                success=True,
+                entity_handle=entity.dxf.handle,
+                description=f"Added polyline with {len(pts)} points (closed={closed})",
+            )
+        except KeyError:
+            return AppliedChange(
+                operation=op,
+                success=False,
+                description=f"Layout not found: {op.target_space}",
+            )
+        except Exception as e:
+            return AppliedChange(
+                operation=op, success=False, description=f"Add polyline failed: {e}"
+            )
+
+    def _apply_add_circle(self, op: EditOperation) -> AppliedChange:
+        center = op.params.get("center", {})
+        radius = op.params.get("radius", 1.0)
+        layer = op.params.get("layer") or op.target_layer
+
+        try:
+            layout = self._get_layout(op.target_space)
+            attribs = {}
+            if layer:
+                attribs["layer"] = layer
+
+            entity = layout.add_circle(
+                (center.get("x", 0), center.get("y", 0)),
+                radius=radius,
+                dxfattribs=attribs,
+            )
+            return AppliedChange(
+                operation=op,
+                success=True,
+                entity_handle=entity.dxf.handle,
+                description=(
+                    f"Added circle at ({center.get('x', 0)}, {center.get('y', 0)}) r={radius}"
+                ),
+            )
+        except KeyError:
+            return AppliedChange(
+                operation=op,
+                success=False,
+                description=f"Layout not found: {op.target_space}",
+            )
+        except Exception as e:
+            return AppliedChange(operation=op, success=False, description=f"Add circle failed: {e}")
+
+    def _apply_add_arc(self, op: EditOperation) -> AppliedChange:
+        center = op.params.get("center", {})
+        radius = op.params.get("radius", 1.0)
+        start_angle = op.params.get("start_angle", 0)
+        end_angle = op.params.get("end_angle", 90)
+        layer = op.params.get("layer") or op.target_layer
+
+        try:
+            layout = self._get_layout(op.target_space)
+            attribs = {}
+            if layer:
+                attribs["layer"] = layer
+
+            entity = layout.add_arc(
+                (center.get("x", 0), center.get("y", 0)),
+                radius=radius,
+                start_angle=start_angle,
+                end_angle=end_angle,
+                dxfattribs=attribs,
+            )
+            return AppliedChange(
+                operation=op,
+                success=True,
+                entity_handle=entity.dxf.handle,
+                description=(
+                    f"Added arc at ({center.get('x', 0)}, {center.get('y', 0)}) "
+                    f"r={radius} {start_angle}°-{end_angle}°"
+                ),
+            )
+        except KeyError:
+            return AppliedChange(
+                operation=op,
+                success=False,
+                description=f"Layout not found: {op.target_space}",
+            )
+        except Exception as e:
+            return AppliedChange(operation=op, success=False, description=f"Add arc failed: {e}")
+
+    def _apply_add_text(self, op: EditOperation) -> AppliedChange:
+        text = op.params.get("text", "")
+        insert = op.params.get("insert", {})
+        height = op.params.get("height", 2.5)
+        rotation = op.params.get("rotation", 0)
+        layer = op.params.get("layer") or op.target_layer
+        text_type = op.params.get("text_type", "TEXT")
+
+        try:
+            layout = self._get_layout(op.target_space)
+            attribs = {}
+            if layer:
+                attribs["layer"] = layer
+
+            ix = insert.get("x", 0)
+            iy = insert.get("y", 0)
+
+            if text_type == "MTEXT":
+                attribs["char_height"] = height
+                attribs["insert"] = (ix, iy)
+                if rotation:
+                    attribs["rotation"] = rotation
+                entity = layout.add_mtext(text, dxfattribs=attribs)
+            else:
+                attribs["height"] = height
+                attribs["insert"] = (ix, iy)
+                if rotation:
+                    attribs["rotation"] = rotation
+                entity = layout.add_text(text, dxfattribs=attribs)
+
+            return AppliedChange(
+                operation=op,
+                success=True,
+                entity_handle=entity.dxf.handle,
+                description=f"Added {text_type} '{text[:30]}' at ({ix}, {iy})",
+            )
+        except KeyError:
+            return AppliedChange(
+                operation=op,
+                success=False,
+                description=f"Layout not found: {op.target_space}",
+            )
+        except Exception as e:
+            return AppliedChange(operation=op, success=False, description=f"Add text failed: {e}")

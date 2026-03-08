@@ -59,7 +59,25 @@ class TestToolDefinitions:
 
     def test_expected_edit_tools(self):
         names = {t["name"] for t in EDIT_TOOLS}
-        assert names == {"move_entity", "edit_text", "delete_entity", "add_block"}
+        expected = {
+            # V1
+            "move_entity",
+            "edit_text",
+            "delete_entity",
+            "add_block",
+            # V2 transforms
+            "rotate_entity",
+            "copy_entity",
+            "scale_entity",
+            "mirror_entity",
+            # V2 creation
+            "add_line",
+            "add_polyline",
+            "add_circle",
+            "add_arc",
+            "add_text",
+        }
+        assert names == expected
 
     def test_move_entity_params(self):
         tool = get_tool_by_name("move_entity")

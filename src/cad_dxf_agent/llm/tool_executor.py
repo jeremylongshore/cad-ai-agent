@@ -1,7 +1,8 @@
 """Tool executor — runs CAD tools invoked by the LLM agent.
 
 Maps tool names to EntityIndex / drawing context operations.
-Edit tools (move, delete, edit_text, add_block) accumulate
+Edit tools (move, delete, edit_text, add_block, rotate, copy, scale,
+mirror, add_line, add_polyline, add_circle, add_arc, add_text) accumulate
 EditOperation objects instead of mutating the drawing directly.
 The operations are later validated and applied by the pipeline.
 """
@@ -46,15 +47,28 @@ class ToolExecutor:
         Raises KeyError for unknown tool names.
         """
         dispatch = {
+            # Query tools
             "find_entities": self._find_entities,
             "get_entity": self._get_entity,
             "find_nearest": self._find_nearest,
             "list_layers": self._list_layers,
             "is_protected": self._is_protected,
+            # V1 edit tools
             "move_entity": self._move_entity,
             "edit_text": self._edit_text,
             "delete_entity": self._delete_entity,
             "add_block": self._add_block,
+            # V2 transform tools
+            "rotate_entity": self._rotate_entity,
+            "copy_entity": self._copy_entity,
+            "scale_entity": self._scale_entity,
+            "mirror_entity": self._mirror_entity,
+            # V2 creation tools
+            "add_line": self._add_line,
+            "add_polyline": self._add_polyline,
+            "add_circle": self._add_circle,
+            "add_arc": self._add_arc,
+            "add_text": self._add_text,
         }
 
         handler = dispatch.get(tool_name)
@@ -145,7 +159,7 @@ class ToolExecutor:
             "protected": layer.upper() in self._protected,
         }
 
-    # --- Edit tools (accumulate operations) ---
+    # --- V1 edit tools (accumulate operations) ---
 
     def _move_entity(self, args: dict[str, Any]) -> dict[str, Any]:
         handle = args["handle"]
@@ -243,6 +257,239 @@ class ToolExecutor:
             "block_name": block_name,
             "x": x,
             "y": y,
+        }
+
+    # --- V2 transform tools ---
+
+    def _rotate_entity(self, args: dict[str, Any]) -> dict[str, Any]:
+        handle = args["handle"]
+        entity = self._index.get_by_handle(handle)
+        if entity is None:
+            return {"error": f"Entity not found: {handle}"}
+        if entity.layer.upper() in self._protected:
+            return {"error": f"Cannot rotate entity on protected layer: {entity.layer}"}
+
+        op = EditOperation(
+            op_type=OpType.ROTATE_ENTITY,
+            target_handle=handle,
+            target_layer=entity.layer,
+            target_space=entity.space,
+            params={
+                "angle": args["angle"],
+                "cx": args.get("cx", 0),
+                "cy": args.get("cy", 0),
+            },
+        )
+        self._operations.append(op)
+        return {
+            "status": "queued",
+            "operation": "rotate_entity",
+            "handle": handle,
+            "angle": args["angle"],
+        }
+
+    def _copy_entity(self, args: dict[str, Any]) -> dict[str, Any]:
+        handle = args["handle"]
+        entity = self._index.get_by_handle(handle)
+        if entity is None:
+            return {"error": f"Entity not found: {handle}"}
+        if entity.layer.upper() in self._protected:
+            return {"error": f"Cannot copy entity on protected layer: {entity.layer}"}
+
+        op = EditOperation(
+            op_type=OpType.COPY_ENTITY,
+            target_handle=handle,
+            target_layer=entity.layer,
+            target_space=entity.space,
+            params={"dx": args["dx"], "dy": args["dy"]},
+        )
+        self._operations.append(op)
+        return {
+            "status": "queued",
+            "operation": "copy_entity",
+            "handle": handle,
+            "dx": args["dx"],
+            "dy": args["dy"],
+        }
+
+    def _scale_entity(self, args: dict[str, Any]) -> dict[str, Any]:
+        handle = args["handle"]
+        entity = self._index.get_by_handle(handle)
+        if entity is None:
+            return {"error": f"Entity not found: {handle}"}
+        if entity.layer.upper() in self._protected:
+            return {"error": f"Cannot scale entity on protected layer: {entity.layer}"}
+
+        op = EditOperation(
+            op_type=OpType.SCALE_ENTITY,
+            target_handle=handle,
+            target_layer=entity.layer,
+            target_space=entity.space,
+            params={
+                "factor": args["factor"],
+                "cx": args.get("cx", 0),
+                "cy": args.get("cy", 0),
+            },
+        )
+        self._operations.append(op)
+        return {
+            "status": "queued",
+            "operation": "scale_entity",
+            "handle": handle,
+            "factor": args["factor"],
+        }
+
+    def _mirror_entity(self, args: dict[str, Any]) -> dict[str, Any]:
+        handle = args["handle"]
+        entity = self._index.get_by_handle(handle)
+        if entity is None:
+            return {"error": f"Entity not found: {handle}"}
+        if entity.layer.upper() in self._protected:
+            return {"error": f"Cannot mirror entity on protected layer: {entity.layer}"}
+
+        op = EditOperation(
+            op_type=OpType.MIRROR_ENTITY,
+            target_handle=handle,
+            target_layer=entity.layer,
+            target_space=entity.space,
+            params={
+                "axis": args["axis"],
+                "value": args.get("value", 0),
+            },
+        )
+        self._operations.append(op)
+        return {
+            "status": "queued",
+            "operation": "mirror_entity",
+            "handle": handle,
+            "axis": args["axis"],
+        }
+
+    # --- V2 creation tools ---
+
+    def _add_line(self, args: dict[str, Any]) -> dict[str, Any]:
+        layer = args.get("layer")
+        if layer and layer.upper() in self._protected:
+            return {"error": f"Cannot create entity on protected layer: {layer}"}
+
+        # Accept both Point2D objects and flat coordinates for backward compat
+        start = args.get("start") or {"x": args.get("start_x", 0), "y": args.get("start_y", 0)}
+        end = args.get("end") or {"x": args.get("end_x", 0), "y": args.get("end_y", 0)}
+
+        op = EditOperation(
+            op_type=OpType.ADD_LINE,
+            target_layer=layer,
+            params={"start": start, "end": end, "layer": layer},
+        )
+        self._operations.append(op)
+        return {
+            "status": "queued",
+            "operation": "add_line",
+            "start": start,
+            "end": end,
+        }
+
+    def _add_polyline(self, args: dict[str, Any]) -> dict[str, Any]:
+        layer = args.get("layer")
+        if layer and layer.upper() in self._protected:
+            return {"error": f"Cannot create entity on protected layer: {layer}"}
+
+        points = args["points"]
+        closed = args.get("closed", False)
+
+        op = EditOperation(
+            op_type=OpType.ADD_POLYLINE,
+            target_layer=layer,
+            params={
+                "points": points,
+                "closed": closed,
+                "layer": layer,
+            },
+        )
+        self._operations.append(op)
+        return {
+            "status": "queued",
+            "operation": "add_polyline",
+            "point_count": len(points),
+            "closed": closed,
+        }
+
+    def _add_circle(self, args: dict[str, Any]) -> dict[str, Any]:
+        layer = args.get("layer")
+        if layer and layer.upper() in self._protected:
+            return {"error": f"Cannot create entity on protected layer: {layer}"}
+
+        # Accept both Point2D object and flat coordinates
+        center = args.get("center") or {"x": args.get("center_x", 0), "y": args.get("center_y", 0)}
+
+        op = EditOperation(
+            op_type=OpType.ADD_CIRCLE,
+            target_layer=layer,
+            params={"center": center, "radius": args["radius"], "layer": layer},
+        )
+        self._operations.append(op)
+        return {
+            "status": "queued",
+            "operation": "add_circle",
+            "center": center,
+            "radius": args["radius"],
+        }
+
+    def _add_arc(self, args: dict[str, Any]) -> dict[str, Any]:
+        layer = args.get("layer")
+        if layer and layer.upper() in self._protected:
+            return {"error": f"Cannot create entity on protected layer: {layer}"}
+
+        # Accept both Point2D object and flat coordinates
+        center = args.get("center") or {"x": args.get("center_x", 0), "y": args.get("center_y", 0)}
+
+        op = EditOperation(
+            op_type=OpType.ADD_ARC,
+            target_layer=layer,
+            params={
+                "center": center,
+                "radius": args["radius"],
+                "start_angle": args["start_angle"],
+                "end_angle": args["end_angle"],
+                "layer": layer,
+            },
+        )
+        self._operations.append(op)
+        return {
+            "status": "queued",
+            "operation": "add_arc",
+            "center": center,
+            "radius": args["radius"],
+        }
+
+    def _add_text(self, args: dict[str, Any]) -> dict[str, Any]:
+        layer = args.get("layer")
+        if layer and layer.upper() in self._protected:
+            return {"error": f"Cannot create entity on protected layer: {layer}"}
+
+        text_type = args.get("text_type", "TEXT")
+
+        # Accept both Point2D object and flat coordinates
+        insert = args.get("insert") or {"x": args.get("x", 0), "y": args.get("y", 0)}
+
+        op = EditOperation(
+            op_type=OpType.ADD_TEXT,
+            target_layer=layer,
+            params={
+                "text": args["text"],
+                "insert": insert,
+                "height": args.get("height", 2.5),
+                "rotation": args.get("rotation", 0),
+                "text_type": text_type,
+                "layer": layer,
+            },
+        )
+        self._operations.append(op)
+        return {
+            "status": "queued",
+            "operation": "add_text",
+            "text": args["text"],
+            "insert": insert,
         }
 
 

@@ -66,6 +66,7 @@ class TestResponseParser:
             parse_planner_response(json.dumps({"result": "ok"}))
 
     def test_reject_invalid_op_type(self):
-        response = json.dumps({"operations": [{"op_type": "scale_entity", "target_handle": "A1"}]})
+        payload = {"operations": [{"op_type": "explode_entity", "target_handle": "A1"}]}
+        response = json.dumps(payload)
         with pytest.raises(ValueError, match="Invalid operation"):
             parse_planner_response(response)
