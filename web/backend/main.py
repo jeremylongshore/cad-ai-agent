@@ -342,8 +342,8 @@ async def load_document(doc_id: str, user: dict = Depends(get_user)):
     meta.document_id = doc_id
     session_mgr.store.save(meta)
 
-    # Touch the document's last_accessed
-    doc.touch()
+    # Touch the document's last_accessed (persists to GCS in production)
+    store.touch_document(user["uid"], doc_id)
 
     # Load drawing info
     try:

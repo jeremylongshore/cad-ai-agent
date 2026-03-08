@@ -53,6 +53,10 @@ class DocumentStore(abc.ABC):
     def get_file_data(self, user_id: str, doc_id: str) -> bytes | None:
         """Retrieve the raw file bytes for a document."""
 
+    def touch_document(self, user_id: str, doc_id: str) -> bool:
+        """Update last_accessed timestamp. Returns True if document exists."""
+        return False  # Default no-op; subclasses override for persistence
+
     def _check_limits(
         self, user_id: str, file_size: int, existing_docs: list[UserDocument],
     ) -> None:
@@ -96,17 +100,15 @@ class InMemoryDocumentStore(DocumentStore):
     ) -> UserDocument:
         with self._lock:
             existing = list((self._documents.get(user_id) or {}).values())
+            self._check_limits(user_id, len(data), existing)
 
-        self._check_limits(user_id, len(data), existing)
+            doc = UserDocument(
+                user_id=user_id,
+                filename=filename,
+                file_size_bytes=len(data),
+                metadata=metadata or {},
+            )
 
-        doc = UserDocument(
-            user_id=user_id,
-            filename=filename,
-            file_size_bytes=len(data),
-            metadata=metadata or {},
-        )
-
-        with self._lock:
             if user_id not in self._documents:
                 self._documents[user_id] = {}
             self._documents[user_id][doc.doc_id] = doc
@@ -134,6 +136,15 @@ class InMemoryDocumentStore(DocumentStore):
             doc = user_docs.get(doc_id)
             if doc and doc.status == "active":
                 doc.status = "deleted"
+                return True
+        return False
+
+    def touch_document(self, user_id: str, doc_id: str) -> bool:
+        with self._lock:
+            user_docs = self._documents.get(user_id, {})
+            doc = user_docs.get(doc_id)
+            if doc and doc.status == "active":
+                doc.touch()
                 return True
         return False
 
@@ -262,6 +273,23 @@ class GCSDocumentStore(DocumentStore):
             return True
         except Exception as exc:
             logger.exception("Failed to delete document %s from GCS: %s", doc_id, exc)
+            return False
+
+    def touch_document(self, user_id: str, doc_id: str) -> bool:
+        doc = self.get_document(user_id, doc_id)
+        if doc is None:
+            return False
+        doc.touch()
+        try:
+            meta_blob = self._bucket().blob(
+                f"{self._doc_prefix(user_id, doc_id)}metadata.json"
+            )
+            meta_blob.upload_from_string(
+                doc.model_dump_json(), content_type="application/json",
+            )
+            return True
+        except Exception as exc:
+            logger.warning("Failed to touch document %s in GCS: %s", doc_id, exc)
             return False
 
     def get_file_data(self, user_id: str, doc_id: str) -> bytes | None:
