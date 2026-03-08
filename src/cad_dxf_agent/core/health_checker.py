@@ -295,9 +295,9 @@ def _check_overlapping_entities(
         for key, handles in list(overlap_groups.items())[:5]:
             parts = key.split(",")
             for handle in handles[:3]:
-                found = index.get_by_handle(handle)
-                if found is not None:
-                    entity = found
+                found_entity = index.get_by_handle(handle)
+                if found_entity is not None:
+                    entity = found_entity
                     evidence.append(
                         EvidenceRef(
                             entity_handle=handle,

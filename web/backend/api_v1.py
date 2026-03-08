@@ -5,10 +5,14 @@ No session, no auth (initially) — designed for CLI tools, CI/CD pipelines,
 MCP servers, and AI agents that need headless drawing analysis.
 
 Routes:
-    POST /api/v1/analyze   → DrawingContext summary + entity stats
-    POST /api/v1/health    → HealthReport (score, issues, evidence)
-    POST /api/v1/zones     → ZoneDetectionResult (rooms, areas)
-    POST /api/v1/entities  → Filtered entity search
+    POST /api/v1/analyze     → DrawingContext summary + entity stats
+    POST /api/v1/health      → HealthReport (score, issues, evidence)
+    POST /api/v1/zones       → ZoneDetectionResult (rooms, areas)
+    POST /api/v1/entities    → Filtered entity search
+    POST /api/v1/compliance  → ComplianceReport (findings, code refs, score)
+    POST /api/v1/takeoff     → TakeoffReport (item counts, measurements)
+    POST /api/v1/summary     → Plain-English drawing summary
+    POST /api/v1/rfi         → RFI report (missing items, ambiguities)
 """
 
 from __future__ import annotations
@@ -19,8 +23,14 @@ from pathlib import Path
 
 from fastapi import APIRouter, File, HTTPException, Query, UploadFile
 
+from cad_dxf_agent.core.compliance_rules import check_compliance
+from cad_dxf_agent.core.design_ops import TakeoffGenerator
+from cad_dxf_agent.core.drawing_summarizer import summarize_drawing
 from cad_dxf_agent.core.dxf_reader import load_dxf
 from cad_dxf_agent.core.entity_index import EntityIndex
+from cad_dxf_agent.core.rfi_generator import generate_rfi
+from cad_dxf_agent.core.zone_detector import detect_zones as run_zones
+from cad_dxf_agent.models.compliance_schema import BUILTIN_PROFILES
 from cad_dxf_agent.otel import span as otel_span
 
 logger = logging.getLogger(__name__)
@@ -152,9 +162,6 @@ async def detect_zones(file: UploadFile = File(...)):
     """
     with otel_span("api.v1.zones"):
         context = _load_context(file)
-
-        from cad_dxf_agent.core.zone_detector import detect_zones as run_zones
-
         result = run_zones(context)
 
         zones = []
@@ -235,3 +242,97 @@ async def search_entities(
             "truncated": total > limit,
             "entities": entities,
         }
+
+
+# ---------------------------------------------------------------------------
+# POST /api/v1/compliance
+# ---------------------------------------------------------------------------
+
+
+@router.post("/compliance")
+async def compliance_check(
+    file: UploadFile = File(...),
+    profile: str = Query("ibc-2021", description="Compliance profile (ada, ibc-2021, residential)"),
+):
+    """Run regulation-aware compliance validation on a DXF file.
+
+    Checks the drawing against a building code profile and returns
+    a structured report with findings, code references, and score.
+    """
+    with otel_span("api.v1.compliance"):
+        context = _load_context(file)
+
+        if profile not in BUILTIN_PROFILES:
+            raise HTTPException(
+                422,
+                f"Unknown profile: {profile}. Available: {', '.join(BUILTIN_PROFILES)}",
+            )
+
+        report = check_compliance(context, profile=profile)
+
+        # model_dump() + computed properties (passed/score are @property)
+        # + rename profile_name → profile for API consistency
+        result = report.model_dump()
+        result["profile"] = result.pop("profile_name")
+        result["passed"] = report.passed
+        result["score"] = report.score
+        return result
+
+
+# ---------------------------------------------------------------------------
+# POST /api/v1/takeoff
+# ---------------------------------------------------------------------------
+
+
+@router.post("/takeoff")
+async def takeoff(file: UploadFile = File(...)):
+    """Generate automated quantity takeoff from a DXF file.
+
+    Returns counted items grouped by category with entity-level
+    evidence (source handles).
+    """
+    with otel_span("api.v1.takeoff"):
+        context = _load_context(file)
+        generator = TakeoffGenerator()
+        result = generator.generate(context, prompt="full takeoff")
+
+        return result.model_dump()
+
+
+# ---------------------------------------------------------------------------
+# POST /api/v1/summary
+# ---------------------------------------------------------------------------
+
+
+@router.post("/summary")
+async def summary(file: UploadFile = File(...)):
+    """Generate a plain-English summary of a DXF drawing.
+
+    Returns a structured summary with headline, sections, and
+    key statistics — no CAD knowledge required to understand.
+    """
+    with otel_span("api.v1.summary"):
+        context = _load_context(file)
+        result = summarize_drawing(context)
+
+        return result.model_dump()
+
+
+# ---------------------------------------------------------------------------
+# POST /api/v1/rfi
+# ---------------------------------------------------------------------------
+
+
+@router.post("/rfi")
+async def rfi_check(file: UploadFile = File(...)):
+    """Generate RFI (Request for Information) report for a DXF file.
+
+    Analyzes the drawing for common construction ambiguities:
+    missing dimensions, unclear references, symbols without legends,
+    and other items that would trigger RFIs from contractors.
+    """
+    with otel_span("api.v1.rfi"):
+        context = _load_context(file)
+        report = generate_rfi(context)
+
+        return report.model_dump()
