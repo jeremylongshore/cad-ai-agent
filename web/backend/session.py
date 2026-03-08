@@ -64,8 +64,15 @@ class Session:
     edit_approval: object | None = None
     edit_apply_result: object | None = None
     audit_events: list = field(default_factory=list)
+    # EPIC-CAD-27: Edit history for undo/redo + named snapshots
+    edit_history: object | None = None  # EditHistory instance (transient)
     # EPIC-CAD-15: Document library binding
     document_id: str = ""
+
+    @property
+    def session_dir(self) -> Path:
+        """Directory for this session's files."""
+        return DEFAULT_SESSION_DIR / self.session_id
 
     def to_metadata(self) -> SessionMetadata:
         """Extract durable metadata from this runtime session."""
