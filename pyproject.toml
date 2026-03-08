@@ -28,6 +28,7 @@ dependencies = [
     "numpy>=1.26",
     "httpx>=0.27",
     "python-dotenv>=1.0",
+    "rtree>=1.0",
 ]
 
 [project.optional-dependencies]

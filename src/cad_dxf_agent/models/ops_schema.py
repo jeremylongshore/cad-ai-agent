@@ -9,12 +9,26 @@ from pydantic import BaseModel, Field
 
 
 class OpType(StrEnum):
-    """Allowed V1 operation types."""
+    """Allowed operation types."""
 
+    # V1 operations
     MOVE_ENTITY = "move_entity"
     EDIT_TEXT = "edit_text"
     DELETE_ENTITY = "delete_entity"
     ADD_BLOCK = "add_block"
+
+    # V2 transform operations
+    ROTATE_ENTITY = "rotate_entity"
+    COPY_ENTITY = "copy_entity"
+    SCALE_ENTITY = "scale_entity"
+    MIRROR_ENTITY = "mirror_entity"
+
+    # V2 entity creation operations
+    ADD_LINE = "add_line"
+    ADD_POLYLINE = "add_polyline"
+    ADD_CIRCLE = "add_circle"
+    ADD_ARC = "add_arc"
+    ADD_TEXT = "add_text"
 
 
 class EditOperation(BaseModel):
@@ -36,6 +50,15 @@ class EditOperation(BaseModel):
     # edit_text params: new_text
     # delete_entity params: (none)
     # add_block params: block_name, insert_point (x, y), scale, rotation
+    # rotate_entity params: angle (degrees), cx, cy (rotation center, optional)
+    # copy_entity params: dx, dy (offset for the copy)
+    # scale_entity params: factor, cx, cy (scale center, optional)
+    # mirror_entity params: axis ("x" or "y"), value (coordinate of mirror line)
+    # add_line params: start (x, y), end (x, y), layer
+    # add_polyline params: points [(x, y), ...], closed (bool), layer
+    # add_circle params: center (x, y), radius, layer
+    # add_arc params: center (x, y), radius, start_angle, end_angle, layer
+    # add_text params: text, insert (x, y), height, layer, rotation (optional)
 
 
 class ChangeSet(BaseModel):

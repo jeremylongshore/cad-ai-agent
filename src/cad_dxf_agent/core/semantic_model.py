@@ -15,12 +15,13 @@ from ..otel import get_tracer
 tracer = get_tracer(__name__)
 
 
-ENTITY_CAP = 500
+ENTITY_CAP = 5000
 """Maximum entities included in verbose planner context.
 
-Real-world DXF files can have thousands of entities, producing millions of
-tokens when serialised as JSON.  Cap at 500 to stay safely within LLM
-context limits (~1M tokens for Gemini).
+Real-world DXF files can have thousands of entities. With R-tree spatial
+indexing and compact context mode, the agent uses tool-based discovery
+rather than dumping all entities into the prompt. The cap is a safety
+valve for the verbose context path only.
 """
 
 
