@@ -93,15 +93,15 @@ def check_drawing_health(
 # ---------------------------------------------------------------------------
 
 
-def _check_unclosed_polylines(
+def _check_polylines_missing_geometry(
     context: DrawingContext,
     index: EntityIndex,
 ) -> list[HealthIssue]:
-    """Flag LWPOLYLINE entities that should be closed but aren't.
+    """Flag LWPOLYLINE entities missing position/vertex data.
 
-    Heuristic: a polyline with 3+ vertices whose start and end points
-    are within 1 drawing unit but is not marked as closed is likely
-    an accidental gap.
+    Identifies polylines that lack insert_point data, which prevents
+    automated geometry analysis (closure, area calculation, etc.).
+    These entities may need manual inspection.
     """
     issues = []
     polylines = index.get_by_type(EntityType.LWPOLYLINE)
@@ -138,7 +138,7 @@ def _check_unclosed_polylines(
                         )
                         for e in no_position[:5]
                     ],
-                    check_name="check_unclosed_polylines",
+                    check_name="check_polylines_missing_geometry",
                 )
             )
 
@@ -264,26 +264,40 @@ def _check_overlapping_entities(
 ) -> list[HealthIssue]:
     """Flag entities at identical coordinates (potential duplicates).
 
-    Uses the R-tree spatial index for efficient proximity detection.
-    Entities within 0.01 drawing units of each other on the same layer
-    are flagged as potential overlaps.
+    Uses the R-tree spatial index for efficient proximity queries.
+    For each entity, queries nearby entities within 0.01 drawing units
+    on the same layer and flags groups as potential overlaps.
     """
     issues = []
-    seen_positions: dict[str, list[str]] = defaultdict(list)
     overlap_threshold = 0.01
+    checked: set[str] = set()
+    overlap_groups: dict[str, list[str]] = {}
 
     for entity in context.entities:
-        if entity.insert_point is None:
+        if entity.insert_point is None or entity.handle in checked:
             continue
-        # Round to threshold precision to group nearby entities
-        key = (
-            f"{round(entity.insert_point.x / overlap_threshold) * overlap_threshold:.2f},"
-            f"{round(entity.insert_point.y / overlap_threshold) * overlap_threshold:.2f},"
-            f"{entity.layer}"
-        )
-        seen_positions[key].append(entity.handle)
+        checked.add(entity.handle)
 
-    overlap_groups = {k: v for k, v in seen_positions.items() if len(v) > 1}
+        # Use R-tree to find nearby entities efficiently
+        nearby = index.find_in_radius(
+            entity.insert_point.x,
+            entity.insert_point.y,
+            overlap_threshold,
+        )
+        # Filter to same-layer neighbors (excluding self)
+        same_layer = [
+            n for n in nearby
+            if n.handle != entity.handle and n.layer == entity.layer
+        ]
+        if same_layer:
+            key = (
+                f"{entity.insert_point.x:.2f},"
+                f"{entity.insert_point.y:.2f},"
+                f"{entity.layer}"
+            )
+            handles = [entity.handle] + [n.handle for n in same_layer]
+            overlap_groups[key] = handles
+            checked.update(n.handle for n in same_layer)
 
     if overlap_groups:
         total_overlaps = sum(len(v) for v in overlap_groups.values())
@@ -556,7 +570,7 @@ def _compute_score(issues: list[HealthIssue], entity_count: int) -> float:
 # ---------------------------------------------------------------------------
 
 _ALL_CHECKS = [
-    _check_unclosed_polylines,
+    _check_polylines_missing_geometry,
     _check_inconsistent_text_heights,
     _check_orphan_layers,
     _check_overlapping_entities,

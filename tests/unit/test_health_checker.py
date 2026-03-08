@@ -16,7 +16,7 @@ from cad_dxf_agent.core.health_checker import (
     _check_missing_text_content,
     _check_orphan_layers,
     _check_overlapping_entities,
-    _check_unclosed_polylines,
+    _check_polylines_missing_geometry,
     _compute_score,
     check_drawing_health,
 )
@@ -339,7 +339,7 @@ class TestComputeScore:
 
 
 class TestCheckUnclosedPolylines:
-    """Test _check_unclosed_polylines."""
+    """Test _check_polylines_missing_geometry."""
 
     def test_no_polylines_no_issues(self):
         ctx = _make_context(
@@ -348,7 +348,7 @@ class TestCheckUnclosedPolylines:
             ]
         )
         idx = EntityIndex(ctx)
-        issues = _check_unclosed_polylines(ctx, idx)
+        issues = _check_polylines_missing_geometry(ctx, idx)
         assert issues == []
 
     def test_polylines_with_position_no_issue(self):
@@ -359,7 +359,7 @@ class TestCheckUnclosedPolylines:
             ]
         )
         idx = EntityIndex(ctx)
-        issues = _check_unclosed_polylines(ctx, idx)
+        issues = _check_polylines_missing_geometry(ctx, idx)
         assert issues == []
 
     def test_polylines_without_position_flagged(self):
@@ -371,7 +371,7 @@ class TestCheckUnclosedPolylines:
             ]
         )
         idx = EntityIndex(ctx)
-        issues = _check_unclosed_polylines(ctx, idx)
+        issues = _check_polylines_missing_geometry(ctx, idx)
         assert len(issues) == 1
         assert issues[0].severity == HealthSeverity.INFO
         assert issues[0].category == HealthCategory.GEOMETRY
@@ -386,7 +386,7 @@ class TestCheckUnclosedPolylines:
         ]
         ctx = _make_context(entities=ents)
         idx = EntityIndex(ctx)
-        issues = _check_unclosed_polylines(ctx, idx)
+        issues = _check_polylines_missing_geometry(ctx, idx)
         assert len(issues) == 1
         assert len(issues[0].evidence) == 5
 
@@ -985,7 +985,7 @@ class TestCheckDrawingHealth:
         )
         report = check_drawing_health(ctx, include_zones=False)
         expected_checks = {
-            "_check_unclosed_polylines",
+            "_check_polylines_missing_geometry",
             "_check_inconsistent_text_heights",
             "_check_orphan_layers",
             "_check_overlapping_entities",
