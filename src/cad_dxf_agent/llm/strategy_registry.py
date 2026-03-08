@@ -57,7 +57,7 @@ _CLASS_DEFAULTS: dict[RequestClass, StagePipelineDefinition] = {
         description="Run comparison pipeline between master and revision",
     ),
     RequestClass.VALIDATE: StagePipelineDefinition(
-        stages=["analyze", "validate"],
+        stages=["analyze", "health_check", "validate"],
         output_mode="direct",
         description="Check drawing for completeness, compliance, or consistency issues",
     ),
