@@ -172,15 +172,15 @@ def build_action_details(
     Maps each operation to an ActionDetail with before/after state,
     status derived from validation blockers, and evidence.
     """
-    # Build set of blocked handles from validation
+    # Build set of blocked handles from validation using operation_index
     blocked_handles: set[str] = set()
     if validation and hasattr(validation, "blockers"):
         for blocker in validation.blockers:
-            msg = getattr(blocker, "message", str(blocker))
-            # Extract handle from blocker message if possible
-            for op in changeset.operations:
-                if op.target_handle and op.target_handle in msg:
-                    blocked_handles.add(op.target_handle)
+            idx = getattr(blocker, "operation_index", None)
+            if idx is not None and 0 <= idx < len(changeset.operations):
+                handle = changeset.operations[idx].target_handle
+                if handle:
+                    blocked_handles.add(handle)
 
     details: list[ActionDetail] = []
     for op in changeset.operations:

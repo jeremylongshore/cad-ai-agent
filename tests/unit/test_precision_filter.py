@@ -459,9 +459,10 @@ class TestBuildActionDetails:
         context = make_context(entity)
         changeset = ChangeSet(prompt="move protected", operations=[make_move_op("A1")])
 
-        # Mock a validation object with a blocker mentioning handle A1
+        # Mock a validation object with a blocker at operation_index 0
         class FakeBlocker:
-            message = "Cannot edit entity A1 on protected layer"
+            message = "Cannot edit entity on protected layer"
+            operation_index = 0
 
         class FakeValidation:
             blockers = [FakeBlocker()]

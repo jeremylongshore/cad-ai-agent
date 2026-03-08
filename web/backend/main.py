@@ -993,7 +993,7 @@ async def v2_prompt(body: PromptRequest, user: dict = Depends(get_user)):
                                 "description": _describe_op(op),
                                 "params": op.params,
                             })
-                except Exception as prec_err:
+                except (ValueError, KeyError, TypeError) as prec_err:
                     logger.warning("Precision enrichment failed (non-fatal): %s", prec_err)
 
                 audit.total_request_time_ms = (_time.monotonic() - total_start) * 1000
