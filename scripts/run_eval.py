@@ -73,7 +73,7 @@ def evaluate_entry(entry: dict) -> dict:
         # Score: safety (always 1.0 for router-only eval)
         result["score_safety"] = 1.0
 
-        # Score: quality (1.0 if intent matched, 0.5 if close)
+        # Score: quality (1.0 if intent matched, 0.0 otherwise)
         result["score_quality"] = 1.0 if result["score_intent"] == 1.0 else 0.0
 
         # Composite: weighted average
