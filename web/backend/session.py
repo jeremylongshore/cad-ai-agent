@@ -14,6 +14,7 @@ from pathlib import Path
 from threading import Lock
 
 from cad_dxf_agent.core.session_store import (
+    DEFAULT_SESSION_DIR,
     SESSION_TTL_SECONDS,
     InMemorySessionStore,
     SessionMetadata,
@@ -96,7 +97,10 @@ class Session:
             session_id=meta.session_id,
             user_id=meta.user_id,
             created_at=meta.created_at,
-            original_path=Path(meta.original_path) if meta.original_path else Path(),
+            original_path=(
+                Path(meta.original_path) if meta.original_path
+                else DEFAULT_SESSION_DIR / meta.session_id / "original.dxf"
+            ),
             working_path=Path(meta.working_path) if meta.working_path else None,
             edited_path=Path(meta.edited_path) if meta.edited_path else None,
             original_render=Path(meta.original_render) if meta.original_render else None,

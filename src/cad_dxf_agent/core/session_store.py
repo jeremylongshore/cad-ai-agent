@@ -271,13 +271,15 @@ class GCSSessionStore(SessionStore):
 
     def get(self, session_id: str) -> SessionMetadata | None:
         try:
+            from google.api_core.exceptions import GoogleAPIError
+
             blob = self._bucket().blob(self._blob_path(session_id))
             if not blob.exists():
                 return None
             data = json.loads(blob.download_as_text())
             metadata = SessionMetadata.from_dict(data)
-        except Exception:
-            logger.exception("Failed to fetch session %s from GCS", session_id)
+        except (GoogleAPIError, json.JSONDecodeError, KeyError, TypeError) as exc:
+            logger.warning("Failed to fetch session %s from GCS: %s", session_id, exc)
             return None
 
         if metadata.is_expired:
@@ -288,22 +290,28 @@ class GCSSessionStore(SessionStore):
 
     def save(self, metadata: SessionMetadata) -> None:
         try:
+            from google.api_core.exceptions import GoogleAPIError
+
             blob = self._bucket().blob(self._blob_path(metadata.session_id))
             blob.upload_from_string(
                 json.dumps(metadata.to_dict(), default=str),
                 content_type="application/json",
             )
-        except Exception:
-            logger.exception("Failed to save session %s to GCS", metadata.session_id)
+        except (GoogleAPIError, json.JSONDecodeError) as exc:
+            logger.exception("Failed to save session %s to GCS: %s", metadata.session_id, exc)
             raise
 
     def delete(self, session_id: str) -> None:
         try:
+            from google.api_core.exceptions import GoogleAPIError, NotFound
+
             blob = self._bucket().blob(self._blob_path(session_id))
             if blob.exists():
                 blob.delete()
-        except Exception:
-            logger.warning("Failed to delete session %s from GCS", session_id)
+        except NotFound:
+            pass  # Already deleted — no action needed
+        except GoogleAPIError as exc:
+            logger.warning("Failed to delete session %s from GCS: %s", session_id, exc)
 
         session_dir = self._session_dir / session_id
         if session_dir.exists():
@@ -311,6 +319,8 @@ class GCSSessionStore(SessionStore):
         logger.info("Deleted GCS session %s", session_id)
 
     def cleanup_expired(self) -> int:
+        from google.api_core.exceptions import GoogleAPIError
+
         count = 0
         try:
             blobs = self._bucket().list_blobs(prefix=self._prefix)
@@ -323,9 +333,9 @@ class GCSSessionStore(SessionStore):
                     if meta.is_expired:
                         self.delete(meta.session_id)
                         count += 1
-                except Exception:
-                    logger.warning("Skipping malformed session blob: %s", blob.name)
-        except Exception:
+                except (json.JSONDecodeError, KeyError, TypeError) as exc:
+                    logger.warning("Skipping malformed session blob %s: %s", blob.name, exc)
+        except GoogleAPIError:
             logger.exception("Failed to cleanup expired sessions from GCS")
 
         if count:
@@ -333,6 +343,8 @@ class GCSSessionStore(SessionStore):
         return count
 
     def list_sessions(self, user_id: str | None = None) -> list[SessionMetadata]:
+        from google.api_core.exceptions import GoogleAPIError
+
         results = []
         try:
             blobs = self._bucket().list_blobs(prefix=self._prefix)
@@ -346,10 +358,10 @@ class GCSSessionStore(SessionStore):
                         user_id is None or meta.user_id == user_id
                     ):
                         results.append(meta)
-                except Exception:
-                    logger.debug("Skipping unreadable blob: %s", blob.name)
+                except (json.JSONDecodeError, KeyError, TypeError) as exc:
+                    logger.debug("Skipping unreadable blob %s: %s", blob.name, exc)
                     continue
-        except Exception:
+        except GoogleAPIError:
             logger.exception("Failed to list sessions from GCS")
 
         return results
