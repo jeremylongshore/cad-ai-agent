@@ -65,6 +65,7 @@
 | 018 | SPEC | [018-TQ-SPEC-unit-roundtrip-test-plan.md](018-TQ-SPEC-unit-roundtrip-test-plan.md) |
 | 032 | TEST | [032-TQ-TEST-sawcuts-sample-drawing.pdf](032-TQ-TEST-sawcuts-sample-drawing.pdf) |
 | 037 | SPEC | [037-TQ-SPEC-evaluation-plan.md](037-TQ-SPEC-evaluation-plan.md) |
+| 055 | AUDT | [055-TQ-AUDT-test-audit-report.md](055-TQ-AUDT-test-audit-report.md) |
 
 ### RL — Reports & Releases
 | # | Type | File |
@@ -151,6 +152,7 @@
 | 053 | PM | AAR | EPIC-CAD-12 end-of-phase report (Evaluation Harness + Quality Governance) |
 | 054 | RL | REPT | Release v0.7.0 report (Phase 5 complete) |
 | 055 | AT | SPEC | EPIC-CAD-13: Objective Intelligence spec |
+| 055 | TQ | AUDT | Test audit report (coverage gaps, security, remediation plan) |
 | 056 | AT | SPEC | EPIC-CAD-14: Professional Precision Controls spec |
 | 057 | AT | SPEC | EPIC-CAD-15: Document Persistence spec |
 | 058 | AT | ARCH | IntentCAD v0.8.0 UI/UX design strategy |
