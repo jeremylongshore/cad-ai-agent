@@ -47,6 +47,7 @@
 | 050 | AAR | [050-PM-AAR-epic-cad-09-aar.md](050-PM-AAR-epic-cad-09-aar.md) |
 | 051 | AAR | [051-PM-AAR-epic-cad-10-aar.md](051-PM-AAR-epic-cad-10-aar.md) |
 | 052 | AAR | [052-PM-AAR-epic-cad-11-aar.md](052-PM-AAR-epic-cad-11-aar.md) |
+| 053 | AAR | [053-PM-AAR-epic-cad-12-aar.md](053-PM-AAR-epic-cad-12-aar.md) |
 
 ### DR — Documentation & Reference
 | # | Type | File |
@@ -142,6 +143,7 @@
 | 050 | PM | AAR | EPIC-CAD-09 end-of-phase report (Design Operations Workflow Pack) |
 | 051 | PM | AAR | EPIC-CAD-10 end-of-phase report (Construction Drawing Workflow Pack) |
 | 052 | PM | AAR | EPIC-CAD-11 end-of-phase report (Session Durability + Scale Readiness) |
+| 053 | PM | AAR | EPIC-CAD-12 end-of-phase report (Evaluation Harness + Quality Governance) |
 
 ## Quick Reference
 
