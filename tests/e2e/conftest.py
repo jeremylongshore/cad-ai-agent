@@ -37,8 +37,7 @@ def pytest_terminal_summary(terminalreporter, config):
     """Warn loudly when E2E sourced-DXF tests were skipped."""
     skipped = terminalreporter.stats.get("skipped", [])
     sourced_skips = [
-        s for s in skipped
-        if hasattr(s, "longrepr") and "e2e_fixtures" in str(s.longrepr)
+        s for s in skipped if hasattr(s, "longrepr") and "e2e_fixtures" in str(s.longrepr)
     ]
     if sourced_skips:
         terminalreporter.section("E2E sourced fixture warning")

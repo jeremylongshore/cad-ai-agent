@@ -208,13 +208,15 @@ def _make_context(
     layer_rules = [LayerRule(name=n) for n in (layers or ["0"])]
     entities: list[EntityRef] = []
     for i, (text, layer) in enumerate(texts or [], start=1):
-        entities.append(EntityRef(
-            handle=hex(i),
-            entity_type=EntityType.TEXT,
-            layer=layer,
-            text_content=text,
-            insert_point=Point2D(x=0, y=0),
-        ))
+        entities.append(
+            EntityRef(
+                handle=hex(i),
+                entity_type=EntityType.TEXT,
+                layer=layer,
+                text_content=text,
+                insert_point=Point2D(x=0, y=0),
+            )
+        )
     return DrawingContext(
         file_path="test.dxf",
         entities=entities,
@@ -244,7 +246,9 @@ class TestFamilyDetectionWiring:
             texts=[("Tree Oak 24in", "PLANTING"), ("Shrub Boxwood", "PLANTING")],
         )
         result = classifier.classify_with_family(
-            "how many trees", TaskFamily.QNA, context=ctx,
+            "how many trees",
+            TaskFamily.QNA,
+            context=ctx,
         )
         assert result.document_family == DocumentFamilyHint.LANDSCAPE
 

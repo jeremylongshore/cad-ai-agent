@@ -174,11 +174,7 @@ def build_enriched_context(context: DrawingContext) -> dict:
             "confidence": family_result.confidence,
             "signal_count": family_result.signal_count,
             "top_signals": family_result.top_signals,
-            "runner_up": (
-                family_result.runner_up.value
-                if family_result.runner_up
-                else None
-            ),
+            "runner_up": (family_result.runner_up.value if family_result.runner_up else None),
         }
 
         # Shared primitives
@@ -187,9 +183,7 @@ def build_enriched_context(context: DrawingContext) -> dict:
             "symbols": {
                 "total_inserts": primitives.symbols.total_inserts,
                 "unique_blocks": primitives.symbols.unique_blocks,
-                "top_blocks": dict(
-                    list(primitives.symbols.counts_by_block.items())[:10]
-                ),
+                "top_blocks": dict(list(primitives.symbols.counts_by_block.items())[:10]),
             },
             "labels": {
                 "total_labels": primitives.labels.total_labels,
@@ -202,18 +196,12 @@ def build_enriched_context(context: DrawingContext) -> dict:
                 "dimension": primitives.layer_classification.dimension,
                 "title_border": primitives.layer_classification.title_border,
                 "mep": primitives.layer_classification.mep,
-                "other_count": len(
-                    primitives.layer_classification.other
-                ),
+                "other_count": len(primitives.layer_classification.other),
             },
             "entity_counts": primitives.entity_counts,
         }
 
-        span.set_attribute(
-            "cad.document_family", family_result.family.value
-        )
-        span.set_attribute(
-            "cad.family_confidence", family_result.confidence
-        )
+        span.set_attribute("cad.document_family", family_result.family.value)
+        span.set_attribute("cad.family_confidence", family_result.confidence)
 
         return base

@@ -25,14 +25,16 @@ def _make_context(
     entities: list[EntityRef] = []
     handle_counter = 1
 
-    for text, layer in (texts or []):
-        entities.append(EntityRef(
-            handle=hex(handle_counter),
-            entity_type=EntityType.TEXT,
-            layer=layer,
-            text_content=text,
-            insert_point=Point2D(x=0, y=0),
-        ))
+    for text, layer in texts or []:
+        entities.append(
+            EntityRef(
+                handle=hex(handle_counter),
+                entity_type=EntityType.TEXT,
+                layer=layer,
+                text_content=text,
+                insert_point=Point2D(x=0, y=0),
+            )
+        )
         handle_counter += 1
 
     return DrawingContext(
