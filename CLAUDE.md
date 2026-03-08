@@ -278,3 +278,6 @@ This project uses `bd` (beads) for issue tracking. Run `bd ready` to find availa
 | EPIC-CAD-10 | cad-8p2 | Construction Drawing Workflow Pack | 4 |
 | EPIC-CAD-11 | cad-36p | Session Durability + Scale Readiness | 5 |
 | EPIC-CAD-12 | cad-m7d | Evaluation Harness + Quality Governance | 5 |
+| EPIC-CAD-13 | cad-dxf-agent-lk9 | Objective Intelligence | 6 |
+| EPIC-CAD-14 | cad-dxf-agent-bmw | Professional Precision Controls | 6 |
+| EPIC-CAD-15 | cad-dxf-agent-aqw | Document Persistence | 6 |
