@@ -76,9 +76,7 @@ class TestCompareLibraryDocuments:
         assert resp.status_code == 404
         assert "revision" in resp.json()["detail"].lower()
 
-    def test_compare_same_document_works(
-        self, client, sample_dxf_bytes, _use_inmemory_doc_store
-    ):
+    def test_compare_same_document_works(self, client, sample_dxf_bytes, _use_inmemory_doc_store):
         """Self-comparing a document (master == revision) is valid and returns zero changes."""
         store = _use_inmemory_doc_store
         doc = store.save_document("test-user-123", "plan.dxf", sample_dxf_bytes)
@@ -92,9 +90,7 @@ class TestCompareLibraryDocuments:
         )
         assert resp.status_code == 200
 
-    def test_compare_respects_user_isolation(
-        self, sample_dxf_bytes, _use_inmemory_doc_store
-    ):
+    def test_compare_respects_user_isolation(self, sample_dxf_bytes, _use_inmemory_doc_store):
         """User B cannot use user A's documents in a compare."""
         from web.backend.main import app, get_user
 

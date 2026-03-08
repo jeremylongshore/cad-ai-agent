@@ -58,9 +58,7 @@ class TestSessionReconnect:
         assert data["reconnected"] is False
         assert data["document_id"] == doc.doc_id
 
-    def test_reconnect_with_deleted_document_returns_404(
-        self, client, _use_inmemory_doc_store
-    ):
+    def test_reconnect_with_deleted_document_returns_404(self, client, _use_inmemory_doc_store):
         """Reconnecting to a deleted document returns 404."""
         store = _use_inmemory_doc_store
         doc = store.save_document("test-user-123", "plan.dxf", SAMPLE_DXF_CONTENT)
@@ -73,9 +71,7 @@ class TestSessionReconnect:
         resp = client.post("/api/session/reconnect", json={"document_id": "does-not-exist"})
         assert resp.status_code == 404
 
-    def test_reconnect_returns_file_info(
-        self, client, sample_dxf_bytes, _use_inmemory_doc_store
-    ):
+    def test_reconnect_returns_file_info(self, client, sample_dxf_bytes, _use_inmemory_doc_store):
         """Reconnected response includes file_info."""
         store = _use_inmemory_doc_store
         doc = store.save_document("test-user-123", "plan.dxf", sample_dxf_bytes)
@@ -98,9 +94,7 @@ class TestSessionReconnect:
         assert resp.status_code == 200
         assert "file_info" in resp.json()
 
-    def test_reconnect_respects_user_isolation(
-        self, sample_dxf_bytes, _use_inmemory_doc_store
-    ):
+    def test_reconnect_respects_user_isolation(self, sample_dxf_bytes, _use_inmemory_doc_store):
         """User B cannot reconnect to user A's document."""
         from web.backend.main import app, get_user
 
@@ -115,9 +109,7 @@ class TestSessionReconnect:
         from starlette.testclient import TestClient
 
         with TestClient(app, raise_server_exceptions=False) as client_b:
-            resp = client_b.post(
-                "/api/session/reconnect", json={"document_id": doc_a.doc_id}
-            )
+            resp = client_b.post("/api/session/reconnect", json={"document_id": doc_a.doc_id})
             # The doc was stored under user-a; user-b cannot find it
             assert resp.status_code == 404
 

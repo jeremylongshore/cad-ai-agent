@@ -218,8 +218,9 @@ class TestFindByDocument:
 
     def test_list_user_sessions_excludes_expired(self):
         """list_user_sessions excludes sessions past the TTL."""
-        from cad_dxf_agent.core.session_store import SESSION_TTL_SECONDS
         from web.backend.session import SessionManager
+
+        from cad_dxf_agent.core.session_store import SESSION_TTL_SECONDS
 
         mgr = SessionManager()
         session = mgr.create("user-1")

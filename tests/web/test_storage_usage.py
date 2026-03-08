@@ -107,9 +107,7 @@ class TestStorageUsageEndpoint:
         expected = round(len(SAMPLE_DXF_CONTENT) / MAX_TOTAL_STORAGE_BYTES * 100, 2)
         assert data["usage_percent"] == pytest.approx(expected, abs=0.01)
 
-    def test_upload_at_limit_returns_413_with_usage_data(
-        self, client, _use_inmemory_doc_store
-    ):
+    def test_upload_at_limit_returns_413_with_usage_data(self, client, _use_inmemory_doc_store):
         """When StorageLimitError is raised, the 413 response includes usage fields."""
         store = _use_inmemory_doc_store
         # Pre-fill to the document count limit
