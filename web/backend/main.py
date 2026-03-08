@@ -236,6 +236,139 @@ async def get_profiles():
     return {name: p.model_dump() for name, p in BUILTIN_PROFILES.items()}
 
 
+# ---------------------------------------------------------------------------
+# Document Library endpoints (EPIC-CAD-15)
+# ---------------------------------------------------------------------------
+
+# Document store singleton — InMemory for dev, GCS for production
+_document_store = None
+
+
+def _get_document_store():
+    global _document_store
+    if _document_store is None:
+        from cad_dxf_agent.core.document_store import (
+            GCSDocumentStore,
+            InMemoryDocumentStore,
+        )
+
+        if os.getenv("CAD_WEB_DEV_MODE", "").lower() in ("1", "true"):
+            _document_store = InMemoryDocumentStore()
+            logger.info("Using InMemory document store (dev mode)")
+        else:
+            bucket = os.getenv("CAD_DOCUMENT_BUCKET", "cad-dxf-agent-documents")
+            _document_store = GCSDocumentStore(bucket_name=bucket)
+            logger.info("Using GCS document store (bucket=%s)", bucket)
+    return _document_store
+
+
+@app.get("/api/documents")
+async def list_documents(user: dict = Depends(get_user)):
+    """List all documents in the user's library."""
+    store = _get_document_store()
+    docs = store.list_documents(user["uid"])
+    return {"documents": [d.model_dump() for d in docs]}
+
+
+@app.post("/api/documents")
+async def upload_document(
+    file: UploadFile = File(...),
+    user: dict = Depends(get_user),
+):
+    """Upload a DXF to the user's permanent document library."""
+    from cad_dxf_agent.core.document_store import StorageLimitError
+
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="No file provided")
+
+    suffix = Path(file.filename).suffix.lower()
+    if suffix not in (".dxf",):
+        raise HTTPException(status_code=400, detail="Only DXF files are supported")
+
+    data = await file.read()
+    if not data:
+        raise HTTPException(status_code=400, detail="Empty file")
+
+    store = _get_document_store()
+    try:
+        doc = store.save_document(user["uid"], file.filename, data)
+    except StorageLimitError as e:
+        raise HTTPException(status_code=413, detail=str(e)) from e
+
+    return {"document": doc.model_dump()}
+
+
+@app.get("/api/documents/{doc_id}")
+async def get_document_info(doc_id: str, user: dict = Depends(get_user)):
+    """Get metadata for a specific document."""
+    store = _get_document_store()
+    doc = store.get_document(user["uid"], doc_id)
+    if doc is None:
+        raise HTTPException(status_code=404, detail="Document not found")
+    return {"document": doc.model_dump()}
+
+
+@app.delete("/api/documents/{doc_id}")
+async def delete_document(doc_id: str, user: dict = Depends(get_user)):
+    """Delete a document from the user's library."""
+    store = _get_document_store()
+    if not store.delete_document(user["uid"], doc_id):
+        raise HTTPException(status_code=404, detail="Document not found")
+    return {"status": "deleted", "doc_id": doc_id}
+
+
+@app.post("/api/documents/{doc_id}/load")
+async def load_document(doc_id: str, user: dict = Depends(get_user)):
+    """Load a library document into a working session.
+
+    Copies the stored DXF to a session directory so the existing pipeline
+    can work with it. Returns session_id + file_info just like /api/upload.
+    """
+    store = _get_document_store()
+    doc = store.get_document(user["uid"], doc_id)
+    if doc is None:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    file_data = store.get_file_data(user["uid"], doc_id)
+    if file_data is None:
+        raise HTTPException(status_code=404, detail="Document file not found")
+
+    # Create a session linked to this document
+    session = session_mgr.create(user["uid"])
+    Path(session.original_path).write_bytes(file_data)
+
+    # Update session with document binding
+    meta = session.to_metadata()
+    meta.document_id = doc_id
+    session_mgr.store.save(meta)
+
+    # Touch the document's last_accessed (persists to GCS in production)
+    store.touch_document(user["uid"], doc_id)
+
+    # Load drawing info
+    try:
+        from cad_dxf_agent.core.dxf_reader import load_dxf
+
+        ctx = load_dxf(str(session.original_path))
+        session.context = ctx
+        file_info = {
+            "filename": doc.filename,
+            "entity_count": len(ctx.entities),
+            "layers": list({e.layer for e in ctx.entities}),
+            "drawing_units": ctx.metadata.get("units", "unknown"),
+        }
+        session.file_info = file_info
+    except Exception as e:
+        logger.warning("Failed to load DXF from library doc %s: %s", doc_id, e)
+        file_info = {"filename": doc.filename, "error": str(e)}
+
+    return {
+        "session_id": session.session_id,
+        "file_info": file_info,
+        "document_id": doc_id,
+    }
+
+
 @app.post("/api/upload")
 async def upload(
     file: UploadFile = File(...),
