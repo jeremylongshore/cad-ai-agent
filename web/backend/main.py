@@ -49,6 +49,7 @@ sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from cad_dxf_agent.otel import span as otel_span  # noqa: E402
 
+from .api_v1 import router as v1_router
 from .auth import get_licensed_user
 from .session import SessionManager
 
@@ -93,6 +94,9 @@ ALLOWED_ORIGINS = [
 custom_origin = os.getenv("CAD_WEB_CORS_ORIGIN")
 if custom_origin:
     ALLOWED_ORIGINS.append(custom_origin)
+
+# Register API v1 router (stateless agent endpoints)
+app.include_router(v1_router)
 
 app.add_middleware(
     CORSMiddleware,
