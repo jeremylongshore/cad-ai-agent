@@ -320,8 +320,8 @@ async def drawing_compliance_check(
     with otel_span("api.drawing_compliance") as span:
         try:
             session = session_mgr.get(req.session_id, user["uid"])
-        except (KeyError, PermissionError) as e:
-            raise HTTPException(404, str(e))
+        except (KeyError, PermissionError):
+            raise HTTPException(404, "Session not found or access denied")
 
         span.set_attribute("cad.session_id", req.session_id)
         span.set_attribute("cad.compliance.profile", req.profile)
