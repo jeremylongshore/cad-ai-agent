@@ -64,6 +64,8 @@ class Session:
     edit_approval: object | None = None
     edit_apply_result: object | None = None
     audit_events: list = field(default_factory=list)
+    # EPIC-CAD-15: Document library binding
+    document_id: str = ""
 
     def to_metadata(self) -> SessionMetadata:
         """Extract durable metadata from this runtime session."""
@@ -74,6 +76,7 @@ class Session:
             file_info=self.file_info,
             conversation_history=self.conversation_history,
             audit_events=self.audit_events,
+            document_id=self.document_id,
             original_path=str(self.original_path) if self.original_path else "",
             working_path=str(self.working_path) if self.working_path else "",
             edited_path=str(self.edited_path) if self.edited_path else "",
@@ -97,6 +100,7 @@ class Session:
             session_id=meta.session_id,
             user_id=meta.user_id,
             created_at=meta.created_at,
+            document_id=meta.document_id,
             original_path=(
                 Path(meta.original_path) if meta.original_path
                 else DEFAULT_SESSION_DIR / meta.session_id / "original.dxf"
@@ -203,3 +207,35 @@ class SessionManager:
         if expired:
             logger.info("Cleaned up %d expired sessions", len(expired))
         return len(expired)
+
+    def find_by_document(self, user_id: str, document_id: str) -> Session | None:
+        """Find an existing non-expired session for this user+document pair.
+
+        Returns the first active session that is bound to the given document,
+        or None if no such session exists.
+        """
+        now = time.time()
+        with self._lock:
+            sessions = list(self._sessions.values())
+
+        for session in sessions:
+            if session.user_id != user_id:
+                continue
+            if session.document_id != document_id:
+                continue
+            if now - session.created_at > SESSION_TTL_SECONDS:
+                continue
+            return session
+
+        return None
+
+    def list_user_sessions(self, user_id: str) -> list[Session]:
+        """Return all non-expired sessions for this user."""
+        now = time.time()
+        with self._lock:
+            sessions = list(self._sessions.values())
+
+        return [
+            s for s in sessions
+            if s.user_id == user_id and now - s.created_at <= SESSION_TTL_SECONDS
+        ]

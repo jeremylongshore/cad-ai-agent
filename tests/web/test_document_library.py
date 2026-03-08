@@ -93,7 +93,10 @@ class TestUploadDocument:
             files={"file": ("overflow.dxf", SAMPLE_DXF_CONTENT, "application/octet-stream")},
         )
         assert resp.status_code == 413
-        assert "limit" in resp.json()["detail"].lower()
+        detail = resp.json()["detail"]
+        # detail is a structured dict with a "message" key (Story 9 enhancement)
+        message = detail["message"] if isinstance(detail, dict) else detail
+        assert "limit" in message.lower()
 
 
 @pytest.mark.web
