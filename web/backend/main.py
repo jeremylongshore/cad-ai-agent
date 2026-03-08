@@ -1843,6 +1843,18 @@ def _user_friendly_conversion_error(raw_error: str | None, ext: str) -> str:
     return f"Could not convert your {ext} file. Please try exporting as DXF from your CAD software."
 
 
+def _get_stage_executor():
+    """Create a StagePipelineExecutor with all registered handlers."""
+    from cad_dxf_agent.llm.stage_executor import StagePipelineExecutor
+    from cad_dxf_agent.llm.stage_handlers.analyze_handler import AnalyzeHandler
+    from cad_dxf_agent.llm.stage_handlers.detect_zones_handler import DetectZonesHandler
+
+    executor = StagePipelineExecutor()
+    executor.register("analyze", AnalyzeHandler())
+    executor.register("detect_zones", DetectZonesHandler())
+    return executor
+
+
 def _enrich_with_objective(
     response: dict,
     objective: ObjectiveClassification | None,
