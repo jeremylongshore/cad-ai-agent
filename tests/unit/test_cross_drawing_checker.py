@@ -247,9 +247,7 @@ class TestLayerNamingConsistency:
         report = check_consistency([sheet_a, sheet_b])
 
         layer_findings = [
-            f
-            for f in report.findings
-            if f.category == ConsistencyCategory.LAYER_NAMING
+            f for f in report.findings if f.category == ConsistencyCategory.LAYER_NAMING
         ]
         assert len(layer_findings) >= 1
         assert any("case" in f.description.lower() for f in layer_findings)
@@ -268,9 +266,7 @@ class TestLayerNamingConsistency:
         report = check_consistency([sheet_a, sheet_b])
 
         layer_findings = [
-            f
-            for f in report.findings
-            if f.category == ConsistencyCategory.LAYER_NAMING
+            f for f in report.findings if f.category == ConsistencyCategory.LAYER_NAMING
         ]
         # Should note layers unique to one sheet
         assert len(layer_findings) >= 1
@@ -329,9 +325,7 @@ class TestBlockConsistency:
         report = check_consistency([sheet_a, sheet_b, sheet_c])
 
         block_findings = [
-            f
-            for f in report.findings
-            if f.category == ConsistencyCategory.BLOCK_CONSISTENCY
+            f for f in report.findings if f.category == ConsistencyCategory.BLOCK_CONSISTENCY
         ]
         assert len(block_findings) >= 1
 
@@ -439,9 +433,7 @@ class TestCoordinateAlignment:
         report = check_consistency([sheet_a, sheet_b])
 
         coord_findings = [
-            f
-            for f in report.findings
-            if f.category == ConsistencyCategory.COORDINATE_ALIGNMENT
+            f for f in report.findings if f.category == ConsistencyCategory.COORDINATE_ALIGNMENT
         ]
         assert len(coord_findings) >= 1
 
@@ -532,10 +524,12 @@ class TestCheckConsistencyIntegration:
     def test_report_checks_run_populated(self):
         from cad_dxf_agent.core.cross_drawing_checker import check_consistency
 
-        report = check_consistency([
-            _make_context("a.dxf", entities=[_line_entity("h1")]),
-            _make_context("b.dxf", entities=[_line_entity("h2")]),
-        ])
+        report = check_consistency(
+            [
+                _make_context("a.dxf", entities=[_line_entity("h1")]),
+                _make_context("b.dxf", entities=[_line_entity("h2")]),
+            ]
+        )
 
         assert "room_labels" in report.checks_run
         assert "layer_naming" in report.checks_run

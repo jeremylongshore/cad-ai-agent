@@ -161,9 +161,11 @@ class TestComputeZoneDeltas:
 
     def test_room_added(self):
         old_zones = _make_zones_result()
-        new_zones = _make_zones_result([
-            _make_zone("z1", area=1500.0, inferred_type="bedroom"),
-        ])
+        new_zones = _make_zones_result(
+            [
+                _make_zone("z1", area=1500.0, inferred_type="bedroom"),
+            ]
+        )
         deltas = _compute_zone_deltas(old_zones, new_zones)
 
         assert len(deltas) == 1
@@ -172,9 +174,11 @@ class TestComputeZoneDeltas:
         assert deltas[0].new_area == 1500.0
 
     def test_room_removed(self):
-        old_zones = _make_zones_result([
-            _make_zone("z1", area=1500.0, inferred_type="bedroom"),
-        ])
+        old_zones = _make_zones_result(
+            [
+                _make_zone("z1", area=1500.0, inferred_type="bedroom"),
+            ]
+        )
         new_zones = _make_zones_result()
         deltas = _compute_zone_deltas(old_zones, new_zones)
 
@@ -184,12 +188,16 @@ class TestComputeZoneDeltas:
         assert deltas[0].area_change == -1500.0
 
     def test_room_resized(self):
-        old_zones = _make_zones_result([
-            _make_zone("z1", area=1000.0, inferred_type="kitchen"),
-        ])
-        new_zones = _make_zones_result([
-            _make_zone("z1", area=1200.0, inferred_type="kitchen"),
-        ])
+        old_zones = _make_zones_result(
+            [
+                _make_zone("z1", area=1000.0, inferred_type="kitchen"),
+            ]
+        )
+        new_zones = _make_zones_result(
+            [
+                _make_zone("z1", area=1200.0, inferred_type="kitchen"),
+            ]
+        )
         deltas = _compute_zone_deltas(old_zones, new_zones)
 
         assert len(deltas) == 1
@@ -206,14 +214,18 @@ class TestComputeZoneDeltas:
         assert deltas[0].status == "unchanged"
 
     def test_mixed_changes(self):
-        old_zones = _make_zones_result([
-            _make_zone("z1", area=1000.0, inferred_type="bedroom"),
-            _make_zone("z2", area=500.0, inferred_type="bathroom"),
-        ])
-        new_zones = _make_zones_result([
-            _make_zone("z1", area=1200.0, inferred_type="bedroom"),
-            _make_zone("z3", area=800.0, inferred_type="kitchen"),
-        ])
+        old_zones = _make_zones_result(
+            [
+                _make_zone("z1", area=1000.0, inferred_type="bedroom"),
+                _make_zone("z2", area=500.0, inferred_type="bathroom"),
+            ]
+        )
+        new_zones = _make_zones_result(
+            [
+                _make_zone("z1", area=1200.0, inferred_type="bedroom"),
+                _make_zone("z3", area=800.0, inferred_type="kitchen"),
+            ]
+        )
         deltas = _compute_zone_deltas(old_zones, new_zones)
 
         statuses = {d.status for d in deltas}
@@ -233,8 +245,7 @@ class TestBuildHeadline:
     def test_headline_with_changes(self):
         changelog = ChangeLog(entries=[_make_entry(), _make_entry()])
         deltas = [
-            ZoneDelta(zone_type="bedroom", status="added",
-                      new_area=1500.0, area_change=1500.0),
+            ZoneDelta(zone_type="bedroom", status="added", new_area=1500.0, area_change=1500.0),
         ]
         headline = _build_headline(changelog, deltas, 1500.0)
 
@@ -250,8 +261,7 @@ class TestBuildHeadline:
     def test_headline_negative_area(self):
         changelog = ChangeLog(entries=[_make_entry()])
         deltas = [
-            ZoneDelta(zone_type="closet", status="removed",
-                      old_area=50.0, area_change=-50.0),
+            ZoneDelta(zone_type="closet", status="removed", old_area=50.0, area_change=-50.0),
         ]
         headline = _build_headline(changelog, deltas, -50.0)
         assert "-50" in headline
@@ -273,7 +283,9 @@ class TestGenerateRevisionReport:
         revision_zones = _make_zones_result()
 
         report = generate_revision_report(
-            master, revision, changelog,
+            master,
+            revision,
+            changelog,
             master_zones=master_zones,
             revision_zones=revision_zones,
         )
@@ -286,21 +298,29 @@ class TestGenerateRevisionReport:
     def test_report_with_changes_and_zones(self):
         master = _make_context(file_path="master.dxf")
         revision = _make_context(file_path="revision.dxf")
-        changelog = ChangeLog(entries=[
-            _make_entry("added", description="New wall added"),
-            _make_entry("modified", description="Wall moved"),
-            _make_entry("removed", description="Old fixture removed"),
-        ])
-        master_zones = _make_zones_result([
-            _make_zone("z1", area=1000.0, inferred_type="bedroom"),
-        ])
-        revision_zones = _make_zones_result([
-            _make_zone("z1", area=1200.0, inferred_type="bedroom"),
-            _make_zone("z2", area=800.0, inferred_type="kitchen"),
-        ])
+        changelog = ChangeLog(
+            entries=[
+                _make_entry("added", description="New wall added"),
+                _make_entry("modified", description="Wall moved"),
+                _make_entry("removed", description="Old fixture removed"),
+            ]
+        )
+        master_zones = _make_zones_result(
+            [
+                _make_zone("z1", area=1000.0, inferred_type="bedroom"),
+            ]
+        )
+        revision_zones = _make_zones_result(
+            [
+                _make_zone("z1", area=1200.0, inferred_type="bedroom"),
+                _make_zone("z2", area=800.0, inferred_type="kitchen"),
+            ]
+        )
 
         report = generate_revision_report(
-            master, revision, changelog,
+            master,
+            revision,
+            changelog,
             master_zones=master_zones,
             revision_zones=revision_zones,
         )
@@ -314,16 +334,22 @@ class TestGenerateRevisionReport:
     def test_plain_summary_readable(self):
         master = _make_context(file_path="floor_plan_v1.dxf")
         revision = _make_context(file_path="floor_plan_v2.dxf")
-        changelog = ChangeLog(entries=[
-            _make_entry("added", description="New bedroom wall"),
-        ])
+        changelog = ChangeLog(
+            entries=[
+                _make_entry("added", description="New bedroom wall"),
+            ]
+        )
         master_zones = _make_zones_result()
-        revision_zones = _make_zones_result([
-            _make_zone("z1", area=1500.0, inferred_type="bedroom"),
-        ])
+        revision_zones = _make_zones_result(
+            [
+                _make_zone("z1", area=1500.0, inferred_type="bedroom"),
+            ]
+        )
 
         report = generate_revision_report(
-            master, revision, changelog,
+            master,
+            revision,
+            changelog,
             master_zones=master_zones,
             revision_zones=revision_zones,
         )

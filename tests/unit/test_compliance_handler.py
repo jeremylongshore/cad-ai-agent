@@ -282,9 +282,6 @@ class TestComplianceHandler:
             context={"drawing_context": ctx},
             prompt="check compliance",
         )
-        violations = [
-            f for f in result["compliance_findings"]
-            if f["severity"] == "violation"
-        ]
+        violations = [f for f in result["compliance_findings"] if f["severity"] == "violation"]
         assert len(violations) >= 1
         assert any("door" in v["title"].lower() for v in violations)

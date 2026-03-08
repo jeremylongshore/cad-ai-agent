@@ -92,9 +92,7 @@ def check_consistency(
 
     # Count by severity
     error_count = sum(1 for f in findings if f.severity == ConsistencySeverity.ERROR)
-    warning_count = sum(
-        1 for f in findings if f.severity == ConsistencySeverity.WARNING
-    )
+    warning_count = sum(1 for f in findings if f.severity == ConsistencySeverity.WARNING)
     info_count = sum(1 for f in findings if f.severity == ConsistencySeverity.INFO)
 
     return ConsistencyReport(
@@ -158,9 +156,7 @@ def _check_room_labels(sheets: list[SheetInfo]) -> list[ConsistencyFinding]:
         if not sheet.room_labels:
             findings.append(
                 ConsistencyFinding(
-                    finding_id=_generate_finding_id(
-                        "room_labels", "no_labels", sheet.file_path
-                    ),
+                    finding_id=_generate_finding_id("room_labels", "no_labels", sheet.file_path),
                     category=ConsistencyCategory.ROOM_LABELS,
                     severity=ConsistencySeverity.INFO,
                     title="No room labels detected",
@@ -185,7 +181,9 @@ def _check_room_labels(sheets: list[SheetInfo]) -> list[ConsistencyFinding]:
             findings.append(
                 ConsistencyFinding(
                     finding_id=_generate_finding_id(
-                        "room_labels", f"missing_{label}", sheet_a.file_path,
+                        "room_labels",
+                        f"missing_{label}",
+                        sheet_a.file_path,
                         sheet_b.file_path,
                     ),
                     category=ConsistencyCategory.ROOM_LABELS,
@@ -205,7 +203,9 @@ def _check_room_labels(sheets: list[SheetInfo]) -> list[ConsistencyFinding]:
             findings.append(
                 ConsistencyFinding(
                     finding_id=_generate_finding_id(
-                        "room_labels", f"missing_{label}", sheet_b.file_path,
+                        "room_labels",
+                        f"missing_{label}",
+                        sheet_b.file_path,
                         sheet_a.file_path,
                     ),
                     category=ConsistencyCategory.ROOM_LABELS,
@@ -252,7 +252,8 @@ def _check_layer_naming(
             findings.append(
                 ConsistencyFinding(
                     finding_id=_generate_finding_id(
-                        "layer_naming", f"case_{lower_name}",
+                        "layer_naming",
+                        f"case_{lower_name}",
                         contexts[0].file_path,
                     ),
                     category=ConsistencyCategory.LAYER_NAMING,
@@ -285,7 +286,9 @@ def _check_layer_naming(
         findings.append(
             ConsistencyFinding(
                 finding_id=_generate_finding_id(
-                    "layer_naming", "mixed_delimiters", contexts[0].file_path,
+                    "layer_naming",
+                    "mixed_delimiters",
+                    contexts[0].file_path,
                 ),
                 category=ConsistencyCategory.LAYER_NAMING,
                 severity=ConsistencySeverity.INFO,
@@ -303,14 +306,14 @@ def _check_layer_naming(
     # Check for layers unique to a single sheet (excluding defaults)
     non_default_layers = all_layers - _DEFAULT_LAYERS
     for layer in sorted(non_default_layers):
-        present_in = [
-            fp for fp, layer_set in layers_per_sheet.items() if layer in layer_set
-        ]
+        present_in = [fp for fp, layer_set in layers_per_sheet.items() if layer in layer_set]
         if len(present_in) == 1 and len(contexts) > 1:
             findings.append(
                 ConsistencyFinding(
                     finding_id=_generate_finding_id(
-                        "layer_naming", f"unique_{layer}", present_in[0],
+                        "layer_naming",
+                        f"unique_{layer}",
+                        present_in[0],
                     ),
                     category=ConsistencyCategory.LAYER_NAMING,
                     severity=ConsistencySeverity.INFO,
@@ -355,7 +358,8 @@ def _check_block_consistency(
                     findings.append(
                         ConsistencyFinding(
                             finding_id=_generate_finding_id(
-                                "block_consistency", f"missing_{block}",
+                                "block_consistency",
+                                f"missing_{block}",
                                 sheet.file_path,
                             ),
                             category=ConsistencyCategory.BLOCK_CONSISTENCY,
@@ -391,7 +395,9 @@ def _check_entity_counts(
             findings.append(
                 ConsistencyFinding(
                     finding_id=_generate_finding_id(
-                        "entity_counts", "empty", sheet.file_path,
+                        "entity_counts",
+                        "empty",
+                        sheet.file_path,
                     ),
                     category=ConsistencyCategory.ENTITY_COUNTS,
                     severity=ConsistencySeverity.ERROR,
@@ -415,7 +421,9 @@ def _check_entity_counts(
                     findings.append(
                         ConsistencyFinding(
                             finding_id=_generate_finding_id(
-                                "entity_counts", "outlier", sheet.file_path,
+                                "entity_counts",
+                                "outlier",
+                                sheet.file_path,
                             ),
                             category=ConsistencyCategory.ENTITY_COUNTS,
                             severity=ConsistencySeverity.WARNING,
@@ -469,7 +477,10 @@ def _check_coordinate_alignment(
                 findings.append(
                     ConsistencyFinding(
                         finding_id=_generate_finding_id(
-                            "coordinate_alignment", "no_overlap", path_a, path_b,
+                            "coordinate_alignment",
+                            "no_overlap",
+                            path_a,
+                            path_b,
                         ),
                         category=ConsistencyCategory.COORDINATE_ALIGNMENT,
                         severity=ConsistencySeverity.ERROR,
@@ -496,8 +507,10 @@ def _check_coordinate_alignment(
                 findings.append(
                     ConsistencyFinding(
                         finding_id=_generate_finding_id(
-                            "coordinate_alignment", "scale_mismatch",
-                            path_a, path_b,
+                            "coordinate_alignment",
+                            "scale_mismatch",
+                            path_a,
+                            path_b,
                         ),
                         category=ConsistencyCategory.COORDINATE_ALIGNMENT,
                         severity=ConsistencySeverity.WARNING,

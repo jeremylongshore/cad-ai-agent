@@ -170,7 +170,9 @@ class TestDimensionsNearDoors:
 
     def test_door_without_dimension_flagged(self):
         door = _make_entity(
-            "d1", EntityType.INSERT, "DOORS",
+            "d1",
+            EntityType.INSERT,
+            "DOORS",
             insert_point=Point2D(x=100, y=100),
             block_name="DOOR_36",
         )
@@ -184,12 +186,16 @@ class TestDimensionsNearDoors:
 
     def test_door_with_nearby_dimension_not_flagged(self):
         door = _make_entity(
-            "d1", EntityType.INSERT, "DOORS",
+            "d1",
+            EntityType.INSERT,
+            "DOORS",
             insert_point=Point2D(x=100, y=100),
             block_name="DOOR_36",
         )
         dim = _make_entity(
-            "dim1", EntityType.DIMENSION, "DIM",
+            "dim1",
+            EntityType.DIMENSION,
+            "DIM",
             insert_point=Point2D(x=105, y=100),
         )
         context = _make_context(entities=[door, dim])
@@ -200,7 +206,9 @@ class TestDimensionsNearDoors:
 
     def test_non_door_inserts_ignored(self):
         insert = _make_entity(
-            "i1", EntityType.INSERT, "FIXTURES",
+            "i1",
+            EntityType.INSERT,
+            "FIXTURES",
             insert_point=Point2D(x=100, y=100),
             block_name="TOILET",
         )
@@ -221,7 +229,9 @@ class TestSymbolsWithoutLegend:
 
     def test_symbol_without_legend_flagged(self):
         insert = _make_entity(
-            "i1", EntityType.INSERT, "SYMBOLS",
+            "i1",
+            EntityType.INSERT,
+            "SYMBOLS",
             block_name="FIRE_EXT_A",
         )
         context = _make_context(entities=[insert])
@@ -234,11 +244,15 @@ class TestSymbolsWithoutLegend:
 
     def test_symbol_with_legend_not_flagged(self):
         insert = _make_entity(
-            "i1", EntityType.INSERT, "SYMBOLS",
+            "i1",
+            EntityType.INSERT,
+            "SYMBOLS",
             block_name="OUTLET",
         )
         legend_text = _make_entity(
-            "t1", EntityType.TEXT, "NOTES",
+            "t1",
+            EntityType.TEXT,
+            "NOTES",
             text_content="OUTLET - Standard 120V duplex receptacle",
         )
         context = _make_context(entities=[insert, legend_text])
@@ -248,9 +262,11 @@ class TestSymbolsWithoutLegend:
         assert len(items) == 0
 
     def test_no_inserts_no_findings(self):
-        context = _make_context(entities=[
-            _make_entity("l1", EntityType.LINE, "WALLS"),
-        ])
+        context = _make_context(
+            entities=[
+                _make_entity("l1", EntityType.LINE, "WALLS"),
+            ]
+        )
         zones = _make_zones_result()
 
         items = _check_symbols_without_legend(context, zones, 0)
@@ -307,7 +323,9 @@ class TestUnclosedBoundaries:
 
     def test_nearly_closed_polyline_flagged(self):
         poly = _make_entity(
-            "p1", EntityType.LWPOLYLINE, "WALLS",
+            "p1",
+            EntityType.LWPOLYLINE,
+            "WALLS",
             insert_point=Point2D(x=0, y=0),
             attributes={
                 "vertices": [[0, 0], [100, 0], [100, 100], [2, 0]],
@@ -323,7 +341,9 @@ class TestUnclosedBoundaries:
 
     def test_clearly_open_polyline_not_flagged(self):
         poly = _make_entity(
-            "p1", EntityType.LWPOLYLINE, "WALLS",
+            "p1",
+            EntityType.LWPOLYLINE,
+            "WALLS",
             insert_point=Point2D(x=0, y=0),
             attributes={
                 "vertices": [[0, 0], [100, 0], [100, 100], [50, 100]],
@@ -339,7 +359,9 @@ class TestUnclosedBoundaries:
 
     def test_closed_polyline_not_flagged(self):
         poly = _make_entity(
-            "p1", EntityType.LWPOLYLINE, "WALLS",
+            "p1",
+            EntityType.LWPOLYLINE,
+            "WALLS",
             attributes={
                 "vertices": [[0, 0], [100, 0], [100, 100], [0, 100]],
                 "is_closed": True,
@@ -371,11 +393,14 @@ class TestGenerateRFI:
 
     def test_drawing_with_issues(self):
         entities = [
-            _make_entity("d1", EntityType.INSERT, "DOORS",
-                         insert_point=Point2D(x=50, y=50),
-                         block_name="DOOR_36"),
-            _make_entity("i1", EntityType.INSERT, "FIXTURES",
-                         block_name="CUSTOM_WIDGET"),
+            _make_entity(
+                "d1",
+                EntityType.INSERT,
+                "DOORS",
+                insert_point=Point2D(x=50, y=50),
+                block_name="DOOR_36",
+            ),
+            _make_entity("i1", EntityType.INSERT, "FIXTURES", block_name="CUSTOM_WIDGET"),
             _make_entity("l1", EntityType.LINE, "WALLS"),
         ]
         context = _make_context(
@@ -395,12 +420,20 @@ class TestGenerateRFI:
 
     def test_rfi_ids_sequential(self):
         entities = [
-            _make_entity("d1", EntityType.INSERT, "DOORS",
-                         insert_point=Point2D(x=50, y=50),
-                         block_name="DOOR_36"),
-            _make_entity("d2", EntityType.INSERT, "DOORS",
-                         insert_point=Point2D(x=150, y=50),
-                         block_name="DR-SINGLE"),
+            _make_entity(
+                "d1",
+                EntityType.INSERT,
+                "DOORS",
+                insert_point=Point2D(x=50, y=50),
+                block_name="DOOR_36",
+            ),
+            _make_entity(
+                "d2",
+                EntityType.INSERT,
+                "DOORS",
+                insert_point=Point2D(x=150, y=50),
+                block_name="DR-SINGLE",
+            ),
         ]
         context = _make_context(entities=entities)
         zones = _make_zones_result()
@@ -414,9 +447,13 @@ class TestGenerateRFI:
     def test_severity_counts_accurate(self):
         context = _make_context(
             entities=[
-                _make_entity("d1", EntityType.INSERT, "DOORS",
-                             insert_point=Point2D(x=50, y=50),
-                             block_name="EXIT_DOOR"),
+                _make_entity(
+                    "d1",
+                    EntityType.INSERT,
+                    "DOORS",
+                    insert_point=Point2D(x=50, y=50),
+                    block_name="EXIT_DOOR",
+                ),
             ],
             layers=["DOORS", "UNUSED_LAYER"],
         )

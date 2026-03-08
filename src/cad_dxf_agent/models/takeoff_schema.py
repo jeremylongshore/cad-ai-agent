@@ -57,13 +57,17 @@ class TakeoffReport(BaseModel):
             ["Category", "Name", "Quantity", "Unit", "Layer", "Zone", "Notes"],
         ]
         for item in self.items:
-            rows.append([
-                item.category.value,
-                item.name,
-                f"{item.quantity:.2f}" if isinstance(item.quantity, float) else str(item.quantity),
-                item.unit,
-                item.source_layer or "",
-                item.zone_id or "",
-                item.notes,
-            ])
+            rows.append(
+                [
+                    item.category.value,
+                    item.name,
+                    f"{item.quantity:.2f}"
+                    if isinstance(item.quantity, float)
+                    else str(item.quantity),
+                    item.unit,
+                    item.source_layer or "",
+                    item.zone_id or "",
+                    item.notes,
+                ]
+            )
         return rows

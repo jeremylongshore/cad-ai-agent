@@ -84,22 +84,24 @@ def _check_unlabeled_rooms(
 
     for zone in zones.zones:
         if zone.inferred_type is None:
-            items.append(RFIItem(
-                rfi_id=f"RFI-{start_id + len(items) + 1:03d}",
-                category=RFICategory.MISSING_LABEL,
-                severity=RFISeverity.MAJOR,
-                question=(
-                    f"What is the intended use of the space at "
-                    f"({zone.centroid.x:.0f}, {zone.centroid.y:.0f})?"
-                ),
-                location_description=(
-                    f"Zone {zone.zone_id[:8]} — area {zone.area:.0f} "
-                    f"sq units, no room label detected"
-                ),
-                zone_id=zone.zone_id,
-                entity_handles=zone.source_handles,
-                suggested_resolution="Add a room name/label text entity inside the space.",
-            ))
+            items.append(
+                RFIItem(
+                    rfi_id=f"RFI-{start_id + len(items) + 1:03d}",
+                    category=RFICategory.MISSING_LABEL,
+                    severity=RFISeverity.MAJOR,
+                    question=(
+                        f"What is the intended use of the space at "
+                        f"({zone.centroid.x:.0f}, {zone.centroid.y:.0f})?"
+                    ),
+                    location_description=(
+                        f"Zone {zone.zone_id[:8]} — area {zone.area:.0f} "
+                        f"sq units, no room label detected"
+                    ),
+                    zone_id=zone.zone_id,
+                    entity_handles=zone.source_handles,
+                    suggested_resolution="Add a room name/label text entity inside the space.",
+                )
+            )
 
     return items
 
@@ -113,7 +115,8 @@ def _check_dimensions_near_doors(
     items: list[RFIItem] = []
 
     doors = [
-        e for e in context.entities
+        e
+        for e in context.entities
         if e.entity_type == EntityType.INSERT
         and e.block_name
         and _DOOR_PATTERN.search(e.block_name)
@@ -123,9 +126,9 @@ def _check_dimensions_near_doors(
         return items
 
     dim_entities = [
-        e for e in context.entities
-        if e.entity_type == EntityType.DIMENSION
-        and e.insert_point is not None
+        e
+        for e in context.entities
+        if e.entity_type == EntityType.DIMENSION and e.insert_point is not None
     ]
 
     for door in doors:
@@ -143,26 +146,28 @@ def _check_dimensions_near_doors(
                 break
 
         if not has_nearby_dim:
-            items.append(RFIItem(
-                rfi_id=f"RFI-{start_id + len(items) + 1:03d}",
-                category=RFICategory.MISSING_DIMENSION,
-                severity=RFISeverity.CRITICAL,
-                question=(
-                    f"What is the clear opening width of door "
-                    f"'{door.block_name}' at "
-                    f"({door.insert_point.x:.0f}, "
-                    f"{door.insert_point.y:.0f})?"
-                ),
-                location_description=(
-                    f"Door block '{door.block_name}' on layer "
-                    f"'{door.layer}' — no dimension entity within "
-                    f"{search_radius:.0f} units"
-                ),
-                entity_handles=[door.handle],
-                suggested_resolution=(
-                    "Add a dimension entity showing door clear opening width."
-                ),
-            ))
+            items.append(
+                RFIItem(
+                    rfi_id=f"RFI-{start_id + len(items) + 1:03d}",
+                    category=RFICategory.MISSING_DIMENSION,
+                    severity=RFISeverity.CRITICAL,
+                    question=(
+                        f"What is the clear opening width of door "
+                        f"'{door.block_name}' at "
+                        f"({door.insert_point.x:.0f}, "
+                        f"{door.insert_point.y:.0f})?"
+                    ),
+                    location_description=(
+                        f"Door block '{door.block_name}' on layer "
+                        f"'{door.layer}' — no dimension entity within "
+                        f"{search_radius:.0f} units"
+                    ),
+                    entity_handles=[door.handle],
+                    suggested_resolution=(
+                        "Add a dimension entity showing door clear opening width."
+                    ),
+                )
+            )
 
     return items
 
@@ -175,10 +180,7 @@ def _check_symbols_without_legend(
     """Flag unique block names that don't appear in any text legend."""
     items: list[RFIItem] = []
 
-    inserts = [
-        e for e in context.entities
-        if e.entity_type == EntityType.INSERT and e.block_name
-    ]
+    inserts = [e for e in context.entities if e.entity_type == EntityType.INSERT and e.block_name]
     if not inserts:
         return items
 
@@ -188,34 +190,31 @@ def _check_symbols_without_legend(
     all_text = " ".join(
         e.text_content.upper()
         for e in context.entities
-        if e.entity_type in (EntityType.TEXT, EntityType.MTEXT)
-        and e.text_content
+        if e.entity_type in (EntityType.TEXT, EntityType.MTEXT) and e.text_content
     )
 
     for block_name in sorted(n for n in block_names if n is not None):
         # Check if block name (or simplified form) appears in text
         simplified = re.sub(r"[_\-\s]", "", block_name.upper())
         if block_name.upper() not in all_text and simplified not in all_text:
-            handles = [
-                e.handle for e in inserts
-                if e.block_name == block_name
-            ][:5]
-            items.append(RFIItem(
-                rfi_id=f"RFI-{start_id + len(items) + 1:03d}",
-                category=RFICategory.AMBIGUOUS_SYMBOL,
-                severity=RFISeverity.MINOR,
-                question=(
-                    f"What does the symbol '{block_name}' represent? "
-                    f"No legend entry found."
-                ),
-                location_description=(
-                    f"Block '{block_name}' appears "
-                    f"{len([e for e in inserts if e.block_name == block_name])} "
-                    f"time(s) but is not referenced in any text/legend"
-                ),
-                entity_handles=handles,
-                suggested_resolution="Add a symbol legend or schedule referencing this block.",
-            ))
+            handles = [e.handle for e in inserts if e.block_name == block_name][:5]
+            items.append(
+                RFIItem(
+                    rfi_id=f"RFI-{start_id + len(items) + 1:03d}",
+                    category=RFICategory.AMBIGUOUS_SYMBOL,
+                    severity=RFISeverity.MINOR,
+                    question=(
+                        f"What does the symbol '{block_name}' represent? No legend entry found."
+                    ),
+                    location_description=(
+                        f"Block '{block_name}' appears "
+                        f"{len([e for e in inserts if e.block_name == block_name])} "
+                        f"time(s) but is not referenced in any text/legend"
+                    ),
+                    entity_handles=handles,
+                    suggested_resolution="Add a symbol legend or schedule referencing this block.",
+                )
+            )
 
     return items
 
@@ -232,20 +231,21 @@ def _check_empty_layers(
 
     for layer in context.layers:
         if layer.name not in entity_layers and layer.name != "0":
-            items.append(RFIItem(
-                rfi_id=f"RFI-{start_id + len(items) + 1:03d}",
-                category=RFICategory.INCOMPLETE_SECTION,
-                severity=RFISeverity.MINOR,
-                question=(
-                    f"Layer '{layer.name}' exists but contains no "
-                    f"entities. Is content missing?"
-                ),
-                location_description=f"Layer '{layer.name}' — 0 entities",
-                suggested_resolution=(
-                    "Verify layer content was included in the export, "
-                    "or remove the layer if unused."
-                ),
-            ))
+            items.append(
+                RFIItem(
+                    rfi_id=f"RFI-{start_id + len(items) + 1:03d}",
+                    category=RFICategory.INCOMPLETE_SECTION,
+                    severity=RFISeverity.MINOR,
+                    question=(
+                        f"Layer '{layer.name}' exists but contains no entities. Is content missing?"
+                    ),
+                    location_description=f"Layer '{layer.name}' — 0 entities",
+                    suggested_resolution=(
+                        "Verify layer content was included in the export, "
+                        "or remove the layer if unused."
+                    ),
+                )
+            )
 
     return items
 
@@ -281,23 +281,25 @@ def _check_unclosed_boundaries(
         if tolerance_actual < gap <= tolerance_close:
             pos = entity.insert_point
             loc = f"({pos.x:.0f}, {pos.y:.0f})" if pos else "unknown"
-            items.append(RFIItem(
-                rfi_id=f"RFI-{start_id + len(items) + 1:03d}",
-                category=RFICategory.COORDINATION,
-                severity=RFISeverity.MAJOR,
-                question=(
-                    f"Polyline on layer '{entity.layer}' at {loc} "
-                    f"has a {gap:.1f}-unit gap. Should this boundary "
-                    f"be closed?"
-                ),
-                location_description=(
-                    f"LWPOLYLINE {entity.handle} on layer "
-                    f"'{entity.layer}' — gap of {gap:.1f} units "
-                    f"between first and last vertex"
-                ),
-                entity_handles=[entity.handle],
-                suggested_resolution="Close the polyline or confirm the gap is intentional.",
-            ))
+            items.append(
+                RFIItem(
+                    rfi_id=f"RFI-{start_id + len(items) + 1:03d}",
+                    category=RFICategory.COORDINATION,
+                    severity=RFISeverity.MAJOR,
+                    question=(
+                        f"Polyline on layer '{entity.layer}' at {loc} "
+                        f"has a {gap:.1f}-unit gap. Should this boundary "
+                        f"be closed?"
+                    ),
+                    location_description=(
+                        f"LWPOLYLINE {entity.handle} on layer "
+                        f"'{entity.layer}' — gap of {gap:.1f} units "
+                        f"between first and last vertex"
+                    ),
+                    entity_handles=[entity.handle],
+                    suggested_resolution="Close the polyline or confirm the gap is intentional.",
+                )
+            )
 
     return items
 
@@ -330,27 +332,27 @@ def _check_mixed_text_heights(
         outlier_count = total - dominant_count
 
         if outlier_count >= 2 and outlier_count / total > 0.1:
-            outlier_heights = sorted(
-                h for h in height_counts if h != dominant_height
+            outlier_heights = sorted(h for h in height_counts if h != dominant_height)
+            items.append(
+                RFIItem(
+                    rfi_id=f"RFI-{start_id + len(items) + 1:03d}",
+                    category=RFICategory.COORDINATION,
+                    severity=RFISeverity.MINOR,
+                    question=(
+                        f"Layer '{layer}' has {len(height_counts)} "
+                        f"different text heights. Is this intentional?"
+                    ),
+                    location_description=(
+                        f"Layer '{layer}' — dominant height "
+                        f"{dominant_height}, also has "
+                        f"{', '.join(str(h) for h in outlier_heights[:3])}"
+                    ),
+                    suggested_resolution=(
+                        "Standardize text heights per layer, or confirm "
+                        "variations are intentional (e.g., titles vs labels)."
+                    ),
+                )
             )
-            items.append(RFIItem(
-                rfi_id=f"RFI-{start_id + len(items) + 1:03d}",
-                category=RFICategory.COORDINATION,
-                severity=RFISeverity.MINOR,
-                question=(
-                    f"Layer '{layer}' has {len(height_counts)} "
-                    f"different text heights. Is this intentional?"
-                ),
-                location_description=(
-                    f"Layer '{layer}' — dominant height "
-                    f"{dominant_height}, also has "
-                    f"{', '.join(str(h) for h in outlier_heights[:3])}"
-                ),
-                suggested_resolution=(
-                    "Standardize text heights per layer, or confirm "
-                    "variations are intentional (e.g., titles vs labels)."
-                ),
-            ))
 
     return items
 

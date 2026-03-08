@@ -142,8 +142,7 @@ class TestSummarizeDrawing:
         entities = [
             _make_entity("l1", EntityType.LINE, "STRUCTURAL"),
             _make_entity("l2", EntityType.LINE, "STRUCTURAL"),
-            _make_entity("t1", EntityType.TEXT, "NOTES",
-                         text_content="BEDROOM"),
+            _make_entity("t1", EntityType.TEXT, "NOTES", text_content="BEDROOM"),
         ]
         bedroom = _make_zone("z1", area=1500.0, inferred_type="bedroom")
         kitchen = _make_zone("z2", area=1000.0, inferred_type="kitchen")
@@ -161,9 +160,12 @@ class TestSummarizeDrawing:
         assert "Kitchen" in room_names
 
     def test_headline_includes_drawing_type(self):
-        context = _make_context(entities=[
-            _make_entity("l1", EntityType.LINE, "STRUCTURAL"),
-        ], layers=["STRUCTURAL"])
+        context = _make_context(
+            entities=[
+                _make_entity("l1", EntityType.LINE, "STRUCTURAL"),
+            ],
+            layers=["STRUCTURAL"],
+        )
         zones = _make_zones_result()
 
         summary = summarize_drawing(context, zones=zones)
@@ -174,12 +176,9 @@ class TestSummarizeDrawing:
 
     def test_key_features_include_symbols(self):
         entities = [
-            _make_entity("d1", EntityType.INSERT, "DOORS",
-                         block_name="DOOR_36"),
-            _make_entity("d2", EntityType.INSERT, "DOORS",
-                         block_name="DOOR_36"),
-            _make_entity("w1", EntityType.INSERT, "WINDOWS",
-                         block_name="WIN_48"),
+            _make_entity("d1", EntityType.INSERT, "DOORS", block_name="DOOR_36"),
+            _make_entity("d2", EntityType.INSERT, "DOORS", block_name="DOOR_36"),
+            _make_entity("w1", EntityType.INSERT, "WINDOWS", block_name="WIN_48"),
         ]
         context = _make_context(entities=entities, layers=["DOORS", "WINDOWS"])
         zones = _make_zones_result()
@@ -192,10 +191,8 @@ class TestSummarizeDrawing:
 
     def test_key_features_include_text_count(self):
         entities = [
-            _make_entity("t1", EntityType.TEXT, "NOTES",
-                         text_content="Note 1"),
-            _make_entity("t2", EntityType.MTEXT, "NOTES",
-                         text_content="Note 2"),
+            _make_entity("t1", EntityType.TEXT, "NOTES", text_content="Note 1"),
+            _make_entity("t2", EntityType.MTEXT, "NOTES", text_content="Note 2"),
         ]
         context = _make_context(entities=entities, layers=["NOTES"])
         zones = _make_zones_result()
@@ -252,9 +249,11 @@ class TestSummarizeDrawing:
             _make_zone("z2", area=1000.0, inferred_type="kitchen"),
             _make_zone("z3", area=500.0, inferred_type="bathroom"),
         ]
-        context = _make_context(entities=[
-            _make_entity("l1", EntityType.LINE, "0"),
-        ])
+        context = _make_context(
+            entities=[
+                _make_entity("l1", EntityType.LINE, "0"),
+            ]
+        )
         zones = _make_zones_result(zones_list)
 
         summary = summarize_drawing(context, zones=zones)
@@ -289,10 +288,13 @@ class TestSummarizeHandler:
             objective_tag=ObjectiveTag.CUSTOMER_COMMUNICATION,
             confidence=0.9,
         )
-        context = _make_context(entities=[
-            _make_entity("l1", EntityType.LINE, "STRUCTURAL"),
-            _make_entity("l2", EntityType.LINE, "STRUCTURAL"),
-        ], layers=["STRUCTURAL"])
+        context = _make_context(
+            entities=[
+                _make_entity("l1", EntityType.LINE, "STRUCTURAL"),
+                _make_entity("l2", EntityType.LINE, "STRUCTURAL"),
+            ],
+            layers=["STRUCTURAL"],
+        )
         zones = _make_zones_result()
 
         result = handler.execute(
@@ -313,9 +315,11 @@ class TestSummarizeHandler:
             objective_tag=ObjectiveTag.CUSTOMER_COMMUNICATION,
             confidence=0.9,
         )
-        context = _make_context(entities=[
-            _make_entity("l1", EntityType.LINE, "0"),
-        ])
+        context = _make_context(
+            entities=[
+                _make_entity("l1", EntityType.LINE, "0"),
+            ]
+        )
         bedroom = _make_zone("z1", area=1500.0, inferred_type="bedroom")
         zones = _make_zones_result([bedroom])
 

@@ -116,16 +116,22 @@ class TestTakeoffSchema:
         report = TakeoffReport(
             items=[
                 TakeoffReportItem(
-                    name="Door", category=TakeoffCategory.SYMBOL,
-                    quantity=3, unit="ea",
+                    name="Door",
+                    category=TakeoffCategory.SYMBOL,
+                    quantity=3,
+                    unit="ea",
                 ),
                 TakeoffReportItem(
-                    name="Wall", category=TakeoffCategory.LINEAR,
-                    quantity=120.0, unit="ft",
+                    name="Wall",
+                    category=TakeoffCategory.LINEAR,
+                    quantity=120.0,
+                    unit="ft",
                 ),
                 TakeoffReportItem(
-                    name="Door2", category=TakeoffCategory.SYMBOL,
-                    quantity=2, unit="ea",
+                    name="Door2",
+                    category=TakeoffCategory.SYMBOL,
+                    quantity=2,
+                    unit="ea",
                 ),
             ],
             total_items=3,
@@ -138,8 +144,11 @@ class TestTakeoffSchema:
         report = TakeoffReport(
             items=[
                 TakeoffReportItem(
-                    name="DOOR_36", category=TakeoffCategory.SYMBOL,
-                    quantity=5, unit="ea", source_layer="DOORS",
+                    name="DOOR_36",
+                    category=TakeoffCategory.SYMBOL,
+                    quantity=5,
+                    unit="ea",
+                    source_layer="DOORS",
                 ),
             ],
             total_items=1,
@@ -210,7 +219,9 @@ class TestMeasureLinear:
 
     def test_line_length(self):
         line = _make_entity(
-            "l1", EntityType.LINE, "WALLS",
+            "l1",
+            EntityType.LINE,
+            "WALLS",
             insert_point=Point2D(x=0, y=0),
             attributes={"end_point": [30, 40]},
         )
@@ -219,7 +230,9 @@ class TestMeasureLinear:
 
     def test_polyline_length(self):
         poly = _make_entity(
-            "p1", EntityType.LWPOLYLINE, "WALLS",
+            "p1",
+            EntityType.LWPOLYLINE,
+            "WALLS",
             attributes={
                 "vertices": [[0, 0], [10, 0], [10, 10]],
                 "is_closed": False,
@@ -230,7 +243,9 @@ class TestMeasureLinear:
 
     def test_closed_polyline_includes_closing_segment(self):
         poly = _make_entity(
-            "p1", EntityType.LWPOLYLINE, "WALLS",
+            "p1",
+            EntityType.LWPOLYLINE,
+            "WALLS",
             attributes={
                 "vertices": [[0, 0], [10, 0], [10, 10], [0, 10]],
                 "is_closed": True,
@@ -241,15 +256,27 @@ class TestMeasureLinear:
 
     def test_measure_linear_per_layer(self):
         entities = [
-            _make_entity("l1", EntityType.LINE, "WALLS",
-                         insert_point=Point2D(x=0, y=0),
-                         attributes={"end_point": [10, 0]}),
-            _make_entity("l2", EntityType.LINE, "WALLS",
-                         insert_point=Point2D(x=10, y=0),
-                         attributes={"end_point": [20, 0]}),
-            _make_entity("l3", EntityType.LINE, "PIPES",
-                         insert_point=Point2D(x=0, y=0),
-                         attributes={"end_point": [5, 0]}),
+            _make_entity(
+                "l1",
+                EntityType.LINE,
+                "WALLS",
+                insert_point=Point2D(x=0, y=0),
+                attributes={"end_point": [10, 0]},
+            ),
+            _make_entity(
+                "l2",
+                EntityType.LINE,
+                "WALLS",
+                insert_point=Point2D(x=10, y=0),
+                attributes={"end_point": [20, 0]},
+            ),
+            _make_entity(
+                "l3",
+                EntityType.LINE,
+                "PIPES",
+                insert_point=Point2D(x=0, y=0),
+                attributes={"end_point": [5, 0]},
+            ),
         ]
         context = _make_context(entities=entities)
         items = _measure_linear(context)
@@ -272,7 +299,9 @@ class TestMeasureLinear:
 
     def test_line_without_endpoint_zero_length(self):
         line = _make_entity(
-            "l1", EntityType.LINE, "WALLS",
+            "l1",
+            EntityType.LINE,
+            "WALLS",
             insert_point=Point2D(x=0, y=0),
         )
         assert _entity_length(line) == 0.0
@@ -386,19 +415,35 @@ class TestGenerateTakeoff:
     def test_full_drawing(self):
         entities = [
             # Doors (symbols)
-            _make_entity("d1", EntityType.INSERT, "DOORS",
-                         insert_point=Point2D(x=10, y=0),
-                         block_name="DOOR_36"),
-            _make_entity("d2", EntityType.INSERT, "DOORS",
-                         insert_point=Point2D(x=50, y=0),
-                         block_name="DOOR_36"),
+            _make_entity(
+                "d1",
+                EntityType.INSERT,
+                "DOORS",
+                insert_point=Point2D(x=10, y=0),
+                block_name="DOOR_36",
+            ),
+            _make_entity(
+                "d2",
+                EntityType.INSERT,
+                "DOORS",
+                insert_point=Point2D(x=50, y=0),
+                block_name="DOOR_36",
+            ),
             # Walls (lines)
-            _make_entity("l1", EntityType.LINE, "WALLS",
-                         insert_point=Point2D(x=0, y=0),
-                         attributes={"end_point": [100, 0]}),
-            _make_entity("l2", EntityType.LINE, "WALLS",
-                         insert_point=Point2D(x=100, y=0),
-                         attributes={"end_point": [100, 50]}),
+            _make_entity(
+                "l1",
+                EntityType.LINE,
+                "WALLS",
+                insert_point=Point2D(x=0, y=0),
+                attributes={"end_point": [100, 0]},
+            ),
+            _make_entity(
+                "l2",
+                EntityType.LINE,
+                "WALLS",
+                insert_point=Point2D(x=100, y=0),
+                attributes={"end_point": [100, 50]},
+            ),
             # Text
             _make_entity("t1", EntityType.TEXT, "NOTES"),
             _make_entity("t2", EntityType.TEXT, "NOTES"),
@@ -436,9 +481,13 @@ class TestGenerateTakeoff:
 
     def test_csv_export_integration(self):
         entities = [
-            _make_entity("d1", EntityType.INSERT, "DOORS",
-                         insert_point=Point2D(x=10, y=0),
-                         block_name="DOOR_36"),
+            _make_entity(
+                "d1",
+                EntityType.INSERT,
+                "DOORS",
+                insert_point=Point2D(x=10, y=0),
+                block_name="DOOR_36",
+            ),
         ]
         context = _make_context(entities=entities)
         zones = _make_zones_result()
@@ -447,39 +496,44 @@ class TestGenerateTakeoff:
         rows = report.to_csv_rows()
 
         assert len(rows) >= 2  # header + at least 1 data row
-        assert rows[0] == ["Category", "Name", "Quantity", "Unit",
-                           "Layer", "Zone", "Notes"]
+        assert rows[0] == ["Category", "Name", "Quantity", "Unit", "Layer", "Zone", "Notes"]
 
     def test_polyline_linear_measurement(self):
         entities = [
-            _make_entity("p1", EntityType.LWPOLYLINE, "WALLS",
-                         attributes={
-                             "vertices": [[0, 0], [100, 0], [100, 50]],
-                             "is_closed": False,
-                         }),
+            _make_entity(
+                "p1",
+                EntityType.LWPOLYLINE,
+                "WALLS",
+                attributes={
+                    "vertices": [[0, 0], [100, 0], [100, 50]],
+                    "is_closed": False,
+                },
+            ),
         ]
         context = _make_context(entities=entities)
         zones = _make_zones_result()
 
         report = generate_takeoff(context, zones=zones)
-        linear_items = [i for i in report.items
-                        if i.category == TakeoffCategory.LINEAR]
+        linear_items = [i for i in report.items if i.category == TakeoffCategory.LINEAR]
 
         assert len(linear_items) == 1
         assert abs(linear_items[0].quantity - 150.0) < 0.01
 
     def test_diagonal_line_measurement(self):
         entities = [
-            _make_entity("l1", EntityType.LINE, "WALLS",
-                         insert_point=Point2D(x=0, y=0),
-                         attributes={"end_point": [30, 40]}),
+            _make_entity(
+                "l1",
+                EntityType.LINE,
+                "WALLS",
+                insert_point=Point2D(x=0, y=0),
+                attributes={"end_point": [30, 40]},
+            ),
         ]
         context = _make_context(entities=entities)
         zones = _make_zones_result()
 
         report = generate_takeoff(context, zones=zones)
-        linear_items = [i for i in report.items
-                        if i.category == TakeoffCategory.LINEAR]
+        linear_items = [i for i in report.items if i.category == TakeoffCategory.LINEAR]
 
         assert len(linear_items) == 1
         assert abs(linear_items[0].quantity - 50.0) < 0.01  # 3-4-5
@@ -487,9 +541,13 @@ class TestGenerateTakeoff:
     def test_report_entity_handles_limited(self):
         """Verify entity handle lists are bounded to prevent huge payloads."""
         entities = [
-            _make_entity(f"l{i}", EntityType.LINE, "WALLS",
-                         insert_point=Point2D(x=i * 10, y=0),
-                         attributes={"end_point": [i * 10 + 10, 0]})
+            _make_entity(
+                f"l{i}",
+                EntityType.LINE,
+                "WALLS",
+                insert_point=Point2D(x=i * 10, y=0),
+                attributes={"end_point": [i * 10 + 10, 0]},
+            )
             for i in range(50)
         ]
         context = _make_context(entities=entities)

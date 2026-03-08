@@ -70,11 +70,13 @@ def summarize_drawing(
     rooms: list[RoomSummary] = []
     for zone in zones.zones:
         room_name = (zone.inferred_type or "unknown space").replace("_", " ").title()
-        rooms.append(RoomSummary(
-            name=room_name,
-            area=round(zone.area, 1),
-            zone_id=zone.zone_id,
-        ))
+        rooms.append(
+            RoomSummary(
+                name=room_name,
+                area=round(zone.area, 1),
+                zone_id=zone.zone_id,
+            )
+        )
 
     # Key features
     key_features = _extract_key_features(context, zones, symbols)
@@ -87,7 +89,11 @@ def summarize_drawing(
 
     # Build plain description
     plain_description = _build_description(
-        drawing_type, context, zones, rooms, key_features,
+        drawing_type,
+        context,
+        zones,
+        rooms,
+        key_features,
     )
 
     return DrawingSummary(
@@ -126,9 +132,8 @@ def _extract_key_features(
         features.append(f"{type_counts[EntityType.DIMENSION.value]} dimension(s)")
 
     if EntityType.TEXT.value in type_counts or EntityType.MTEXT.value in type_counts:
-        text_count = (
-            type_counts.get(EntityType.TEXT.value, 0)
-            + type_counts.get(EntityType.MTEXT.value, 0)
+        text_count = type_counts.get(EntityType.TEXT.value, 0) + type_counts.get(
+            EntityType.MTEXT.value, 0
         )
         features.append(f"{text_count} text label(s)")
 
@@ -239,16 +244,12 @@ def _build_description(
         )
 
         if rooms:
-            room_list = ", ".join(
-                f"{r.name} ({r.area:.0f} sq units)" for r in rooms[:5]
-            )
+            room_list = ", ".join(f"{r.name} ({r.area:.0f} sq units)" for r in rooms[:5])
             sentences.append(f"Spaces: {room_list}.")
     else:
         sentences.append("No enclosed spaces detected.")
 
     if key_features:
-        sentences.append(
-            f"Key features: {'; '.join(key_features[:4])}."
-        )
+        sentences.append(f"Key features: {'; '.join(key_features[:4])}.")
 
     return " ".join(sentences)
