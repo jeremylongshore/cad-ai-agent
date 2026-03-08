@@ -81,8 +81,11 @@ def _make_zone(
         boundary=boundary,
         area=area,
         perimeter=sum(
-            ((boundary[i].x - boundary[(i + 1) % len(boundary)].x) ** 2
-             + (boundary[i].y - boundary[(i + 1) % len(boundary)].y) ** 2) ** 0.5
+            (
+                (boundary[i].x - boundary[(i + 1) % len(boundary)].x) ** 2
+                + (boundary[i].y - boundary[(i + 1) % len(boundary)].y) ** 2
+            )
+            ** 0.5
             for i in range(len(boundary))
         ),
         centroid=Point2D(
@@ -255,7 +258,9 @@ class TestCheckCompliance:
 
         # Drawing with a small bedroom zone and a door
         door = _make_entity(
-            "d1", EntityType.INSERT, "DOORS",
+            "d1",
+            EntityType.INSERT,
+            "DOORS",
             insert_point=Point2D(x=5, y=5),
             block_name="DOOR_36",
             attributes={"width": 36.0},
@@ -305,7 +310,9 @@ class TestDoorWidthChecks:
         from cad_dxf_agent.core.compliance_rules import _check_door_widths
 
         door = _make_entity(
-            "d1", EntityType.INSERT, "DOORS",
+            "d1",
+            EntityType.INSERT,
+            "DOORS",
             insert_point=Point2D(x=10, y=10),
             block_name="DOOR_30",
             attributes={"width": 30.0},
@@ -327,7 +334,9 @@ class TestDoorWidthChecks:
         from cad_dxf_agent.core.compliance_rules import _check_door_widths
 
         door = _make_entity(
-            "d1", EntityType.INSERT, "DOORS",
+            "d1",
+            EntityType.INSERT,
+            "DOORS",
             insert_point=Point2D(x=10, y=10),
             block_name="DOOR_36",
             attributes={"width": 36.0},
@@ -356,7 +365,9 @@ class TestDoorWidthChecks:
         from cad_dxf_agent.core.compliance_rules import _check_door_widths
 
         door = _make_entity(
-            "d1", EntityType.INSERT, "DOORS",
+            "d1",
+            EntityType.INSERT,
+            "DOORS",
             insert_point=Point2D(x=10, y=10),
             block_name="DOOR_STANDARD",
             attributes={},
@@ -373,7 +384,9 @@ class TestDoorWidthChecks:
         from cad_dxf_agent.core.compliance_rules import _check_door_widths
 
         door = _make_entity(
-            "d1", EntityType.INSERT, "DOORS",
+            "d1",
+            EntityType.INSERT,
+            "DOORS",
             insert_point=Point2D(x=10, y=10),
             block_name="DR-1",
             attributes={"x_scale": 32.0},
@@ -391,15 +404,30 @@ class TestDoorWidthChecks:
         from cad_dxf_agent.core.compliance_rules import _check_door_widths
 
         doors = [
-            _make_entity("d1", EntityType.INSERT, "DOORS",
-                         insert_point=Point2D(x=0, y=0),
-                         block_name="DOOR_30", attributes={"width": 30.0}),
-            _make_entity("d2", EntityType.INSERT, "DOORS",
-                         insert_point=Point2D(x=50, y=0),
-                         block_name="DOOR_36", attributes={"width": 36.0}),
-            _make_entity("d3", EntityType.INSERT, "DOORS",
-                         insert_point=Point2D(x=100, y=0),
-                         block_name="ENTRY_42", attributes={"width": 42.0}),
+            _make_entity(
+                "d1",
+                EntityType.INSERT,
+                "DOORS",
+                insert_point=Point2D(x=0, y=0),
+                block_name="DOOR_30",
+                attributes={"width": 30.0},
+            ),
+            _make_entity(
+                "d2",
+                EntityType.INSERT,
+                "DOORS",
+                insert_point=Point2D(x=50, y=0),
+                block_name="DOOR_36",
+                attributes={"width": 36.0},
+            ),
+            _make_entity(
+                "d3",
+                EntityType.INSERT,
+                "DOORS",
+                insert_point=Point2D(x=100, y=0),
+                block_name="ENTRY_42",
+                attributes={"width": 42.0},
+            ),
         ]
         context = _make_context(entities=doors)
         thresholds = ComplianceThresholds(min_door_width=36.0)
@@ -541,7 +569,9 @@ class TestRoomAreaChecks:
         from cad_dxf_agent.core.compliance_rules import _check_room_areas
 
         hallway = _make_zone(
-            zone_id="h1", area=500.0, inferred_type="hallway",
+            zone_id="h1",
+            area=500.0,
+            inferred_type="hallway",
         )
         context = _make_context()
         zones = _make_zones_result([hallway])
@@ -581,12 +611,16 @@ class TestEgressChecks:
         from cad_dxf_agent.core.compliance_rules import _check_egress
 
         door = _make_entity(
-            "d1", EntityType.INSERT, "DOORS",
+            "d1",
+            EntityType.INSERT,
+            "DOORS",
             insert_point=Point2D(x=5, y=5),
             block_name="DOOR_36",
         )
         room = _make_zone(
-            zone_id="r1", area=200.0, inferred_type="bedroom",
+            zone_id="r1",
+            area=200.0,
+            inferred_type="bedroom",
             boundary=[
                 Point2D(x=0, y=0),
                 Point2D(x=20, y=0),
@@ -608,7 +642,9 @@ class TestEgressChecks:
 
         # Room with no doors or windows anywhere
         room = _make_zone(
-            zone_id="r1", area=200.0, inferred_type="bedroom",
+            zone_id="r1",
+            area=200.0,
+            inferred_type="bedroom",
             boundary=[
                 Point2D(x=0, y=0),
                 Point2D(x=20, y=0),
@@ -629,12 +665,16 @@ class TestEgressChecks:
         from cad_dxf_agent.core.compliance_rules import _check_egress
 
         window = _make_entity(
-            "w1", EntityType.INSERT, "WINDOWS",
+            "w1",
+            EntityType.INSERT,
+            "WINDOWS",
             insert_point=Point2D(x=10, y=0),
             block_name="WINDOW_36x48",
         )
         room = _make_zone(
-            zone_id="r1", area=200.0, inferred_type="bedroom",
+            zone_id="r1",
+            area=200.0,
+            inferred_type="bedroom",
             boundary=[
                 Point2D(x=0, y=0),
                 Point2D(x=20, y=0),
@@ -687,7 +727,9 @@ class TestDoorCountChecks:
         from cad_dxf_agent.core.compliance_rules import _check_door_count
 
         door = _make_entity(
-            "d1", EntityType.INSERT, "DOORS",
+            "d1",
+            EntityType.INSERT,
+            "DOORS",
             insert_point=Point2D(x=10, y=10),
             block_name="DOOR_36",
         )
@@ -781,14 +823,10 @@ class TestBlockDetection:
         )
 
         entities = [
-            _make_entity("d1", EntityType.INSERT, "DOORS",
-                         block_name="DOOR_36"),
-            _make_entity("d2", EntityType.INSERT, "DOORS",
-                         block_name="DR-SINGLE"),
-            _make_entity("d3", EntityType.INSERT, "DOORS",
-                         block_name="ENTRY_MAIN"),
-            _make_entity("w1", EntityType.INSERT, "WINDOWS",
-                         block_name="WINDOW_48"),
+            _make_entity("d1", EntityType.INSERT, "DOORS", block_name="DOOR_36"),
+            _make_entity("d2", EntityType.INSERT, "DOORS", block_name="DR-SINGLE"),
+            _make_entity("d3", EntityType.INSERT, "DOORS", block_name="ENTRY_MAIN"),
+            _make_entity("w1", EntityType.INSERT, "WINDOWS", block_name="WINDOW_48"),
             _make_entity("l1", EntityType.LINE, "WALLS"),
         ]
         context = _make_context(entities=entities)
@@ -805,14 +843,10 @@ class TestBlockDetection:
         )
 
         entities = [
-            _make_entity("w1", EntityType.INSERT, "WINDOWS",
-                         block_name="WINDOW_36x48"),
-            _make_entity("w2", EntityType.INSERT, "WINDOWS",
-                         block_name="WNDW-DH"),
-            _make_entity("w3", EntityType.INSERT, "WINDOWS",
-                         block_name="GLAZING_PANEL"),
-            _make_entity("d1", EntityType.INSERT, "DOORS",
-                         block_name="DOOR_36"),
+            _make_entity("w1", EntityType.INSERT, "WINDOWS", block_name="WINDOW_36x48"),
+            _make_entity("w2", EntityType.INSERT, "WINDOWS", block_name="WNDW-DH"),
+            _make_entity("w3", EntityType.INSERT, "WINDOWS", block_name="GLAZING_PANEL"),
+            _make_entity("d1", EntityType.INSERT, "DOORS", block_name="DOOR_36"),
         ]
         context = _make_context(entities=entities)
 
@@ -826,8 +860,7 @@ class TestBlockDetection:
         )
 
         entities = [
-            _make_entity("t1", EntityType.TEXT, "NOTES",
-                         text_content="DOOR SCHEDULE"),
+            _make_entity("t1", EntityType.TEXT, "NOTES", text_content="DOOR SCHEDULE"),
             _make_entity("l1", EntityType.LINE, "WALLS"),
         ]
         context = _make_context(entities=entities)
@@ -908,7 +941,9 @@ class TestFullProfileChecks:
 
         # Small door + narrow hallway
         door = _make_entity(
-            "d1", EntityType.INSERT, "DOORS",
+            "d1",
+            EntityType.INSERT,
+            "DOORS",
             insert_point=Point2D(x=10, y=10),
             block_name="DOOR_30",
             attributes={"width": 30.0},
@@ -938,7 +973,9 @@ class TestFullProfileChecks:
 
         # Good door + good hallway + good room
         door = _make_entity(
-            "d1", EntityType.INSERT, "DOORS",
+            "d1",
+            EntityType.INSERT,
+            "DOORS",
             insert_point=Point2D(x=10, y=5),
             block_name="DOOR_36",
             attributes={"width": 36.0},
@@ -979,7 +1016,9 @@ class TestFullProfileChecks:
         from cad_dxf_agent.core.compliance_rules import check_compliance
 
         door = _make_entity(
-            "d1", EntityType.INSERT, "DOORS",
+            "d1",
+            EntityType.INSERT,
+            "DOORS",
             insert_point=Point2D(x=10, y=10),
             block_name="DOOR_32",
             attributes={"width": 32.0},
@@ -993,8 +1032,8 @@ class TestFullProfileChecks:
         assert report.profile_name == "residential"
         # 32" door meets residential 32" minimum
         door_violations = [
-            f for f in report.findings
-            if f.rule_id == "DOOR-WIDTH-001"
-            and f.severity == ComplianceSeverity.VIOLATION
+            f
+            for f in report.findings
+            if f.rule_id == "DOOR-WIDTH-001" and f.severity == ComplianceSeverity.VIOLATION
         ]
         assert len(door_violations) == 0

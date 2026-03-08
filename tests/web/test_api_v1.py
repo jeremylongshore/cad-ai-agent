@@ -184,10 +184,7 @@ class TestV1Health:
         resp = _upload(client, "/api/v1/health", dxf)
         data = resp.json()
 
-        layer_issues = [
-            i for i in data["issues"]
-            if i["category"] == "layer"
-        ]
+        layer_issues = [i for i in data["issues"] if i["category"] == "layer"]
         assert len(layer_issues) > 0
 
 

@@ -125,7 +125,7 @@ disallow_untyped_defs = false
 check_untyped_defs = true
 
 [[tool.mypy.overrides]]
-module = ["ezdxf.*", "PySide6.*", "opentelemetry.*", "pdfplumber.*", "fitz.*", "matplotlib.*", "fpdf.*", "google.*", "vertexai.*"]
+module = ["ezdxf.*", "PySide6.*", "opentelemetry.*", "pdfplumber.*", "fitz.*", "matplotlib.*", "fpdf.*", "google.*", "vertexai.*", "rtree.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

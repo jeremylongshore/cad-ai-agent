@@ -92,8 +92,12 @@ def generate_revision_report(
     # Build headline and summary
     headline = _build_headline(changelog, zone_deltas, area_change)
     plain_summary = _build_plain_summary(
-        changelog, change_categories, zone_deltas, area_change,
-        master_context, revision_context,
+        changelog,
+        change_categories,
+        zone_deltas,
+        area_change,
+        master_context,
+        revision_context,
     )
 
     return RevisionReport(
@@ -122,12 +126,14 @@ def _categorize_changes(
     for category, cat_entries in sorted(by_cat.items()):
         layers = sorted({e.layer for e in cat_entries})
         descriptions = [e.description for e in cat_entries[:5]]
-        summaries.append(ChangeCategorySummary(
-            category=category,
-            count=len(cat_entries),
-            layers_affected=layers,
-            sample_descriptions=descriptions,
-        ))
+        summaries.append(
+            ChangeCategorySummary(
+                category=category,
+                count=len(cat_entries),
+                layers_affected=layers,
+                sample_descriptions=descriptions,
+            )
+        )
 
     return summaries
 
@@ -162,21 +168,25 @@ def _compute_zone_deltas(
         if old_count == 0 and new_count > 0:
             # All zones of this type are new
             for area in new_areas:
-                deltas.append(ZoneDelta(
-                    zone_type=zone_type,
-                    status="added",
-                    new_area=round(area, 1),
-                    area_change=round(area, 1),
-                ))
+                deltas.append(
+                    ZoneDelta(
+                        zone_type=zone_type,
+                        status="added",
+                        new_area=round(area, 1),
+                        area_change=round(area, 1),
+                    )
+                )
         elif old_count > 0 and new_count == 0:
             # All zones of this type were removed
             for area in old_areas:
-                deltas.append(ZoneDelta(
-                    zone_type=zone_type,
-                    status="removed",
-                    old_area=round(area, 1),
-                    area_change=round(-area, 1),
-                ))
+                deltas.append(
+                    ZoneDelta(
+                        zone_type=zone_type,
+                        status="removed",
+                        old_area=round(area, 1),
+                        area_change=round(-area, 1),
+                    )
+                )
         else:
             # Compare counts
             matched = min(old_count, new_count)
@@ -185,31 +195,37 @@ def _compute_zone_deltas(
                 new_a = new_areas[i]
                 change = new_a - old_a
                 status = "resized" if abs(change) > 0.1 else "unchanged"
-                deltas.append(ZoneDelta(
-                    zone_type=zone_type,
-                    status=status,
-                    old_area=round(old_a, 1),
-                    new_area=round(new_a, 1),
-                    area_change=round(change, 1),
-                ))
+                deltas.append(
+                    ZoneDelta(
+                        zone_type=zone_type,
+                        status=status,
+                        old_area=round(old_a, 1),
+                        new_area=round(new_a, 1),
+                        area_change=round(change, 1),
+                    )
+                )
 
             # Extra new zones
             for i in range(matched, new_count):
-                deltas.append(ZoneDelta(
-                    zone_type=zone_type,
-                    status="added",
-                    new_area=round(new_areas[i], 1),
-                    area_change=round(new_areas[i], 1),
-                ))
+                deltas.append(
+                    ZoneDelta(
+                        zone_type=zone_type,
+                        status="added",
+                        new_area=round(new_areas[i], 1),
+                        area_change=round(new_areas[i], 1),
+                    )
+                )
 
             # Extra removed zones
             for i in range(matched, old_count):
-                deltas.append(ZoneDelta(
-                    zone_type=zone_type,
-                    status="removed",
-                    old_area=round(old_areas[i], 1),
-                    area_change=round(-old_areas[i], 1),
-                ))
+                deltas.append(
+                    ZoneDelta(
+                        zone_type=zone_type,
+                        status="removed",
+                        old_area=round(old_areas[i], 1),
+                        area_change=round(-old_areas[i], 1),
+                    )
+                )
 
     return deltas
 
@@ -263,9 +279,7 @@ def _build_plain_summary(
     )
 
     if change_categories:
-        cat_strs = [
-            f"{c.count} {c.category}" for c in change_categories
-        ]
+        cat_strs = [f"{c.count} {c.category}" for c in change_categories]
         sentences.append(f"Changes: {', '.join(cat_strs)}.")
 
     added = [d for d in zone_deltas if d.status == "added"]
@@ -285,8 +299,6 @@ def _build_plain_summary(
 
     if abs(area_change) > 0.1:
         sign = "+" if area_change > 0 else ""
-        sentences.append(
-            f"Net area change: {sign}{area_change:.0f} square units."
-        )
+        sentences.append(f"Net area change: {sign}{area_change:.0f} square units.")
 
     return " ".join(sentences)

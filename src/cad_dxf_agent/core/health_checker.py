@@ -166,7 +166,7 @@ def _check_inconsistent_text_heights(
             continue
 
         height = entity.text_geometry.effective_height
-        if height > 0:
+        if height is not None and height > 0:
             layer_heights[entity.layer].append((entity.handle, height))
 
     for layer, entries in layer_heights.items():
@@ -180,11 +180,7 @@ def _check_inconsistent_text_heights(
             # More than 2 distinct heights on one layer = likely inconsistency
             height_counts = Counter(round(h, 2) for h in heights)
             dominant = height_counts.most_common(1)[0]
-            outliers = [
-                (handle, h)
-                for handle, h in entries
-                if round(h, 2) != dominant[0]
-            ]
+            outliers = [(handle, h) for handle, h in entries if round(h, 2) != dominant[0]]
 
             issues.append(
                 HealthIssue(
@@ -285,16 +281,9 @@ def _check_overlapping_entities(
             overlap_threshold,
         )
         # Filter to same-layer neighbors (excluding self)
-        same_layer = [
-            n for n in nearby
-            if n.handle != entity.handle and n.layer == entity.layer
-        ]
+        same_layer = [n for n in nearby if n.handle != entity.handle and n.layer == entity.layer]
         if same_layer:
-            key = (
-                f"{entity.insert_point.x:.2f},"
-                f"{entity.insert_point.y:.2f},"
-                f"{entity.layer}"
-            )
+            key = f"{entity.insert_point.x:.2f},{entity.insert_point.y:.2f},{entity.layer}"
             handles = [entity.handle] + [n.handle for n in same_layer]
             overlap_groups[key] = handles
             checked.update(n.handle for n in same_layer)
@@ -306,15 +295,15 @@ def _check_overlapping_entities(
         for key, handles in list(overlap_groups.items())[:5]:
             parts = key.split(",")
             for handle in handles[:3]:
-                entity = index.get_by_handle(handle)
-                if entity:
+                found = index.get_by_handle(handle)
+                if found is not None:
                     evidence.append(
                         EvidenceRef(
                             entity_handle=handle,
-                            layer=entity.layer,
-                            entity_type=entity.entity_type.value,
-                            location=(entity.insert_point.x, entity.insert_point.y)
-                            if entity.insert_point
+                            layer=found.layer,
+                            entity_type=found.entity_type.value,
+                            location=(found.insert_point.x, found.insert_point.y)
+                            if found.insert_point
                             else None,
                             description=(
                                 f"Overlaps with {len(handles) - 1} other "
@@ -361,8 +350,7 @@ def _check_missing_text_content(
                 severity=HealthSeverity.WARNING,
                 category=HealthCategory.TEXT,
                 title=(
-                    f"{len(empty_texts)} empty text "
-                    f"entit{'y' if len(empty_texts) == 1 else 'ies'}"
+                    f"{len(empty_texts)} empty text entit{'y' if len(empty_texts) == 1 else 'ies'}"
                 ),
                 description=(
                     f"{len(empty_texts)} TEXT/MTEXT "
@@ -375,9 +363,7 @@ def _check_missing_text_content(
                         entity_handle=e.handle,
                         layer=e.layer,
                         entity_type=e.entity_type.value,
-                        location=(e.insert_point.x, e.insert_point.y)
-                        if e.insert_point
-                        else None,
+                        location=(e.insert_point.x, e.insert_point.y) if e.insert_point else None,
                         description="Empty text content",
                     )
                     for e in empty_texts[:10]
@@ -501,7 +487,7 @@ def _check_unnamed_zones(context: DrawingContext) -> list[HealthIssue]:
 
     Requires zone_detector — imported lazily to avoid circular dependency.
     """
-    issues = []
+    issues: list[HealthIssue] = []
     try:
         from .zone_detector import detect_zones
     except ImportError:

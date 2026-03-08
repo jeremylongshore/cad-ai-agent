@@ -76,15 +76,17 @@ def _count_symbols(context: DrawingContext) -> list[TakeoffReportItem]:
     for block_name, entities in sorted(by_block.items()):
         layers = sorted({e.layer for e in entities})
         handles = [e.handle for e in entities]
-        items.append(TakeoffReportItem(
-            name=block_name,
-            category=TakeoffCategory.SYMBOL,
-            quantity=len(entities),
-            unit="ea",
-            source_layer=layers[0] if layers else None,
-            entity_handles=handles,
-            notes=f"Block inserts across {len(layers)} layer(s)",
-        ))
+        items.append(
+            TakeoffReportItem(
+                name=block_name,
+                category=TakeoffCategory.SYMBOL,
+                quantity=len(entities),
+                unit="ea",
+                source_layer=layers[0] if layers else None,
+                entity_handles=handles,
+                notes=f"Block inserts across {len(layers)} layer(s)",
+            )
+        )
 
     return items
 
@@ -105,15 +107,17 @@ def _measure_linear(context: DrawingContext) -> list[TakeoffReportItem]:
 
     for layer, total_length in sorted(layer_lengths.items()):
         handles = layer_handles.get(layer, [])
-        items.append(TakeoffReportItem(
-            name=f"Linear on '{layer}'",
-            category=TakeoffCategory.LINEAR,
-            quantity=round(total_length, 2),
-            unit="drawing_units",
-            source_layer=layer,
-            entity_handles=handles[:20],
-            notes=f"{len(handles)} segment(s)",
-        ))
+        items.append(
+            TakeoffReportItem(
+                name=f"Linear on '{layer}'",
+                category=TakeoffCategory.LINEAR,
+                quantity=round(total_length, 2),
+                unit="drawing_units",
+                source_layer=layer,
+                entity_handles=handles[:20],
+                notes=f"{len(handles)} segment(s)",
+            )
+        )
 
     return items
 
@@ -124,15 +128,17 @@ def _measure_zone_areas(zones: ZoneDetectionResult) -> list[TakeoffReportItem]:
 
     for zone in zones.zones:
         zone_type = zone.inferred_type or "unknown"
-        items.append(TakeoffReportItem(
-            name=f"{zone_type.replace('_', ' ').title()} ({zone.zone_id[:8]})",
-            category=TakeoffCategory.AREA,
-            quantity=round(zone.area, 2),
-            unit="sq_drawing_units",
-            zone_id=zone.zone_id,
-            entity_handles=zone.source_handles,
-            notes=f"Perimeter: {zone.perimeter:.1f}",
-        ))
+        items.append(
+            TakeoffReportItem(
+                name=f"{zone_type.replace('_', ' ').title()} ({zone.zone_id[:8]})",
+                category=TakeoffCategory.AREA,
+                quantity=round(zone.area, 2),
+                unit="sq_drawing_units",
+                zone_id=zone.zone_id,
+                entity_handles=zone.source_handles,
+                notes=f"Perimeter: {zone.perimeter:.1f}",
+            )
+        )
 
     return items
 
@@ -153,14 +159,16 @@ def _count_by_layer(context: DrawingContext) -> list[TakeoffReportItem]:
         if count < 2:
             continue
         handles = layer_handles.get(layer, [])
-        items.append(TakeoffReportItem(
-            name=f"Entities on '{layer}'",
-            category=TakeoffCategory.COUNT,
-            quantity=count,
-            unit="ea",
-            source_layer=layer,
-            entity_handles=handles[:20],
-        ))
+        items.append(
+            TakeoffReportItem(
+                name=f"Entities on '{layer}'",
+                category=TakeoffCategory.COUNT,
+                quantity=count,
+                unit="ea",
+                source_layer=layer,
+                entity_handles=handles[:20],
+            )
+        )
 
     return items
 

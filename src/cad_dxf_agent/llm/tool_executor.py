@@ -498,12 +498,9 @@ class ToolExecutor:
             "insert": insert,
         }
 
-
     # --- V3 batch tools ---
 
-    def _resolve_batch_filter(
-        self, args: dict[str, Any]
-    ) -> list[EntityRef] | dict[str, Any]:
+    def _resolve_batch_filter(self, args: dict[str, Any]) -> list[EntityRef] | dict[str, Any]:
         """Apply filter criteria and return matching entities.
 
         Returns list[EntityRef] on success, or error dict if no filters
@@ -516,10 +513,14 @@ class ToolExecutor:
         center_y = args.get("center_y")
         radius = args.get("radius")
 
-        has_filter = any([
-            layer, entity_type, text_contains,
-            (center_x is not None and center_y is not None and radius),
-        ])
+        has_filter = any(
+            [
+                layer,
+                entity_type,
+                text_contains,
+                (center_x is not None and center_y is not None and radius),
+            ]
+        )
         if not has_filter:
             return {
                 "error": (
@@ -529,11 +530,7 @@ class ToolExecutor:
             }
 
         # Spatial filter first if specified
-        if (
-            center_x is not None
-            and center_y is not None
-            and radius is not None
-        ):
+        if center_x is not None and center_y is not None and radius is not None:
             candidates = self._index.find_in_radius(
                 float(center_x),
                 float(center_y),
@@ -542,23 +539,16 @@ class ToolExecutor:
                 layer=layer,
             )
         else:
-            candidates = self._index.filter(
-                layer=layer, entity_type=entity_type
-            )
+            candidates = self._index.filter(layer=layer, entity_type=entity_type)
 
         # Text filter
         if text_contains:
             text_matches = self._index.search_text(text_contains)
             match_handles = {e.handle for e in text_matches}
-            candidates = [
-                e for e in candidates if e.handle in match_handles
-            ]
+            candidates = [e for e in candidates if e.handle in match_handles]
 
         # Exclude protected layers
-        candidates = [
-            e for e in candidates
-            if e.layer.upper() not in self._protected
-        ]
+        candidates = [e for e in candidates if e.layer.upper() not in self._protected]
 
         if not candidates:
             return {"error": "No matching entities found"}
@@ -695,7 +685,8 @@ class ToolExecutor:
 
         # Further filter: only TEXT/MTEXT with the find string
         text_entities = [
-            e for e in result
+            e
+            for e in result
             if e.entity_type.value in ("TEXT", "MTEXT")
             and e.text_content
             and find_str in e.text_content
@@ -705,7 +696,7 @@ class ToolExecutor:
             return {"error": f"No text entities contain '{find_str}'"}
 
         for entity in text_entities:
-            new_text = entity.text_content.replace(find_str, replace_str)
+            new_text = (entity.text_content or "").replace(find_str, replace_str)
             op = EditOperation(
                 op_type=OpType.EDIT_TEXT,
                 target_handle=entity.handle,

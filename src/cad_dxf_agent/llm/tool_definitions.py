@@ -680,8 +680,7 @@ BATCH_DELETE = {
 BATCH_EDIT_TEXT = {
     "name": "batch_edit_text",
     "description": (
-        "Find-and-replace text content across all TEXT/MTEXT entities "
-        "matching the filter criteria."
+        "Find-and-replace text content across all TEXT/MTEXT entities matching the filter criteria."
     ),
     "parameters": {
         "type": "object",

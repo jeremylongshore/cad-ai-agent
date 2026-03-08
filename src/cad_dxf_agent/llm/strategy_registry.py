@@ -107,9 +107,9 @@ _TAG_OVERRIDES: dict[tuple[RequestClass, ObjectiveTag], StagePipelineDefinition]
         description="Analyze spatial layout, recommend density/placement improvements",
     ),
     (RequestClass.VALIDATE, ObjectiveTag.COMPLIANCE): StagePipelineDefinition(
-        stages=["analyze", "validate"],
+        stages=["analyze", "detect_zones", "compliance_check"],
         output_mode="direct",
-        description="Check drawing against code compliance indicators",
+        description="Detect rooms/zones, then check against building code compliance",
     ),
     (RequestClass.VALIDATE, ObjectiveTag.MISSING_ITEMS): StagePipelineDefinition(
         stages=["analyze", "validate"],

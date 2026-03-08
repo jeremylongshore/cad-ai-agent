@@ -71,10 +71,7 @@ def _make_context(
     """Build a DrawingContext with optional entity and layer lists."""
     ents = entities or []
     layer_names = layers or list({e.layer for e in ents})
-    layer_infos = [
-        LayerRule(name=n, color=1)
-        for n in layer_names
-    ]
+    layer_infos = [LayerRule(name=n, color=1) for n in layer_names]
     return DrawingContext(
         file_path="test.dxf",
         entities=ents,
@@ -156,9 +153,7 @@ class TestHealthSchema:
         assert report.info_count == 1
 
     def test_health_report_summary_no_issues(self):
-        report = HealthReport(
-            score=100.0, issues=[], checks_run=["a"], entity_count=10
-        )
+        report = HealthReport(score=100.0, issues=[], checks_run=["a"], entity_count=10)
         assert "no issues found" in report.summary
 
     def test_health_report_summary_with_issues(self):
@@ -304,31 +299,35 @@ class TestComputeScore:
 
     def test_max_deductions_floor_at_zero(self):
         """Score never goes below 0."""
-        issues = [
-            HealthIssue(
-                severity=HealthSeverity.CRITICAL,
-                category=HealthCategory.GENERAL,
-                title=f"c{i}",
-                description="d",
-            )
-            for i in range(4)  # -60
-        ] + [
-            HealthIssue(
-                severity=HealthSeverity.WARNING,
-                category=HealthCategory.TEXT,
-                title=f"w{i}",
-                description="d",
-            )
-            for i in range(7)  # -30
-        ] + [
-            HealthIssue(
-                severity=HealthSeverity.INFO,
-                category=HealthCategory.LAYER,
-                title=f"i{i}",
-                description="d",
-            )
-            for i in range(15)  # -10
-        ]
+        issues = (
+            [
+                HealthIssue(
+                    severity=HealthSeverity.CRITICAL,
+                    category=HealthCategory.GENERAL,
+                    title=f"c{i}",
+                    description="d",
+                )
+                for i in range(4)  # -60
+            ]
+            + [
+                HealthIssue(
+                    severity=HealthSeverity.WARNING,
+                    category=HealthCategory.TEXT,
+                    title=f"w{i}",
+                    description="d",
+                )
+                for i in range(7)  # -30
+            ]
+            + [
+                HealthIssue(
+                    severity=HealthSeverity.INFO,
+                    category=HealthCategory.LAYER,
+                    title=f"i{i}",
+                    description="d",
+                )
+                for i in range(15)  # -10
+            ]
+        )
         # Total deductions: 60 + 30 + 10 = 100
         assert _compute_score(issues, entity_count=10) == 0.0
 
@@ -380,10 +379,7 @@ class TestCheckUnclosedPolylines:
 
     def test_evidence_capped_at_5(self):
         """Only first 5 polylines appear in evidence."""
-        ents = [
-            _make_entity(str(i), EntityType.LWPOLYLINE)
-            for i in range(10)
-        ]
+        ents = [_make_entity(str(i), EntityType.LWPOLYLINE) for i in range(10)]
         ctx = _make_context(entities=ents)
         idx = EntityIndex(ctx)
         issues = _check_polylines_missing_geometry(ctx, idx)
@@ -399,12 +395,20 @@ class TestCheckInconsistentTextHeights:
         ctx = _make_context(
             entities=[
                 _make_entity(
-                    "1", EntityType.TEXT, layer="NOTES",
-                    x=0, y=0, text_height=3.0,
+                    "1",
+                    EntityType.TEXT,
+                    layer="NOTES",
+                    x=0,
+                    y=0,
+                    text_height=3.0,
                 ),
                 _make_entity(
-                    "2", EntityType.TEXT, layer="NOTES",
-                    x=10, y=0, text_height=3.0,
+                    "2",
+                    EntityType.TEXT,
+                    layer="NOTES",
+                    x=10,
+                    y=0,
+                    text_height=3.0,
                 ),
             ]
         )
@@ -417,12 +421,20 @@ class TestCheckInconsistentTextHeights:
         ctx = _make_context(
             entities=[
                 _make_entity(
-                    "1", EntityType.TEXT, layer="NOTES",
-                    x=0, y=0, text_height=3.0,
+                    "1",
+                    EntityType.TEXT,
+                    layer="NOTES",
+                    x=0,
+                    y=0,
+                    text_height=3.0,
                 ),
                 _make_entity(
-                    "2", EntityType.TEXT, layer="NOTES",
-                    x=10, y=0, text_height=5.0,
+                    "2",
+                    EntityType.TEXT,
+                    layer="NOTES",
+                    x=10,
+                    y=0,
+                    text_height=5.0,
                 ),
             ]
         )
@@ -435,20 +447,36 @@ class TestCheckInconsistentTextHeights:
         ctx = _make_context(
             entities=[
                 _make_entity(
-                    "1", EntityType.TEXT, layer="NOTES",
-                    x=0, y=0, text_height=3.0,
+                    "1",
+                    EntityType.TEXT,
+                    layer="NOTES",
+                    x=0,
+                    y=0,
+                    text_height=3.0,
                 ),
                 _make_entity(
-                    "2", EntityType.TEXT, layer="NOTES",
-                    x=10, y=0, text_height=3.0,
+                    "2",
+                    EntityType.TEXT,
+                    layer="NOTES",
+                    x=10,
+                    y=0,
+                    text_height=3.0,
                 ),
                 _make_entity(
-                    "3", EntityType.TEXT, layer="NOTES",
-                    x=20, y=0, text_height=5.0,
+                    "3",
+                    EntityType.TEXT,
+                    layer="NOTES",
+                    x=20,
+                    y=0,
+                    text_height=5.0,
                 ),
                 _make_entity(
-                    "4", EntityType.TEXT, layer="NOTES",
-                    x=30, y=0, text_height=8.0,
+                    "4",
+                    EntityType.TEXT,
+                    layer="NOTES",
+                    x=30,
+                    y=0,
+                    text_height=8.0,
                 ),
             ]
         )
@@ -476,12 +504,20 @@ class TestCheckInconsistentTextHeights:
         ctx = _make_context(
             entities=[
                 _make_entity(
-                    "1", EntityType.TEXT, layer="NOTES",
-                    x=0, y=0, text_height=0.0,
+                    "1",
+                    EntityType.TEXT,
+                    layer="NOTES",
+                    x=0,
+                    y=0,
+                    text_height=0.0,
                 ),
                 _make_entity(
-                    "2", EntityType.TEXT, layer="NOTES",
-                    x=10, y=0, text_height=3.0,
+                    "2",
+                    EntityType.TEXT,
+                    layer="NOTES",
+                    x=10,
+                    y=0,
+                    text_height=3.0,
                 ),
             ]
         )
@@ -589,8 +625,7 @@ class TestCheckOverlappingEntities:
         ctx = _make_context(
             entities=[
                 _make_entity("1", EntityType.LINE, layer="A", x=10, y=10),
-                _make_entity("2", EntityType.TEXT, layer="A", x=10, y=10,
-                             text_content="X"),
+                _make_entity("2", EntityType.TEXT, layer="A", x=10, y=10, text_content="X"),
             ],
             layers=["A"],
         )
@@ -663,7 +698,10 @@ class TestCheckMissingTextContent:
         ctx = _make_context(
             entities=[
                 _make_entity(
-                    "1", EntityType.TEXT, x=0, y=0,
+                    "1",
+                    EntityType.TEXT,
+                    x=0,
+                    y=0,
                     text_content="Hello World",
                 ),
             ]
@@ -677,7 +715,10 @@ class TestCheckMissingTextContent:
         ctx = _make_context(
             entities=[
                 _make_entity(
-                    "1", EntityType.TEXT, x=0, y=0,
+                    "1",
+                    EntityType.TEXT,
+                    x=0,
+                    y=0,
                     text_content="",
                 ),
             ]
@@ -693,7 +734,10 @@ class TestCheckMissingTextContent:
         ctx = _make_context(
             entities=[
                 _make_entity(
-                    "1", EntityType.MTEXT, x=0, y=0,
+                    "1",
+                    EntityType.MTEXT,
+                    x=0,
+                    y=0,
                     text_content="   \n  ",
                 ),
             ]
@@ -738,7 +782,10 @@ class TestCheckMissingTextContent:
         """Only first 10 empty texts appear in evidence."""
         ents = [
             _make_entity(
-                str(i), EntityType.TEXT, x=i * 10.0, y=0,
+                str(i),
+                EntityType.TEXT,
+                x=i * 10.0,
+                y=0,
                 text_content="",
             )
             for i in range(15)
@@ -754,12 +801,8 @@ class TestCheckDimensionCoverage:
 
     def test_drawing_with_dimensions_ok(self):
         """Drawing with geometry and dimensions = no issue."""
-        ents = [
-            _make_entity(str(i), EntityType.LINE, x=i * 10.0, y=0)
-            for i in range(15)
-        ] + [
-            _make_entity(f"d{i}", EntityType.DIMENSION, x=i * 10.0, y=-5)
-            for i in range(5)
+        ents = [_make_entity(str(i), EntityType.LINE, x=i * 10.0, y=0) for i in range(15)] + [
+            _make_entity(f"d{i}", EntityType.DIMENSION, x=i * 10.0, y=-5) for i in range(5)
         ]
         ctx = _make_context(entities=ents)
         idx = EntityIndex(ctx)
@@ -768,10 +811,7 @@ class TestCheckDimensionCoverage:
 
     def test_no_dimensions_with_geometry_warning(self):
         """10+ geometric entities and 0 dimensions = WARNING."""
-        ents = [
-            _make_entity(str(i), EntityType.LINE, x=i * 10.0, y=0)
-            for i in range(12)
-        ]
+        ents = [_make_entity(str(i), EntityType.LINE, x=i * 10.0, y=0) for i in range(12)]
         ctx = _make_context(entities=ents)
         idx = EntityIndex(ctx)
         issues = _check_dimension_coverage(ctx, idx)
@@ -782,10 +822,7 @@ class TestCheckDimensionCoverage:
 
     def test_few_geometry_entities_no_issue(self):
         """Less than 10 geometric entities = no dimension check."""
-        ents = [
-            _make_entity(str(i), EntityType.LINE, x=i * 10.0, y=0)
-            for i in range(5)
-        ]
+        ents = [_make_entity(str(i), EntityType.LINE, x=i * 10.0, y=0) for i in range(5)]
         ctx = _make_context(entities=ents)
         idx = EntityIndex(ctx)
         issues = _check_dimension_coverage(ctx, idx)
@@ -793,10 +830,7 @@ class TestCheckDimensionCoverage:
 
     def test_low_dimension_ratio_info(self):
         """20+ geometry with <5% dimensions = INFO."""
-        ents = [
-            _make_entity(str(i), EntityType.LINE, x=i * 5.0, y=0)
-            for i in range(25)
-        ]
+        ents = [_make_entity(str(i), EntityType.LINE, x=i * 5.0, y=0) for i in range(25)]
         # Add 0 dimensions (less than 5% of 25 = 1.25, so 0 triggers WARNING)
         # Add 1 dimension = 4% < 5% → triggers INFO
         ents.append(_make_entity("d0", EntityType.DIMENSION, x=0, y=-5))
@@ -809,10 +843,7 @@ class TestCheckDimensionCoverage:
 
     def test_polylines_count_as_geometry(self):
         """LWPOLYLINE entities should count toward geometry total."""
-        ents = [
-            _make_entity(str(i), EntityType.LWPOLYLINE, x=i * 5.0, y=0)
-            for i in range(12)
-        ]
+        ents = [_make_entity(str(i), EntityType.LWPOLYLINE, x=i * 5.0, y=0) for i in range(12)]
         ctx = _make_context(entities=ents)
         idx = EntityIndex(ctx)
         issues = _check_dimension_coverage(ctx, idx)
@@ -837,8 +868,7 @@ class TestCheckEntityTypeDistribution:
         ctx = _make_context(
             entities=[
                 _make_entity("1", EntityType.LINE, x=0, y=0),
-                _make_entity("2", EntityType.TEXT, x=10, y=0,
-                             text_content="Note"),
+                _make_entity("2", EntityType.TEXT, x=10, y=0, text_content="Note"),
             ]
         )
         idx = EntityIndex(ctx)
@@ -849,7 +879,10 @@ class TestCheckEntityTypeDistribution:
         """All text, no geometry, 5+ entities = INFO."""
         ents = [
             _make_entity(
-                str(i), EntityType.TEXT, x=i * 10.0, y=0,
+                str(i),
+                EntityType.TEXT,
+                x=i * 10.0,
+                y=0,
                 text_content=f"Text {i}",
             )
             for i in range(8)
@@ -865,7 +898,10 @@ class TestCheckEntityTypeDistribution:
         """Text-only but <= 5 entities shouldn't flag."""
         ents = [
             _make_entity(
-                str(i), EntityType.TEXT, x=i * 10.0, y=0,
+                str(i),
+                EntityType.TEXT,
+                x=i * 10.0,
+                y=0,
                 text_content="X",
             )
             for i in range(3)
@@ -891,7 +927,10 @@ class TestCheckEntityTypeDistribution:
         """MTEXT should count toward text total."""
         ents = [
             _make_entity(
-                str(i), EntityType.MTEXT, x=i * 10.0, y=0,
+                str(i),
+                EntityType.MTEXT,
+                x=i * 10.0,
+                y=0,
                 text_content=f"Note {i}",
             )
             for i in range(8)
@@ -914,19 +953,21 @@ class TestCheckDrawingHealth:
     def test_clean_drawing_perfect_score(self):
         """A well-formed drawing should get a high score."""
         # Lines + text + dimensions = healthy
-        ents = [
-            _make_entity(str(i), EntityType.LINE, x=i * 10.0, y=0)
-            for i in range(15)
-        ] + [
-            _make_entity(
-                f"t{i}", EntityType.TEXT, x=i * 10.0, y=10,
-                text_content=f"Label {i}", text_height=3.0,
-            )
-            for i in range(5)
-        ] + [
-            _make_entity(f"d{i}", EntityType.DIMENSION, x=i * 10.0, y=-5)
-            for i in range(5)
-        ]
+        ents = (
+            [_make_entity(str(i), EntityType.LINE, x=i * 10.0, y=0) for i in range(15)]
+            + [
+                _make_entity(
+                    f"t{i}",
+                    EntityType.TEXT,
+                    x=i * 10.0,
+                    y=10,
+                    text_content=f"Label {i}",
+                    text_height=3.0,
+                )
+                for i in range(5)
+            ]
+            + [_make_entity(f"d{i}", EntityType.DIMENSION, x=i * 10.0, y=-5) for i in range(5)]
+        )
         ctx = _make_context(entities=ents, layers=["STRUCTURAL"])
         report = check_drawing_health(ctx, include_zones=False)
 
@@ -949,7 +990,10 @@ class TestCheckDrawingHealth:
             # Empty text entities (WARNING)
             [
                 _make_entity(
-                    f"e{i}", EntityType.TEXT, x=i * 10.0, y=0,
+                    f"e{i}",
+                    EntityType.TEXT,
+                    x=i * 10.0,
+                    y=0,
                     text_content="",
                 )
                 for i in range(5)
@@ -957,16 +1001,17 @@ class TestCheckDrawingHealth:
             # Inconsistent text heights (WARNING)
             + [
                 _make_entity(
-                    f"h{i}", EntityType.TEXT, layer="NOTES",
-                    x=i * 10.0, y=20, text_height=float(i + 1),
+                    f"h{i}",
+                    EntityType.TEXT,
+                    layer="NOTES",
+                    x=i * 10.0,
+                    y=20,
+                    text_height=float(i + 1),
                 )
                 for i in range(4)
             ]
             # Lines but no dimensions (WARNING)
-            + [
-                _make_entity(f"l{i}", EntityType.LINE, x=i * 10.0, y=40)
-                for i in range(15)
-            ]
+            + [_make_entity(f"l{i}", EntityType.LINE, x=i * 10.0, y=40) for i in range(15)]
         )
         ctx = _make_context(
             entities=ents,
@@ -1010,8 +1055,7 @@ class TestCheckDrawingHealth:
         ctx = _make_context(
             entities=[
                 _make_entity("1", EntityType.LINE, x=0, y=0),
-                _make_entity("2", EntityType.TEXT, x=10, y=0,
-                             text_content=""),
+                _make_entity("2", EntityType.TEXT, x=10, y=0, text_content=""),
             ]
         )
         report = check_drawing_health(ctx, include_zones=False)

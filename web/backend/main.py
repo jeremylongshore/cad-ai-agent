@@ -220,10 +220,10 @@ async def get_user(request: Request) -> dict:
 
 
 def _build_typed_compare_response(
-    result: "ComparisonResult",  # noqa: F821 — forward ref, imported at call site
-    outputs: "ComparisonOutputs",  # noqa: F821
+    result: ComparisonResult,  # noqa: F821 — forward ref, imported at call site
+    outputs: ComparisonOutputs,  # noqa: F821
     *,
-    audit: "AuditMetadata | None" = None,  # noqa: F821
+    audit: AuditMetadata | None = None,  # noqa: F821
 ) -> dict:
     """Build a PlatformResponse dict for a comparison result.
 
@@ -272,7 +272,7 @@ async def drawing_health_check(
         try:
             session = session_mgr.get(req.session_id, user["uid"])
         except (KeyError, PermissionError) as e:
-            raise HTTPException(404, str(e))
+            raise HTTPException(404, str(e)) from None
 
         span.set_attribute("cad.session_id", req.session_id)
 
@@ -300,6 +300,82 @@ async def drawing_health_check(
             "warning_count": report.warning_count,
             "info_count": report.info_count,
         }
+
+
+class DrawingComplianceRequest(BaseModel):
+    session_id: str
+    profile: str = "ibc-2021"
+
+
+@app.post("/api/drawing-compliance")
+async def drawing_compliance_check(
+    req: DrawingComplianceRequest,
+    user=Depends(get_licensed_user),
+):
+    """Run regulation-aware compliance validation on the uploaded DXF.
+
+    Checks the drawing against a compliance profile (ada, ibc, residential)
+    and returns a structured report with findings, code references, and score.
+    """
+    with otel_span("api.drawing_compliance") as span:
+        try:
+            session = session_mgr.get(req.session_id, user["uid"])
+        except (KeyError, PermissionError):
+            raise HTTPException(404, "Session not found or access denied") from None
+
+        span.set_attribute("cad.session_id", req.session_id)
+        span.set_attribute("cad.compliance.profile", req.profile)
+
+        dxf_path = session.original_path
+        if dxf_path is None or not dxf_path.exists():
+            raise HTTPException(400, "No DXF file in session")
+
+        from cad_dxf_agent.core.compliance_rules import check_compliance
+        from cad_dxf_agent.core.dxf_reader import load_dxf
+        from cad_dxf_agent.models.compliance_schema import BUILTIN_PROFILES
+
+        if req.profile not in BUILTIN_PROFILES:
+            raise HTTPException(
+                422,
+                f"Unknown profile: {req.profile}. Available: {', '.join(BUILTIN_PROFILES)}",
+            )
+
+        # Cache parsed DrawingContext on session for repeated compliance checks
+        if session.context is None:
+            session.context = load_dxf(str(dxf_path))
+        context = session.context
+        report = check_compliance(context, profile=req.profile)
+
+        span.set_attribute("cad.compliance.score", report.score)
+        span.set_attribute("cad.compliance.violations", report.violation_count)
+
+        return {
+            "profile": report.profile_name,
+            "passed": report.passed,
+            "score": report.score,
+            "findings": [f.model_dump() for f in report.findings],
+            "checks_run": report.checks_run,
+            "violation_count": report.violation_count,
+            "warning_count": report.warning_count,
+            "pass_count": report.pass_count,
+            "zone_count": report.zone_count,
+            "entity_count": report.entity_count,
+        }
+
+
+@app.get("/api/compliance-profiles")
+async def list_compliance_profiles():
+    """List available compliance profiles and their descriptions."""
+    from cad_dxf_agent.models.compliance_schema import BUILTIN_PROFILES
+
+    return {
+        name: {
+            "name": p.name,
+            "description": p.description,
+            "enabled_categories": [c.value for c in p.enabled_categories],
+        }
+        for name, p in BUILTIN_PROFILES.items()
+    }
 
 
 @app.get("/api/profiles")
@@ -1198,7 +1274,8 @@ async def v2_prompt(body: PromptRequest, user: dict = Depends(get_user)):
 
                 # Build structured EditPlan for preview/apply workflow (EPIC-CAD-08)
                 try:
-                    from cad_dxf_agent.llm.plan_builder import EditPlanBuilder, PlanRequest as PlanReq
+                    from cad_dxf_agent.llm.plan_builder import EditPlanBuilder
+                    from cad_dxf_agent.llm.plan_builder import PlanRequest as PlanReq
 
                     plan_req = PlanReq(
                         prompt=body.prompt,
@@ -2146,11 +2223,13 @@ def _get_stage_executor():
     """Create a StagePipelineExecutor with all registered handlers."""
     from cad_dxf_agent.llm.stage_executor import StagePipelineExecutor
     from cad_dxf_agent.llm.stage_handlers.analyze_handler import AnalyzeHandler
+    from cad_dxf_agent.llm.stage_handlers.compliance_handler import ComplianceHandler
     from cad_dxf_agent.llm.stage_handlers.detect_zones_handler import DetectZonesHandler
 
     executor = StagePipelineExecutor()
     executor.register("analyze", AnalyzeHandler())
     executor.register("detect_zones", DetectZonesHandler())
+    executor.register("compliance_check", ComplianceHandler())
     return executor
 
 
@@ -2190,8 +2269,8 @@ def _enrich_with_objective(
 
 
 def _enrich_with_precision(
-    changeset: "ChangeSet",
-    context: "DrawingContext",
+    changeset: ChangeSet,
+    context: DrawingContext,
     validation: Any,
     client_metadata: dict | None,
 ) -> tuple[list[dict] | None, list[dict] | None]:
