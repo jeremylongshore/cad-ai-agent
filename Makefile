@@ -48,7 +48,7 @@ scorecard-live:
 
 security:
 	bandit -r src/ -ll
-	pip-audit
+	pip-audit --local
 
 check: lint format typecheck test smoke
 	@echo "All checks passed."
