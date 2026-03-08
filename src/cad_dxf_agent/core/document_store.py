@@ -189,7 +189,7 @@ class GCSDocumentStore(DocumentStore):
 
     def _get_client(self):
         if self._client is None:
-            from google.cloud import storage
+            from google.cloud import storage  # type: ignore[attr-defined]
 
             self._client = storage.Client()
         return self._client

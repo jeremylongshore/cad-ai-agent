@@ -192,7 +192,7 @@ def _check_symbols_without_legend(
         and e.text_content
     )
 
-    for block_name in sorted(block_names):
+    for block_name in sorted(n for n in block_names if n is not None):
         # Check if block name (or simplified form) appears in text
         simplified = re.sub(r"[_\-\s]", "", block_name.upper())
         if block_name.upper() not in all_text and simplified not in all_text:
@@ -315,8 +315,9 @@ def _check_mixed_text_heights(
     for entity in context.entities:
         if entity.entity_type not in (EntityType.TEXT, EntityType.MTEXT):
             continue
-        if entity.text_geometry and entity.text_geometry.effective_height > 0:
-            height = round(entity.text_geometry.effective_height, 2)
+        eff_height = entity.text_geometry.effective_height if entity.text_geometry else None
+        if eff_height is not None and eff_height > 0:
+            height = round(eff_height, 2)
             layer_heights.setdefault(entity.layer, Counter())[height] += 1
 
     for layer, height_counts in layer_heights.items():

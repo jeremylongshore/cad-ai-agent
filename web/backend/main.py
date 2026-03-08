@@ -220,10 +220,10 @@ async def get_user(request: Request) -> dict:
 
 
 def _build_typed_compare_response(
-    result: "ComparisonResult",  # noqa: F821 — forward ref, imported at call site
-    outputs: "ComparisonOutputs",  # noqa: F821
+    result: ComparisonResult,  # noqa: F821 — forward ref, imported at call site
+    outputs: ComparisonOutputs,  # noqa: F821
     *,
-    audit: "AuditMetadata | None" = None,  # noqa: F821
+    audit: AuditMetadata | None = None,  # noqa: F821
 ) -> dict:
     """Build a PlatformResponse dict for a comparison result.
 
@@ -272,7 +272,7 @@ async def drawing_health_check(
         try:
             session = session_mgr.get(req.session_id, user["uid"])
         except (KeyError, PermissionError) as e:
-            raise HTTPException(404, str(e))
+            raise HTTPException(404, str(e)) from None
 
         span.set_attribute("cad.session_id", req.session_id)
 
@@ -321,7 +321,7 @@ async def drawing_compliance_check(
         try:
             session = session_mgr.get(req.session_id, user["uid"])
         except (KeyError, PermissionError):
-            raise HTTPException(404, "Session not found or access denied")
+            raise HTTPException(404, "Session not found or access denied") from None
 
         span.set_attribute("cad.session_id", req.session_id)
         span.set_attribute("cad.compliance.profile", req.profile)
@@ -1271,7 +1271,8 @@ async def v2_prompt(body: PromptRequest, user: dict = Depends(get_user)):
 
                 # Build structured EditPlan for preview/apply workflow (EPIC-CAD-08)
                 try:
-                    from cad_dxf_agent.llm.plan_builder import EditPlanBuilder, PlanRequest as PlanReq
+                    from cad_dxf_agent.llm.plan_builder import EditPlanBuilder
+                    from cad_dxf_agent.llm.plan_builder import PlanRequest as PlanReq
 
                     plan_req = PlanReq(
                         prompt=body.prompt,
@@ -2265,8 +2266,8 @@ def _enrich_with_objective(
 
 
 def _enrich_with_precision(
-    changeset: "ChangeSet",
-    context: "DrawingContext",
+    changeset: ChangeSet,
+    context: DrawingContext,
     validation: Any,
     client_metadata: dict | None,
 ) -> tuple[list[dict] | None, list[dict] | None]:

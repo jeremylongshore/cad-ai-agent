@@ -10,7 +10,6 @@ from typing import Any
 
 from cad_dxf_agent.core.compliance_rules import check_compliance
 from cad_dxf_agent.models.cad_schema import DrawingContext
-from cad_dxf_agent.models.compliance_schema import BUILTIN_PROFILES
 from cad_dxf_agent.models.objective_schema import ObjectiveClassification
 from cad_dxf_agent.models.zone_schema import ZoneDetectionResult
 

@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from cad_dxf_agent.llm.stage_handlers.compliance_handler import (
     ComplianceHandler,
     _build_summary,

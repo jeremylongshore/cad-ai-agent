@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import logging
 import re
+from collections.abc import Callable
 
 from cad_dxf_agent.core.entity_index import EntityIndex
 from cad_dxf_agent.core.zone_detector import detect_zones
@@ -30,6 +31,12 @@ from cad_dxf_agent.models.compliance_schema import (
 from cad_dxf_agent.models.zone_schema import DetectedZone, ZoneDetectionResult
 
 logger = logging.getLogger(__name__)
+
+# Type alias for check functions
+_CheckFn = Callable[
+    [DrawingContext, ZoneDetectionResult, EntityIndex, ComplianceThresholds],
+    list[ComplianceFinding],
+]
 
 # --- Block name patterns for door/window detection ---
 _DOOR_PATTERNS = re.compile(
@@ -470,19 +477,8 @@ def _check_dead_end_corridors(
 
 # --- Check registry ---
 
-_ALL_CHECKS: list[
-    tuple[
-        type[None]
-        | type[
-            list[ComplianceFinding]
-        ],
-        ComplianceCategory,
-        str,
-    ]
-] = []
-
-# Use a simpler approach: list of (function, category, name) tuples
-_ALL_CHECKS = [
+# Check registry: list of (function, category, name) tuples
+_ALL_CHECKS: list[tuple[_CheckFn, ComplianceCategory, str]] = [
     (_check_door_widths, ComplianceCategory.DOOR, "door_widths"),
     (_check_door_count, ComplianceCategory.DOOR, "door_count"),
     (_check_hallway_widths, ComplianceCategory.CORRIDOR, "hallway_widths"),

@@ -705,7 +705,7 @@ class ToolExecutor:
             return {"error": f"No text entities contain '{find_str}'"}
 
         for entity in text_entities:
-            new_text = entity.text_content.replace(find_str, replace_str)
+            new_text = (entity.text_content or "").replace(find_str, replace_str)
             op = EditOperation(
                 op_type=OpType.EDIT_TEXT,
                 target_handle=entity.handle,

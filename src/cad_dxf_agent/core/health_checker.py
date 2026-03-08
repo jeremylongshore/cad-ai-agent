@@ -166,7 +166,7 @@ def _check_inconsistent_text_heights(
             continue
 
         height = entity.text_geometry.effective_height
-        if height > 0:
+        if height is not None and height > 0:
             layer_heights[entity.layer].append((entity.handle, height))
 
     for layer, entries in layer_heights.items():
@@ -306,8 +306,9 @@ def _check_overlapping_entities(
         for key, handles in list(overlap_groups.items())[:5]:
             parts = key.split(",")
             for handle in handles[:3]:
-                entity = index.get_by_handle(handle)
-                if entity:
+                found_entity = index.get_by_handle(handle)
+                if found_entity is not None:
+                    entity = found_entity
                     evidence.append(
                         EvidenceRef(
                             entity_handle=handle,
@@ -501,7 +502,7 @@ def _check_unnamed_zones(context: DrawingContext) -> list[HealthIssue]:
 
     Requires zone_detector — imported lazily to avoid circular dependency.
     """
-    issues = []
+    issues: list[HealthIssue] = []
     try:
         from .zone_detector import detect_zones
     except ImportError:
