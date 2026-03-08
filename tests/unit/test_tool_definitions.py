@@ -76,6 +76,12 @@ class TestToolDefinitions:
             "add_circle",
             "add_arc",
             "add_text",
+            # V3 batch
+            "batch_move",
+            "batch_rotate",
+            "batch_scale",
+            "batch_delete",
+            "batch_edit_text",
         }
         assert names == expected
 
