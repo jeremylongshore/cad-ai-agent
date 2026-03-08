@@ -1,9 +1,49 @@
 import { Link } from 'react-router-dom';
+import { useEffect, useRef } from 'react';
 
 export default function LoginPage({ onSignInWithGoogle, error, clearError }) {
+  const gistRef = useRef(null);
+
+  useEffect(() => {
+    if (!gistRef.current) return;
+    const iframe = document.createElement('iframe');
+    iframe.style.width = '100%';
+    iframe.style.border = 'none';
+    iframe.style.minHeight = '200px';
+    const doc = `
+      <html><head><base target="_blank"></head>
+      <body style="margin:0">
+        <script src="https://gist.github.com/jeremylongshore/0303189683f9547c79e1fc1fc68be711.js"></script>
+      </body></html>`;
+    gistRef.current.innerHTML = '';
+    gistRef.current.appendChild(iframe);
+    iframe.contentDocument.open();
+    iframe.contentDocument.write(doc);
+    iframe.contentDocument.close();
+    const resize = () => {
+      try { iframe.style.height = iframe.contentDocument.body.scrollHeight + 'px'; } catch {}
+    };
+    iframe.onload = resize;
+    setTimeout(resize, 2000);
+  }, []);
+
   return (
     <div className="page" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
       <div className="card" style={{ maxWidth: 420, width: '100%', textAlign: 'center' }}>
+        <div style={{
+          background: 'var(--accent-primary)',
+          color: '#fff',
+          fontSize: '0.75rem',
+          fontWeight: 600,
+          padding: '4px 12px',
+          borderRadius: 'var(--radius-sm)',
+          display: 'inline-block',
+          marginBottom: 'var(--space-3)',
+          letterSpacing: '0.05em',
+          textTransform: 'uppercase',
+        }}>
+          Beta — Development Ongoing
+        </div>
         <div className="site-header__logo-icon" aria-hidden="true"
              style={{ width: 64, height: 64, fontSize: 28, margin: '0 auto var(--space-4)' }}>
           I
@@ -54,6 +94,13 @@ export default function LoginPage({ onSignInWithGoogle, error, clearError }) {
           </svg>
           Sign in with Google
         </button>
+
+        <details style={{ marginTop: 'var(--space-5)', textAlign: 'left' }}>
+          <summary className="text-sm text-muted" style={{ cursor: 'pointer', textAlign: 'center' }}>
+            View App Audit
+          </summary>
+          <div ref={gistRef} style={{ marginTop: 'var(--space-3)', maxHeight: 400, overflow: 'auto', borderRadius: 'var(--radius-sm)' }} />
+        </details>
 
         <p className="text-muted" style={{ marginTop: 'var(--space-6)', fontSize: '0.8rem' }}>
           by Intent Solutions
