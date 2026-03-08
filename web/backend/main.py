@@ -444,6 +444,7 @@ async def v2_prompt(body: PromptRequest, user: dict = Depends(get_user)):
 
     from cad_dxf_agent.llm.capability_registry import CapabilityRegistry
     from cad_dxf_agent.llm.intent_router import IntentRouter
+    from cad_dxf_agent.llm.objective_classifier import ObjectiveClassifier
     from cad_dxf_agent.llm.response_builder import ResponseBuilder
     from cad_dxf_agent.models.response_schema import AuditMetadata, TaskFamily
 
@@ -459,9 +460,13 @@ async def v2_prompt(body: PromptRequest, user: dict = Depends(get_user)):
         if session.context is None:
             raise HTTPException(status_code=400, detail="No file loaded in session")
 
-        # Classify intent
+        # Classify intent (TaskFamily routing — existing behavior)
         router = IntentRouter.from_settings()
         intent = router.classify(body.prompt)
+
+        # Objective classification (two-axis: RequestClass + ObjectiveTag)
+        objective_cls = ObjectiveClassifier()
+        objective = objective_cls.classify_with_family(body.prompt, intent.family)
 
         audit = AuditMetadata(
             router_time_ms=intent.router_time_ms,
@@ -469,18 +474,22 @@ async def v2_prompt(body: PromptRequest, user: dict = Depends(get_user)):
             router_confidence=intent.confidence,
         )
 
+        # Helper to enrich response with objective metadata
+        def _enrich(resp_dict: dict) -> dict:
+            return _enrich_with_objective(resp_dict, objective)
+
         # Gate unimplemented families
         registry = CapabilityRegistry()
         if not registry.is_implemented(intent.family):
             audit.total_request_time_ms = (_time.monotonic() - total_start) * 1000
-            return ResponseBuilder.unsupported_operation(
+            return _enrich(ResponseBuilder.unsupported_operation(
                 family=intent.family, audit=audit,
-            ).model_dump()
+            ).model_dump())
 
         # Handle needs_clarification
         if intent.family == TaskFamily.NEEDS_CLARIFICATION:
             audit.total_request_time_ms = (_time.monotonic() - total_start) * 1000
-            return ResponseBuilder.needs_clarification(audit=audit).model_dump()
+            return _enrich(ResponseBuilder.needs_clarification(audit=audit).model_dump())
 
         # Handle Q&A — deterministic, no LLM
         if intent.family == TaskFamily.QNA:
@@ -495,17 +504,17 @@ async def v2_prompt(body: PromptRequest, user: dict = Depends(get_user)):
             audit.context_build_time_ms = (_time.monotonic() - ctx_start) * 1000
             audit.total_request_time_ms = (_time.monotonic() - total_start) * 1000
             result.audit = audit
-            return result.model_dump()
+            return _enrich(result.model_dump())
 
         # Handle compare (requires revision file)
         if intent.family == TaskFamily.COMPARE:
             if session.revision_path is None or not session.revision_path.exists():
                 audit.total_request_time_ms = (_time.monotonic() - total_start) * 1000
-                return ResponseBuilder.needs_clarification(
+                return _enrich(ResponseBuilder.needs_clarification(
                     message="Upload a revision file first to compare drawings.",
                     family=TaskFamily.COMPARE,
                     audit=audit,
-                ).model_dump()
+                ).model_dump())
 
             # Use cached comparison result if available, else run pipeline
             if session.comparison_result is not None and session.comparison_changelog is not None:
@@ -519,16 +528,16 @@ async def v2_prompt(body: PromptRequest, user: dict = Depends(get_user)):
                     revision_path=session.revision_path,
                 )
                 audit.total_request_time_ms = (_time.monotonic() - total_start) * 1000
-                return _build_typed_compare_response(
+                return _enrich(_build_typed_compare_response(
                     session.comparison_result, outputs, audit=audit
-                )
+                ))
 
             audit.total_request_time_ms = (_time.monotonic() - total_start) * 1000
-            return ResponseBuilder.needs_clarification(
+            return _enrich(ResponseBuilder.needs_clarification(
                 message="Use /api/compare for full comparison workflow.",
                 family=TaskFamily.COMPARE,
                 audit=audit,
-            ).model_dump()
+            ).model_dump())
 
         # Handle markup_interpretation — deterministic redline report, no LLM
         if intent.family == TaskFamily.MARKUP_INTERPRETATION:
@@ -539,7 +548,7 @@ async def v2_prompt(body: PromptRequest, user: dict = Depends(get_user)):
             audit.context_build_time_ms = (_time.monotonic() - ctx_start) * 1000
             audit.total_request_time_ms = (_time.monotonic() - total_start) * 1000
 
-            return ResponseBuilder.markup_redline(
+            return _enrich(ResponseBuilder.markup_redline(
                 message=(
                     f"{result.total_clouds} revision cloud(s) found, "
                     f"{result.total_affected_entities} affected entity(ies)."
@@ -548,7 +557,7 @@ async def v2_prompt(body: PromptRequest, user: dict = Depends(get_user)):
                 confidence=result.aggregate_confidence,
                 ambiguity_flags=result.ambiguity_flags,
                 audit=audit,
-            ).model_dump()
+            ).model_dump())
 
         # Handle repeated_condition — deterministic, no LLM
         if intent.family == TaskFamily.REPEATED_CONDITION:
@@ -571,7 +580,7 @@ async def v2_prompt(body: PromptRequest, user: dict = Depends(get_user)):
                 audit.context_build_time_ms = (_time.monotonic() - ctx_start) * 1000
                 audit.total_request_time_ms = (_time.monotonic() - total_start) * 1000
 
-                return ResponseBuilder.repeated_condition(
+                return _enrich(ResponseBuilder.repeated_condition(
                     message=(
                         f"{result.total_groups} condition group(s), "
                         f"{result.total_instances} total instance(s)."
@@ -580,15 +589,15 @@ async def v2_prompt(body: PromptRequest, user: dict = Depends(get_user)):
                     confidence=result.aggregate_confidence,
                     ambiguity_flags=result.ambiguity_flags,
                     audit=audit,
-                ).model_dump()
+                ).model_dump())
 
             if not exemplar_handles:
                 audit.total_request_time_ms = (_time.monotonic() - total_start) * 1000
-                return ResponseBuilder.needs_clarification(
+                return _enrich(ResponseBuilder.needs_clarification(
                     message="Select entities to use as the exemplar for repeated-condition search.",
                     family=TaskFamily.REPEATED_CONDITION,
                     audit=audit,
-                ).model_dump()
+                ).model_dump())
 
             ctx_start = _time.monotonic()
             detector = ConditionDetector(session.context)
@@ -596,14 +605,14 @@ async def v2_prompt(body: PromptRequest, user: dict = Depends(get_user)):
             audit.context_build_time_ms = (_time.monotonic() - ctx_start) * 1000
             audit.total_request_time_ms = (_time.monotonic() - total_start) * 1000
 
-            return ResponseBuilder.repeated_condition(
+            return _enrich(ResponseBuilder.repeated_condition(
                 message=result.summary,
                 data=result.model_dump(),
                 evidence=[ev.model_dump() for c in result.candidates for ev in c.evidence[:3]],
                 confidence=result.candidates[0].confidence if result.candidates else 0.0,
                 ambiguity_flags=result.ambiguity_flags,
                 audit=audit,
-            ).model_dump()
+            ).model_dump())
 
         # Handle design_assist — deterministic layout analysis, no LLM
         if intent.family == TaskFamily.DESIGN_ASSIST:
@@ -688,13 +697,13 @@ async def v2_prompt(body: PromptRequest, user: dict = Depends(get_user)):
             audit.context_build_time_ms = (_time.monotonic() - ctx_start) * 1000
             audit.total_request_time_ms = (_time.monotonic() - total_start) * 1000
 
-            return ResponseBuilder.design_assist(
+            return _enrich(ResponseBuilder.design_assist(
                 message=message,
                 data=data,
                 confidence=confidence,
                 ambiguity_flags=flags,
                 audit=audit,
-            ).model_dump()
+            ).model_dump())
 
         # Handle summary — deterministic revision summary, no LLM
         if intent.family == TaskFamily.SUMMARY:
@@ -709,7 +718,7 @@ async def v2_prompt(body: PromptRequest, user: dict = Depends(get_user)):
             audit.context_build_time_ms = (_time.monotonic() - ctx_start) * 1000
             audit.total_request_time_ms = (_time.monotonic() - total_start) * 1000
 
-            return ResponseBuilder.summary_result(
+            return _enrich(ResponseBuilder.summary_result(
                 message=result.headline,
                 data=result.model_dump(),
                 confidence=min(
@@ -717,7 +726,7 @@ async def v2_prompt(body: PromptRequest, user: dict = Depends(get_user)):
                 ),
                 ambiguity_flags=result.ambiguity_flags,
                 audit=audit,
-            ).model_dump()
+            ).model_dump())
 
         # Handle takeoff_estimate — deterministic counting, no LLM
         if intent.family == TaskFamily.TAKEOFF_ESTIMATE:
@@ -742,7 +751,7 @@ async def v2_prompt(body: PromptRequest, user: dict = Depends(get_user)):
                 "low": 0.4,
                 "estimate_only": 0.2,
             }
-            return ResponseBuilder.takeoff_result(
+            return _enrich(ResponseBuilder.takeoff_result(
                 message=(
                     f"{result.total_items} takeoff item(s), "
                     f"{result.total_quantity_items} total quantity."
@@ -751,7 +760,7 @@ async def v2_prompt(body: PromptRequest, user: dict = Depends(get_user)):
                 confidence=_conf_labels.get(result.aggregate_confidence.value, 0.5),
                 ambiguity_flags=result.ambiguity_flags,
                 audit=audit,
-            ).model_dump()
+            ).model_dump())
 
         # Handle edit_plan — dispatch to existing planner
         if intent.family == TaskFamily.EDIT_PLAN:
@@ -829,7 +838,7 @@ async def v2_prompt(body: PromptRequest, user: dict = Depends(get_user)):
 
                 audit.total_request_time_ms = (_time.monotonic() - total_start) * 1000
 
-                return ResponseBuilder.plan_only(
+                return _enrich(ResponseBuilder.plan_only(
                     operations=operations,
                     message=llm_message or summary,
                     validation={
@@ -838,7 +847,7 @@ async def v2_prompt(body: PromptRequest, user: dict = Depends(get_user)):
                         "is_valid": len(validation.blockers) == 0,
                     },
                     audit=audit,
-                ).model_dump()
+                ).model_dump())
 
             except Exception as e:
                 logger.error("v2 plan failed: %s", e, exc_info=True)
@@ -846,9 +855,9 @@ async def v2_prompt(body: PromptRequest, user: dict = Depends(get_user)):
 
         # Catch-all for families that are "implemented" but not yet wired
         audit.total_request_time_ms = (_time.monotonic() - total_start) * 1000
-        return ResponseBuilder.unsupported_operation(
+        return _enrich(ResponseBuilder.unsupported_operation(
             family=intent.family, audit=audit,
-        ).model_dump()
+        ).model_dump())
 
 
 # ---------------------------------------------------------------------------
@@ -1696,6 +1705,26 @@ def _user_friendly_conversion_error(raw_error: str | None, ext: str) -> str:
             "Please export as DXF from your CAD software."
         )
     return f"Could not convert your {ext} file. Please try exporting as DXF from your CAD software."
+
+
+def _enrich_with_objective(
+    response: dict,
+    objective: object | None,
+) -> dict:
+    """Add objective classification metadata to a response dict.
+
+    Backward compatible — fields are additive. Existing clients ignore them.
+    """
+    if objective is None:
+        return response
+    response["request_class"] = getattr(objective, "request_class", None)
+    if response["request_class"] is not None:
+        response["request_class"] = str(response["request_class"])
+    tag = getattr(objective, "objective_tag", None)
+    response["objective_tag"] = str(tag) if tag is not None else None
+    family = getattr(objective, "document_family", None)
+    response["document_family"] = str(family) if family is not None else None
+    return response
 
 
 def _parse_selected_region(selected_regions: list[dict] | None):
