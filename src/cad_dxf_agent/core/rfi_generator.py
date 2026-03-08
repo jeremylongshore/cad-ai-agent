@@ -317,9 +317,9 @@ def _check_mixed_text_heights(
     for entity in context.entities:
         if entity.entity_type not in (EntityType.TEXT, EntityType.MTEXT):
             continue
-        eff_height = entity.text_geometry.effective_height if entity.text_geometry else None
-        if eff_height is not None and eff_height > 0:
-            height = round(eff_height, 2)
+        height = entity.text_geometry.effective_height if entity.text_geometry else None
+        if height is not None and height > 0:
+            height = round(height, 2)
             layer_heights.setdefault(entity.layer, Counter())[height] += 1
 
     for layer, height_counts in layer_heights.items():

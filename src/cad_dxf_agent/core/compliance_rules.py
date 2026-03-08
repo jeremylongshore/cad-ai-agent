@@ -32,7 +32,6 @@ from cad_dxf_agent.models.zone_schema import DetectedZone, ZoneDetectionResult
 
 logger = logging.getLogger(__name__)
 
-# Type alias for check functions
 _CheckFn = Callable[
     [DrawingContext, ZoneDetectionResult, EntityIndex, ComplianceThresholds],
     list[ComplianceFinding],
@@ -498,7 +497,6 @@ def _check_dead_end_corridors(
 
 # --- Check registry ---
 
-# Check registry: list of (function, category, name) tuples
 _ALL_CHECKS: list[tuple[_CheckFn, ComplianceCategory, str]] = [
     (_check_door_widths, ComplianceCategory.DOOR, "door_widths"),
     (_check_door_count, ComplianceCategory.DOOR, "door_count"),

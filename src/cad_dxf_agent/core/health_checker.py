@@ -297,13 +297,14 @@ def _check_overlapping_entities(
             for handle in handles[:3]:
                 found = index.get_by_handle(handle)
                 if found is not None:
+                    entity = found
                     evidence.append(
                         EvidenceRef(
                             entity_handle=handle,
-                            layer=found.layer,
-                            entity_type=found.entity_type.value,
-                            location=(found.insert_point.x, found.insert_point.y)
-                            if found.insert_point
+                            layer=entity.layer,
+                            entity_type=entity.entity_type.value,
+                            location=(entity.insert_point.x, entity.insert_point.y)
+                            if entity.insert_point
                             else None,
                             description=(
                                 f"Overlaps with {len(handles) - 1} other "
