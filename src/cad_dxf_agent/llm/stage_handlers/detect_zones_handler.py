@@ -54,7 +54,8 @@ class DetectZonesHandler:
             type_desc = ", ".join(f"{v} {k}" for k, v in type_counts.items())
             summary = (
                 f"{result.zone_count} zones detected ({type_desc}), "
-                f"total area: {result.total_area:.1f} sq units"
+                f"total area: {result.total_area:.1f} sq units, "
+                f"method: {result.method}"
             )
 
         return {

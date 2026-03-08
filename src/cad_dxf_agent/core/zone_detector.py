@@ -17,6 +17,23 @@ from cad_dxf_agent.core.primitive_extractors import LayerClassification, classif
 from cad_dxf_agent.models.cad_schema import DrawingContext, EntityType, Point2D
 from cad_dxf_agent.models.zone_schema import DetectedZone, ZoneDetectionResult
 
+# --- Detection limits ---
+_MAX_GRAPH_NODES = 500  # Skip cycle detection for graphs larger than this
+_MAX_CYCLES = 50  # Stop cycle search after this many results
+_MAX_CYCLE_LENGTH = 20  # Maximum edges in a single cycle
+
+# --- Zone classification thresholds (area in drawing units²) ---
+_AREA_CLOSET_MAX = 20
+_AREA_BATHROOM_MAX = 80
+_AREA_ROOM_MAX = 300
+_AREA_LARGE_ROOM_MAX = 600
+
+# --- Spatial search ---
+_LABEL_SEARCH_RADIUS = 100  # Max distance to search for nearby text labels
+
+# --- Aspect ratio ---
+_HALLWAY_ASPECT_RATIO = 4.0  # Zones with aspect ratio above this are hallways
+
 
 def detect_zones(
     context: DrawingContext,
@@ -226,18 +243,17 @@ def _find_minimal_cycles(
     Returns list of (ordered_vertices, handle_set) pairs.
     Uses bounded DFS to avoid combinatorial explosion.
     """
-    max_cycle_len = 20
     found: list[tuple[list[tuple[float, float]], set[str]]] = []
     seen_cycles: set[frozenset[tuple[float, float]]] = set()
 
     nodes = list(graph.keys())
-    if len(nodes) > 500:
+    if len(nodes) > _MAX_GRAPH_NODES:
         return []  # Too many nodes, skip cycle detection
 
     for start_node in nodes:
-        if len(found) >= 50:
+        if len(found) >= _MAX_CYCLES:
             break
-        _dfs_cycles(graph, start_node, max_cycle_len, found, seen_cycles)
+        _dfs_cycles(graph, start_node, _MAX_CYCLE_LENGTH, found, seen_cycles)
 
     return found
 
@@ -261,7 +277,7 @@ def _dfs_cycles(
     ] = [(start, [start], set(), {start})]
 
     while stack:
-        if len(found) >= 50:
+        if len(found) >= _MAX_CYCLES:
             return
 
         node, path, handles, visited = stack.pop()
@@ -298,18 +314,18 @@ def _classify_zone(
 
     # Aspect ratio check for hallways/corridors
     aspect = _aspect_ratio(zone.boundary)
-    if aspect > 4.0:
+    if aspect > _HALLWAY_ASPECT_RATIO:
         return "hallway"
 
     # Area-based classification
     area = zone.area
-    if area < 20:
+    if area < _AREA_CLOSET_MAX:
         return "closet"
-    if area < 80:
+    if area < _AREA_BATHROOM_MAX:
         return "bathroom"
-    if area < 300:
+    if area < _AREA_ROOM_MAX:
         return "room"
-    if area < 600:
+    if area < _AREA_LARGE_ROOM_MAX:
         return "large_room"
     return "open_area"
 
@@ -335,7 +351,7 @@ def _find_nearby_label(
             best_text = text
 
     # Use adaptive distance threshold if max_distance not specified
-    if max_distance is None and best_dist > 100:
+    if max_distance is None and best_dist > _LABEL_SEARCH_RADIUS:
         return None
 
     return best_text

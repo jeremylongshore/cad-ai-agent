@@ -81,7 +81,7 @@ class TestZoneDetectionResult:
         assert result.total_area == 0.0
         assert result.zone_count == 0
         assert result.confidence == 0.0
-        assert result.method == "polyline_tracing"
+        assert result.method == "polyline_and_line_tracing"
         assert result.warnings == []
 
     def test_with_zones(self):

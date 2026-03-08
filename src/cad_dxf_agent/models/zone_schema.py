@@ -33,5 +33,5 @@ class ZoneDetectionResult(BaseModel):
     total_area: float = 0.0
     zone_count: int = 0
     confidence: float = 0.0
-    method: str = "polyline_tracing"
+    method: str = "polyline_and_line_tracing"
     warnings: list[str] = Field(default_factory=list)
