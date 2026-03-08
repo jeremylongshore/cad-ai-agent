@@ -410,16 +410,17 @@ class ObjectiveClassifier:
         tag_scores: dict[ObjectiveTag, int] = {}
         tag_patterns: list[str] = []
         for tag_rule, tag_compiled in _COMPILED_TAG_RULES:
-            matches = sum(1 for p in tag_compiled if p.search(stripped))
-            if matches > 0:
-                tag_scores[tag_rule.tag] = matches
-                tag_patterns.extend(
-                    p.pattern for p in tag_compiled if p.search(stripped)
-                )
+            matched = [p for p in tag_compiled if p.search(stripped)]
+            if matched:
+                tag_scores[tag_rule.tag] = len(matched)
+                tag_patterns.extend(p.pattern for p in matched)
 
         objective_tag: ObjectiveTag | None = None
         if tag_scores:
-            objective_tag = max(tag_scores, key=tag_scores.get)  # type: ignore[arg-type]
+            # Deterministic: highest score wins, tie-break by tag name (asc)
+            objective_tag = sorted(
+                tag_scores, key=lambda t: (-tag_scores[t], t.value),
+            )[0]
 
         # Fallback: if no class matched, infer from tag or default
         if request_class is None:

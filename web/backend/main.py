@@ -1709,7 +1709,7 @@ def _user_friendly_conversion_error(raw_error: str | None, ext: str) -> str:
 
 def _enrich_with_objective(
     response: dict,
-    objective: object | None,
+    objective: "ObjectiveClassification | None",  # noqa: F821
 ) -> dict:
     """Add objective classification metadata to a response dict.
 

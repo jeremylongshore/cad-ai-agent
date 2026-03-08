@@ -139,5 +139,5 @@ class StagePipelineDefinition(BaseModel):
     """Defines which stages run for a given (class, objective) pair."""
 
     stages: list[str]  # e.g. ["analyze", "recommend", "plan", "preview"]
-    output_mode: str = "full"  # "direct", "staged", "full"
+    output_mode: Literal["direct", "staged", "full"] = "full"
     description: str = ""
