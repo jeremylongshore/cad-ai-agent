@@ -23,8 +23,14 @@ from pathlib import Path
 
 from fastapi import APIRouter, File, HTTPException, Query, UploadFile
 
+from cad_dxf_agent.core.compliance_rules import check_compliance
+from cad_dxf_agent.core.design_ops import TakeoffGenerator
+from cad_dxf_agent.core.drawing_summarizer import summarize_drawing
 from cad_dxf_agent.core.dxf_reader import load_dxf
 from cad_dxf_agent.core.entity_index import EntityIndex
+from cad_dxf_agent.core.rfi_generator import generate_rfi
+from cad_dxf_agent.core.zone_detector import detect_zones as run_zones
+from cad_dxf_agent.models.compliance_schema import BUILTIN_PROFILES
 from cad_dxf_agent.otel import span as otel_span
 
 logger = logging.getLogger(__name__)
@@ -156,9 +162,6 @@ async def detect_zones(file: UploadFile = File(...)):
     """
     with otel_span("api.v1.zones"):
         context = _load_context(file)
-
-        from cad_dxf_agent.core.zone_detector import detect_zones as run_zones
-
         result = run_zones(context)
 
         zones = []
@@ -259,14 +262,10 @@ async def compliance_check(
     with otel_span("api.v1.compliance"):
         context = _load_context(file)
 
-        from cad_dxf_agent.core.compliance_rules import check_compliance
-        from cad_dxf_agent.models.compliance_schema import BUILTIN_PROFILES
-
         if profile not in BUILTIN_PROFILES:
             raise HTTPException(
                 422,
-                f"Unknown profile: {profile}. "
-                f"Available: {', '.join(BUILTIN_PROFILES)}",
+                f"Unknown profile: {profile}. Available: {', '.join(BUILTIN_PROFILES)}",
             )
 
         report = check_compliance(context, profile=profile)
@@ -299,9 +298,6 @@ async def takeoff(file: UploadFile = File(...)):
     """
     with otel_span("api.v1.takeoff"):
         context = _load_context(file)
-
-        from cad_dxf_agent.core.design_ops import TakeoffGenerator
-
         generator = TakeoffGenerator()
         result = generator.generate(context, prompt="full takeoff")
 
@@ -322,9 +318,6 @@ async def summary(file: UploadFile = File(...)):
     """
     with otel_span("api.v1.summary"):
         context = _load_context(file)
-
-        from cad_dxf_agent.core.drawing_summarizer import summarize_drawing
-
         result = summarize_drawing(context)
 
         return result.model_dump()
@@ -345,9 +338,6 @@ async def rfi_check(file: UploadFile = File(...)):
     """
     with otel_span("api.v1.rfi"):
         context = _load_context(file)
-
-        from cad_dxf_agent.core.rfi_generator import generate_rfi
-
         report = generate_rfi(context)
 
         return {
