@@ -778,7 +778,11 @@ async def upload(
     try:
         from cad_dxf_agent.core.edit_history import EditHistory
 
-        session.edit_history = EditHistory(session.working_path, max_snapshots=20)
+        from cad_dxf_agent.settings import settings as cad_settings
+
+        session.edit_history = EditHistory(
+            session.working_path, max_snapshots=cad_settings.max_undo_snapshots
+        )
     except Exception as hist_err:
         logger.warning("Edit history init failed (non-fatal): %s", hist_err)
 
@@ -1646,20 +1650,31 @@ class SnapshotRequest(BaseModel):
     label: str = ""
 
 
-@app.post("/api/undo")
-async def undo(body: UndoRedoRequest, user: dict = Depends(get_user)):
-    """Undo the last edit operation, restoring the previous DXF state."""
+def _get_session_history(
+    session_id: str, user: dict, *, require: bool = True,
+) -> tuple:
+    """Shared helper: resolve session + edit history, raise on error.
+
+    Returns (session, history). If require=True and no history exists,
+    raises 400. If require=False, history may be None.
+    """
+    from cad_dxf_agent.core.edit_history import EditHistory
+
     try:
-        session = session_mgr.get(body.session_id, user["uid"])
+        session = session_mgr.get(session_id, user["uid"])
     except (KeyError, PermissionError) as e:
         raise HTTPException(status_code=404, detail=str(e)) from None
 
-    if session.edit_history is None:
+    history: EditHistory | None = session.edit_history
+    if require and history is None:
         raise HTTPException(status_code=400, detail="No edit history in session.")
+    return session, history
 
-    from cad_dxf_agent.core.edit_history import EditHistory
 
-    history: EditHistory = session.edit_history
+@app.post("/api/undo")
+async def undo(body: UndoRedoRequest, user: dict = Depends(get_user)):
+    """Undo the last edit operation, restoring the previous DXF state."""
+    session, history = _get_session_history(body.session_id, user)
     if not history.can_undo:
         return {
             "undone": False,
@@ -1691,17 +1706,7 @@ async def undo(body: UndoRedoRequest, user: dict = Depends(get_user)):
 @app.post("/api/redo")
 async def redo(body: UndoRedoRequest, user: dict = Depends(get_user)):
     """Redo the previously undone edit operation."""
-    try:
-        session = session_mgr.get(body.session_id, user["uid"])
-    except (KeyError, PermissionError) as e:
-        raise HTTPException(status_code=404, detail=str(e)) from None
-
-    if session.edit_history is None:
-        raise HTTPException(status_code=400, detail="No edit history in session.")
-
-    from cad_dxf_agent.core.edit_history import EditHistory
-
-    history: EditHistory = session.edit_history
+    session, history = _get_session_history(body.session_id, user)
     if not history.can_redo:
         return {
             "redone": False,
@@ -1732,17 +1737,7 @@ async def redo(body: UndoRedoRequest, user: dict = Depends(get_user)):
 @app.post("/api/snapshot")
 async def create_snapshot(body: SnapshotRequest, user: dict = Depends(get_user)):
     """Create a named snapshot of the current DXF state."""
-    try:
-        session = session_mgr.get(body.session_id, user["uid"])
-    except (KeyError, PermissionError) as e:
-        raise HTTPException(status_code=404, detail=str(e)) from None
-
-    if session.edit_history is None:
-        raise HTTPException(status_code=400, detail="No edit history in session.")
-
-    from cad_dxf_agent.core.edit_history import EditHistory
-
-    history: EditHistory = session.edit_history
+    _session, history = _get_session_history(body.session_id, user)
 
     # Get the current document
     doc = history.get_current_doc()
@@ -1761,12 +1756,9 @@ async def create_snapshot(body: SnapshotRequest, user: dict = Depends(get_user))
 @app.get("/api/history")
 async def get_history(session_id: str = Query(...), user: dict = Depends(get_user)):
     """Get edit history timeline for a session."""
-    try:
-        session = session_mgr.get(session_id, user["uid"])
-    except (KeyError, PermissionError) as e:
-        raise HTTPException(status_code=404, detail=str(e)) from None
+    _session, history = _get_session_history(session_id, user, require=False)
 
-    if session.edit_history is None:
+    if history is None:
         return {
             "entries": [],
             "current_index": -1,
@@ -1774,20 +1766,17 @@ async def get_history(session_id: str = Query(...), user: dict = Depends(get_use
             "can_redo": False,
         }
 
-    from cad_dxf_agent.core.edit_history import EditHistory
-
-    history: EditHistory = session.edit_history
-
     entries = [{"index": -1, "label": "initial"}]
+    labels = history.labels
     for i in range(history.depth):
         entries.append({
             "index": i,
-            "label": history._labels[i],
+            "label": labels[i],
         })
 
     return {
         "entries": entries,
-        "current_index": history._cursor,
+        "current_index": history.cursor,
         "current_label": history.current_label,
         "can_undo": history.can_undo,
         "can_redo": history.can_redo,

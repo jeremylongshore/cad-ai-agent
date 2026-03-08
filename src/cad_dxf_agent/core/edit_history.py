@@ -114,6 +114,16 @@ class EditHistory:
             return "initial"
         return self._labels[self._cursor]
 
+    @property
+    def labels(self) -> list[str]:
+        """All snapshot labels (read-only copy)."""
+        return list(self._labels)
+
+    @property
+    def cursor(self) -> int:
+        """Current cursor position (-1 = initial state)."""
+        return self._cursor
+
     def get_current_doc(self) -> ezdxf.document.Drawing:
         """Return the document at the current cursor position."""
         if self._cursor < 0:
