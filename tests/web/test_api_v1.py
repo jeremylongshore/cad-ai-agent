@@ -316,3 +316,167 @@ class TestV1Entities:
         data = resp.json()
         assert data["total"] == 0
         assert data["entities"] == []
+
+
+# ===================================================================
+# POST /api/v1/compliance
+# ===================================================================
+
+
+class TestV1Compliance:
+    """Test the /api/v1/compliance endpoint."""
+
+    def test_compliance_structural(self, client, tmp_path):
+        dxf = create_structural_drawing(tmp_path)
+        resp = _upload(client, "/api/v1/compliance", dxf)
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "profile" in data
+        assert "passed" in data
+        assert "score" in data
+        assert "findings" in data
+        assert "checks_run" in data
+
+    def test_compliance_default_profile_is_ibc(self, client, tmp_path):
+        dxf = create_structural_drawing(tmp_path)
+        resp = _upload(client, "/api/v1/compliance", dxf)
+        assert resp.json()["profile"] == "ibc-2021"
+
+    def test_compliance_ada_profile(self, client, tmp_path):
+        dxf = create_structural_drawing(tmp_path)
+        with open(dxf, "rb") as f:
+            resp = client.post(
+                "/api/v1/compliance?profile=ada",
+                files={"file": ("test.dxf", f)},
+            )
+        assert resp.status_code == 200
+        assert resp.json()["profile"] == "ada"
+
+    def test_compliance_unknown_profile(self, client, tmp_path):
+        dxf = create_structural_drawing(tmp_path)
+        with open(dxf, "rb") as f:
+            resp = client.post(
+                "/api/v1/compliance?profile=nonexistent",
+                files={"file": ("test.dxf", f)},
+            )
+        assert resp.status_code == 422
+
+    def test_compliance_score_range(self, client, tmp_path):
+        dxf = create_structural_drawing(tmp_path)
+        resp = _upload(client, "/api/v1/compliance", dxf)
+        score = resp.json()["score"]
+        assert 0 <= score <= 100
+
+    def test_compliance_empty_drawing(self, client, tmp_path):
+        dxf = create_empty_dxf(tmp_path)
+        resp = _upload(client, "/api/v1/compliance", dxf)
+        assert resp.status_code == 200
+
+
+# ===================================================================
+# POST /api/v1/takeoff
+# ===================================================================
+
+
+class TestV1Takeoff:
+    """Test the /api/v1/takeoff endpoint."""
+
+    def test_takeoff_structural(self, client, tmp_path):
+        dxf = create_structural_drawing(tmp_path)
+        resp = _upload(client, "/api/v1/takeoff", dxf)
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "items" in data
+        assert isinstance(data["items"], list)
+
+    def test_takeoff_has_methodology(self, client, tmp_path):
+        dxf = create_structural_drawing(tmp_path)
+        resp = _upload(client, "/api/v1/takeoff", dxf)
+        data = resp.json()
+        assert "methodology" in data
+
+    def test_takeoff_empty_drawing(self, client, tmp_path):
+        dxf = create_empty_dxf(tmp_path)
+        resp = _upload(client, "/api/v1/takeoff", dxf)
+        assert resp.status_code == 200
+
+
+# ===================================================================
+# POST /api/v1/summary
+# ===================================================================
+
+
+class TestV1Summary:
+    """Test the /api/v1/summary endpoint."""
+
+    def test_summary_structural(self, client, tmp_path):
+        dxf = create_structural_drawing(tmp_path)
+        resp = _upload(client, "/api/v1/summary", dxf)
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "headline" in data
+        assert "drawing_type" in data
+        assert "entity_count" in data
+        assert "layer_count" in data
+
+    def test_summary_has_description(self, client, tmp_path):
+        dxf = create_structural_drawing(tmp_path)
+        resp = _upload(client, "/api/v1/summary", dxf)
+        data = resp.json()
+        assert "plain_description" in data
+        assert len(data["plain_description"]) > 0
+
+    def test_summary_has_key_features(self, client, tmp_path):
+        dxf = create_structural_drawing(tmp_path)
+        resp = _upload(client, "/api/v1/summary", dxf)
+        data = resp.json()
+        assert "key_features" in data
+        assert isinstance(data["key_features"], list)
+
+    def test_summary_empty_drawing(self, client, tmp_path):
+        dxf = create_empty_dxf(tmp_path)
+        resp = _upload(client, "/api/v1/summary", dxf)
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["entity_count"] == 0
+
+
+# ===================================================================
+# POST /api/v1/rfi
+# ===================================================================
+
+
+class TestV1RFI:
+    """Test the /api/v1/rfi endpoint."""
+
+    def test_rfi_structural(self, client, tmp_path):
+        dxf = create_structural_drawing(tmp_path)
+        resp = _upload(client, "/api/v1/rfi", dxf)
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "total_items" in data
+        assert "items" in data
+        assert isinstance(data["items"], list)
+
+    def test_rfi_has_severity_counts(self, client, tmp_path):
+        dxf = create_structural_drawing(tmp_path)
+        resp = _upload(client, "/api/v1/rfi", dxf)
+        data = resp.json()
+        assert "critical_count" in data
+        assert "major_count" in data
+        assert "minor_count" in data
+
+    def test_rfi_item_structure(self, client, tmp_path):
+        dxf = create_structural_drawing(tmp_path)
+        resp = _upload(client, "/api/v1/rfi", dxf)
+        data = resp.json()
+        for item in data["items"]:
+            assert "rfi_id" in item
+            assert "category" in item
+            assert "severity" in item
+            assert "question" in item
+
+    def test_rfi_empty_drawing(self, client, tmp_path):
+        dxf = create_empty_dxf(tmp_path)
+        resp = _upload(client, "/api/v1/rfi", dxf)
+        assert resp.status_code == 200
