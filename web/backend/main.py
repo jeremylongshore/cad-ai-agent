@@ -774,6 +774,14 @@ async def upload(
     session.working_path = session_dir / "working.dxf"
     shutil.copy2(str(dxf_path), str(session.working_path))
 
+    # Initialize edit history for undo/redo (EPIC-CAD-27)
+    try:
+        from cad_dxf_agent.core.edit_history import EditHistory
+
+        session.edit_history = EditHistory(session.working_path, max_snapshots=20)
+    except Exception as hist_err:
+        logger.warning("Edit history init failed (non-fatal): %s", hist_err)
+
     # Load and analyze
     try:
         from cad_dxf_agent.core.dxf_reader import load_dxf
@@ -1492,6 +1500,17 @@ async def v2_apply(body: V2ApplyRequest, user: dict = Depends(get_user)):
     if result.output_path:
         session.edited_path = Path(result.output_path)
 
+    # Push edit snapshot for undo/redo (EPIC-CAD-27)
+    if result.output_path and session.edit_history is not None:
+        try:
+            import ezdxf
+
+            doc = ezdxf.readfile(str(result.output_path))
+            label = session.edit_plan.summary if hasattr(session.edit_plan, "summary") else "edit"
+            session.edit_history.push(doc, label=label)
+        except Exception as hist_err:
+            logger.warning("Edit history push failed (non-fatal): %s", hist_err)
+
     # Render edited preview
     try:
         from cad_dxf_agent.core.renderer import render_dxf_to_png
@@ -1562,6 +1581,14 @@ async def apply_changes(body: ApplyRequest, user: dict = Depends(get_user)):
         session.edited_path = session_dir / "edited.dxf"
         engine.save(session.edited_path)
 
+        # Push edit snapshot for undo/redo (EPIC-CAD-27)
+        if session.edit_history is not None:
+            try:
+                label = changeset.prompt or "edit"
+                session.edit_history.push(engine.doc, label=label)
+            except Exception as hist_err:
+                logger.warning("Edit history push failed (non-fatal): %s", hist_err)
+
         # Render edited preview
         try:
             from cad_dxf_agent.core.renderer import render_dxf_to_png
@@ -1603,6 +1630,169 @@ async def clear_history(body: ClearHistoryRequest, user: dict = Depends(get_user
     session.conversation_history = []
     session.changeset = None
     return {"message": "Conversation cleared."}
+
+
+# ---------------------------------------------------------------------------
+# Edit History endpoints — undo/redo/snapshot (EPIC-CAD-27)
+# ---------------------------------------------------------------------------
+
+
+class UndoRedoRequest(BaseModel):
+    session_id: str
+
+
+class SnapshotRequest(BaseModel):
+    session_id: str
+    label: str = ""
+
+
+@app.post("/api/undo")
+async def undo(body: UndoRedoRequest, user: dict = Depends(get_user)):
+    """Undo the last edit operation, restoring the previous DXF state."""
+    try:
+        session = session_mgr.get(body.session_id, user["uid"])
+    except (KeyError, PermissionError) as e:
+        raise HTTPException(status_code=404, detail=str(e)) from None
+
+    if session.edit_history is None:
+        raise HTTPException(status_code=400, detail="No edit history in session.")
+
+    from cad_dxf_agent.core.edit_history import EditHistory
+
+    history: EditHistory = session.edit_history
+    if not history.can_undo:
+        return {
+            "undone": False,
+            "message": "Already at initial state — nothing to undo.",
+            "can_undo": False,
+            "can_redo": history.can_redo,
+            "current_label": history.current_label,
+            "depth": history.depth,
+        }
+
+    doc = history.undo()
+    if doc is not None:
+        # Save the restored document as the current edited file
+        session_dir = Path("/tmp/cad-sessions") / session.session_id
+        restored_path = session_dir / "edited.dxf"
+        doc.saveas(str(restored_path))
+        session.edited_path = restored_path
+
+    return {
+        "undone": True,
+        "message": f"Undone. Now at: {history.current_label}",
+        "can_undo": history.can_undo,
+        "can_redo": history.can_redo,
+        "current_label": history.current_label,
+        "depth": history.depth,
+    }
+
+
+@app.post("/api/redo")
+async def redo(body: UndoRedoRequest, user: dict = Depends(get_user)):
+    """Redo the previously undone edit operation."""
+    try:
+        session = session_mgr.get(body.session_id, user["uid"])
+    except (KeyError, PermissionError) as e:
+        raise HTTPException(status_code=404, detail=str(e)) from None
+
+    if session.edit_history is None:
+        raise HTTPException(status_code=400, detail="No edit history in session.")
+
+    from cad_dxf_agent.core.edit_history import EditHistory
+
+    history: EditHistory = session.edit_history
+    if not history.can_redo:
+        return {
+            "redone": False,
+            "message": "Already at latest state — nothing to redo.",
+            "can_undo": history.can_undo,
+            "can_redo": False,
+            "current_label": history.current_label,
+            "depth": history.depth,
+        }
+
+    doc = history.redo()
+    if doc is not None:
+        session_dir = Path("/tmp/cad-sessions") / session.session_id
+        restored_path = session_dir / "edited.dxf"
+        doc.saveas(str(restored_path))
+        session.edited_path = restored_path
+
+    return {
+        "redone": True,
+        "message": f"Redone. Now at: {history.current_label}",
+        "can_undo": history.can_undo,
+        "can_redo": history.can_redo,
+        "current_label": history.current_label,
+        "depth": history.depth,
+    }
+
+
+@app.post("/api/snapshot")
+async def create_snapshot(body: SnapshotRequest, user: dict = Depends(get_user)):
+    """Create a named snapshot of the current DXF state."""
+    try:
+        session = session_mgr.get(body.session_id, user["uid"])
+    except (KeyError, PermissionError) as e:
+        raise HTTPException(status_code=404, detail=str(e)) from None
+
+    if session.edit_history is None:
+        raise HTTPException(status_code=400, detail="No edit history in session.")
+
+    from cad_dxf_agent.core.edit_history import EditHistory
+
+    history: EditHistory = session.edit_history
+
+    # Get the current document
+    doc = history.get_current_doc()
+    label = body.label or f"snapshot-{history.depth + 1}"
+    history.push(doc, label=label)
+
+    return {
+        "message": f"Snapshot created: {label}",
+        "label": label,
+        "depth": history.depth,
+        "can_undo": history.can_undo,
+        "can_redo": history.can_redo,
+    }
+
+
+@app.get("/api/history")
+async def get_history(session_id: str = Query(...), user: dict = Depends(get_user)):
+    """Get edit history timeline for a session."""
+    try:
+        session = session_mgr.get(session_id, user["uid"])
+    except (KeyError, PermissionError) as e:
+        raise HTTPException(status_code=404, detail=str(e)) from None
+
+    if session.edit_history is None:
+        return {
+            "entries": [],
+            "current_index": -1,
+            "can_undo": False,
+            "can_redo": False,
+        }
+
+    from cad_dxf_agent.core.edit_history import EditHistory
+
+    history: EditHistory = session.edit_history
+
+    entries = [{"index": -1, "label": "initial"}]
+    for i in range(history.depth):
+        entries.append({
+            "index": i,
+            "label": history._labels[i],
+        })
+
+    return {
+        "entries": entries,
+        "current_index": history._cursor,
+        "current_label": history.current_label,
+        "can_undo": history.can_undo,
+        "can_redo": history.can_redo,
+        "depth": history.depth,
+    }
 
 
 @app.post("/api/compare")
