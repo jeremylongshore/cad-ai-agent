@@ -17,6 +17,7 @@ from cad_dxf_agent.models.cad_schema import (
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _entity(
     handle,
     layer="STRUCTURAL",
@@ -65,6 +66,7 @@ def _cloud(handle, layer="CLOUD", vertices=None):
 # Cloud detection — layer matching
 # ---------------------------------------------------------------------------
 
+
 class TestCloudDetectionLayers:
     """Clouds are detected on layers matching CLOUD*, MARKUP*, REVISION*, REDLINE*."""
 
@@ -108,6 +110,7 @@ class TestCloudDetectionLayers:
 # Non-cloud entities ignored
 # ---------------------------------------------------------------------------
 
+
 class TestNonCloudFiltering:
     """Non-LWPOLYLINE on cloud layers and LWPOLYLINE on non-cloud layers are ignored."""
 
@@ -120,8 +123,12 @@ class TestNonCloudFiltering:
 
     def test_text_on_cloud_layer_ignored(self):
         text = _entity(
-            "T1", layer="CLOUD", entity_type=EntityType.TEXT,
-            x=50, y=50, text_content="NOTE",
+            "T1",
+            layer="CLOUD",
+            entity_type=EntityType.TEXT,
+            x=50,
+            y=50,
+            text_content="NOTE",
         )
         ctx = _context([text])
         result = MarkupRedlineGenerator().generate(ctx, "redline")
@@ -129,7 +136,9 @@ class TestNonCloudFiltering:
 
     def test_lwpolyline_on_structural_layer_ignored(self):
         poly = _entity(
-            "P1", layer="STRUCTURAL", entity_type=EntityType.LWPOLYLINE,
+            "P1",
+            layer="STRUCTURAL",
+            entity_type=EntityType.LWPOLYLINE,
             attributes={"vertices": [(0, 0), (100, 0), (100, 100), (0, 100)]},
         )
         entity = _entity("E1", layer="STRUCTURAL", x=50, y=50)
@@ -147,6 +156,7 @@ class TestNonCloudFiltering:
 # ---------------------------------------------------------------------------
 # Bounding box computation
 # ---------------------------------------------------------------------------
+
 
 class TestBoundingBox:
     """Bounding box is computed from cloud vertices."""
@@ -178,6 +188,7 @@ class TestBoundingBox:
 # ---------------------------------------------------------------------------
 # Entity containment
 # ---------------------------------------------------------------------------
+
 
 class TestEntityContainment:
     """Entities within cloud bounds are detected; outside are not."""
@@ -242,6 +253,7 @@ class TestEntityContainment:
 # Edge cases — empty / no-cloud
 # ---------------------------------------------------------------------------
 
+
 class TestEdgeCases:
     """Empty drawings, no clouds, vertex-less polylines."""
 
@@ -265,7 +277,9 @@ class TestEdgeCases:
 
     def test_vertexless_lwpolyline_on_cloud_layer_skipped(self):
         cloud_no_verts = _entity(
-            "C1", layer="CLOUD", entity_type=EntityType.LWPOLYLINE,
+            "C1",
+            layer="CLOUD",
+            entity_type=EntityType.LWPOLYLINE,
             attributes={},
         )
         entity = _entity("E1", x=50, y=50)
@@ -276,7 +290,9 @@ class TestEdgeCases:
 
     def test_cloud_with_empty_vertices_list_skipped(self):
         cloud_empty = _entity(
-            "C1", layer="CLOUD", entity_type=EntityType.LWPOLYLINE,
+            "C1",
+            layer="CLOUD",
+            entity_type=EntityType.LWPOLYLINE,
             attributes={"vertices": []},
         )
         ctx = _context([cloud_empty])
@@ -287,6 +303,7 @@ class TestEdgeCases:
 # ---------------------------------------------------------------------------
 # Multiple clouds
 # ---------------------------------------------------------------------------
+
 
 class TestMultipleClouds:
     """Each cloud independently reports its affected entities."""
@@ -318,6 +335,7 @@ class TestMultipleClouds:
 # ---------------------------------------------------------------------------
 # Confidence
 # ---------------------------------------------------------------------------
+
 
 class TestConfidence:
     """Confidence varies by vertex count and layer name."""
@@ -352,7 +370,8 @@ class TestConfidence:
         result1 = MarkupRedlineGenerator().generate(ctx1, "redline")
 
         cloud2 = _cloud(
-            "C2", layer="REVISION_MARKS",
+            "C2",
+            layer="REVISION_MARKS",
             vertices=[(0, 0), (100, 0), (100, 100), (0, 100)],
         )
         e2 = _entity("E2", x=50, y=50)
@@ -367,6 +386,7 @@ class TestConfidence:
 # ---------------------------------------------------------------------------
 # Result structure / metadata
 # ---------------------------------------------------------------------------
+
 
 class TestResultStructure:
     """Verify result fields: counts, layers, serialization."""

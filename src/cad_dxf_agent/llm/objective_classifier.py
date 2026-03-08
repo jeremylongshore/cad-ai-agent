@@ -341,13 +341,11 @@ _TAG_RULES: list[_TagRule] = [
 
 # Pre-compile
 _COMPILED_CLASS_RULES: list[tuple[_ClassRule, list[re.Pattern[str]]]] = [
-    (rule, [re.compile(p, re.IGNORECASE) for p in rule.patterns])
-    for rule in _CLASS_RULES
+    (rule, [re.compile(p, re.IGNORECASE) for p in rule.patterns]) for rule in _CLASS_RULES
 ]
 
 _COMPILED_TAG_RULES: list[tuple[_TagRule, list[re.Pattern[str]]]] = [
-    (rule, [re.compile(p, re.IGNORECASE) for p in rule.patterns])
-    for rule in _TAG_RULES
+    (rule, [re.compile(p, re.IGNORECASE) for p in rule.patterns]) for rule in _TAG_RULES
 ]
 
 
@@ -419,7 +417,8 @@ class ObjectiveClassifier:
         if tag_scores:
             # Deterministic: highest score wins, tie-break by tag name (asc)
             objective_tag = sorted(
-                tag_scores, key=lambda t: (-tag_scores[t], t.value),
+                tag_scores,
+                key=lambda t: (-tag_scores[t], t.value),
             )[0]
 
         # Fallback: if no class matched, infer from tag or default
@@ -468,7 +467,9 @@ class ObjectiveClassifier:
         )
 
     def classify_with_family(
-        self, prompt: str, task_family: TaskFamily,
+        self,
+        prompt: str,
+        task_family: TaskFamily,
     ) -> ObjectiveClassification:
         """Classify using both the objective heuristic and an existing TaskFamily.
 

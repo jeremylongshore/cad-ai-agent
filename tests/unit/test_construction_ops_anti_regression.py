@@ -32,6 +32,7 @@ from cad_dxf_agent.models.cad_schema import (
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _entity(
     handle,
     layer="STRUCTURAL",

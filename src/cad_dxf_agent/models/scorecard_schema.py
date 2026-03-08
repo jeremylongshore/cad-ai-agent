@@ -41,9 +41,7 @@ class ScorecardEntry(BaseModel):
     must_have_evidence: bool = Field(
         default=False, description="True if evidence list must be non-empty"
     )
-    expected_risk_level: str = Field(
-        default="none", description="Expected risk_level value"
-    )
+    expected_risk_level: str = Field(default="none", description="Expected risk_level value")
     pass_criteria: list[str] = Field(
         default_factory=list,
         description="Human-readable pass criteria descriptions",

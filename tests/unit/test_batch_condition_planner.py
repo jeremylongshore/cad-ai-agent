@@ -17,6 +17,7 @@ from cad_dxf_agent.models.cad_schema import (
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _entity(
     handle,
     layer="STRUCTURAL",
@@ -81,6 +82,7 @@ def _texts(content, count, layer="NOTES", entity_type=EntityType.TEXT, start_han
 # Block-based grouping
 # ---------------------------------------------------------------------------
 
+
 class TestBlockGrouping:
     """INSERT entities grouped by block_name with 3+ instances."""
 
@@ -102,10 +104,7 @@ class TestBlockGrouping:
         ctx = _context(entities)
         result = BatchConditionPlanner().plan(ctx, "batch")
         # Should NOT form a group since 2 < 3
-        block_groups = [
-            g for g in result.groups
-            if "OUTLET" in str(g.model_dump())
-        ]
+        block_groups = [g for g in result.groups if "OUTLET" in str(g.model_dump())]
         assert len(block_groups) == 0
 
     def test_multiple_block_names_separate_groups(self):
@@ -128,6 +127,7 @@ class TestBlockGrouping:
 # ---------------------------------------------------------------------------
 # Text-based grouping
 # ---------------------------------------------------------------------------
+
 
 class TestTextGrouping:
     """TEXT/MTEXT entities grouped by similarity (levenshtein >= 0.8) with 3+ instances."""
@@ -159,9 +159,9 @@ class TestTextGrouping:
         result = BatchConditionPlanner().plan(ctx, "batch")
         # These are all dissimilar, so no text group
         text_groups = [
-            g for g in result.groups
-            if "text" in str(g.model_dump()).lower()
-            or getattr(g, "group_type", "") == "text"
+            g
+            for g in result.groups
+            if "text" in str(g.model_dump()).lower() or getattr(g, "group_type", "") == "text"
         ]
         assert len(text_groups) == 0
 
@@ -169,10 +169,7 @@ class TestTextGrouping:
         entities = _texts("FIRE ALARM", 2)
         ctx = _context(entities)
         result = BatchConditionPlanner().plan(ctx, "batch")
-        text_groups = [
-            g for g in result.groups
-            if "FIRE ALARM" in str(g.model_dump())
-        ]
+        text_groups = [g for g in result.groups if "FIRE ALARM" in str(g.model_dump())]
         assert len(text_groups) == 0
 
     def test_mtext_entities_also_grouped(self):
@@ -202,6 +199,7 @@ class TestTextGrouping:
 # Mixed entity types
 # ---------------------------------------------------------------------------
 
+
 class TestMixedTypes:
     """Block and text groups returned together."""
 
@@ -213,10 +211,7 @@ class TestMixedTypes:
         assert result.total_groups >= 2
 
     def test_non_insert_non_text_entities_ignored(self):
-        lines = [
-            _entity(f"L{i}", entity_type=EntityType.LINE, x=float(i * 10))
-            for i in range(5)
-        ]
+        lines = [_entity(f"L{i}", entity_type=EntityType.LINE, x=float(i * 10)) for i in range(5)]
         ctx = _context(lines)
         result = BatchConditionPlanner().plan(ctx, "batch")
         assert result.total_groups == 0
@@ -225,6 +220,7 @@ class TestMixedTypes:
 # ---------------------------------------------------------------------------
 # Edge cases
 # ---------------------------------------------------------------------------
+
 
 class TestEdgeCases:
     """Empty drawings and no qualifying patterns."""
@@ -252,6 +248,7 @@ class TestEdgeCases:
 # Sorting
 # ---------------------------------------------------------------------------
 
+
 class TestSorting:
     """Groups sorted by instance count descending."""
 
@@ -268,6 +265,7 @@ class TestSorting:
 # ---------------------------------------------------------------------------
 # Confidence
 # ---------------------------------------------------------------------------
+
 
 class TestConfidence:
     """Confidence scales with instance count; text groups have lower ceiling."""
@@ -325,6 +323,7 @@ class TestConfidence:
 # ---------------------------------------------------------------------------
 # Result structure / metadata
 # ---------------------------------------------------------------------------
+
 
 class TestResultStructure:
     """Verify total counts, exemplar handles, serialization."""

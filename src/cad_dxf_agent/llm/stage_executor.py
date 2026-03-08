@@ -154,11 +154,13 @@ class StagePipelineExecutor:
                 # Mark remaining stages as skipped
                 remaining_idx = pipeline.stages.index(stage_name) + 1
                 for remaining in pipeline.stages[remaining_idx:]:
-                    gates.append(StageGate(
-                        stage_name=remaining,
-                        status="skipped",
-                        output_summary=f"Skipped due to '{stage_name}' failure",
-                    ))
+                    gates.append(
+                        StageGate(
+                            stage_name=remaining,
+                            status="skipped",
+                            output_summary=f"Skipped due to '{stage_name}' failure",
+                        )
+                    )
                 break
 
         total_ms = (time.monotonic() - start) * 1000

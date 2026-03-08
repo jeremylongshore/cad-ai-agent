@@ -18,6 +18,7 @@ from cad_dxf_agent.models.construction_ops_schema import FieldSectionType
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _entity(
     handle,
     layer="STRUCTURAL",
@@ -59,31 +60,35 @@ def _rich_context():
 
 def _grid_context():
     """Context with vertical and horizontal grid lines on GRID layer plus block inserts."""
-    entities = [
-        # Vertical grid lines (same x for start and end)
-        EntityRef(
-            handle=f"VG{i}",
-            entity_type=EntityType.LINE,
-            layer="GRID",
-            insert_point=Point2D(x=float(i * 30), y=0.0),
-            attributes={"end_point": (float(i * 30), 100.0)},
-        )
-        for i in range(4)
-    ] + [
-        # Horizontal grid lines (same y for start and end)
-        EntityRef(
-            handle=f"HG{i}",
-            entity_type=EntityType.LINE,
-            layer="GRID",
-            insert_point=Point2D(x=0.0, y=float(i * 30)),
-            attributes={"end_point": (120.0, float(i * 30))},
-        )
-        for i in range(4)
-    ] + [
-        # Some block inserts so other sections can fire too
-        _entity(f"BLK{i}", block_name="COL", x=float(i * 30), y=50.0)
-        for i in range(5)
-    ]
+    entities = (
+        [
+            # Vertical grid lines (same x for start and end)
+            EntityRef(
+                handle=f"VG{i}",
+                entity_type=EntityType.LINE,
+                layer="GRID",
+                insert_point=Point2D(x=float(i * 30), y=0.0),
+                attributes={"end_point": (float(i * 30), 100.0)},
+            )
+            for i in range(4)
+        ]
+        + [
+            # Horizontal grid lines (same y for start and end)
+            EntityRef(
+                handle=f"HG{i}",
+                entity_type=EntityType.LINE,
+                layer="GRID",
+                insert_point=Point2D(x=0.0, y=float(i * 30)),
+                attributes={"end_point": (120.0, float(i * 30))},
+            )
+            for i in range(4)
+        ]
+        + [
+            # Some block inserts so other sections can fire too
+            _entity(f"BLK{i}", block_name="COL", x=float(i * 30), y=50.0)
+            for i in range(5)
+        ]
+    )
     return _context(entities)
 
 
@@ -115,10 +120,7 @@ def _comparison_with_adds():
 
 def _repeated_blocks_context():
     """Context with 3+ identical block inserts to trigger condition report."""
-    entities = [
-        _entity(f"REP{i}", block_name="FOOTING", x=float(i * 10), y=0.0)
-        for i in range(5)
-    ]
+    entities = [_entity(f"REP{i}", block_name="FOOTING", x=float(i * 10), y=0.0) for i in range(5)]
     return _context(entities)
 
 

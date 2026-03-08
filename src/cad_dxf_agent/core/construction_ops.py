@@ -73,9 +73,9 @@ class GridAnalyzer:
 
         # Find line entities on grid-like layers
         grid_entities = [
-            e for e in entities
-            if e.entity_type in _LINE_TYPES
-            and _GRID_LAYER_PATTERN.search(e.layer)
+            e
+            for e in entities
+            if e.entity_type in _LINE_TYPES and _GRID_LAYER_PATTERN.search(e.layer)
         ]
 
         if not grid_entities:
@@ -86,9 +86,7 @@ class GridAnalyzer:
             )
 
         # Build text index for label lookups
-        text_entities = [
-            e for e in entities if e.entity_type in _TEXT_TYPES and e.text_content
-        ]
+        text_entities = [e for e in entities if e.entity_type in _TEXT_TYPES and e.text_content]
 
         # Classify lines as horizontal or vertical
         grid_lines: list[GridLine] = []
@@ -139,9 +137,7 @@ class GridAnalyzer:
             )
             ambiguity_flags.append("unlabeled_grid_lines")
 
-        pattern_desc = (
-            f"{len(v_lines)} vertical, {len(h_lines)} horizontal grid line(s)"
-        )
+        pattern_desc = f"{len(v_lines)} vertical, {len(h_lines)} horizontal grid line(s)"
         summary = (
             f"{len(grid_lines)} grid line(s) on {len({gl.layer for gl in grid_lines})} "
             f"layer(s); {len(bays)} bay(s) computed."
@@ -157,9 +153,7 @@ class GridAnalyzer:
             caveats=caveats,
         )
 
-    def _classify_line(
-        self, entity: EntityRef
-    ) -> tuple[GridDirection | None, float]:
+    def _classify_line(self, entity: EntityRef) -> tuple[GridDirection | None, float]:
         """Classify a line as horizontal or vertical by start/end points."""
         if entity.entity_type == EntityType.LWPOLYLINE:
             vertices = entity.attributes.get("vertices", [])
@@ -191,9 +185,7 @@ class GridAnalyzer:
             return GridDirection.HORIZONTAL, start[1]
         return None, 0.0
 
-    def _find_label(
-        self, grid_entity: EntityRef, text_entities: list[EntityRef]
-    ) -> str:
+    def _find_label(self, grid_entity: EntityRef, text_entities: list[EntityRef]) -> str:
         """Find the nearest text label to a grid line endpoint."""
         if not grid_entity.insert_point or not text_entities:
             return ""
@@ -212,9 +204,7 @@ class GridAnalyzer:
 
         return best_text
 
-    def _compute_bays(
-        self, sorted_lines: list[GridLine], direction: GridDirection
-    ) -> list[Bay]:
+    def _compute_bays(self, sorted_lines: list[GridLine], direction: GridDirection) -> list[Bay]:
         """Compute bays as gaps between adjacent parallel grid lines."""
         bays: list[Bay] = []
         for i in range(len(sorted_lines) - 1):
@@ -430,10 +420,7 @@ class BatchConditionPlanner:
 
     def _group_by_text(self, entities: list[EntityRef]) -> list[ConditionGroup]:
         """Group TEXT/MTEXT entities with similar content (levenshtein >= 0.8)."""
-        text_entities = [
-            e for e in entities
-            if e.entity_type in _TEXT_TYPES and e.text_content
-        ]
+        text_entities = [e for e in entities if e.entity_type in _TEXT_TYPES and e.text_content]
         if not text_entities:
             return []
 

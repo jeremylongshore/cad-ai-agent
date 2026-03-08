@@ -150,7 +150,9 @@ class StrategyRegistry:
             key = (request_class, objective_tag)
             if key in self._tag_overrides:
                 logger.debug(
-                    "Strategy override: %s × %s", request_class.value, objective_tag.value,
+                    "Strategy override: %s × %s",
+                    request_class.value,
+                    objective_tag.value,
                 )
                 return self._tag_overrides[key]
 

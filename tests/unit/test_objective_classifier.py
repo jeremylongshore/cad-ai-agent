@@ -15,38 +15,41 @@ def classifier():
 class TestRequestClassClassification:
     """Test Axis 1: RequestClass detection."""
 
-    @pytest.mark.parametrize("prompt,expected", [
-        ("compare these two drawings", RequestClass.COMPARE),
-        ("what changed between revisions", RequestClass.COMPARE),
-        ("diff the plans", RequestClass.COMPARE),
-        ("validate this drawing for completeness", RequestClass.VALIDATE),
-        ("check for missing dimensions", RequestClass.VALIDATE),
-        ("is this code compliant", RequestClass.VALIDATE),
-        ("verify the notes are consistent", RequestClass.VALIDATE),
-        ("audit this plan set", RequestClass.VALIDATE),
-        ("make this cheaper", RequestClass.OPTIMIZE),
-        ("reduce cost by 20%", RequestClass.OPTIMIZE),
-        ("optimize the layout", RequestClass.OPTIMIZE),
-        ("simplify the design", RequestClass.OPTIMIZE),
-        ("move the wall 3 feet north", RequestClass.MODIFY),
-        ("delete the door", RequestClass.MODIFY),
-        ("add a window here", RequestClass.MODIFY),
-        ("rotate this block", RequestClass.MODIFY),
-        ("recommend a better layout", RequestClass.RECOMMEND),
-        ("suggest improvements", RequestClass.RECOMMEND),
-        ("what options do I have", RequestClass.RECOMMEND),
-        ("how much would this cost", RequestClass.ESTIMATE),
-        ("count all the doors", RequestClass.ESTIMATE),
-        ("how many windows are there", RequestClass.ESTIMATE),
-        ("generate a takeoff", RequestClass.ESTIMATE),
-        ("summarize this drawing", RequestClass.SUMMARIZE),
-        ("describe this plan for the homeowner", RequestClass.SUMMARIZE),
-        ("give me an overview", RequestClass.SUMMARIZE),
-        ("explain to the contractor", RequestClass.SUMMARIZE),
-        ("what is on layer WALLS", RequestClass.UNDERSTAND),
-        ("where is the front door", RequestClass.UNDERSTAND),
-        ("show me the title block", RequestClass.UNDERSTAND),
-    ])
+    @pytest.mark.parametrize(
+        "prompt,expected",
+        [
+            ("compare these two drawings", RequestClass.COMPARE),
+            ("what changed between revisions", RequestClass.COMPARE),
+            ("diff the plans", RequestClass.COMPARE),
+            ("validate this drawing for completeness", RequestClass.VALIDATE),
+            ("check for missing dimensions", RequestClass.VALIDATE),
+            ("is this code compliant", RequestClass.VALIDATE),
+            ("verify the notes are consistent", RequestClass.VALIDATE),
+            ("audit this plan set", RequestClass.VALIDATE),
+            ("make this cheaper", RequestClass.OPTIMIZE),
+            ("reduce cost by 20%", RequestClass.OPTIMIZE),
+            ("optimize the layout", RequestClass.OPTIMIZE),
+            ("simplify the design", RequestClass.OPTIMIZE),
+            ("move the wall 3 feet north", RequestClass.MODIFY),
+            ("delete the door", RequestClass.MODIFY),
+            ("add a window here", RequestClass.MODIFY),
+            ("rotate this block", RequestClass.MODIFY),
+            ("recommend a better layout", RequestClass.RECOMMEND),
+            ("suggest improvements", RequestClass.RECOMMEND),
+            ("what options do I have", RequestClass.RECOMMEND),
+            ("how much would this cost", RequestClass.ESTIMATE),
+            ("count all the doors", RequestClass.ESTIMATE),
+            ("how many windows are there", RequestClass.ESTIMATE),
+            ("generate a takeoff", RequestClass.ESTIMATE),
+            ("summarize this drawing", RequestClass.SUMMARIZE),
+            ("describe this plan for the homeowner", RequestClass.SUMMARIZE),
+            ("give me an overview", RequestClass.SUMMARIZE),
+            ("explain to the contractor", RequestClass.SUMMARIZE),
+            ("what is on layer WALLS", RequestClass.UNDERSTAND),
+            ("where is the front door", RequestClass.UNDERSTAND),
+            ("show me the title block", RequestClass.UNDERSTAND),
+        ],
+    )
     def test_request_class(self, classifier, prompt, expected):
         result = classifier.classify(prompt)
         assert result.request_class == expected, (
@@ -66,22 +69,25 @@ class TestRequestClassClassification:
 class TestObjectiveTagClassification:
     """Test Axis 2: ObjectiveTag detection."""
 
-    @pytest.mark.parametrize("prompt,expected_tag", [
-        ("how much does this cost", ObjectiveTag.COST_REDUCTION),
-        ("reduce labor hours", ObjectiveTag.LABOR_REDUCTION),
-        ("shrink the room to 200 sq ft", ObjectiveTag.AREA_CHANGE),
-        ("all the fixtures and devices", ObjectiveTag.EQUIPMENT_COUNT),
-        ("how many rooms are there", ObjectiveTag.SPACE_COUNT),
-        ("summarize for the contractor", ObjectiveTag.CONTRACTOR_COMMUNICATION),
-        ("present to the homeowner", ObjectiveTag.CUSTOMER_COMMUNICATION),
-        ("prepare for the plan reviewer", ObjectiveTag.REVIEWER_COMMUNICATION),
-        ("improve the layout spacing", ObjectiveTag.LAYOUT_IMPROVEMENT),
-        ("check for missing dimensions", ObjectiveTag.MISSING_ITEMS),
-        ("is this ADA compliant", ObjectiveTag.COMPLIANCE),
-        ("what changed in revision 3", ObjectiveTag.REVISION_EXPLANATION),
-        ("is this constructable", ObjectiveTag.CONSTRUCTABILITY),
-        ("what does this look like aesthetically", ObjectiveTag.AESTHETICS),
-    ])
+    @pytest.mark.parametrize(
+        "prompt,expected_tag",
+        [
+            ("how much does this cost", ObjectiveTag.COST_REDUCTION),
+            ("reduce labor hours", ObjectiveTag.LABOR_REDUCTION),
+            ("shrink the room to 200 sq ft", ObjectiveTag.AREA_CHANGE),
+            ("all the fixtures and devices", ObjectiveTag.EQUIPMENT_COUNT),
+            ("how many rooms are there", ObjectiveTag.SPACE_COUNT),
+            ("summarize for the contractor", ObjectiveTag.CONTRACTOR_COMMUNICATION),
+            ("present to the homeowner", ObjectiveTag.CUSTOMER_COMMUNICATION),
+            ("prepare for the plan reviewer", ObjectiveTag.REVIEWER_COMMUNICATION),
+            ("improve the layout spacing", ObjectiveTag.LAYOUT_IMPROVEMENT),
+            ("check for missing dimensions", ObjectiveTag.MISSING_ITEMS),
+            ("is this ADA compliant", ObjectiveTag.COMPLIANCE),
+            ("what changed in revision 3", ObjectiveTag.REVISION_EXPLANATION),
+            ("is this constructable", ObjectiveTag.CONSTRUCTABILITY),
+            ("what does this look like aesthetically", ObjectiveTag.AESTHETICS),
+        ],
+    )
     def test_objective_tag(self, classifier, prompt, expected_tag):
         result = classifier.classify(prompt)
         assert result.objective_tag == expected_tag, (
@@ -118,13 +124,15 @@ class TestClassifyWithFamily:
 
     def test_high_confidence_ignores_family(self, classifier):
         result = classifier.classify_with_family(
-            "compare the drawings", TaskFamily.QNA,
+            "compare the drawings",
+            TaskFamily.QNA,
         )
         assert result.request_class == RequestClass.COMPARE
 
     def test_low_confidence_uses_family(self, classifier):
         result = classifier.classify_with_family(
-            "xyzzy gibberish", TaskFamily.TAKEOFF_ESTIMATE,
+            "xyzzy gibberish",
+            TaskFamily.TAKEOFF_ESTIMATE,
         )
         assert result.request_class == RequestClass.ESTIMATE
         assert result.source == "family_fallback"
@@ -132,7 +140,8 @@ class TestClassifyWithFamily:
     def test_medium_confidence_preserved(self, classifier):
         # "cost" matches COST_REDUCTION tag, infers OPTIMIZE at 0.75
         result = classifier.classify_with_family(
-            "cost", TaskFamily.QNA,
+            "cost",
+            TaskFamily.QNA,
         )
         assert result.request_class == RequestClass.OPTIMIZE
         assert result.confidence == 0.75

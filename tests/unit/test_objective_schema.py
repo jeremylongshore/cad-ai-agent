@@ -21,8 +21,14 @@ class TestRequestClass:
 
     def test_all_values(self):
         expected = {
-            "understand", "estimate", "recommend", "optimize",
-            "modify", "summarize", "compare", "validate",
+            "understand",
+            "estimate",
+            "recommend",
+            "optimize",
+            "modify",
+            "summarize",
+            "compare",
+            "validate",
         }
         assert {v.value for v in RequestClass} == expected
 
@@ -38,18 +44,27 @@ class TestObjectiveTag:
 
     def test_new_tags_present(self):
         new_tags = {
-            "contractor_communication", "reviewer_communication",
-            "space_count", "equipment_count",
-            "layout_improvement", "missing_items",
+            "contractor_communication",
+            "reviewer_communication",
+            "space_count",
+            "equipment_count",
+            "layout_improvement",
+            "missing_items",
         }
         values = {v.value for v in ObjectiveTag}
         assert new_tags.issubset(values)
 
     def test_original_tags_preserved(self):
         original_tags = {
-            "cost_reduction", "labor_reduction", "area_change",
-            "aesthetics", "quantity_estimation", "customer_communication",
-            "constructability", "compliance", "revision_explanation",
+            "cost_reduction",
+            "labor_reduction",
+            "area_change",
+            "aesthetics",
+            "quantity_estimation",
+            "customer_communication",
+            "constructability",
+            "compliance",
+            "revision_explanation",
         }
         values = {v.value for v in ObjectiveTag}
         assert original_tags.issubset(values)

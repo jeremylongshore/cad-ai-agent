@@ -129,9 +129,7 @@ class StageGate(BaseModel):
     status: Literal["pending", "active", "completed", "rejected", "skipped"] = "pending"
     output_summary: str = ""
     requires_user_input: bool = False
-    timestamp: str = Field(
-        default_factory=lambda: datetime.now(UTC).isoformat()
-    )
+    timestamp: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
     output_data: dict[str, Any] = Field(default_factory=dict)
 
 
