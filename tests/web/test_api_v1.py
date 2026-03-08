@@ -23,10 +23,16 @@ def client():
     """Create a test client with dev mode (no auth)."""
     import os
 
+    old = os.environ.get("CAD_WEB_DEV_MODE")
     os.environ["CAD_WEB_DEV_MODE"] = "1"
     from web.backend.main import app
 
-    return TestClient(app)
+    with TestClient(app) as c:
+        yield c
+    if old is None:
+        os.environ.pop("CAD_WEB_DEV_MODE", None)
+    else:
+        os.environ["CAD_WEB_DEV_MODE"] = old
 
 
 def _upload(client: TestClient, path: str, dxf_path: Path):

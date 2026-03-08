@@ -7,7 +7,6 @@ is never called -- design-ops are fully deterministic.
 
 from __future__ import annotations
 
-import os
 import time
 from pathlib import Path
 from unittest.mock import patch
@@ -15,9 +14,6 @@ from unittest.mock import patch
 import pytest
 
 starlette = pytest.importorskip("starlette", reason="web tests require fastapi/starlette")
-
-# Must be set before importing the app so the auth middleware sees it.
-os.environ["CAD_WEB_DEV_MODE"] = "1"
 
 from starlette.testclient import TestClient  # noqa: E402
 from web.backend.main import app, get_user  # noqa: E402

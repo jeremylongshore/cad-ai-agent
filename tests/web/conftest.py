@@ -35,13 +35,22 @@ def client(auth_user):
 
 @pytest.fixture
 def unauth_client():
-    """TestClient with real auth (will reject requests without valid token)."""
-    from web.backend.main import app
+    """TestClient with real auth (will reject requests without valid token).
 
+    Explicitly removes any get_user override so auth is actually enforced,
+    even if a previous test's fixture teardown hasn't run yet.
+    """
+    from web.backend.main import app, get_user
+
+    saved = dict(app.dependency_overrides)
     app.dependency_overrides.clear()
+    # Double-check: get_user must NOT be overridden
+    assert get_user not in app.dependency_overrides
     with TestClient(app, raise_server_exceptions=False) as c:
         yield c
+    # Restore previous overrides (don't clobber other fixtures' state)
     app.dependency_overrides.clear()
+    app.dependency_overrides.update(saved)
 
 
 @pytest.fixture
