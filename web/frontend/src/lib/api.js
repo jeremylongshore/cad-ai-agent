@@ -299,6 +299,37 @@ export async function compareLibraryDocuments(masterDocId, revisionDocId, profil
   return res.json();
 }
 
+// --- Profile + Workspace (EPIC-CAD-30) ---
+
+export async function getProfile() {
+  const res = await request('/api/profile');
+  return res.json();
+}
+
+export async function updateProfile(updates) {
+  const res = await request('/api/profile', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(updates),
+  });
+  return res.json();
+}
+
+export async function getWorkspace() {
+  const res = await request('/api/workspace');
+  return res.json();
+}
+
+export async function saveDocumentProgress(docId) {
+  const res = await request(`/api/documents/${docId}/save-progress`, { method: 'POST' });
+  return res.json();
+}
+
+export async function clearDocumentProgress(docId) {
+  const res = await request(`/api/documents/${docId}/work-progress`, { method: 'DELETE' });
+  return res.json();
+}
+
 // --- v2 Preview / Approve / Apply (EPIC-CAD-08) ---
 
 export async function v2Preview(sessionId) {

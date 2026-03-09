@@ -69,6 +69,8 @@ class Session:
     edit_history: object | None = None  # EditHistory instance (transient)
     # EPIC-CAD-15: Document library binding
     document_id: str = ""
+    # EPIC-CAD-30: Tenant scope
+    tenant_id: str = ""
 
     @property
     def session_dir(self) -> Path:
@@ -85,6 +87,7 @@ class Session:
             conversation_history=self.conversation_history,
             audit_events=self.audit_events,
             document_id=self.document_id,
+            tenant_id=self.tenant_id,
             original_path=str(self.original_path) if self.original_path else "",
             working_path=str(self.working_path) if self.working_path else "",
             edited_path=str(self.edited_path) if self.edited_path else "",
@@ -109,6 +112,7 @@ class Session:
             user_id=meta.user_id,
             created_at=meta.created_at,
             document_id=meta.document_id,
+            tenant_id=getattr(meta, "tenant_id", ""),
             original_path=(
                 Path(meta.original_path)
                 if meta.original_path

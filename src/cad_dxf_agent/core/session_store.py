@@ -48,6 +48,7 @@ class SessionMetadata:
     audit_events: list = field(default_factory=list)
     # Paths stored as strings for serialization
     document_id: str = ""  # Links session to a stored document (EPIC-CAD-15)
+    tenant_id: str = ""  # Workspace tenant scope (EPIC-CAD-30)
     original_path: str = ""
     working_path: str = ""
     edited_path: str = ""
