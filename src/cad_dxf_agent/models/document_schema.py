@@ -28,6 +28,8 @@ class UserDocument(BaseModel):
     gcs_path: str = ""
     file_size_bytes: int = 0
     status: Literal["active", "deleted"] = "active"
+    tenant_id: str = ""
+    has_work_progress: bool = False
     metadata: dict[str, Any] = Field(default_factory=dict)
 
     def touch(self) -> None:

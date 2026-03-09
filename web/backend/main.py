@@ -57,7 +57,7 @@ from cad_dxf_agent.core.edit_history import EditHistory  # noqa: E402
 from cad_dxf_agent.otel import span as otel_span  # noqa: E402
 
 from .api_v1 import router as v1_router  # noqa: E402
-from .auth import get_licensed_user  # noqa: E402
+from .auth import _get_profile, _get_tenant, _update_profile, get_licensed_user  # noqa: E402
 from .session import Session, SessionManager  # noqa: E402
 
 logger = logging.getLogger(__name__)
@@ -79,10 +79,22 @@ SESSION_CLEANUP_INTERVAL = 30 * 60  # 30 minutes
 
 
 async def _session_cleanup_loop():
-    """Periodically remove expired sessions to prevent memory/disk leaks."""
+    """Periodically remove expired sessions to prevent memory/disk leaks.
+
+    Before deleting, saves work progress for document-bound sessions
+    so users can resume where they left off (EPIC-CAD-30).
+    """
     while True:
         await asyncio.sleep(SESSION_CLEANUP_INTERVAL)
         try:
+            # Save progress for expiring document-bound sessions before cleanup
+            for session in list(session_mgr._sessions.values()):
+                if session.document_id and session.conversation_history:
+                    try:
+                        await _save_work_progress(session, session.user_id)
+                    except Exception:
+                        logger.debug("Pre-cleanup save failed for %s", session.session_id)
+
             removed = session_mgr.cleanup_expired()
             if removed:
                 logger.info("Session cleanup: removed %d expired session(s)", removed)
@@ -445,6 +457,159 @@ def _get_document_store():
     return _document_store
 
 
+# ---------------------------------------------------------------------------
+# Work progress auto-save helper (EPIC-CAD-30)
+# ---------------------------------------------------------------------------
+
+
+async def _save_work_progress(session: Session, user_id: str) -> None:
+    """Fire-and-forget: persist work progress for a document-bound session."""
+    if not session.document_id:
+        return
+    try:
+        from cad_dxf_agent.models.work_progress_schema import WorkProgress
+
+        progress = WorkProgress(
+            user_id=user_id,
+            doc_id=session.document_id,
+            tenant_id=getattr(session, "tenant_id", ""),
+            conversation_history=session.conversation_history[-MAX_CONVERSATION_HISTORY:],
+            edit_count=len(session.audit_events),
+            last_prompt=session.conversation_history[-1].get("content", "")
+            if session.conversation_history
+            else "",
+            has_working_dxf=session.edited_path is not None
+            and session.edited_path.exists(),
+            audit_events=session.audit_events[-50:],  # Cap at 50 events
+        )
+        working_path = session.edited_path if progress.has_working_dxf else None
+        store = _get_document_store()
+        store.save_work_progress(user_id, session.document_id, progress, working_path)
+        logger.debug("Auto-saved work progress for doc %s", session.document_id)
+    except (OSError, ValueError, TypeError) as exc:
+        logger.warning("Work progress auto-save failed (non-fatal): %s", exc)
+
+
+def _restore_work_progress(session: Session, user_id: str, store) -> bool:
+    """Restore saved work progress into a session. Returns True if restored."""
+    if not session.document_id:
+        return False
+    progress = store.get_work_progress(user_id, session.document_id)
+    if progress is None:
+        return False
+
+    session.conversation_history = progress.conversation_history
+    session.audit_events = progress.audit_events
+
+    # Restore working DXF if available
+    if progress.has_working_dxf:
+        working_data = store.get_working_dxf(user_id, session.document_id)
+        if working_data:
+            working_path = session.session_dir / "working.dxf"
+            working_path.write_bytes(working_data)
+            session.working_path = working_path
+
+    return True
+
+
+# ---------------------------------------------------------------------------
+# Profile + Workspace endpoints (EPIC-CAD-30)
+# ---------------------------------------------------------------------------
+
+
+class ProfileUpdateRequest(BaseModel):
+    display_name: str | None = None
+    company: str | None = None
+
+
+@app.get("/api/profile")
+async def get_profile(user: dict = Depends(get_user)):
+    """Get the current user's profile."""
+    if os.getenv("CAD_WEB_DEV_MODE", "").lower() in ("1", "true"):
+        return {
+            "profile": {
+                "uid": user["uid"],
+                "email": user.get("email", "dev@localhost"),
+                "display_name": user.get("display_name", "Dev User"),
+                "company": "",
+                "tenant_id": user.get("tenant_id", "dev-tenant"),
+                "role": "owner",
+            }
+        }
+    from starlette.concurrency import run_in_threadpool
+
+    profile = await run_in_threadpool(_get_profile, user["uid"])
+    if profile is None:
+        raise HTTPException(status_code=404, detail="Profile not found")
+    return {"profile": profile}
+
+
+@app.put("/api/profile")
+async def update_profile(body: ProfileUpdateRequest, user: dict = Depends(get_user)):
+    """Update the current user's display name and/or company."""
+    if os.getenv("CAD_WEB_DEV_MODE", "").lower() in ("1", "true"):
+        profile = {"uid": user["uid"], "display_name": body.display_name or ""}
+        if body.company is not None:
+            profile["company"] = body.company
+        return {"profile": profile}
+
+    updates = {}
+    if body.display_name is not None:
+        updates["display_name"] = body.display_name
+    if body.company is not None:
+        updates["company"] = body.company
+    if not updates:
+        raise HTTPException(status_code=400, detail="No fields to update")
+
+    from starlette.concurrency import run_in_threadpool
+
+    profile = await run_in_threadpool(_update_profile, user["uid"], updates)
+    if profile is None:
+        raise HTTPException(status_code=404, detail="Profile not found")
+    return {"profile": profile}
+
+
+@app.get("/api/workspace")
+async def get_workspace(user: dict = Depends(get_user)):
+    """Get the current user's workspace/tenant info."""
+    tenant_id = user.get("tenant_id", "")
+    if os.getenv("CAD_WEB_DEV_MODE", "").lower() in ("1", "true"):
+        return {
+            "workspace": {"tenant_id": "dev-tenant", "name": "Dev Workspace", "plan": "personal"}
+        }
+
+    if not tenant_id:
+        raise HTTPException(status_code=404, detail="No workspace found")
+
+    from starlette.concurrency import run_in_threadpool
+
+    tenant = await run_in_threadpool(_get_tenant, tenant_id)
+    if tenant is None:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+    return {"workspace": tenant}
+
+
+@app.post("/api/documents/{doc_id}/save-progress")
+async def save_document_progress(doc_id: str, user: dict = Depends(get_user)):
+    """Manually save work progress for a document's active session."""
+    existing = session_mgr.find_by_document(user["uid"], doc_id)
+    if existing is None:
+        raise HTTPException(status_code=404, detail="No active session for this document")
+
+    await _save_work_progress(existing, user["uid"])
+    return {"status": "saved", "doc_id": doc_id}
+
+
+@app.delete("/api/documents/{doc_id}/work-progress")
+async def clear_document_progress(doc_id: str, user: dict = Depends(get_user)):
+    """Clear saved work progress (start fresh next time)."""
+    store = _get_document_store()
+    cleared = store.clear_work_progress(user["uid"], doc_id)
+    if not cleared:
+        raise HTTPException(status_code=404, detail="No work progress to clear")
+    return {"status": "cleared", "doc_id": doc_id}
+
+
 @app.get("/api/documents")
 async def list_documents(user: dict = Depends(get_user)):
     """List all documents in the user's library."""
@@ -567,6 +732,7 @@ async def load_document(doc_id: str, user: dict = Depends(get_user)):
             "session_id": existing.session_id,
             "file_info": existing.file_info,
             "document_id": doc_id,
+            "restored": False,
         }
 
     file_data = store.get_file_data(user["uid"], doc_id)
@@ -576,6 +742,7 @@ async def load_document(doc_id: str, user: dict = Depends(get_user)):
     # Create a session linked to this document
     session = session_mgr.create(user["uid"])
     session.document_id = doc_id
+    session.tenant_id = user.get("tenant_id", "")
     Path(session.original_path).write_bytes(file_data)
 
     # Persist document binding in durable metadata
@@ -584,11 +751,16 @@ async def load_document(doc_id: str, user: dict = Depends(get_user)):
     # Touch the document's last_accessed (persists to GCS in production)
     store.touch_document(user["uid"], doc_id)
 
+    # Restore work progress if available
+    restored = _restore_work_progress(session, user["uid"], store)
+
     # Load drawing info
     try:
         from cad_dxf_agent.core.dxf_reader import load_dxf
 
-        ctx = load_dxf(str(session.original_path))
+        # Use working DXF if restored, otherwise original
+        dxf_to_load = session.working_path or session.original_path
+        ctx = load_dxf(str(dxf_to_load))
         session.context = ctx
         file_info = {
             "filename": doc.filename,
@@ -605,6 +777,7 @@ async def load_document(doc_id: str, user: dict = Depends(get_user)):
         "session_id": session.session_id,
         "file_info": file_info,
         "document_id": doc_id,
+        "restored": restored,
     }
 
 
@@ -657,14 +830,19 @@ async def reconnect_session(body: ReconnectRequest, user: dict = Depends(get_use
 
     session = session_mgr.create(user["uid"])
     session.document_id = body.document_id
+    session.tenant_id = user.get("tenant_id", "")
     Path(session.original_path).write_bytes(file_data)
     session_mgr.save_metadata(session)
     store.touch_document(user["uid"], body.document_id)
 
+    # Restore work progress if available
+    restored = _restore_work_progress(session, user["uid"], store)
+
     try:
         from cad_dxf_agent.core.dxf_reader import load_dxf
 
-        ctx = load_dxf(str(session.original_path))
+        dxf_to_load = session.working_path or session.original_path
+        ctx = load_dxf(str(dxf_to_load))
         session.context = ctx
         file_info = {
             "filename": doc.filename,
@@ -682,6 +860,7 @@ async def reconnect_session(body: ReconnectRequest, user: dict = Depends(get_use
         "file_info": file_info,
         "document_id": body.document_id,
         "reconnected": False,
+        "restored": restored,
     }
 
 
@@ -1627,6 +1806,11 @@ async def v2_apply(body: V2ApplyRequest, user: dict = Depends(get_user)):
     )
 
     audit = AuditMetadata()
+
+    # Auto-save work progress (fire-and-forget)
+    if session.document_id:
+        asyncio.create_task(_save_work_progress(session, user["uid"]))
+
     return ResponseBuilder.structured_apply_result(
         result=result,
         audit=audit,
@@ -1696,6 +1880,11 @@ async def apply_changes(body: ApplyRequest, user: dict = Depends(get_user)):
 
             render_available = session.edited_render is not None and session.edited_render.exists()
             success_count = sum(1 for r in results if r.success)
+
+            # Auto-save work progress (fire-and-forget)
+            if session.document_id:
+                asyncio.create_task(_save_work_progress(session, user["uid"]))
+
             return {
                 "message": f"Applied {success_count}/{len(results)} operations.",
                 "render_available": render_available,

@@ -8,10 +8,12 @@ from __future__ import annotations
 
 import abc
 import logging
+from pathlib import Path
 from threading import Lock
 from typing import Any
 
 from cad_dxf_agent.models.document_schema import UserDocument
+from cad_dxf_agent.models.work_progress_schema import WorkProgress
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +63,33 @@ class DocumentStore(abc.ABC):
         """Update last_accessed timestamp. Returns True if document exists."""
         return False  # Default no-op; subclasses override for persistence
 
+    def save_work_progress(
+        self,
+        user_id: str,
+        doc_id: str,
+        progress: WorkProgress,
+        working_dxf_path: Path | None = None,
+    ) -> None:
+        """Save work-in-progress state for a document.
+
+        Also marks ``has_work_progress`` on the document metadata.
+        If *working_dxf_path* is provided, the DXF bytes are persisted
+        so they can be restored into a future session.
+        """
+        return  # Default no-op; subclasses override
+
+    def get_work_progress(self, user_id: str, doc_id: str) -> WorkProgress | None:
+        """Load saved work progress, or None if nothing saved."""
+        return None
+
+    def get_working_dxf(self, user_id: str, doc_id: str) -> bytes | None:
+        """Retrieve the saved working DXF bytes, or None."""
+        return None
+
+    def clear_work_progress(self, user_id: str, doc_id: str) -> bool:
+        """Remove saved work progress. Returns True if there was something to clear."""
+        return False
+
     def _check_limits(
         self,
         user_id: str,
@@ -98,6 +127,9 @@ class InMemoryDocumentStore(DocumentStore):
     def __init__(self) -> None:
         self._documents: dict[str, dict[str, UserDocument]] = {}  # user_id -> {doc_id -> doc}
         self._file_data: dict[str, bytes] = {}  # doc_id -> bytes
+        # (user_id, doc_id) -> WorkProgress / bytes
+        self._work_progress: dict[tuple[str, str], WorkProgress] = {}
+        self._working_dxf: dict[tuple[str, str], bytes] = {}
         self._lock = Lock()
 
     def save_document(
@@ -163,6 +195,44 @@ class InMemoryDocumentStore(DocumentStore):
             return None
         with self._lock:
             return self._file_data.get(doc_id)
+
+    def save_work_progress(
+        self,
+        user_id: str,
+        doc_id: str,
+        progress: WorkProgress,
+        working_dxf_path: Path | None = None,
+    ) -> None:
+        key = (user_id, doc_id)
+        with self._lock:
+            self._work_progress[key] = progress
+            if working_dxf_path and working_dxf_path.exists():
+                self._working_dxf[key] = working_dxf_path.read_bytes()
+            # Mark on document metadata
+            user_docs = self._documents.get(user_id, {})
+            doc = user_docs.get(doc_id)
+            if doc:
+                doc.has_work_progress = True
+
+    def get_work_progress(self, user_id: str, doc_id: str) -> WorkProgress | None:
+        with self._lock:
+            return self._work_progress.get((user_id, doc_id))
+
+    def get_working_dxf(self, user_id: str, doc_id: str) -> bytes | None:
+        with self._lock:
+            return self._working_dxf.get((user_id, doc_id))
+
+    def clear_work_progress(self, user_id: str, doc_id: str) -> bool:
+        key = (user_id, doc_id)
+        with self._lock:
+            had = key in self._work_progress
+            self._work_progress.pop(key, None)
+            self._working_dxf.pop(key, None)
+            user_docs = self._documents.get(user_id, {})
+            doc = user_docs.get(doc_id)
+            if doc:
+                doc.has_work_progress = False
+            return had
 
 
 # ---------------------------------------------------------------------------
@@ -315,3 +385,91 @@ class GCSDocumentStore(DocumentStore):
         except Exception as exc:
             logger.warning("Failed to download document %s from GCS: %s", doc_id, exc)
             return None
+
+    def save_work_progress(
+        self,
+        user_id: str,
+        doc_id: str,
+        progress: WorkProgress,
+        working_dxf_path: Path | None = None,
+    ) -> None:
+        try:
+            bucket = self._bucket()
+            prefix = self._doc_prefix(user_id, doc_id)
+
+            # Save progress JSON
+            prog_blob = bucket.blob(f"{prefix}work_progress.json")
+            prog_blob.upload_from_string(
+                progress.model_dump_json(),
+                content_type="application/json",
+            )
+
+            # Save working DXF if provided
+            if working_dxf_path and working_dxf_path.exists():
+                dxf_blob = bucket.blob(f"{prefix}working.dxf")
+                dxf_blob.upload_from_filename(str(working_dxf_path))
+
+            # Update has_work_progress on document metadata
+            doc = self.get_document(user_id, doc_id)
+            if doc:
+                doc.has_work_progress = True
+                meta_blob = bucket.blob(f"{prefix}metadata.json")
+                meta_blob.upload_from_string(
+                    doc.model_dump_json(),
+                    content_type="application/json",
+                )
+
+            logger.info("Saved work progress for doc %s user %s", doc_id, user_id)
+        except Exception as exc:
+            logger.warning("Failed to save work progress for doc %s: %s", doc_id, exc)
+
+    def get_work_progress(self, user_id: str, doc_id: str) -> WorkProgress | None:
+        try:
+            prefix = self._doc_prefix(user_id, doc_id)
+            blob = self._bucket().blob(f"{prefix}work_progress.json")
+            if not blob.exists():
+                return None
+            return WorkProgress.model_validate_json(blob.download_as_text())
+        except Exception as exc:
+            logger.warning("Failed to load work progress for doc %s: %s", doc_id, exc)
+            return None
+
+    def get_working_dxf(self, user_id: str, doc_id: str) -> bytes | None:
+        try:
+            prefix = self._doc_prefix(user_id, doc_id)
+            blob = self._bucket().blob(f"{prefix}working.dxf")
+            if not blob.exists():
+                return None
+            return bytes(blob.download_as_bytes())
+        except Exception as exc:
+            logger.warning("Failed to load working DXF for doc %s: %s", doc_id, exc)
+            return None
+
+    def clear_work_progress(self, user_id: str, doc_id: str) -> bool:
+        try:
+            bucket = self._bucket()
+            prefix = self._doc_prefix(user_id, doc_id)
+
+            prog_blob = bucket.blob(f"{prefix}work_progress.json")
+            had: bool = bool(prog_blob.exists())
+            if had:
+                prog_blob.delete()
+
+            dxf_blob = bucket.blob(f"{prefix}working.dxf")
+            if dxf_blob.exists():
+                dxf_blob.delete()
+
+            # Update metadata
+            doc = self.get_document(user_id, doc_id)
+            if doc:
+                doc.has_work_progress = False
+                meta_blob = bucket.blob(f"{prefix}metadata.json")
+                meta_blob.upload_from_string(
+                    doc.model_dump_json(),
+                    content_type="application/json",
+                )
+
+            return had
+        except Exception as exc:
+            logger.warning("Failed to clear work progress for doc %s: %s", doc_id, exc)
+            return False
