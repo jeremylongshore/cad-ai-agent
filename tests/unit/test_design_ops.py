@@ -156,6 +156,8 @@ class TestLayoutRecommenderEmptyDrawing:
         ctx = _context([])
         result = LayoutRecommender().recommend(ctx, "any prompt")
         assert "empty_drawing" in result.ambiguity_flags
+        assert result.recommendations == []
+        assert result.aggregate_confidence == 0.0
 
     def test_empty_drawing_has_limitation(self):
         ctx = _context([])
@@ -354,6 +356,11 @@ class TestRevisionSummarizerFromChangeset:
         )
         result = RevisionSummarizer().summarize(changeset=cs)
         assert len(result.key_changes) == 2
+        # Verify each change carries the correct op type and layer
+        assert result.key_changes[0].change_type == "move_entity"
+        assert result.key_changes[1].change_type == "delete_entity"
+        assert result.key_changes[0].layer == "STRUCTURAL"
+        assert result.key_changes[1].layer == "STRUCTURAL"
 
     def test_key_change_layer_set_from_op(self):
         op = self._op(OpType.EDIT_TEXT, "H3", layer="NOTES")
@@ -379,7 +386,7 @@ class TestRevisionSummarizerFromChangeset:
         ]
         cs = ChangeSet(operations=ops, prompt="test")
         result = RevisionSummarizer().summarize(changeset=cs)
-        assert result.areas_affected == sorted(result.areas_affected)
+        assert result.areas_affected == ["ZONE_A", "ZONE_B", "ZONE_C"]
 
     def test_move_entity_plain_description(self):
         op = self._op(OpType.MOVE_ENTITY, "H1", layer="STRUCTURAL")
@@ -693,3 +700,33 @@ class TestScopeBuilderBasic:
         result = ScopeBuilder().build(ctx, "scope of region work", region=region)
         # partial_region flag should appear in the summary's ambiguity_flags
         assert "partial_region" in result.ambiguity_flags
+
+
+# ---------------------------------------------------------------------------
+# Negative / boundary tests — adversarial inputs
+# ---------------------------------------------------------------------------
+
+
+class TestRevisionSummarizerMalformedOps:
+    """Test RevisionSummarizer with malformed EditOperation inputs."""
+
+    def test_none_handle_op_still_produces_change(self):
+        """An op with target_handle=None must not crash and should produce a key_change."""
+        op = EditOperation(op_type=OpType.MOVE_ENTITY, target_handle=None, target_layer="WALLS")
+        cs = ChangeSet(operations=[op], prompt="test")
+        result = RevisionSummarizer().summarize(changeset=cs)
+        assert result.change_count == 1
+        assert result.key_changes[0].layer == "WALLS"
+
+    def test_mixed_valid_and_none_handle_ops(self):
+        """A mix of valid and None-handle ops must not crash and must count all ops."""
+        ops = [
+            EditOperation(op_type=OpType.MOVE_ENTITY, target_handle="H1", target_layer="A"),
+            EditOperation(op_type=OpType.DELETE_ENTITY, target_handle=None, target_layer="B"),
+            EditOperation(op_type=OpType.EDIT_TEXT, target_handle="H3", target_layer="C"),
+        ]
+        cs = ChangeSet(operations=ops, prompt="mixed")
+        result = RevisionSummarizer().summarize(changeset=cs)
+        assert result.change_count == 3
+        layers = {kc.layer for kc in result.key_changes}
+        assert layers == {"A", "B", "C"}

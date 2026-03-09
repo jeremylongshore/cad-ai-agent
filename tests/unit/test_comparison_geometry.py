@@ -30,9 +30,16 @@ class TestExtractSnapshots:
         master, _ = make_identical_pair(tmp_path)
         snaps = extract_snapshots(master)
         lines = [s for s in snaps if s.entity_type == EntityType.LINE]
-        assert len(lines) >= 1
+        # _build_base creates 2 lines: (0,0)-(10,0) and (0,0)-(0,10)
+        assert len(lines) == 2
         for line in lines:
             assert len(line.points) == 2
+        # Verify actual coordinates of the known lines
+        line_coords = sorted(
+            [(ln.points[0].x, ln.points[0].y, ln.points[1].x, ln.points[1].y) for ln in lines]
+        )
+        assert line_coords[0] == pytest.approx((0, 0, 0, 10))
+        assert line_coords[1] == pytest.approx((0, 0, 10, 0))
 
     def test_text_has_content(self, tmp_path):
         master, _ = make_identical_pair(tmp_path)
@@ -82,16 +89,26 @@ class TestExtractSnapshots:
         master, _ = make_identical_pair(tmp_path)
         snaps = extract_snapshots(master)
         for snap in snaps:
-            # Centroid should be finite
             assert snap.centroid.x != float("inf")
             assert snap.centroid.y != float("inf")
+        # Verify centroid of known line (0,0)-(10,0) is midpoint (5,0)
+        lines = [s for s in snaps if s.entity_type == EntityType.LINE]
+        horiz = [ln for ln in lines if ln.points[1].x == pytest.approx(10.0)]
+        assert len(horiz) == 1
+        assert horiz[0].centroid.x == pytest.approx(5.0)
+        assert horiz[0].centroid.y == pytest.approx(0.0)
 
     def test_handles_are_strings(self, tmp_path):
         master, _ = make_identical_pair(tmp_path)
         snaps = extract_snapshots(master)
+        # _build_base creates 4 entities: 2 lines + 1 text + 1 lwpolyline
+        assert len(snaps) == 4
         for snap in snaps:
             assert isinstance(snap.handle, str)
             assert len(snap.handle) > 0
+        # All handles must be unique (DXF invariant)
+        handles = [s.handle for s in snaps]
+        assert len(handles) == len(set(handles))
 
     def test_complex_drawing(self, tmp_path):
         master, _ = make_complex_pair(tmp_path)
@@ -1207,3 +1224,49 @@ class TestExtractOnePrivateApi:
         # "WIPEOUT" is a real DXF type outside the handler set
         result = _extract_one(entity, "WIPEOUT")
         assert result is None
+
+
+# ---------------------------------------------------------------------------
+# Negative / boundary tests — adversarial inputs
+# ---------------------------------------------------------------------------
+
+
+class TestExtractSnapshotsEmptyModelspace:
+    """Extract from a DXF with no entities in modelspace."""
+
+    def test_empty_dxf_returns_empty_list(self, tmp_path):
+        import ezdxf
+
+        path = tmp_path / "empty.dxf"
+        doc = ezdxf.new(dxfversion="R2018")
+        doc.saveas(str(path))
+        snaps = extract_snapshots(path)
+        assert snaps == []
+
+
+class TestApplyProfileRegexEdgeCases:
+    """Edge cases in layer regex filtering."""
+
+    def test_include_layers_regex_anchored(self):
+        """Include pattern 'STRUCT' should match 'STRUCTURAL' via regex search."""
+        mk = make_geometry_snapshot
+        snaps = [
+            mk(handle="L1", layer="STRUCTURAL", points=[(0, 0), (10, 0)]),
+            mk(handle="L2", layer="NOTES", points=[(5, 5)], entity_type=EntityType.TEXT),
+        ]
+        profile = ComparisonProfile(name="test", include_layers=["STRUCT"])
+        result = apply_profile(snaps, profile)
+        assert len(result) == 1
+        assert result[0].handle == "L1"
+
+    def test_exclude_layers_regex_case_insensitive(self):
+        """Exclude pattern 'notes' should match 'NOTES' case-insensitively."""
+        mk = make_geometry_snapshot
+        snaps = [
+            mk(handle="L1", layer="STRUCTURAL", points=[(0, 0), (10, 0)]),
+            mk(handle="T1", layer="NOTES", points=[(5, 5)], entity_type=EntityType.TEXT),
+        ]
+        profile = ComparisonProfile(name="test", exclude_layers=["notes"])
+        result = apply_profile(snaps, profile)
+        assert len(result) == 1
+        assert result[0].handle == "L1"
