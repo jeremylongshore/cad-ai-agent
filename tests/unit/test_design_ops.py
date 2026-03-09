@@ -1301,7 +1301,7 @@ class TestScopeBuilderPropagation:
         assert "context_truncated" in result.ambiguity_flags
 
     def test_layout_section_confidence_equals_layout_result_aggregate(self):
-        """LAYOUT_RECOMMENDATIONS section.confidence must equal layout_result.aggregate_confidence."""
+        """LAYOUT_RECOMMENDATIONS confidence must equal aggregate_confidence."""
         # Many entities concentrated on one layer → triggers recommendation with known confidence
         entities = [_entity(f"E{i}", layer="WALLS") for i in range(12)]
         ctx = _context(entities)
