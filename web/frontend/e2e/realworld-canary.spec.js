@@ -18,8 +18,22 @@ const CANARY_PATH = path.join(PROJECT_ROOT, 'tests', 'fixtures', 'realworld_cana
 const RESULTS_DIR = path.join(import.meta.dirname, '..', 'test-results', 'canary-results');
 const SCREENSHOTS_DIR = path.join(import.meta.dirname, '..', 'test-results', 'screenshots');
 
-// Canary fixture — small committed DXF that's always available
-const CANARY_FIXTURE = path.join(PROJECT_ROOT, 'tests', 'fixtures', 'dxf_zoo', 'r2000_blocks.dxf');
+// Default canary fixture — small committed DXF that's always available
+const DEFAULT_FIXTURE = path.join(PROJECT_ROOT, 'tests', 'fixtures', 'dxf_zoo', 'r2000_blocks.dxf');
+
+/**
+ * Resolve fixture for a canary prompt. Uses the prompt's drawing_fixture
+ * if specified and the file exists, otherwise falls back to default.
+ */
+function resolveCanaryFixture(prompt) {
+  if (prompt.drawing_fixture) {
+    const resolved = prompt.drawing_fixture.startsWith('/')
+      ? prompt.drawing_fixture
+      : path.join(PROJECT_ROOT, prompt.drawing_fixture);
+    if (fs.existsSync(resolved)) return resolved;
+  }
+  return DEFAULT_FIXTURE;
+}
 
 const PROMPT_TIMEOUT = 120_000;
 
@@ -42,8 +56,9 @@ test.describe('Production Canary (Gemini E2E)', () => {
     test(`canary: ${prompt.id} — ${prompt.prompt.slice(0, 50)}`, async ({ page }) => {
       const startTime = Date.now();
 
-      if (!fs.existsSync(CANARY_FIXTURE)) {
-        test.skip(true, `Canary fixture not found: ${CANARY_FIXTURE}`);
+      const fixturePath = resolveCanaryFixture(prompt);
+      if (!fs.existsSync(fixturePath)) {
+        test.skip(true, `Canary fixture not found: ${fixturePath}`);
         return;
       }
 
@@ -63,7 +78,7 @@ test.describe('Production Canary (Gemini E2E)', () => {
       await page.goto('/');
       await expect(page.locator('h2')).toContainText('Upload a drawing', { timeout: 15_000 });
 
-      await page.locator('input[type="file"][accept*=".pdf"]').setInputFiles(CANARY_FIXTURE);
+      await page.locator('input[type="file"][accept*=".pdf"]').setInputFiles(fixturePath);
       await expect(
         page.locator('.message--system').filter({ hasText: 'Loaded' })
       ).toBeVisible({ timeout: 30_000 });

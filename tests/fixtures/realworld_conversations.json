@@ -76,7 +76,7 @@
   {
     "id": "conv-analysis-drilldown-001",
     "title": "Layer inventory, entity count, text listing",
-    "drawing_fixture": "tests/fixtures/dxf_zoo/r2000_blocks.dxf",
+    "drawing_fixture": "tests/fixtures/dxf_zoo/sourced/jscad-floorplan.dxf",
     "turns": [
       {
         "prompt": "What layers exist in this drawing?",
@@ -84,12 +84,12 @@
         "expected_behavior": "answer_only"
       },
       {
-        "prompt": "How many entities are on the STRUCT layer?",
+        "prompt": "How many entities are in this floor plan?",
         "expected_family": "qna",
         "expected_behavior": "answer_only"
       },
       {
-        "prompt": "List all the text labels on the ANNOT layer",
+        "prompt": "List all the text labels in this drawing",
         "expected_family": "qna",
         "expected_behavior": "answer_only"
       }
@@ -97,8 +97,8 @@
   },
   {
     "id": "conv-analysis-drilldown-002",
-    "title": "Drawing summary, grid focus, bolt mark details",
-    "drawing_fixture": "tests/fixtures/dxf_zoo/r2000_blocks.dxf",
+    "title": "Drawing summary, detail focus, annotation details",
+    "drawing_fixture": "tests/fixtures/dxf_zoo/sourced/gds-api-cw750-details.dxf",
     "turns": [
       {
         "prompt": "Give me a summary of this drawing",
@@ -106,12 +106,12 @@
         "expected_behavior": "answer_only"
       },
       {
-        "prompt": "Tell me more about the bolt layout pattern",
+        "prompt": "Tell me more about the construction details shown",
         "expected_family": "qna",
         "expected_behavior": "answer_only"
       },
       {
-        "prompt": "What are the bolt mark labels in the bottom row?",
+        "prompt": "What detail callouts or annotations are visible?",
         "expected_family": "qna",
         "expected_behavior": "answer_only"
       }
@@ -120,7 +120,7 @@
   {
     "id": "conv-analysis-drilldown-003",
     "title": "Entity type count, show inserts, layer query",
-    "drawing_fixture": "tests/fixtures/dxf_zoo/r2000_blocks.dxf",
+    "drawing_fixture": "tests/fixtures/dxf_zoo/sourced/jscad-CustomBlocks.dxf",
     "turns": [
       {
         "prompt": "How many entities of each type are in this drawing?",
@@ -141,22 +141,21 @@
   },
   {
     "id": "conv-mixed-001",
-    "title": "Ask about drawing, edit it, verify change",
-    "drawing_fixture": "tests/fixtures/dxf_zoo/r2000_blocks.dxf",
+    "title": "Ask about PDF drawing, summarize, verify details",
+    "drawing_fixture": "tests/fixtures/test_pdfs/structural_plan.pdf",
     "turns": [
       {
-        "prompt": "Where is the bolt labeled B22 located?",
+        "prompt": "What structural elements are shown in this drawing?",
         "expected_family": "qna",
         "expected_behavior": "answer_only"
       },
       {
-        "prompt": "Move that bolt 10 units to the right",
-        "expected_family": "edit_plan",
-        "expected_behavior": "produces_ops",
-        "apply": true
+        "prompt": "Summarize the key structural details",
+        "expected_family": "summary",
+        "expected_behavior": "answer_only"
       },
       {
-        "prompt": "What is the new position of B22?",
+        "prompt": "Are there any notes or specifications called out?",
         "expected_family": "qna",
         "expected_behavior": "answer_only"
       }
@@ -187,22 +186,22 @@
   },
   {
     "id": "conv-mixed-003",
-    "title": "Ask about layers, delete entities, check count",
-    "drawing_fixture": "tests/fixtures/dxf_zoo/r2000_blocks.dxf",
+    "title": "Ask about text entities, delete one, check count",
+    "drawing_fixture": "tests/fixtures/dxf_zoo/sourced/jscad-texts.dxf",
     "turns": [
       {
-        "prompt": "How many text entities are on the ANNOT layer?",
+        "prompt": "How many text entities are in this drawing?",
         "expected_family": "qna",
         "expected_behavior": "answer_only"
       },
       {
-        "prompt": "Delete the text labels B00, B01, and B02",
+        "prompt": "Delete any text entity that says 'HELLO WORLD'",
         "expected_family": "edit_plan",
         "expected_behavior": "produces_ops",
         "apply": true
       },
       {
-        "prompt": "How many text entities are on ANNOT now?",
+        "prompt": "How many text entities remain in the drawing?",
         "expected_family": "qna",
         "expected_behavior": "answer_only"
       }
@@ -211,15 +210,15 @@
   {
     "id": "conv-error-001",
     "title": "Reference nonexistent entity, clarify, succeed",
-    "drawing_fixture": "tests/fixtures/dxf_zoo/r2000_blocks.dxf",
+    "drawing_fixture": "tests/fixtures/dxf_zoo/sourced/jscad-blocks1.dxf",
     "turns": [
       {
-        "prompt": "Move bolt B99 east by 10 units",
+        "prompt": "Move block XYZ99 east by 10 units",
         "expected_family": "edit_plan",
         "expected_behavior": "needs_clarification"
       },
       {
-        "prompt": "Sorry, I meant B42 — move it east by 10 units",
+        "prompt": "Sorry, I meant the first block reference — move it east by 10 units",
         "expected_family": "edit_plan",
         "expected_behavior": "produces_ops",
         "apply": true
@@ -265,10 +264,10 @@
   {
     "id": "conv-undo-001",
     "title": "Move entity, reverse direction, apply correction",
-    "drawing_fixture": "tests/fixtures/dxf_zoo/r2000_blocks.dxf",
+    "drawing_fixture": "tests/fixtures/dxf_zoo/r2018_polylines.dxf",
     "turns": [
       {
-        "prompt": "Move bolt B11 east by 20 units",
+        "prompt": "Move the first polyline east by 20 units",
         "expected_family": "edit_plan",
         "expected_behavior": "produces_ops",
         "apply": true
@@ -302,23 +301,23 @@
   },
   {
     "id": "conv-undo-003",
-    "title": "Edit text to wrong value, correct it, apply",
-    "drawing_fixture": "tests/fixtures/dxf_zoo/r2000_blocks.dxf",
+    "title": "Edit text to wrong value, correct it, verify",
+    "drawing_fixture": "tests/fixtures/dxf_zoo/sourced/gds-mtext-test.dxf",
     "turns": [
       {
-        "prompt": "Change the text B14 to read B14-HOLD",
+        "prompt": "Change the first MTEXT entity to read 'UPDATED NOTE'",
         "expected_family": "edit_plan",
         "expected_behavior": "produces_ops",
         "apply": true
       },
       {
-        "prompt": "That should be B14-APPROVED not B14-HOLD",
+        "prompt": "Actually that should say 'REVISED NOTE' not 'UPDATED NOTE'",
         "expected_family": "edit_plan",
         "expected_behavior": "produces_ops",
         "apply": true
       },
       {
-        "prompt": "Confirm the label now reads B14-APPROVED",
+        "prompt": "Confirm the text now reads 'REVISED NOTE'",
         "expected_family": "qna",
         "expected_behavior": "answer_only"
       }

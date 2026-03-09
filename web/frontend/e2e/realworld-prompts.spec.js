@@ -30,6 +30,27 @@ const FIXTURE_MAP = {
   empty_layers: path.join(PROJECT_ROOT, 'tests', 'fixtures', 'dxf_zoo', 'r12_basic.dxf'),
   residential: path.join(PROJECT_ROOT, 'tests', 'fixtures', 'dxf_zoo', 'r2000_blocks.dxf'),
   unicode: path.join(PROJECT_ROOT, 'tests', 'fixtures', 'dxf_zoo', 'r2000_blocks.dxf'),
+  // Sourced DXFs
+  floorplan: path.join(PROJECT_ROOT, 'tests', 'fixtures', 'dxf_zoo', 'sourced', 'jscad-floorplan.dxf'),
+  details: path.join(PROJECT_ROOT, 'tests', 'fixtures', 'dxf_zoo', 'sourced', 'gds-api-cw750-details.dxf'),
+  custom_blocks: path.join(PROJECT_ROOT, 'tests', 'fixtures', 'dxf_zoo', 'sourced', 'jscad-CustomBlocks.dxf'),
+  blocks1: path.join(PROJECT_ROOT, 'tests', 'fixtures', 'dxf_zoo', 'sourced', 'jscad-blocks1.dxf'),
+  blocks2: path.join(PROJECT_ROOT, 'tests', 'fixtures', 'dxf_zoo', 'sourced', 'jscad-blocks2.dxf'),
+  lines: path.join(PROJECT_ROOT, 'tests', 'fixtures', 'dxf_zoo', 'sourced', 'jscad-2Dlines.dxf'),
+  circles: path.join(PROJECT_ROOT, 'tests', 'fixtures', 'dxf_zoo', 'sourced', 'jscad-2Dcircles.dxf'),
+  texts: path.join(PROJECT_ROOT, 'tests', 'fixtures', 'dxf_zoo', 'sourced', 'jscad-texts.dxf'),
+  polylines_sourced: path.join(PROJECT_ROOT, 'tests', 'fixtures', 'dxf_zoo', 'sourced', 'jscad-2Dpolylines.dxf'),
+  rectangles: path.join(PROJECT_ROOT, 'tests', 'fixtures', 'dxf_zoo', 'sourced', 'jscad-2Drectangles.dxf'),
+  arcs: path.join(PROJECT_ROOT, 'tests', 'fixtures', 'dxf_zoo', 'sourced', 'jscad-2Darcs.dxf'),
+  layers: path.join(PROJECT_ROOT, 'tests', 'fixtures', 'dxf_zoo', 'sourced', 'jscad-layers.dxf'),
+  mtext: path.join(PROJECT_ROOT, 'tests', 'fixtures', 'dxf_zoo', 'sourced', 'gds-mtext-test.dxf'),
+  gds_polylines: path.join(PROJECT_ROOT, 'tests', 'fixtures', 'dxf_zoo', 'sourced', 'gds-polylines.dxf'),
+  // PDFs
+  pdf_structural: path.join(PROJECT_ROOT, 'tests', 'fixtures', 'test_pdfs', 'structural_plan.pdf'),
+  pdf_foundation: path.join(PROJECT_ROOT, 'tests', 'fixtures', 'test_pdfs', 'foundation_detail.pdf'),
+  pdf_simple: path.join(PROJECT_ROOT, 'tests', 'fixtures', 'test_pdfs', 'simple_geometry.pdf'),
+  pdf_stamped: path.join(PROJECT_ROOT, '000-docs', 'aMULBERRYdsn01.1-STAMPED-SEALED.pdf'),
+  pdf_sawcuts: path.join(PROJECT_ROOT, '000-docs', '032-TQ-TEST-sawcuts-sample-drawing.pdf'),
 };
 
 /**

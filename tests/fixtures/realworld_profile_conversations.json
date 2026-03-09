@@ -456,12 +456,12 @@
   },
   {
     "id": "profile-15",
-    "title": "Profile 15 — Landscape Designer (HeyFlora) — water-efficient landscape proposal",
+    "title": "Profile 15 — Landscape Designer — water-efficient landscape proposal",
     "drawing_fixture": "tests/fixtures/dxf_zoo/sourced/jscad-floorplan.dxf",
     "profile": {
       "id": "15",
       "role": "Landscape Designer",
-      "context": "HeyFlora.ai partner firm, water-efficient commercial landscape design, client proposal due"
+      "context": "Water-efficient commercial landscape design, client proposal due next week"
     },
     "turns": [
       {
@@ -486,7 +486,7 @@
         "apply": true
       },
       {
-        "prompt": "Generate an updated summary reflecting the changes for the FloraDocs proposal",
+        "prompt": "Generate an updated summary reflecting the changes for the client proposal",
         "expected_family": "summary",
         "expected_behavior": "report"
       }
@@ -784,7 +784,7 @@
   },
   {
     "id": "profile-25",
-    "title": "Profile 25 — Landscape Field Crew Lead (HeyFlora FieldSmart) — hardscape installation brief",
+    "title": "Profile 25 — Landscape Field Crew Lead — hardscape installation brief",
     "drawing_fixture": "tests/fixtures/dxf_zoo/sourced/jscad-2Darcs.dxf",
     "profile": {
       "id": "25",

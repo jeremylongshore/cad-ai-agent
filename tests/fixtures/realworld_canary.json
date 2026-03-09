@@ -258,5 +258,70 @@
     "min_ops": 1,
     "must_not_produce_ops": false,
     "critical": true
+  },
+  {
+    "id": "canary-pdf-summary-001",
+    "source_id": "profile-10",
+    "category": "summary",
+    "prompt": "Summarize this drawing",
+    "drawing_fixture": "tests/fixtures/test_pdfs/structural_plan.pdf",
+    "expected_family": "summary",
+    "expected_behavior": "report",
+    "expected_op_types": [],
+    "min_ops": 0,
+    "must_not_produce_ops": true,
+    "critical": true
+  },
+  {
+    "id": "canary-pdf-qna-001",
+    "source_id": "profile-17",
+    "category": "qna",
+    "prompt": "What elements are visible in this drawing?",
+    "drawing_fixture": "tests/fixtures/test_pdfs/simple_geometry.pdf",
+    "expected_family": "summary",
+    "expected_behavior": "answer_only",
+    "expected_op_types": [],
+    "min_ops": 0,
+    "must_not_produce_ops": true,
+    "critical": true
+  },
+  {
+    "id": "canary-pdf-compliance-001",
+    "source_id": "profile-12",
+    "category": "compliance",
+    "prompt": "Check this drawing for building code compliance",
+    "drawing_fixture": "000-docs/aMULBERRYdsn01.1-STAMPED-SEALED.pdf",
+    "expected_family": "needs_clarification",
+    "expected_behavior": "report",
+    "expected_op_types": [],
+    "min_ops": 0,
+    "must_not_produce_ops": true,
+    "critical": true
+  },
+  {
+    "id": "canary-pdf-health-001",
+    "source_id": "profile-18",
+    "category": "health",
+    "prompt": "Run a health check on this drawing",
+    "drawing_fixture": "000-docs/032-TQ-TEST-sawcuts-sample-drawing.pdf",
+    "expected_family": "summary",
+    "expected_behavior": "report",
+    "expected_op_types": [],
+    "min_ops": 0,
+    "must_not_produce_ops": true,
+    "critical": true
+  },
+  {
+    "id": "canary-pdf-takeoff-001",
+    "source_id": "profile-11",
+    "category": "takeoff",
+    "prompt": "Generate a material takeoff from this drawing",
+    "drawing_fixture": "tests/fixtures/test_pdfs/foundation_detail.pdf",
+    "expected_family": "takeoff_estimate",
+    "expected_behavior": "report",
+    "expected_op_types": [],
+    "min_ops": 0,
+    "must_not_produce_ops": true,
+    "critical": true
   }
 ]

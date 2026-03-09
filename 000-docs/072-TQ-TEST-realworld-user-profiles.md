@@ -41,7 +41,7 @@ Each profile defines:
 | 12 | Code Compliance Officer | Stamped plan set (PDF) | `000-docs/aMULBERRYdsn01.1-STAMPED-SEALED.pdf` | PDF | compliance, RFI, health |
 | 13 | Interior Designer | Text-heavy drawing | `tests/fixtures/dxf_zoo/sourced/jscad-texts.dxf` | DXF | edit_text, summary, zone, add_text |
 | 14 | Civil Engineer | Polyline site plan | `tests/fixtures/dxf_zoo/sourced/jscad-2Dpolylines.dxf` | DXF | add_polyline, move, scale, Q&A |
-| 15 | Landscape Designer (HeyFlora) | Landscape site plan | `tests/fixtures/dxf_zoo/sourced/jscad-floorplan.dxf` | DXF | compliance (MWELO), takeoff, summary, edit, Q&A, health |
+| 15 | Landscape Designer | Landscape site plan | `tests/fixtures/dxf_zoo/sourced/jscad-floorplan.dxf` | DXF | compliance (MWELO), takeoff, summary, edit, Q&A, health |
 | 16 | Construction Manager | Revision pair | `tests/fixtures/revision/clean_realworld/master.dxf` + `revision.dxf` | DXF | compare, summary, Q&A |
 | 17 | Project Manager | Simple geometry (PDF) | `tests/fixtures/test_pdfs/simple_geometry.pdf` | PDF | summary, Q&A (non-technical) |
 | 18 | Plan Reviewer (City) | Sawcut drawing (PDF) | `000-docs/032-TQ-TEST-sawcuts-sample-drawing.pdf` | PDF | compliance, RFI, health |
@@ -51,7 +51,7 @@ Each profile defines:
 | 22 | Solar Installer | Rectangle layout | `tests/fixtures/dxf_zoo/sourced/jscad-2Drectangles.dxf` | DXF | add_block (panels), copy, batch, takeoff |
 | 23 | BIM Coordinator | Modern polylines | `tests/fixtures/dxf_zoo/r2018_polylines.dxf` | DXF | health, compare, Q&A, summary |
 | 24 | Junior Drafter/Intern | Layers + empty | `tests/fixtures/dxf_zoo/sourced/jscad-layers.dxf` | DXF | Q&A (learning), move, edit_text, summary |
-| 25 | Landscape Field Crew Lead (HeyFlora FieldSmart) | Arc/curve plan | `tests/fixtures/dxf_zoo/sourced/jscad-2Darcs.dxf` | DXF | Q&A, summary, health, takeoff |
+| 25 | Landscape Field Crew Lead | Arc/curve plan | `tests/fixtures/dxf_zoo/sourced/jscad-2Darcs.dxf` | DXF | Q&A, summary, health, takeoff |
 
 ---
 
@@ -502,11 +502,11 @@ Verification that all platform capabilities appear in at least two profiles:
 
 ---
 
-### Profile 15 — Landscape Designer (HeyFlora Model)
+### Profile 15 — Landscape Designer
 
-**Who:** Maya Greenfield, RLA (Registered Landscape Architect) at GreenEdge Design-Build, a firm that partners with HeyFlora.ai for water-efficient landscape design. 9 years of experience in drought-tolerant commercial landscapes in Southern California. Currently designing a 2-acre water-efficient landscape for a new corporate campus in Irvine.
+**Who:** Maya Greenfield, RLA (Registered Landscape Architect) at GreenEdge Design-Build, specializing in water-efficient landscape design. 9 years of experience in drought-tolerant commercial landscapes in Southern California. Currently designing a 2-acre water-efficient landscape for a new corporate campus in Irvine.
 **Document:** `tests/fixtures/dxf_zoo/sourced/jscad-floorplan.dxf` (DXF)
-**Business context:** Client proposal due next week. Maya needs to verify the planting plan complies with California's Model Water Efficient Landscape Ordinance (MWELO), count all plant symbols for the bid, generate a client-facing summary for the FloraDocs proposal document, and adjust planting group spacing to optimize irrigation coverage.
+**Business context:** Client proposal due next week. Maya needs to verify the planting plan complies with California's Model Water Efficient Landscape Ordinance (MWELO), count all plant symbols for the bid, generate a client-facing summary for the proposal document, and adjust planting group spacing to optimize irrigation coverage.
 
 #### Capabilities exercised
 - **summary** — client-facing proposal narrative
@@ -532,23 +532,14 @@ Verification that all platform capabilities appear in at least two profiles:
 | 2 | "Check MWELO compliance. California requires a Maximum Applied Water Allowance based on the landscape area and an ET adjustment factor. Flag anything that might not pass" | compliance | Runs compliance check against MWELO framework. Evaluates planting area ratios, plant water use classifications (if detectable), and irrigation system indicators. Reports findings with MWELO section references. |
 | 3 | "Takeoff all plant symbols. I need a count by type for the bid quantities" | takeoff | Extracts all INSERT entities representing plant symbols. Groups by block name/type. Returns a structured plant schedule with counts, suitable for bid pricing. |
 | 4 | "The irrigation designer said the group near 25,40 needs to shift 3 feet east for better head-to-head coverage. Move it" | edit_plan | Targets entities near (25,40). Generates move operation with delta X=3. Preview confirms new position improves spacing relative to adjacent groups. |
-| 5 | "Great. Now give me an updated summary I can paste into FloraDocs reflecting the changes we made" | summary | Generates an updated summary that accounts for the modifications made during this session. Notes the adjusted planting positions and any compliance improvements. |
+| 5 | "Great. Now give me an updated summary I can paste into the proposal reflecting the changes we made" | summary | Generates an updated summary that accounts for the modifications made during this session. Notes the adjusted planting positions and any compliance improvements. |
 
-#### HeyFlora.ai integration context
+#### Landscape management integration context
 
-**Company:** HeyFlora.ai — AI-powered B2B operating system for the $150B professional landscape management sector
-**Founder:** Scott Hutcheon
-**Knowledge base:** RAG trained on ANSI A300, OSHA, USDA, EPA, MWELO, IPM, LEED standards
-
-**Modules relevant to this profile:**
-- **FloraDocs** — Proposal generation, project documentation, client-facing deliverables. Maya uses our summary output directly in FloraDocs proposals.
-- **AI Design Studio** — Design review and optimization. Our compliance checks feed design review recommendations.
-- **Growth Engine** — Business development and project pipeline. Takeoff quantities feed directly into bid pricing models.
-
-**How our platform integrates:**
-- IntentCAD provides the drawing intelligence layer that FloraDocs cannot: reading DXF/PDF plans, extracting plant counts, and checking spatial compliance. HeyFlora handles the domain knowledge (plant species, water use factors, maintenance schedules) while we handle the drawing analysis.
-- Compliance checks map to MWELO sections that HeyFlora's RAG knowledge base can then elaborate with specific plant recommendations and water budget calculations.
-- Takeoff quantities from IntentCAD feed into HeyFlora's Growth Engine bid pricing module, eliminating manual counting from plan sheets.
+This profile models the landscape management vertical — a $150B professional sector that relies on drawing analysis for compliance, bidding, and field operations. Landscape design firms need to:
+- Read DXF/PDF site plans and extract plant counts for bid pricing
+- Check spatial compliance against water-efficiency ordinances (MWELO, LEED)
+- Generate client-facing summaries for proposals and reports
 
 **Compliance frameworks checked:**
 - **MWELO** (Model Water Efficient Landscape Ordinance) — California water use requirements for new landscapes
@@ -823,9 +814,9 @@ Verification that all platform capabilities appear in at least two profiles:
 
 ---
 
-### Profile 25 — Landscape Field Crew Lead (HeyFlora FieldSmart Model)
+### Profile 25 — Landscape Field Crew Lead
 
-**Who:** Marcus Thompson, landscape crew lead at Green Valley Landscapes, a company that uses HeyFlora.ai's FieldSmart module for voice-first field operations. 8 years of hands-on landscape installation experience. Reviews plans on a ruggedized tablet at the job site. Prefers short, direct answers.
+**Who:** Marcus Thompson, landscape crew lead at Green Valley Landscapes. 8 years of hands-on landscape installation experience. Reviews plans on a ruggedized tablet at the job site. Prefers short, direct answers — voice-first interaction style.
 **Document:** `tests/fixtures/dxf_zoo/sourced/jscad-2Darcs.dxf` (DXF)
 **Business context:** On-site for a hardscape installation at a commercial property. Marcus pulled up the plan on his tablet and needs to quickly identify what features are in different areas of the site, confirm what types of elements are along specific boundaries, get a quick field crew brief, and flag any drawing issues the office should fix before tomorrow's concrete pour.
 
@@ -851,20 +842,13 @@ Verification that all platform capabilities appear in at least two profiles:
 | 3 | "Give me a quick brief I can read to my crew. What are we looking at and what's the scope?" | summary | Returns a concise field-oriented summary: what's on the drawing, approximate extents, key features, materials implied by the geometry. Written for a 2-minute crew huddle, not a boardroom presentation. |
 | 4 | "Anything wrong with this drawing? I don't want to pour concrete and then find out the plan was messed up" | health | Quick health check focused on field-relevant issues: inconsistent dimensions, missing information, conflicting geometry, potential constructability problems. Reports issues the office needs to resolve before the crew proceeds. |
 
-#### HeyFlora.ai integration context
+#### Landscape field operations context
 
-**Company:** HeyFlora.ai — AI-powered B2B operating system for the $150B professional landscape management sector
-**Founder:** Scott Hutcheon
-**Knowledge base:** RAG trained on ANSI A300, OSHA, USDA, EPA, MWELO, IPM, LEED standards
-
-**Modules relevant to this profile:**
-- **FieldSmart** — Voice-first AI for field crews. Marcus would normally ask these questions by voice through the HeyFlora FieldSmart app, which would query IntentCAD's API on the backend to analyze the drawing. The prompts above reflect the natural, conversational tone of voice-first interaction.
-- **FloraCare** — Plant health monitoring and maintenance scheduling. If the drawing includes planting areas, FloraCare would use IntentCAD's zone and takeoff data to build maintenance routes and scheduling.
-
-**How our platform integrates:**
-- IntentCAD serves as the "eyes" for HeyFlora's FieldSmart module: when a crew lead asks a spatial question about a drawing ("what's in the northeast corner?"), FieldSmart routes the query to IntentCAD's Q&A capability, then wraps the response in a voice-friendly format.
-- Health check results from IntentCAD flow back to the HeyFlora office dashboard, where the project manager can see field-reported drawing issues alongside the platform's automated quality findings.
-- Takeoff data (arc lengths, area calculations) from IntentCAD feeds into FieldSmart's daily work tracking, allowing crew leads to report progress as a percentage of total installed vs. total on the plan.
+This profile models the field crew use case for landscape management — the person who reads plans on a tablet at the job site. Voice-first interaction style: short, direct questions about what's where and what to build. Field crews need:
+- Spatial Q&A ("what's in the northeast corner?") routed through drawing analysis
+- Quick field briefs summarizing scope for crew huddles
+- Health checks that flag drawing issues before concrete pours or installations
+- Takeoff data (arc lengths, area calculations) for daily progress tracking
 
 **Compliance frameworks checked:**
 - **OSHA 29 CFR 1926** — Construction safety standards (relevant for field crew operations)
@@ -924,5 +908,5 @@ Each profile maps to:
 | Revision comparison | 0 multi-doc profiles | 1 profile (16) with file pair |
 | Non-technical users | 0 profiles | 2 profiles (17, 24) |
 | Field/mobile use | 0 profiles | 2 profiles (10, 25) |
-| HeyFlora integration | 0 profiles | 2 profiles (15, 25) |
+| Landscape management vertical | 0 profiles | 2 profiles (15, 25) |
 | Diverse DXF formats | 1 (R2000 only) | 3 formats (R12, R2000, R2018) |
