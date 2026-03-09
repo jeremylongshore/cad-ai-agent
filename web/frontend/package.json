@@ -12,7 +12,12 @@
     "e2e:prod:headed": "TARGET=production playwright test --headed",
     "e2e:headed": "playwright test --headed",
     "e2e:debug": "PWDEBUG=1 playwright test --headed",
-    "e2e:report": "playwright show-report"
+    "e2e:report": "playwright show-report",
+    "e2e:realworld": "REALWORLD=1 playwright test --grep 'Real-World Prompts'",
+    "e2e:realworld:report": "node e2e/realworld-report.js",
+    "e2e:conversations": "REALWORLD=1 playwright test --grep 'Multi-Turn Conversations'",
+    "e2e:canary": "REALWORLD=1 playwright test --grep 'Production Canary'",
+    "e2e:profiles": "REALWORLD=1 playwright test --grep 'Real-World Profile Journeys'"
   },
   "dependencies": {
     "dxf-viewer": "^1.0.46",

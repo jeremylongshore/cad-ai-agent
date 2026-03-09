@@ -39,7 +39,7 @@ class TestScorecardEntries:
         assert ENTRIES_PATH.exists()
 
     def test_minimum_entry_count(self):
-        assert len(ENTRIES) >= 32, f"Only {len(ENTRIES)} entries, need 32+"
+        assert len(ENTRIES) >= 56, f"Only {len(ENTRIES)} entries, need 56+"
 
     def test_all_entries_have_unique_ids(self):
         ids = [e.entry_id for e in ENTRIES]

@@ -594,3 +594,628 @@ def create_rich_mtext_drawing(
     dxf_path = tmp_path / filename
     doc.saveas(str(dxf_path))
     return dxf_path
+
+
+def create_residential_drawing(
+    tmp_path: Path,
+    *,
+    filename: str = "residential.dxf",
+) -> Path:
+    """Build a realistic residential floor plan with ~80-120 entities.
+
+    Simulates a single-unit floor plan for compliance, zone detection,
+    and RFI testing.
+
+    Generates:
+    - Outer walls as closed LWPOLYLINE on WALLS layer (60x40 footprint)
+    - Interior partition walls as LINEs on WALLS layer (4-5 rooms)
+    - Door swings as INSERTs (DOOR_SWING block: arc + line) on DOORS layer
+    - Window blocks (WINDOW: rectangle) as INSERTs on WINDOWS layer
+    - Room labels as TEXT on ROOMS layer
+    - Simple furniture blocks as INSERTs on FURNITURE layer
+    - Electrical outlet circles on ELECTRICAL layer
+    - Title block text on TITLE layer (protected)
+
+    Returns path to the saved DXF.
+    """
+    doc = ezdxf.new(dxfversion="R2018")
+    msp = doc.modelspace()
+
+    # Layers
+    doc.layers.add("WALLS", color=1)
+    doc.layers.add("DOORS", color=2)
+    doc.layers.add("WINDOWS", color=4)
+    doc.layers.add("ROOMS", color=3)
+    doc.layers.add("FURNITURE", color=5)
+    doc.layers.add("ELECTRICAL", color=6)
+    doc.layers.add("PLUMBING", color=4)
+    doc.layers.add("STRUCTURAL", color=1)
+    doc.layers.add("NOTES", color=3)
+    doc.layers.add("TITLE", color=7)
+    doc.layers.add("TITLEBLOCK", color=7)
+
+    # --- Block: DOOR_SWING (arc sweep + threshold line) ---
+    door_block = doc.blocks.new("DOOR_SWING")
+    door_block.add_arc((0, 0), radius=8, start_angle=0, end_angle=90)
+    door_block.add_line((0, 0), (8, 0))
+
+    # --- Block: WINDOW (glazing rectangle with centre line) ---
+    win_block = doc.blocks.new("WINDOW")
+    win_block.add_lwpolyline([(-6, -1), (6, -1), (6, 1), (-6, 1)], close=True)
+    win_block.add_line((-6, 0), (6, 0))
+
+    # --- Block: BED (simple rectangle with headboard line) ---
+    bed_block = doc.blocks.new("BED")
+    bed_block.add_lwpolyline([(-8, -5), (8, -5), (8, 5), (-8, 5)], close=True)
+    bed_block.add_line((-8, 2), (8, 2))
+
+    # --- Block: TABLE ---
+    table_block = doc.blocks.new("TABLE")
+    table_block.add_lwpolyline([(-5, -3), (5, -3), (5, 3), (-5, 3)], close=True)
+
+    # --- Block: TOILET ---
+    toilet_block = doc.blocks.new("TOILET")
+    toilet_block.add_lwpolyline([(-3, -4), (3, -4), (3, 2), (-3, 2)], close=True)
+    toilet_block.add_arc((0, 2), radius=3, start_angle=0, end_angle=180)
+
+    # --- Outer walls: 60x40 rectangle ---
+    msp.add_lwpolyline(
+        [(0, 0), (60, 0), (60, 40), (0, 40)],
+        close=True,
+        dxfattribs={"layer": "WALLS"},
+    )
+
+    # --- Interior walls creating 5 rooms ---
+    # Vertical wall x=20 splits left zone from middle
+    msp.add_line((20, 0), (20, 40), dxfattribs={"layer": "WALLS"})
+    # Vertical wall x=40 creates right third
+    msp.add_line((40, 0), (40, 40), dxfattribs={"layer": "WALLS"})
+    # Horizontal wall y=20 in left zone: bedroom 1 above, living room below
+    msp.add_line((0, 20), (20, 20), dxfattribs={"layer": "WALLS"})
+    # Horizontal wall y=20 in middle zone: kitchen above, hallway below
+    msp.add_line((20, 20), (40, 20), dxfattribs={"layer": "WALLS"})
+    # Horizontal wall y=25 in right zone: bathroom above, bedroom 2 below
+    msp.add_line((40, 25), (60, 25), dxfattribs={"layer": "WALLS"})
+
+    # --- Door inserts at room entrances ---
+    door_positions = [
+        (20, 8),  # living room → hallway
+        (20, 30),  # bedroom 1 → hallway
+        (40, 12),  # hallway → kitchen
+        (40, 32),  # hallway → bathroom
+        (50, 25),  # bedroom 2 entrance
+        (10, 40),  # front entry
+    ]
+    for pos in door_positions:
+        msp.add_blockref(
+            "DOOR_SWING",
+            insert=pos,
+            dxfattribs={"layer": "DOORS"},
+        )
+
+    # --- Window inserts on exterior walls ---
+    window_positions = [
+        # Bottom wall
+        ((10, 0), 0.0),
+        ((30, 0), 0.0),
+        ((50, 0), 0.0),
+        # Top wall
+        ((10, 40), 0.0),
+        ((50, 40), 0.0),
+        # Left wall
+        ((0, 10), 90.0),
+        ((0, 30), 90.0),
+        # Right wall
+        ((60, 10), 90.0),
+        ((60, 35), 90.0),
+    ]
+    for pos, rot in window_positions:
+        msp.add_blockref(
+            "WINDOW",
+            insert=pos,
+            dxfattribs={"layer": "WINDOWS", "rotation": rot},
+        )
+
+    # --- Room labels ---
+    room_labels = [
+        ("LIVING ROOM", (7, 8)),
+        ("BEDROOM 1", (7, 28)),
+        ("KITCHEN", (27, 28)),
+        ("HALLWAY", (27, 8)),
+        ("BATHROOM", (47, 30)),
+        ("BEDROOM 2", (47, 10)),
+    ]
+    for label, pos in room_labels:
+        msp.add_text(
+            label,
+            dxfattribs={"layer": "ROOMS", "height": 2.0, "insert": pos},
+        )
+
+    # --- Furniture block inserts ---
+    furniture_inserts = [
+        ("BED", (10, 31)),  # bedroom 1
+        ("BED", (50, 5)),  # bedroom 2
+        ("TABLE", (28, 10)),  # kitchen/dining
+        ("TOILET", (53, 37)),  # bathroom
+    ]
+    for block_name, pos in furniture_inserts:
+        msp.add_blockref(
+            block_name,
+            insert=pos,
+            dxfattribs={"layer": "FURNITURE"},
+        )
+
+    # --- Electrical outlets as circles ---
+    outlet_positions = [
+        (5, 2),
+        (15, 2),
+        (25, 2),
+        (45, 2),
+        (55, 2),
+        (5, 38),
+        (30, 38),
+        (55, 38),
+        (2, 10),
+        (2, 25),
+        (58, 15),
+        (58, 32),
+    ]
+    for pos in outlet_positions:
+        msp.add_circle(pos, radius=0.8, dxfattribs={"layer": "ELECTRICAL"})
+
+    # --- Plumbing note ---
+    msp.add_mtext(
+        "PLUMBING ROUGH-IN\nSee plumbing drawings",
+        dxfattribs={
+            "layer": "PLUMBING",
+            "insert": (42, 27),
+            "char_height": 1.5,
+        },
+    )
+
+    # --- Structural corner column marks ---
+    for cx, cy in [
+        (0, 0),
+        (20, 0),
+        (40, 0),
+        (60, 0),
+        (0, 40),
+        (20, 40),
+        (40, 40),
+        (60, 40),
+    ]:
+        msp.add_circle((cx, cy), radius=1.5, dxfattribs={"layer": "STRUCTURAL"})
+
+    # --- Extra wall segments (closet walls, chase walls) ---
+    # Closet in bedroom 1 (left zone, upper)
+    msp.add_line((0, 33), (8, 33), dxfattribs={"layer": "WALLS"})
+    msp.add_line((8, 33), (8, 40), dxfattribs={"layer": "WALLS"})
+    # Closet in bedroom 2 (right zone, lower)
+    msp.add_line((40, 18), (50, 18), dxfattribs={"layer": "WALLS"})
+    msp.add_line((50, 18), (50, 25), dxfattribs={"layer": "WALLS"})
+    # Hallway niche (middle zone)
+    msp.add_line((30, 0), (30, 8), dxfattribs={"layer": "WALLS"})
+    msp.add_line((30, 8), (40, 8), dxfattribs={"layer": "WALLS"})
+
+    # --- Extra window and door for closets/utility ---
+    msp.add_blockref(
+        "DOOR_SWING",
+        insert=(4, 33),
+        dxfattribs={"layer": "DOORS"},
+    )
+    msp.add_blockref(
+        "DOOR_SWING",
+        insert=(45, 18),
+        dxfattribs={"layer": "DOORS"},
+    )
+    msp.add_blockref(
+        "WINDOW",
+        insert=(30, 40),
+        dxfattribs={"layer": "WINDOWS", "rotation": 0.0},
+    )
+
+    # --- Room area annotations ---
+    area_labels = [
+        ("~ 120 SF", (7, 4)),
+        ("~ 95 SF", (7, 23)),
+        ("~ 90 SF", (27, 23)),
+        ("~ 60 SF", (27, 4)),
+        ("~ 55 SF", (47, 35)),
+        ("~ 100 SF", (47, 5)),
+    ]
+    for label, pos in area_labels:
+        msp.add_text(
+            label,
+            dxfattribs={"layer": "ROOMS", "height": 1.5, "insert": pos},
+        )
+
+    # --- Additional electrical circuits ---
+    for pos in [(10, 20), (30, 20), (50, 20), (10, 0), (50, 0)]:
+        msp.add_circle(pos, radius=0.8, dxfattribs={"layer": "ELECTRICAL"})
+
+    # --- Dimension lines along outer perimeter ---
+    dim_h = msp.add_aligned_dim(
+        p1=(0, 0),
+        p2=(60, 0),
+        distance=-8,
+        dxfattribs={"layer": "NOTES"},
+    )
+    dim_h.render()
+    dim_v = msp.add_aligned_dim(
+        p1=(0, 0),
+        p2=(0, 40),
+        distance=-8,
+        dxfattribs={"layer": "NOTES"},
+    )
+    dim_v.render()
+
+    # --- General notes ---
+    msp.add_mtext(
+        'ALL WALLS 2x4 STUD @ 16" O.C.\nU.N.O.',
+        dxfattribs={
+            "layer": "NOTES",
+            "insert": (0, -10),
+            "char_height": 1.5,
+        },
+    )
+    msp.add_mtext(
+        "PROVIDE BLOCKING AT ALL\nWALL-MOUNTED FIXTURES",
+        dxfattribs={
+            "layer": "NOTES",
+            "insert": (30, -10),
+            "char_height": 1.5,
+        },
+    )
+    msp.add_mtext(
+        "GFA: ~520 SF\nOCCUPANCY: R-2",
+        dxfattribs={
+            "layer": "NOTES",
+            "insert": (0, -18),
+            "char_height": 1.5,
+        },
+    )
+
+    # --- Title block on protected layers ---
+    msp.add_text(
+        "RESIDENTIAL FLOOR PLAN",
+        dxfattribs={"layer": "TITLE", "height": 5.0, "insert": (0, -28)},
+    )
+    msp.add_text(
+        "PROJECT: UNIT 101 - SAMPLE RESIDENCE",
+        dxfattribs={"layer": "TITLEBLOCK", "height": 3.0, "insert": (0, -36)},
+    )
+    msp.add_text(
+        'SCALE: 1/4" = 1\'-0"',
+        dxfattribs={"layer": "TITLEBLOCK", "height": 2.0, "insert": (0, -42)},
+    )
+    msp.add_text(
+        "DRAWN BY: AI",
+        dxfattribs={"layer": "TITLEBLOCK", "height": 2.0, "insert": (0, -47)},
+    )
+
+    dxf_path = tmp_path / filename
+    doc.saveas(str(dxf_path))
+    return dxf_path
+
+
+def create_electrical_drawing(
+    tmp_path: Path,
+    *,
+    filename: str = "electrical.dxf",
+) -> Path:
+    """Build a realistic electrical plan with ~60-100 entities.
+
+    Simulates an MEP electrical plan for jargon, circuit, and panel testing.
+
+    Generates:
+    - Background reference grid as LINEs on STRUCTURAL layer (4x3 grid)
+    - Panel schedule rectangles + labels on PANELS layer (PANEL-A, PANEL-B)
+    - Circuit home-run lines on CIRCUITS layer connecting outlets to panels
+    - Outlet symbols (OUTLET_SYMBOL block) as INSERTs on ELECTRICAL layer
+    - Switch symbols (SWITCH_SYMBOL block) as INSERTs on ELECTRICAL layer
+    - Light fixture symbols (LIGHT_FIXTURE block) as INSERTs on ELECTRICAL layer
+    - Circuit annotation TEXT on NOTES layer
+    - Title block text on TITLE layer (protected)
+
+    Returns path to the saved DXF.
+    """
+    doc = ezdxf.new(dxfversion="R2018")
+    msp = doc.modelspace()
+
+    # Layers
+    doc.layers.add("ELECTRICAL", color=2)
+    doc.layers.add("PANELS", color=1)
+    doc.layers.add("CIRCUITS", color=5)
+    doc.layers.add("NOTES", color=3)
+    doc.layers.add("STRUCTURAL", color=8)
+    doc.layers.add("TITLE", color=7)
+
+    # --- Block: OUTLET_SYMBOL (circle with vertical tick) ---
+    outlet_block = doc.blocks.new("OUTLET_SYMBOL")
+    outlet_block.add_circle((0, 0), radius=1.2)
+    outlet_block.add_line((0, 0), (0, 2.5))
+
+    # --- Block: SWITCH_SYMBOL (small diamond with leader) ---
+    switch_block = doc.blocks.new("SWITCH_SYMBOL")
+    switch_block.add_lwpolyline([(0, 1.5), (1.5, 0), (0, -1.5), (-1.5, 0)], close=True)
+    switch_block.add_line((0, 1.5), (0, 3.5))
+
+    # --- Block: LIGHT_FIXTURE (circle with crosshair) ---
+    fixture_block = doc.blocks.new("LIGHT_FIXTURE")
+    fixture_block.add_circle((0, 0), radius=2.5)
+    fixture_block.add_line((-2.5, 0), (2.5, 0))
+    fixture_block.add_line((0, -2.5), (0, 2.5))
+
+    # --- Reference grid: 4 columns x 3 rows at 20-unit spacing ---
+    grid_cols = 4
+    grid_rows = 3
+    grid_spacing = 20.0
+
+    for col in range(grid_cols + 1):
+        x = col * grid_spacing
+        msp.add_line(
+            (x, 0),
+            (x, grid_rows * grid_spacing),
+            dxfattribs={"layer": "STRUCTURAL"},
+        )
+    for row in range(grid_rows + 1):
+        y = row * grid_spacing
+        msp.add_line(
+            (0, y),
+            (grid_cols * grid_spacing, y),
+            dxfattribs={"layer": "STRUCTURAL"},
+        )
+
+    # --- Panel schedule: PANEL-A (lower-left) ---
+    panel_a_origin = (2, 2)
+    msp.add_lwpolyline(
+        [
+            (panel_a_origin[0], panel_a_origin[1]),
+            (panel_a_origin[0] + 14, panel_a_origin[1]),
+            (panel_a_origin[0] + 14, panel_a_origin[1] + 8),
+            (panel_a_origin[0], panel_a_origin[1] + 8),
+        ],
+        close=True,
+        dxfattribs={"layer": "PANELS"},
+    )
+    msp.add_text(
+        "PANEL-A",
+        dxfattribs={
+            "layer": "PANELS",
+            "height": 2.0,
+            "insert": (panel_a_origin[0] + 1, panel_a_origin[1] + 5),
+        },
+    )
+    msp.add_text(
+        "200A / 120/240V",
+        dxfattribs={
+            "layer": "PANELS",
+            "height": 1.5,
+            "insert": (panel_a_origin[0] + 1, panel_a_origin[1] + 2),
+        },
+    )
+
+    # --- Panel schedule: PANEL-B (upper-right) ---
+    panel_b_origin = (65, 52)
+    msp.add_lwpolyline(
+        [
+            (panel_b_origin[0], panel_b_origin[1]),
+            (panel_b_origin[0] + 14, panel_b_origin[1]),
+            (panel_b_origin[0] + 14, panel_b_origin[1] + 8),
+            (panel_b_origin[0], panel_b_origin[1] + 8),
+        ],
+        close=True,
+        dxfattribs={"layer": "PANELS"},
+    )
+    msp.add_text(
+        "PANEL-B",
+        dxfattribs={
+            "layer": "PANELS",
+            "height": 2.0,
+            "insert": (panel_b_origin[0] + 1, panel_b_origin[1] + 5),
+        },
+    )
+    msp.add_text(
+        "100A / 277/480V",
+        dxfattribs={
+            "layer": "PANELS",
+            "height": 1.5,
+            "insert": (panel_b_origin[0] + 1, panel_b_origin[1] + 2),
+        },
+    )
+
+    # --- Outlet inserts (12 duplex outlets) ---
+    outlet_positions = [
+        (18, 5),
+        (38, 5),
+        (58, 5),
+        (18, 25),
+        (38, 25),
+        (58, 25),
+        (18, 45),
+        (38, 45),
+        (58, 45),
+        (8, 15),
+        (28, 35),
+        (48, 55),
+    ]
+    for pos in outlet_positions:
+        msp.add_blockref(
+            "OUTLET_SYMBOL",
+            insert=pos,
+            dxfattribs={"layer": "ELECTRICAL"},
+        )
+
+    # --- Switch inserts (6 switches) ---
+    switch_positions = [
+        (22, 8),
+        (42, 8),
+        (22, 28),
+        (42, 28),
+        (22, 48),
+        (42, 48),
+    ]
+    for pos in switch_positions:
+        msp.add_blockref(
+            "SWITCH_SYMBOL",
+            insert=pos,
+            dxfattribs={"layer": "ELECTRICAL"},
+        )
+
+    # --- Light fixture inserts (9 fixtures) ---
+    fixture_positions = [
+        (10, 10),
+        (30, 10),
+        (50, 10),
+        (70, 10),
+        (10, 30),
+        (30, 30),
+        (50, 30),
+        (10, 50),
+        (30, 50),
+    ]
+    for pos in fixture_positions:
+        msp.add_blockref(
+            "LIGHT_FIXTURE",
+            insert=pos,
+            dxfattribs={"layer": "ELECTRICAL"},
+        )
+
+    # --- Circuit home runs to panels ---
+    panel_a_tap = (9, 6)
+    panel_b_tap = (65, 55)
+
+    circuit_runs = [
+        # Circuits back to PANEL-A
+        (18, 5, panel_a_tap[0], panel_a_tap[1]),
+        (38, 5, panel_a_tap[0], panel_a_tap[1]),
+        (18, 25, panel_a_tap[0], panel_a_tap[1]),
+        (8, 15, panel_a_tap[0], panel_a_tap[1]),
+        # Circuits back to PANEL-B
+        (58, 45, panel_b_tap[0], panel_b_tap[1]),
+        (38, 45, panel_b_tap[0], panel_b_tap[1]),
+        (48, 55, panel_b_tap[0], panel_b_tap[1]),
+    ]
+    for x1, y1, x2, y2 in circuit_runs:
+        msp.add_line((x1, y1), (x2, y2), dxfattribs={"layer": "CIRCUITS"})
+
+    # --- Circuit annotation notes ---
+    circuit_notes = [
+        ("20A CIRCUIT", (20, 3)),
+        ("GFCI", (58, 3)),
+        ("DEDICATED CIRCUIT", (58, 23)),
+        ("277V LIGHTING", (68, 28)),
+        ("EMERGENCY CIRCUIT", (8, 52)),
+        ("SPARE", (28, 52)),
+    ]
+    for note_text, pos in circuit_notes:
+        msp.add_text(
+            note_text,
+            dxfattribs={"layer": "NOTES", "height": 1.5, "insert": pos},
+        )
+
+    # --- Legend box + text entries ---
+    legend_origin = (0, 68)
+    msp.add_lwpolyline(
+        [
+            (legend_origin[0], legend_origin[1]),
+            (legend_origin[0] + 35, legend_origin[1]),
+            (legend_origin[0] + 35, legend_origin[1] + 22),
+            (legend_origin[0], legend_origin[1] + 22),
+        ],
+        close=True,
+        dxfattribs={"layer": "NOTES"},
+    )
+    legend_entries = [
+        ("DUPLEX OUTLET", (legend_origin[0] + 2, legend_origin[1] + 17)),
+        ("SWITCH", (legend_origin[0] + 2, legend_origin[1] + 13)),
+        ("LIGHT FIXTURE", (legend_origin[0] + 2, legend_origin[1] + 9)),
+        ("HOME RUN TO PANEL", (legend_origin[0] + 2, legend_origin[1] + 5)),
+        ("LEGEND", (legend_origin[0] + 12, legend_origin[1] + 19)),
+    ]
+    for entry_text, pos in legend_entries:
+        msp.add_text(
+            entry_text,
+            dxfattribs={"layer": "NOTES", "height": 1.5, "insert": pos},
+        )
+
+    # --- Dimension lines along grid perimeter ---
+    dim_h = msp.add_aligned_dim(
+        p1=(0, 0),
+        p2=(grid_cols * grid_spacing, 0),
+        distance=-8,
+        dxfattribs={"layer": "NOTES"},
+    )
+    dim_h.render()
+    dim_v = msp.add_aligned_dim(
+        p1=(0, 0),
+        p2=(0, grid_rows * grid_spacing),
+        distance=-8,
+        dxfattribs={"layer": "NOTES"},
+    )
+    dim_v.render()
+
+    # --- Column / row grid labels ---
+    col_labels = ["A", "B", "C", "D"]
+    for i, lbl in enumerate(col_labels):
+        msp.add_text(
+            lbl,
+            dxfattribs={
+                "layer": "STRUCTURAL",
+                "height": 2.5,
+                "insert": (i * grid_spacing + grid_spacing / 2 - 1, -6),
+            },
+        )
+    for row in range(grid_rows):
+        msp.add_text(
+            str(row + 1),
+            dxfattribs={
+                "layer": "STRUCTURAL",
+                "height": 2.5,
+                "insert": (-6, row * grid_spacing + grid_spacing / 2 - 1),
+            },
+        )
+
+    # --- General notes ---
+    msp.add_mtext(
+        "ALL WIRING IN EMT CONDUIT\nU.N.O.",
+        dxfattribs={
+            "layer": "NOTES",
+            "insert": (0, -8),
+            "char_height": 1.5,
+        },
+    )
+    msp.add_mtext(
+        "COORDINATE ROUTING WITH\nMECHANICAL CONTRACTOR",
+        dxfattribs={
+            "layer": "NOTES",
+            "insert": (40, -8),
+            "char_height": 1.5,
+        },
+    )
+    msp.add_mtext(
+        "VERIFY PANEL LOCATIONS\nIN FIELD PRIOR TO ROUGH-IN",
+        dxfattribs={
+            "layer": "NOTES",
+            "insert": (0, -16),
+            "char_height": 1.5,
+        },
+    )
+
+    # --- Title block on protected TITLE layer ---
+    msp.add_text(
+        "ELECTRICAL POWER PLAN",
+        dxfattribs={"layer": "TITLE", "height": 5.0, "insert": (0, -26)},
+    )
+    msp.add_text(
+        "PROJECT: SAMPLE BUILDING - LEVEL 1",
+        dxfattribs={"layer": "TITLE", "height": 3.0, "insert": (0, -34)},
+    )
+    msp.add_text(
+        "DRAWN BY: AI",
+        dxfattribs={"layer": "TITLE", "height": 2.0, "insert": (0, -40)},
+    )
+
+    dxf_path = tmp_path / filename
+    doc.saveas(str(dxf_path))
+    return dxf_path

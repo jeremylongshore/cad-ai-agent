@@ -9,10 +9,19 @@ const PROJECT_ROOT = path.resolve(import.meta.dirname, '..', '..');
 const TARGET = process.env.TARGET || 'local';
 const isProduction = TARGET === 'production';
 
+// REALWORLD=1 uses real Gemini instead of mock provider for local backend
+const useRealGemini = !!process.env.REALWORLD;
+
 const PROD_URL = 'https://cad-dxf-agent.web.app';
 const LOCAL_URL = 'http://localhost:3000';
 
 const AUTH_STATE_PATH = path.join(import.meta.dirname, 'test-results', '.auth-state.json');
+
+// Backend LLM provider — real Gemini for realworld/canary tests, mock for regular E2E
+const llmProvider = useRealGemini ? 'gemini' : 'mock';
+
+// Realworld tests need longer timeouts (Gemini cold start + LLM reasoning)
+const testTimeout = useRealGemini ? 120_000 : 90_000;
 
 export default defineConfig({
   testDir: './e2e',
@@ -20,7 +29,7 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: 1,
   workers: 1,
-  timeout: 90_000, // production can be slower (Cloud Run cold start)
+  timeout: testTimeout,
 
   globalSetup: './e2e/global-setup.js',
 
@@ -55,18 +64,19 @@ export default defineConfig({
           'CAD_WEB_DEV_MODE=1',
           'OTEL_ENABLED=1',
           'OTEL_EXPORTER=console',
-          'CAD_LLM_PROVIDER=mock',
+          `CAD_LLM_PROVIDER=${llmProvider}`,
+          ...(useRealGemini ? ['CAD_GCP_PROJECT=cad-dxf-agent'] : []),
           `${PROJECT_ROOT}/.venv/bin/python -m uvicorn web.backend.main:app --port 8322`,
         ].join(' '),
         port: 8322,
         cwd: PROJECT_ROOT,
         reuseExistingServer: !process.env.CI,
-        timeout: 30_000,
+        timeout: useRealGemini ? 60_000 : 30_000,
         stdout: 'pipe',
         stderr: 'pipe',
       },
       {
-        command: 'npm run dev',
+        command: 'VITE_DEV_AUTH=1 npm run dev',
         port: 3000,
         reuseExistingServer: !process.env.CI,
         timeout: 30_000,
