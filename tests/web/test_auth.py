@@ -134,9 +134,11 @@ class TestCheckLicense:
         import web.backend.auth as auth_mod
 
         auth_mod._license_cache.clear()
+        auth_mod._allowlist_cache.clear()
         old_dev = os.environ.pop("CAD_WEB_DEV_MODE", None)
         yield
         auth_mod._license_cache.clear()
+        auth_mod._allowlist_cache.clear()
         if old_dev is not None:
             os.environ["CAD_WEB_DEV_MODE"] = old_dev
         else:
@@ -177,7 +179,7 @@ class TestCheckLicense:
             await check_license(user)  # should not raise
 
     @pytest.mark.asyncio
-    async def test_new_user_auto_provisioned(self):
+    async def test_new_user_auto_provisioned_when_on_allowlist(self):
         from unittest.mock import MagicMock, patch
 
         from web.backend.auth import check_license
@@ -191,6 +193,7 @@ class TestCheckLicense:
         mock_provision = MagicMock()
         with (
             patch("web.backend.auth._fetch_license", return_value=False),
+            patch("web.backend.auth._check_email_allowed", return_value=True),
             patch("web.backend.auth._provision_license", mock_provision),
         ):
             await check_license(user)  # should not raise
@@ -218,6 +221,157 @@ class TestCheckLicense:
 
     @pytest.mark.asyncio
     async def test_dev_mode_bypasses_license(self):
+        from web.backend.auth import check_license
+
+        os.environ["CAD_WEB_DEV_MODE"] = "1"
+        user = {"uid": "any-user"}
+        await check_license(user)  # should not raise
+
+
+@pytest.mark.web
+class TestAllowlist:
+    """Test email allowlist gating for auto-provisioning."""
+
+    @pytest.fixture(autouse=True)
+    def _reset_state(self):
+        """Reset caches and env vars between tests."""
+        import web.backend.auth as auth_mod
+
+        auth_mod._license_cache.clear()
+        auth_mod._allowlist_cache.clear()
+        old_dev = os.environ.pop("CAD_WEB_DEV_MODE", None)
+        old_allowed = os.environ.pop("CAD_ALLOWED_EMAILS", None)
+        yield
+        auth_mod._license_cache.clear()
+        auth_mod._allowlist_cache.clear()
+        if old_dev is not None:
+            os.environ["CAD_WEB_DEV_MODE"] = old_dev
+        else:
+            os.environ.pop("CAD_WEB_DEV_MODE", None)
+        if old_allowed is not None:
+            os.environ["CAD_ALLOWED_EMAILS"] = old_allowed
+        else:
+            os.environ.pop("CAD_ALLOWED_EMAILS", None)
+
+    @pytest.mark.asyncio
+    async def test_unlisted_email_rejected_with_403(self):
+        """A new user not on the allowlist gets 403, not auto-provisioned."""
+        from unittest.mock import patch
+
+        from web.backend.auth import check_license
+
+        user = {
+            "uid": "stranger",
+            "email": "stranger@gmail.com",
+            "firebase": {"sign_in_provider": "google.com"},
+        }
+        with (
+            patch("web.backend.auth._fetch_license", return_value=False),
+            patch("web.backend.auth._check_email_allowed", return_value=False),
+            pytest.raises(HTTPException) as exc_info,
+        ):
+            await check_license(user)
+        assert exc_info.value.status_code == 403
+        assert "Access restricted" in exc_info.value.detail
+
+    @pytest.mark.asyncio
+    async def test_env_var_allows_email(self):
+        """Email listed in CAD_ALLOWED_EMAILS is auto-provisioned."""
+        from unittest.mock import MagicMock, patch
+
+        from web.backend.auth import check_license
+
+        os.environ["CAD_ALLOWED_EMAILS"] = "beta@test.com,vip@corp.com"
+        user = {
+            "uid": "beta-user",
+            "email": "beta@test.com",
+            "firebase": {"sign_in_provider": "google.com"},
+        }
+        mock_provision = MagicMock()
+        with (
+            patch("web.backend.auth._fetch_license", return_value=False),
+            patch("web.backend.auth._provision_license", mock_provision),
+        ):
+            await check_license(user)
+        mock_provision.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_env_var_case_insensitive(self):
+        """Allowlist matching is case-insensitive."""
+        from unittest.mock import MagicMock, patch
+
+        from web.backend.auth import check_license
+
+        os.environ["CAD_ALLOWED_EMAILS"] = "BETA@Test.COM"
+        user = {
+            "uid": "beta-user",
+            "email": "beta@test.com",
+            "firebase": {"sign_in_provider": "google.com"},
+        }
+        mock_provision = MagicMock()
+        with (
+            patch("web.backend.auth._fetch_license", return_value=False),
+            patch("web.backend.auth._provision_license", mock_provision),
+        ):
+            await check_license(user)
+        mock_provision.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_firestore_allowlist_allows_email(self):
+        """Email found in Firestore allowlist collection is auto-provisioned."""
+        from unittest.mock import MagicMock, patch
+
+        from web.backend.auth import check_license
+
+        user = {
+            "uid": "firestore-user",
+            "email": "approved@corp.com",
+            "firebase": {"sign_in_provider": "google.com"},
+        }
+        mock_provision = MagicMock()
+        with (
+            patch("web.backend.auth._fetch_license", return_value=False),
+            patch("web.backend.auth._check_email_allowed", return_value=True),
+            patch("web.backend.auth._provision_license", mock_provision),
+        ):
+            await check_license(user)
+        mock_provision.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_existing_license_skips_allowlist(self):
+        """A user with an active license is not checked against the allowlist."""
+        from unittest.mock import patch
+
+        from web.backend.auth import check_license
+
+        user = {
+            "uid": "existing-user",
+            "email": "old@example.com",
+            "firebase": {"sign_in_provider": "google.com"},
+        }
+        # _check_email_allowed should NOT be called
+        with (
+            patch("web.backend.auth._fetch_license", return_value=True),
+            patch("web.backend.auth._check_email_allowed") as mock_check,
+        ):
+            await check_license(user)
+        mock_check.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_allowlist_cached(self):
+        """Second check for same email uses the cache, not Firestore."""
+        import time
+
+        from web.backend.auth import _allowlist_cache, _check_email_allowed
+
+        # Pre-populate cache
+        _allowlist_cache["cached@test.com"] = (True, time.monotonic())
+        # No Firestore or env var needed — cache hit
+        assert _check_email_allowed("cached@test.com") is True
+
+    @pytest.mark.asyncio
+    async def test_dev_mode_bypasses_allowlist(self):
+        """Dev mode skips the entire license+allowlist chain."""
         from web.backend.auth import check_license
 
         os.environ["CAD_WEB_DEV_MODE"] = "1"

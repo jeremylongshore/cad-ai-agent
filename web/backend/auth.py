@@ -24,6 +24,10 @@ _PROFILE_CACHE_TTL = 300  # 5 minutes
 _tenant_cache: dict[str, tuple[dict, float]] = {}
 _TENANT_CACHE_TTL = 600  # 10 minutes — tenants rarely change
 
+# Allowlist cache: {email: (allowed: bool, timestamp: float)}
+_allowlist_cache: dict[str, tuple[bool, float]] = {}
+_ALLOWLIST_CACHE_TTL = 300  # 5 minutes
+
 # Lazy-init firebase admin
 _firebase_app = None
 
@@ -115,8 +119,16 @@ async def check_license(user: dict) -> None:
         active = await run_in_threadpool(_fetch_license, uid)
 
         if not active:
-            # Auto-provision 30-day trial for any Google sign-in
+            # Only auto-provision if the email is on the allowlist
             email = user.get("email", "").lower()
+            allowed = await run_in_threadpool(_check_email_allowed, email)
+            if not allowed:
+                _license_cache[uid] = (False, now)
+                logger.info("Rejected unlisted email %s", email)
+                raise HTTPException(
+                    status_code=403,
+                    detail="Access restricted — contact admin for an invitation",
+                )
             await run_in_threadpool(_provision_license, uid, email)
             _license_cache[uid] = (True, now)
             logger.info("Auto-provisioned 30-day trial for %s", email)
@@ -166,6 +178,48 @@ def _provision_license(uid: str, email: str) -> None:
             "expires_at": datetime.datetime.now(datetime.UTC) + datetime.timedelta(days=30),
         }
     )
+
+
+def _check_email_allowed(email: str) -> bool:
+    """Check if an email is on the allowlist (env var or Firestore).
+
+    Two sources are checked in order:
+    1. ``CAD_ALLOWED_EMAILS`` env var — comma-separated list of emails
+    2. Firestore ``allowlist/{email}`` document
+
+    Results are cached for 5 minutes.  Called via ``run_in_threadpool``.
+    """
+    email = email.lower().strip()
+    now = time.monotonic()
+
+    cached = _allowlist_cache.get(email)
+    if cached is not None:
+        allowed, ts = cached
+        if now - ts < _ALLOWLIST_CACHE_TTL:
+            return allowed
+
+    # 1. Check env var (fast, no network)
+    env_list = os.getenv("CAD_ALLOWED_EMAILS", "")
+    if env_list:
+        allowed_emails = [e.strip().lower() for e in env_list.split(",") if e.strip()]
+        if email in allowed_emails:
+            _allowlist_cache[email] = (True, now)
+            return True
+
+    # 2. Check Firestore allowlist collection
+    try:
+        from google.cloud import firestore
+
+        db = firestore.Client()
+        doc = db.collection("allowlist").document(email).get()
+        found: bool = bool(doc.exists)
+    except Exception as exc:
+        logger.warning("Allowlist Firestore check failed: %s", exc)
+        # Fail closed — deny access if we can't verify
+        found = False
+
+    _allowlist_cache[email] = (found, now)
+    return found
 
 
 # ---------------------------------------------------------------------------
