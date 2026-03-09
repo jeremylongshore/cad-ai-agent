@@ -234,7 +234,8 @@ def _fetch_or_create_profile(uid: str, email: str, display_name: str) -> dict:
 
     # First login — create tenant + profile
     tenant_id = uuid.uuid4().hex[:12]
-    tenant_name = f"{display_name or email.split('@')[0]}'s Workspace"
+    name_part = display_name or (email.split("@")[0] if "@" in email else "") or "Personal"
+    tenant_name = f"{name_part}'s Workspace"
 
     tenant_data = {
         "tenant_id": tenant_id,

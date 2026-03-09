@@ -486,8 +486,8 @@ async def _save_work_progress(session: Session, user_id: str) -> None:
         store = _get_document_store()
         store.save_work_progress(user_id, session.document_id, progress, working_path)
         logger.debug("Auto-saved work progress for doc %s", session.document_id)
-    except Exception:
-        logger.warning("Work progress auto-save failed (non-fatal)", exc_info=True)
+    except (OSError, ValueError, TypeError) as exc:
+        logger.warning("Work progress auto-save failed (non-fatal): %s", exc)
 
 
 def _restore_work_progress(session: Session, user_id: str, store) -> bool:
