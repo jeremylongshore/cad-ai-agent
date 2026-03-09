@@ -30,13 +30,19 @@ Routes:
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import shutil
 import sys
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Literal
+from typing import TYPE_CHECKING, Any, Literal
+
+if TYPE_CHECKING:
+    from cad_dxf_agent.models.cad_schema import DrawingContext
+    from cad_dxf_agent.models.objective_schema import ObjectiveClassification
+    from cad_dxf_agent.models.ops_schema import ChangeSet
 
 from fastapi import Depends, FastAPI, File, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -60,11 +66,28 @@ logger = logging.getLogger(__name__)
 # Constants
 # ---------------------------------------------------------------------------
 MAX_CONVERSATION_HISTORY = 10  # Max user+model entries kept per session
+MAX_UPLOAD_SIZE = 25 * 1024 * 1024  # 25 MB — shared across all upload endpoints
+RENDER_ENTITY_LIMIT = 100_000  # Skip DXF preview render above this (OOM risk)
 
 # ---------------------------------------------------------------------------
 # Session manager (singleton)
 # ---------------------------------------------------------------------------
 session_mgr = SessionManager()
+
+
+SESSION_CLEANUP_INTERVAL = 30 * 60  # 30 minutes
+
+
+async def _session_cleanup_loop():
+    """Periodically remove expired sessions to prevent memory/disk leaks."""
+    while True:
+        await asyncio.sleep(SESSION_CLEANUP_INTERVAL)
+        try:
+            removed = session_mgr.cleanup_expired()
+            if removed:
+                logger.info("Session cleanup: removed %d expired session(s)", removed)
+        except Exception:
+            logger.exception("Session cleanup failed")
 
 
 @asynccontextmanager
@@ -75,7 +98,10 @@ async def lifespan(app: FastAPI):
 
     init_otel(service_name="cad-dxf-web")
     logger.info("CAD DXF Web Backend starting")
+
+    cleanup_task = asyncio.create_task(_session_cleanup_loop())
     yield
+    cleanup_task.cancel()
     logger.info("CAD DXF Web Backend shutting down")
 
 
@@ -723,7 +749,7 @@ async def compare_library_documents(
         raise HTTPException(status_code=400, detail=str(e)) from None
     except Exception as e:
         logger.error("Library comparison failed: %s", e, exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Comparison failed: {e}") from None
+        raise HTTPException(status_code=500, detail="Comparison failed") from None
 
 
 @app.post("/api/upload")
@@ -742,8 +768,7 @@ async def upload(
     session = session_mgr.create(user_id=user["uid"])
     session_dir = Path("/tmp/cad-sessions") / session.session_id
 
-    # Save uploaded file — enforce size limit (ARCH-REVIEW-CAD-01 P0)
-    MAX_UPLOAD_SIZE = 25 * 1024 * 1024  # 25 MB
+    # Save uploaded file — enforce size limit
     upload_path = session_dir / f"upload{ext}"
     content = await file.read()
     if len(content) > MAX_UPLOAD_SIZE:
@@ -807,12 +832,14 @@ async def upload(
         }
     except Exception as e:
         logger.error("Failed to load DXF: %s", e)
-        raise HTTPException(status_code=422, detail=f"Failed to read DXF: {e}") from None
+        raise HTTPException(
+            status_code=422,
+            detail="Failed to read DXF file. It may be corrupted.",
+        ) from None
 
     # Render original preview
     # For PDF uploads: render first page directly (fast, no entity limit concern)
     # For DXF uploads: use ezdxf renderer (skip if too many entities — OOM risk)
-    RENDER_ENTITY_LIMIT = 100_000
     if ext == ".pdf":
         try:
             preview_path = session_dir / "original.png"
@@ -931,7 +958,7 @@ async def plan(body: PlanRequest, user: dict = Depends(get_user)):
 
     except Exception as e:
         logger.error("Plan failed: %s", e, exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Planning failed: {e}") from None
+        raise HTTPException(status_code=500, detail="Planning failed") from None
 
 
 @app.post("/api/v2/prompt")
@@ -1120,7 +1147,9 @@ async def v2_prompt(body: PromptRequest, user: dict = Depends(get_user)):
                 audit.total_request_time_ms = (_time.monotonic() - total_start) * 1000
                 return _enrich(
                     ResponseBuilder.needs_clarification(
-                        message="Select entities to use as the exemplar for repeated-condition search.",
+                        message=(
+                            "Select entities to use as the exemplar for repeated-condition search."
+                        ),
                         family=TaskFamily.REPEATED_CONDITION,
                         audit=audit,
                     ).model_dump()
@@ -1429,7 +1458,7 @@ async def v2_prompt(body: PromptRequest, user: dict = Depends(get_user)):
 
             except Exception as e:
                 logger.error("v2 plan failed: %s", e, exc_info=True)
-                raise HTTPException(status_code=500, detail=f"Planning failed: {e}") from None
+                raise HTTPException(status_code=500, detail="Planning failed") from None
 
         # Catch-all for families that are "implemented" but not yet wired
         audit.total_request_time_ms = (_time.monotonic() - total_start) * 1000
@@ -1607,77 +1636,84 @@ async def v2_apply(body: V2ApplyRequest, user: dict = Depends(get_user)):
 @app.post("/api/apply")
 async def apply_changes(body: ApplyRequest, user: dict = Depends(get_user)):
     """Apply (selected) operations from the last plan."""
-    try:
-        session = session_mgr.get(body.session_id, user["uid"])
-    except (KeyError, PermissionError) as e:
-        raise HTTPException(status_code=404, detail=str(e)) from None
-
-    if session.changeset is None:
-        raise HTTPException(status_code=400, detail="No plan to apply. Run /api/plan first.")
-
-    try:
-        from cad_dxf_agent.core.edit_engine import EditEngine
-        from cad_dxf_agent.models.ops_schema import ChangeSet
-
-        changeset = session.changeset
-
-        # Filter to selected ops if specified
-        if body.selected_ops is not None:
-            selected = [
-                changeset.operations[i]
-                for i in body.selected_ops
-                if 0 <= i < len(changeset.operations)
-            ]
-            changeset = ChangeSet(
-                operations=selected,
-                prompt=changeset.prompt,
-            )
-
-        # Apply
-        engine = EditEngine(session.working_path)
-        results = engine.apply_changeset(changeset)
-
-        # Save edited file
-        session_dir = Path("/tmp/cad-sessions") / session.session_id
-        session.edited_path = session_dir / "edited.dxf"
-        engine.save(session.edited_path)
-
-        # Push edit snapshot for undo/redo (EPIC-CAD-27)
-        if session.edit_history is not None:
-            try:
-                label = changeset.prompt or "edit"
-                session.edit_history.push(engine.doc, label=label)
-            except Exception as hist_err:
-                logger.warning("Edit history push failed (non-fatal): %s", hist_err)
-
-        # Render edited preview
+    async with session_mgr.session_lock(body.session_id):
         try:
-            from cad_dxf_agent.core.renderer import render_dxf_to_png
+            session = session_mgr.get(body.session_id, user["uid"])
+        except (KeyError, PermissionError) as e:
+            raise HTTPException(status_code=404, detail=str(e)) from None
 
-            render_result = render_dxf_to_png(session.edited_path, session_dir / "edited.png")
-            if render_result.success:
-                session.edited_render = render_result.output_path
-            else:
-                logger.warning("Edited render returned failure: %s", render_result.error)
+        if session.changeset is None:
+            raise HTTPException(status_code=400, detail="No plan to apply. Run /api/plan first.")
+
+        try:
+            from cad_dxf_agent.core.edit_engine import EditEngine
+            from cad_dxf_agent.models.ops_schema import ChangeSet
+
+            changeset = session.changeset
+
+            # Filter to selected ops if specified
+            if body.selected_ops is not None:
+                selected = [
+                    changeset.operations[i]
+                    for i in sorted(set(body.selected_ops))
+                    if 0 <= i < len(changeset.operations)
+                ]
+                changeset = ChangeSet(
+                    operations=selected,
+                    prompt=changeset.prompt,
+                )
+
+            # Apply
+            engine = EditEngine(session.working_path)
+            results = engine.apply_changeset(changeset)
+
+            # Save edited file
+            session_dir = Path("/tmp/cad-sessions") / session.session_id
+            session.edited_path = session_dir / "edited.dxf"
+            engine.save(session.edited_path)
+
+            # Push edit snapshot for undo/redo (EPIC-CAD-27)
+            if session.edit_history is not None:
+                try:
+                    label = changeset.prompt or "edit"
+                    session.edit_history.push(engine.doc, label=label)
+                except Exception as hist_err:
+                    logger.warning("Edit history push failed (non-fatal): %s", hist_err)
+
+            # Render edited preview
+            try:
+                from cad_dxf_agent.core.renderer import render_dxf_to_png
+
+                render_result = render_dxf_to_png(session.edited_path, session_dir / "edited.png")
+                if render_result.success:
+                    session.edited_render = render_result.output_path
+                else:
+                    logger.warning("Edited render returned failure: %s", render_result.error)
+                    session.edited_render = None
+            except Exception as e:
+                logger.warning("Edited render failed (non-fatal): %s", e, exc_info=True)
                 session.edited_render = None
+
+            render_available = session.edited_render is not None and session.edited_render.exists()
+            success_count = sum(1 for r in results if r.success)
+            return {
+                "message": f"Applied {success_count}/{len(results)} operations.",
+                "render_available": render_available,
+                "results": [
+                    {
+                        "success": r.success,
+                        "message": r.message if hasattr(r, "message") else "",
+                    }
+                    for r in results
+                ],
+            }
+
         except Exception as e:
-            logger.warning("Edited render failed (non-fatal): %s", e, exc_info=True)
-            session.edited_render = None
-
-        render_available = session.edited_render is not None and session.edited_render.exists()
-        success_count = sum(1 for r in results if r.success)
-        return {
-            "message": f"Applied {success_count}/{len(results)} operations.",
-            "render_available": render_available,
-            "results": [
-                {"success": r.success, "message": r.message if hasattr(r, "message") else ""}
-                for r in results
-            ],
-        }
-
-    except Exception as e:
-        logger.error("Apply failed: %s", e, exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Apply failed: {e}") from None
+            logger.error("Apply failed: %s", e, exc_info=True)
+            raise HTTPException(
+                status_code=500,
+                detail="Apply failed",
+            ) from None
 
 
 @app.post("/api/clear-history")
@@ -1743,56 +1779,58 @@ def _save_restored_dxf(session: Session, doc: object) -> None:
 async def undo(body: UndoRedoRequest, user: dict = Depends(get_user)):
     """Undo the last edit operation, restoring the previous DXF state."""
     session, history = _get_session_history(body.session_id, user)
-    if not history.can_undo:
+    async with session_mgr.session_lock(body.session_id):
+        if not history.can_undo:
+            return {
+                "undone": False,
+                "message": "Already at initial state — nothing to undo.",
+                "can_undo": False,
+                "can_redo": history.can_redo,
+                "current_label": history.current_label,
+                "depth": history.depth,
+            }
+
+        doc = history.undo()
+        if doc is not None:
+            _save_restored_dxf(session, doc)
+
         return {
-            "undone": False,
-            "message": "Already at initial state — nothing to undo.",
-            "can_undo": False,
+            "undone": True,
+            "message": f"Undone. Now at: {history.current_label}",
+            "can_undo": history.can_undo,
             "can_redo": history.can_redo,
             "current_label": history.current_label,
             "depth": history.depth,
         }
-
-    doc = history.undo()
-    if doc is not None:
-        _save_restored_dxf(session, doc)
-
-    return {
-        "undone": True,
-        "message": f"Undone. Now at: {history.current_label}",
-        "can_undo": history.can_undo,
-        "can_redo": history.can_redo,
-        "current_label": history.current_label,
-        "depth": history.depth,
-    }
 
 
 @app.post("/api/redo")
 async def redo(body: UndoRedoRequest, user: dict = Depends(get_user)):
     """Redo the previously undone edit operation."""
     session, history = _get_session_history(body.session_id, user)
-    if not history.can_redo:
+    async with session_mgr.session_lock(body.session_id):
+        if not history.can_redo:
+            return {
+                "redone": False,
+                "message": "Already at latest state — nothing to redo.",
+                "can_undo": history.can_undo,
+                "can_redo": False,
+                "current_label": history.current_label,
+                "depth": history.depth,
+            }
+
+        doc = history.redo()
+        if doc is not None:
+            _save_restored_dxf(session, doc)
+
         return {
-            "redone": False,
-            "message": "Already at latest state — nothing to redo.",
+            "redone": True,
+            "message": f"Redone. Now at: {history.current_label}",
             "can_undo": history.can_undo,
-            "can_redo": False,
+            "can_redo": history.can_redo,
             "current_label": history.current_label,
             "depth": history.depth,
         }
-
-    doc = history.redo()
-    if doc is not None:
-        _save_restored_dxf(session, doc)
-
-    return {
-        "redone": True,
-        "message": f"Redone. Now at: {history.current_label}",
-        "can_undo": history.can_undo,
-        "can_redo": history.can_redo,
-        "current_label": history.current_label,
-        "depth": history.depth,
-    }
 
 
 @app.post("/api/snapshot")
@@ -1873,17 +1911,22 @@ async def compare(
                 status_code=400, detail="No master file loaded. Upload a file first."
             )
 
-        # Save uploaded file
+        # Save uploaded file — enforce size limit
+        content = await file.read()
+        if len(content) > MAX_UPLOAD_SIZE:
+            raise HTTPException(
+                status_code=413,
+                detail=f"File too large ({len(content) / 1024 / 1024:.1f} MB). Maximum is 25 MB.",
+            )
+
         session_dir = Path("/tmp/cad-sessions") / session.session_id
         revision_path = session_dir / "revision.dxf"
 
         if ext == ".dwg":
             dwg_path = session_dir / "revision_upload.dwg"
-            content = await file.read()
             dwg_path.write_bytes(content)
             _convert_dwg_to_dxf(dwg_path, output_dir=session_dir, dest_path=revision_path)
         else:
-            content = await file.read()
             revision_path.write_bytes(content)
 
         try:
@@ -1931,22 +1974,19 @@ async def compare(
             raise HTTPException(status_code=400, detail=str(e)) from None
         except Exception as e:
             logger.error("Comparison failed: %s", e, exc_info=True)
-            raise HTTPException(status_code=500, detail=f"Comparison failed: {e}") from None
+            raise HTTPException(status_code=500, detail="Comparison failed") from None
 
 
 @app.get("/api/dxf")
 async def get_dxf_file(
     session_id: str = Query(...),
     render_type: str = Query("original", alias="type"),
+    user: dict = Depends(get_user),
 ):
-    """Serve raw DXF for client-side WebGL rendering.
-
-    No auth required — same rationale as /api/render (Firebase rewrites
-    strip Authorization headers on proxied GET requests).
-    """
+    """Serve raw DXF for client-side WebGL rendering."""
     try:
-        session = session_mgr.get_by_id(session_id)
-    except KeyError as e:
+        session = session_mgr.get(session_id, user["uid"])
+    except (KeyError, PermissionError) as e:
         raise HTTPException(status_code=404, detail=str(e)) from None
 
     dxf_map: dict[str, Path | None] = {
@@ -1970,16 +2010,12 @@ async def get_dxf_file(
 async def render(
     session_id: str = Query(...),
     render_type: str = Query("original", alias="type"),
+    user: dict = Depends(get_user),
 ):
-    """Return a PNG render of the drawing.
-
-    No auth required — the session UUID is unguessable and serves as
-    the access credential.  This avoids the problem where Firebase
-    Hosting rewrites strip the Authorization header on proxied GETs.
-    """
+    """Return a PNG render of the drawing."""
     try:
-        session = session_mgr.get_by_id(session_id)
-    except KeyError as e:
+        session = session_mgr.get(session_id, user["uid"])
+    except (KeyError, PermissionError) as e:
         raise HTTPException(status_code=404, detail=str(e)) from None
 
     render_map = {
@@ -2004,18 +2040,16 @@ async def render(
 async def download(
     session_id: str = Query(...),
     output_format: str = Query("dxf", alias="format"),
+    user: dict = Depends(get_user),
 ):
     """Download the edited file as DXF or DWG.
-
-    No auth required — same rationale as /api/render (Firebase rewrites
-    strip Authorization headers on proxied GET requests).
 
     Query params:
         format: "dxf" (default) or "dwg" (converts via ODA before download).
     """
     try:
-        session = session_mgr.get_by_id(session_id)
-    except KeyError as e:
+        session = session_mgr.get(session_id, user["uid"])
+    except (KeyError, PermissionError) as e:
         raise HTTPException(status_code=404, detail=str(e)) from None
 
     if session.edited_path is None or not session.edited_path.exists():
@@ -2104,16 +2138,22 @@ async def revision_upload(
         except (KeyError, PermissionError) as e:
             raise HTTPException(status_code=404, detail=str(e)) from None
 
+        # Enforce size limit
+        content = await file.read()
+        if len(content) > MAX_UPLOAD_SIZE:
+            raise HTTPException(
+                status_code=413,
+                detail=f"File too large ({len(content) / 1024 / 1024:.1f} MB). Maximum is 25 MB.",
+            )
+
         session_dir = Path("/tmp/cad-sessions") / session.session_id
         revision_path = session_dir / "revision.dxf"
 
         if ext == ".dwg":
             dwg_path = session_dir / "revision_upload.dwg"
-            content = await file.read()
             dwg_path.write_bytes(content)
             _convert_dwg_to_dxf(dwg_path, output_dir=session_dir, dest_path=revision_path)
         else:
-            content = await file.read()
             revision_path.write_bytes(content)
         session.revision_path = revision_path
 
@@ -2175,7 +2215,7 @@ async def revision_align(body: RevisionAlignRequest, user: dict = Depends(get_us
             raise HTTPException(status_code=400, detail=str(e)) from None
         except Exception as e:
             logger.error("Alignment failed: %s", e, exc_info=True)
-            raise HTTPException(status_code=500, detail=f"Alignment failed: {e}") from None
+            raise HTTPException(status_code=500, detail="Alignment failed") from None
 
 
 @app.post("/api/revision/diff")
@@ -2268,7 +2308,7 @@ async def revision_diff(body: RevisionDiffRequest, user: dict = Depends(get_user
 
         except Exception as e:
             logger.error("Diff failed: %s", e, exc_info=True)
-            raise HTTPException(status_code=500, detail=f"Diff failed: {e}") from None
+            raise HTTPException(status_code=500, detail="Diff failed") from None
 
 
 @app.post("/api/revision/approve")
@@ -2309,7 +2349,7 @@ async def revision_approve(body: RevisionApproveRequest, user: dict = Depends(ge
             raise HTTPException(status_code=400, detail=str(e)) from None
         except Exception as e:
             logger.error("Approve failed: %s", e, exc_info=True)
-            raise HTTPException(status_code=500, detail=f"Approve failed: {e}") from None
+            raise HTTPException(status_code=500, detail="Approve failed") from None
 
 
 @app.post("/api/revision/apply")
@@ -2362,22 +2402,24 @@ async def revision_apply(body: RevisionApplyRequest, user: dict = Depends(get_us
 
         except Exception as e:
             logger.error("Apply failed: %s", e, exc_info=True)
-            raise HTTPException(status_code=500, detail=f"Apply failed: {e}") from None
+            raise HTTPException(
+                status_code=500,
+                detail="Apply failed",
+            ) from None
 
 
 @app.get("/api/revision/download")
-async def revision_download(session_id: str = Query(...)):
-    """Download the revision bundle as a zip file.
-
-    No auth required — same rationale as /api/render (Firebase rewrites
-    strip Authorization headers on proxied GET requests).
-    """
+async def revision_download(
+    session_id: str = Query(...),
+    user: dict = Depends(get_user),
+):
+    """Download the revision bundle as a zip file."""
     import io
     import zipfile
 
     try:
-        session = session_mgr.get_by_id(session_id)
-    except KeyError as e:
+        session = session_mgr.get(session_id, user["uid"])
+    except (KeyError, PermissionError) as e:
         raise HTTPException(status_code=404, detail=str(e)) from None
 
     if session.bundle_dir is None or not session.bundle_dir.exists():

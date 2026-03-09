@@ -30,9 +30,16 @@ class TestExtractSnapshots:
         master, _ = make_identical_pair(tmp_path)
         snaps = extract_snapshots(master)
         lines = [s for s in snaps if s.entity_type == EntityType.LINE]
-        assert len(lines) >= 1
+        # _build_base creates 2 lines: (0,0)-(10,0) and (0,0)-(0,10)
+        assert len(lines) == 2
         for line in lines:
             assert len(line.points) == 2
+        # Verify actual coordinates of the known lines
+        line_coords = sorted(
+            [(ln.points[0].x, ln.points[0].y, ln.points[1].x, ln.points[1].y) for ln in lines]
+        )
+        assert line_coords[0] == pytest.approx((0, 0, 0, 10))
+        assert line_coords[1] == pytest.approx((0, 0, 10, 0))
 
     def test_text_has_content(self, tmp_path):
         master, _ = make_identical_pair(tmp_path)
@@ -82,16 +89,26 @@ class TestExtractSnapshots:
         master, _ = make_identical_pair(tmp_path)
         snaps = extract_snapshots(master)
         for snap in snaps:
-            # Centroid should be finite
             assert snap.centroid.x != float("inf")
             assert snap.centroid.y != float("inf")
+        # Verify centroid of known line (0,0)-(10,0) is midpoint (5,0)
+        lines = [s for s in snaps if s.entity_type == EntityType.LINE]
+        horiz = [ln for ln in lines if ln.points[1].x == pytest.approx(10.0)]
+        assert len(horiz) == 1
+        assert horiz[0].centroid.x == pytest.approx(5.0)
+        assert horiz[0].centroid.y == pytest.approx(0.0)
 
     def test_handles_are_strings(self, tmp_path):
         master, _ = make_identical_pair(tmp_path)
         snaps = extract_snapshots(master)
+        # _build_base creates 4 entities: 2 lines + 1 text + 1 lwpolyline
+        assert len(snaps) == 4
         for snap in snaps:
             assert isinstance(snap.handle, str)
             assert len(snap.handle) > 0
+        # All handles must be unique (DXF invariant)
+        handles = [s.handle for s in snaps]
+        assert len(handles) == len(set(handles))
 
     def test_complex_drawing(self, tmp_path):
         master, _ = make_complex_pair(tmp_path)
@@ -836,6 +853,298 @@ class TestExtractOneExceptionPaths:
         assert result is None
 
 
+# ---------------------------------------------------------------------------
+# Mutation-killing tests — _extract_one attribute detail assertions,
+# INSERT xscale/yscale/rotation, ARC angles, CIRCLE radius,
+# TEXT text_geometry extracted, xref warning message content,
+# extract_snapshots profile filtering with count verification
+# ---------------------------------------------------------------------------
+
+
+class TestExtractOneAttributeDetailsMutationKilling:
+    """Kill attribute-value mutations in _extract_one branches."""
+
+    def test_arc_start_angle_exact_value(self, tmp_path):
+        """ARC start_angle must be extracted exactly (not end_angle)."""
+        import ezdxf
+
+        doc = ezdxf.new(dxfversion="R2018")
+        msp = doc.modelspace()
+        doc.layers.add("L", color=1)
+        msp.add_arc(
+            (10, 20), radius=5.0, start_angle=30.0, end_angle=120.0, dxfattribs={"layer": "L"}
+        )
+        path = tmp_path / "arc_angles.dxf"
+        doc.saveas(str(path))
+
+        snaps = extract_snapshots(path)
+        arcs = [s for s in snaps if s.entity_type == EntityType.ARC]
+        assert len(arcs) == 1
+        assert arcs[0].attributes["start_angle"] == pytest.approx(30.0)
+        assert arcs[0].attributes["end_angle"] == pytest.approx(120.0)
+        # Verify they are NOT swapped
+        assert arcs[0].attributes["start_angle"] != pytest.approx(120.0)
+
+    def test_arc_radius_exact_value(self, tmp_path):
+        """ARC radius attribute must hold the precise radius value."""
+        import ezdxf
+
+        doc = ezdxf.new(dxfversion="R2018")
+        msp = doc.modelspace()
+        doc.layers.add("L", color=1)
+        msp.add_arc((0, 0), radius=7.5, start_angle=0, end_angle=90, dxfattribs={"layer": "L"})
+        path = tmp_path / "arc_radius.dxf"
+        doc.saveas(str(path))
+
+        snaps = extract_snapshots(path)
+        arcs = [s for s in snaps if s.entity_type == EntityType.ARC]
+        assert len(arcs) == 1
+        assert arcs[0].attributes["radius"] == pytest.approx(7.5)
+
+    def test_arc_centre_point_exact_coordinates(self, tmp_path):
+        """ARC centre point must match the actual centre (not a different corner)."""
+        import ezdxf
+
+        doc = ezdxf.new(dxfversion="R2018")
+        msp = doc.modelspace()
+        doc.layers.add("L", color=1)
+        msp.add_arc((15, 25), radius=3.0, start_angle=45, end_angle=135, dxfattribs={"layer": "L"})
+        path = tmp_path / "arc_centre.dxf"
+        doc.saveas(str(path))
+
+        snaps = extract_snapshots(path)
+        arcs = [s for s in snaps if s.entity_type == EntityType.ARC]
+        assert len(arcs) == 1
+        assert arcs[0].points[0].x == pytest.approx(15.0)
+        assert arcs[0].points[0].y == pytest.approx(25.0)
+
+    def test_circle_radius_exact_value(self, tmp_path):
+        """CIRCLE radius attribute must hold the precise value."""
+        import ezdxf
+
+        doc = ezdxf.new(dxfversion="R2018")
+        msp = doc.modelspace()
+        doc.layers.add("L", color=1)
+        msp.add_circle((0, 0), radius=12.5, dxfattribs={"layer": "L"})
+        path = tmp_path / "circle_radius.dxf"
+        doc.saveas(str(path))
+
+        snaps = extract_snapshots(path)
+        circles = [s for s in snaps if s.entity_type == EntityType.CIRCLE]
+        assert len(circles) == 1
+        assert circles[0].attributes["radius"] == pytest.approx(12.5)
+
+    def test_circle_centre_point_exact_coordinates(self, tmp_path):
+        """CIRCLE centre point must match the actual centre."""
+        import ezdxf
+
+        doc = ezdxf.new(dxfversion="R2018")
+        msp = doc.modelspace()
+        doc.layers.add("L", color=1)
+        msp.add_circle((33.0, 44.0), radius=5.0, dxfattribs={"layer": "L"})
+        path = tmp_path / "circle_centre.dxf"
+        doc.saveas(str(path))
+
+        snaps = extract_snapshots(path)
+        circles = [s for s in snaps if s.entity_type == EntityType.CIRCLE]
+        assert len(circles) == 1
+        assert circles[0].points[0].x == pytest.approx(33.0)
+        assert circles[0].points[0].y == pytest.approx(44.0)
+
+    def test_insert_xscale_extracted_correctly(self, tmp_path):
+        """INSERT xscale attribute must be extracted (not confused with yscale)."""
+        import ezdxf
+
+        doc = ezdxf.new(dxfversion="R2018")
+        msp = doc.modelspace()
+        doc.layers.add("L", color=1)
+        blk = doc.blocks.new("SCALED_BLK")
+        blk.add_circle((0, 0), radius=1)
+        msp.add_blockref(
+            "SCALED_BLK",
+            insert=(5, 5),
+            dxfattribs={"layer": "L", "xscale": 2.0, "yscale": 3.0, "rotation": 45.0},
+        )
+        path = tmp_path / "insert_scale.dxf"
+        doc.saveas(str(path))
+
+        snaps = extract_snapshots(path)
+        inserts = [s for s in snaps if s.entity_type == EntityType.INSERT]
+        assert len(inserts) == 1
+        assert inserts[0].attributes["insert_xscale"] == pytest.approx(2.0)
+        assert inserts[0].attributes["insert_yscale"] == pytest.approx(3.0)
+        # xscale != yscale ensures they are not swapped
+        assert inserts[0].attributes["insert_xscale"] != pytest.approx(3.0)
+
+    def test_insert_rotation_extracted_and_normalised(self, tmp_path):
+        """INSERT rotation must be extracted modulo 360."""
+        import ezdxf
+
+        doc = ezdxf.new(dxfversion="R2018")
+        msp = doc.modelspace()
+        doc.layers.add("L", color=1)
+        blk = doc.blocks.new("ROT_BLK")
+        blk.add_circle((0, 0), radius=1)
+        # rotation = 90.0
+        msp.add_blockref(
+            "ROT_BLK",
+            insert=(0, 0),
+            dxfattribs={"layer": "L", "rotation": 90.0},
+        )
+        path = tmp_path / "insert_rot.dxf"
+        doc.saveas(str(path))
+
+        snaps = extract_snapshots(path)
+        inserts = [s for s in snaps if s.entity_type == EntityType.INSERT]
+        assert len(inserts) == 1
+        assert inserts[0].attributes["insert_rotation"] == pytest.approx(90.0)
+
+    def test_insert_rotation_above_360_normalised(self, tmp_path):
+        """INSERT rotation > 360 must be reduced modulo 360."""
+        import ezdxf
+
+        doc = ezdxf.new(dxfversion="R2018")
+        msp = doc.modelspace()
+        doc.layers.add("L", color=1)
+        blk = doc.blocks.new("ROT2_BLK")
+        blk.add_circle((0, 0), radius=1)
+        # 450 % 360 == 90
+        msp.add_blockref(
+            "ROT2_BLK",
+            insert=(0, 0),
+            dxfattribs={"layer": "L", "rotation": 450.0},
+        )
+        path = tmp_path / "insert_rot2.dxf"
+        doc.saveas(str(path))
+
+        snaps = extract_snapshots(path)
+        inserts = [s for s in snaps if s.entity_type == EntityType.INSERT]
+        assert len(inserts) == 1
+        assert inserts[0].attributes["insert_rotation"] == pytest.approx(90.0)
+
+    def test_text_entity_text_geometry_extracted(self, tmp_path):
+        """TEXT entity must have text_geometry populated (not None)."""
+        import ezdxf
+
+        doc = ezdxf.new(dxfversion="R2018")
+        msp = doc.modelspace()
+        doc.layers.add("L", color=1)
+        msp.add_text("Hello", dxfattribs={"layer": "L", "insert": (0, 0), "height": 2.5})
+        path = tmp_path / "text_geo.dxf"
+        doc.saveas(str(path))
+
+        snaps = extract_snapshots(path)
+        texts = [s for s in snaps if s.entity_type == EntityType.TEXT]
+        assert len(texts) == 1
+        assert texts[0].text_content == "Hello"
+        # text_geometry must be populated (not None) for TEXT entities
+        assert texts[0].text_geometry is not None
+
+
+class TestXrefWarningContentMutationKilling:
+    """Kill mutations on xref warning message content (block name, count, 'external reference')."""
+
+    def test_xref_warning_contains_external_reference_phrase(self, tmp_path):
+        """The xref warning must contain the exact phrase 'external reference'."""
+        from tests.helpers.comparison_factory import make_xref_pair
+
+        master, _ = make_xref_pair(tmp_path)
+        warnings: list[str] = []
+        extract_snapshots(master, _profile_warnings=warnings)
+
+        xref_warnings = [w for w in warnings if "external reference" in w.lower()]
+        assert xref_warnings
+        # Must contain 'external reference' (not just 'xref' or 'reference')
+        assert "external reference" in xref_warnings[0].lower()
+
+    def test_xref_warning_contains_xref_count(self, tmp_path):
+        """The xref warning must mention the count of xref blocks found."""
+        from tests.helpers.comparison_factory import make_xref_pair
+
+        master, _ = make_xref_pair(tmp_path)
+        warnings: list[str] = []
+        extract_snapshots(master, _profile_warnings=warnings)
+
+        xref_warnings = [w for w in warnings if "external reference" in w.lower()]
+        assert xref_warnings
+        # The factory creates 1 xref block (GRID_REF) — '1' must appear in the warning
+        assert "1" in xref_warnings[0]
+
+    def test_xref_warning_contains_block_name_not_just_count(self, tmp_path):
+        """Warning must contain the specific block name 'GRID_REF', not just a count."""
+        from tests.helpers.comparison_factory import make_xref_pair
+
+        master, _ = make_xref_pair(tmp_path)
+        warnings: list[str] = []
+        extract_snapshots(master, _profile_warnings=warnings)
+
+        xref_warnings = [w for w in warnings if "external reference" in w.lower()]
+        assert xref_warnings
+        assert "GRID_REF" in xref_warnings[0]
+
+
+class TestExtractSnapshotsProfileFilteringCount:
+    """Kill mutations on profile filtering logic in extract_snapshots."""
+
+    def test_focus_type_filter_exact_count(self, tmp_path):
+        """focus_entity_types=LINE should return exactly the LINE count, not all entities."""
+        master, _ = make_identical_pair(tmp_path)
+        # _build_base creates: 2 lines, 1 text, 1 lwpolyline = 4 total
+        all_snaps = extract_snapshots(master)
+        total = len(all_snaps)
+
+        config = ComparisonConfig(focus_entity_types=[EntityType.LINE])
+        filtered = extract_snapshots(master, config)
+        assert len(filtered) == 2  # Exactly the 2 LINE entities
+        assert len(filtered) < total  # Must be fewer than all entities
+
+    def test_ignored_layers_exact_count(self, tmp_path):
+        """Ignoring NOTES layer should reduce the snapshot count by exactly the NOTES count."""
+        master, _ = make_identical_pair(tmp_path)
+        all_snaps = extract_snapshots(master)
+        notes_count = sum(1 for s in all_snaps if s.layer == "NOTES")
+
+        config = ComparisonConfig(ignored_layers=["NOTES"])
+        filtered = extract_snapshots(master, config)
+        assert len(filtered) == len(all_snaps) - notes_count
+
+    def test_no_config_returns_all_entities(self, tmp_path):
+        """No config → no filtering → all 4 entities from _build_base returned."""
+        master, _ = make_identical_pair(tmp_path)
+        snaps = extract_snapshots(master)
+        # _build_base: 2 lines + 1 text + 1 lwpolyline = 4
+        assert len(snaps) == 4
+
+    def test_profile_via_config_reduces_count(self, tmp_path):
+        """Profile in ComparisonConfig must actually filter entities."""
+        master, _ = make_identical_pair(tmp_path)
+        all_snaps = extract_snapshots(master)
+
+        config = ComparisonConfig(profile=ComparisonProfile(include_entity_types=[EntityType.LINE]))
+        filtered = extract_snapshots(master, config)
+        assert len(filtered) < len(all_snaps)
+        assert all(s.entity_type == EntityType.LINE for s in filtered)
+
+    def test_ellipse_ratio_not_equal_to_major_axis_value(self, tmp_path):
+        """ELLIPSE ratio and major_axis must not be swapped — they are different types."""
+        import ezdxf
+
+        doc = ezdxf.new(dxfversion="R2018")
+        msp = doc.modelspace()
+        doc.layers.add("L", color=1)
+        msp.add_ellipse(center=(0, 0), major_axis=(10, 0, 0), ratio=0.25, dxfattribs={"layer": "L"})
+        path = tmp_path / "ellipse_ratio.dxf"
+        doc.saveas(str(path))
+
+        snaps = extract_snapshots(path)
+        ellipses = [s for s in snaps if s.entity_type == EntityType.ELLIPSE]
+        assert len(ellipses) == 1
+        # ratio must be the scalar 0.25, not the major_axis tuple
+        assert ellipses[0].attributes["ratio"] == pytest.approx(0.25)
+        # major_axis is a tuple/sequence — not the same as ratio
+        assert ellipses[0].attributes["ratio"] != ellipses[0].attributes["major_axis"]
+
+
 class TestDetectXrefsAndDynblocksDirectly:
     """Cover _detect_xrefs_and_dynblocks branches via mock ezdxf documents."""
 
@@ -1013,3 +1322,1600 @@ class TestDetectXrefsAndDynblocksDirectly:
         )
         warnings = _detect_xrefs_and_dynblocks(doc, [snap], "")
         assert warnings == []
+
+
+# ---------------------------------------------------------------------------
+# New tests — coverage gaps + semantic edge cases
+# ---------------------------------------------------------------------------
+
+
+class TestExtractSnapshotsProfileWarnings:
+    """Line 92: check_profile_warnings called when both profile and _profile_warnings given."""
+
+    def test_profile_warnings_collected_via_extract_snapshots(self, tmp_path):
+        """Passing _profile_warnings to extract_snapshots accumulates warning strings.
+
+        Exercises the branch at line 92 where both config.profile and
+        _profile_warnings are set at the same time.
+        """
+        from tests.helpers.comparison_factory import make_complex_pair
+
+        master, _ = make_complex_pair(tmp_path)
+        # A profile that excludes everything forces check_profile_warnings to fire.
+        config = ComparisonConfig(
+            profile=ComparisonProfile(
+                name="nuke-all",
+                exclude_layers=[r".*"],  # matches every layer
+            )
+        )
+        collected: list[str] = []
+        extract_snapshots(master, config, _profile_warnings=collected, _source="master")
+        # At least one warning should have been appended (all entities excluded).
+        assert len(collected) >= 1
+        assert any("master" in w for w in collected)
+
+
+class TestBBoxRegionValidation:
+    """BBoxRegion raises ValueError when bounds are inverted."""
+
+    def test_inverted_x_bounds_raises(self):
+        """min_x > max_x must raise ValueError."""
+        with pytest.raises(ValueError, match="min_x"):
+            BBoxRegion(min_x=50.0, min_y=0.0, max_x=10.0, max_y=10.0)
+
+    def test_inverted_y_bounds_raises(self):
+        """min_y > max_y must raise ValueError."""
+        with pytest.raises(ValueError, match="min_y"):
+            BBoxRegion(min_x=0.0, min_y=20.0, max_x=10.0, max_y=5.0)
+
+    def test_zero_area_bbox_is_valid(self):
+        """A point region (min==max on both axes) is valid and contains its own centre."""
+        region = BBoxRegion(min_x=7.0, min_y=3.0, max_x=7.0, max_y=3.0)
+        assert region.contains(7.0, 3.0)
+        assert not region.contains(7.0001, 3.0)
+
+
+class TestDetectTitleblockRegionNegativeCoords:
+    """detect_titleblock_region handles drawings with negative coordinate origins."""
+
+    def test_negative_coordinate_titleblock(self):
+        """Title-block entities at negative positions still produce a valid BBoxRegion."""
+        from tests.helpers.comparison_factory import make_geometry_snapshot
+
+        snaps = [
+            make_geometry_snapshot(handle="T1", layer="TITLE", points=[(-200, -100), (-50, -10)]),
+        ]
+        region = detect_titleblock_region(snaps, padding=2.0)
+        assert region is not None
+        assert region.min_x == pytest.approx(-202.0)
+        assert region.min_y == pytest.approx(-102.0)
+        assert region.max_x == pytest.approx(-48.0)
+        assert region.max_y == pytest.approx(-8.0)
+
+    def test_multiple_exclude_regions_independent(self):
+        """apply_profile drops entities whose centroid falls in ANY of several regions."""
+        from tests.helpers.comparison_factory import make_geometry_snapshot
+
+        snap_a = make_geometry_snapshot(
+            handle="A",
+            layer="X",
+            points=[(5, 5)],  # centroid inside region 1
+        )
+        snap_b = make_geometry_snapshot(
+            handle="B",
+            layer="X",
+            points=[(95, 95)],  # centroid inside region 2
+        )
+        snap_c = make_geometry_snapshot(
+            handle="C",
+            layer="X",
+            points=[(50, 50)],  # centroid outside both
+        )
+        profile = ComparisonProfile(
+            exclude_regions=[
+                BBoxRegion(min_x=0, min_y=0, max_x=10, max_y=10),
+                BBoxRegion(min_x=90, min_y=90, max_x=100, max_y=100),
+            ]
+        )
+        result = apply_profile([snap_a, snap_b, snap_c], profile)
+        handles = {s.handle for s in result}
+        assert handles == {"C"}
+
+
+class TestCheckProfileWarningsExact80Boundary:
+    """Exactly 80% excluded sits at the threshold boundary — no warning expected."""
+
+    def test_exactly_80_pct_no_warning(self):
+        """Excluded fraction == 0.80 does not exceed > 0.80, so no warning is issued."""
+        from tests.helpers.comparison_factory import make_geometry_snapshot
+
+        # 10 total, 2 remaining = 80% excluded — boundary, NOT over the limit.
+        remaining = [
+            make_geometry_snapshot(handle=f"L{i}", layer="A", points=[(i, 0)]) for i in range(2)
+        ]
+        profile = ComparisonProfile(name="boundary")
+        warnings = check_profile_warnings(10, remaining, profile)
+        assert len(warnings) == 0, f"Expected no warnings at exact 80%, got: {warnings}"
+
+    def test_just_over_80_pct_warns(self):
+        """81% excluded (9/11 removed) triggers the high-exclusion warning."""
+        from tests.helpers.comparison_factory import make_geometry_snapshot
+
+        remaining = [
+            make_geometry_snapshot(handle="L1", layer="A", points=[(0, 0)]),
+            make_geometry_snapshot(handle="L2", layer="A", points=[(1, 0)]),
+        ]
+        profile = ComparisonProfile(name="just-over")
+        # 11 total, 2 remaining = 9/11 ≈ 81.8% excluded
+        warnings = check_profile_warnings(11, remaining, profile)
+        assert len(warnings) == 1
+        assert "just-over" in warnings[0]
+
+
+class TestExtractOnePrivateApi:
+    """Cover _extract_one branches that remain uncovered after the main test suite."""
+
+    def test_insert_rotation_normalised_to_360(self):
+        """INSERT rotation is stored modulo 360 — confirm wrap-around is handled."""
+        from unittest.mock import MagicMock
+
+        from cad_dxf_agent.core.comparison.geometry import _extract_one
+
+        class _Coord:
+            def __init__(self, x, y):
+                self.x = x
+                self.y = y
+
+        entity = MagicMock()
+        entity.dxf.handle = "INS1"
+        entity.dxf.layer = "STRUCTURAL"
+        entity.dxf.insert = _Coord(5.0, 10.0)
+        entity.dxf.name = "COLUMN"
+        entity.dxf.get = lambda attr, default=None: {
+            "xscale": 1.0,
+            "yscale": 1.0,
+            "rotation": 450.0,  # 450 % 360 == 90
+        }.get(attr, default)
+
+        result = _extract_one(entity, "INSERT")
+        assert result is not None
+        assert result.attributes["insert_rotation"] == pytest.approx(90.0)
+
+    def test_leader_success_path_returns_snapshot(self):
+        """LEADER branch: vertices list succeeds — line 403 must be hit."""
+        from unittest.mock import MagicMock
+
+        from cad_dxf_agent.core.comparison.geometry import _extract_one
+
+        class _Vertex:
+            def __init__(self, x, y):
+                self.x = x
+                self.y = y
+
+        entity = MagicMock()
+        entity.dxf.handle = "LD1"
+        entity.dxf.layer = "NOTES"
+        entity.vertices = [_Vertex(0, 0), _Vertex(5, 5), _Vertex(10, 0)]
+
+        result = _extract_one(entity, "LEADER")
+        assert result is not None
+        assert len(result.points) == 3
+        assert result.points[1].x == pytest.approx(5.0)
+        assert result.points[1].y == pytest.approx(5.0)
+
+    def test_truly_unknown_type_returns_none(self):
+        """The final else-branch (line 419) returns None for a type not handled by any branch."""
+        from unittest.mock import MagicMock
+
+        from cad_dxf_agent.core.comparison.geometry import _extract_one
+
+        entity = MagicMock()
+        entity.dxf.handle = "XX1"
+        entity.dxf.layer = "LAYER0"
+
+        # "WIPEOUT" is a real DXF type outside the handler set
+        result = _extract_one(entity, "WIPEOUT")
+        assert result is None
+
+
+# ---------------------------------------------------------------------------
+# Negative / boundary tests — adversarial inputs
+# ---------------------------------------------------------------------------
+
+
+class TestExtractSnapshotsEmptyModelspace:
+    """Extract from a DXF with no entities in modelspace."""
+
+    def test_empty_dxf_returns_empty_list(self, tmp_path):
+        import ezdxf
+
+        path = tmp_path / "empty.dxf"
+        doc = ezdxf.new(dxfversion="R2018")
+        doc.saveas(str(path))
+        snaps = extract_snapshots(path)
+        assert snaps == []
+
+
+class TestApplyProfileRegexEdgeCases:
+    """Edge cases in layer regex filtering."""
+
+    def test_include_layers_regex_anchored(self):
+        """Include pattern 'STRUCT' should match 'STRUCTURAL' via regex search."""
+        mk = make_geometry_snapshot
+        snaps = [
+            mk(handle="L1", layer="STRUCTURAL", points=[(0, 0), (10, 0)]),
+            mk(handle="L2", layer="NOTES", points=[(5, 5)], entity_type=EntityType.TEXT),
+        ]
+        profile = ComparisonProfile(name="test", include_layers=["STRUCT"])
+        result = apply_profile(snaps, profile)
+        assert len(result) == 1
+        assert result[0].handle == "L1"
+
+    def test_exclude_layers_regex_case_insensitive(self):
+        """Exclude pattern 'notes' should match 'NOTES' case-insensitively."""
+        mk = make_geometry_snapshot
+        snaps = [
+            mk(handle="L1", layer="STRUCTURAL", points=[(0, 0), (10, 0)]),
+            mk(handle="T1", layer="NOTES", points=[(5, 5)], entity_type=EntityType.TEXT),
+        ]
+        profile = ComparisonProfile(name="test", exclude_layers=["notes"])
+        result = apply_profile(snaps, profile)
+        assert len(result) == 1
+        assert result[0].handle == "L1"
+
+
+# ---------------------------------------------------------------------------
+# Mutation-killing tests — Part 2
+# Target: None vs "" initializers, coordinate swaps, all entity-type attributes,
+# INSERT defaults, MTEXT geometry, profile-warning message strings.
+# ---------------------------------------------------------------------------
+
+
+class TestNoneInitializersMutationKilling:
+    """Kill mutants that change `None` initializers to `""` in _extract_one.
+
+    text_content and block_name default to None; non-text entity types must
+    leave them as None (identity check, not just falsy check).
+    """
+
+    def test_line_text_content_is_none_not_empty_string(self, tmp_path):
+        """LINE has no text — text_content must be None, not ''."""
+        import ezdxf
+
+        doc = ezdxf.new(dxfversion="R2018")
+        msp = doc.modelspace()
+        doc.layers.add("L", color=1)
+        msp.add_line((0, 0), (100, 200), dxfattribs={"layer": "L"})
+        path = tmp_path / "line_none.dxf"
+        doc.saveas(str(path))
+
+        snaps = extract_snapshots(path)
+        lines = [s for s in snaps if s.entity_type == EntityType.LINE]
+        assert len(lines) == 1
+        assert lines[0].text_content is None  # identity check — not just falsy
+        assert lines[0].block_name is None
+
+    def test_lwpolyline_text_content_is_none(self, tmp_path):
+        """LWPOLYLINE has no text — text_content must be None, not ''."""
+        import ezdxf
+
+        doc = ezdxf.new(dxfversion="R2018")
+        msp = doc.modelspace()
+        doc.layers.add("L", color=1)
+        msp.add_lwpolyline([(10, 20), (30, 40), (50, 20)], close=True, dxfattribs={"layer": "L"})
+        path = tmp_path / "poly_none.dxf"
+        doc.saveas(str(path))
+
+        snaps = extract_snapshots(path)
+        polys = [s for s in snaps if s.entity_type == EntityType.LWPOLYLINE]
+        assert len(polys) == 1
+        assert polys[0].text_content is None
+        assert polys[0].block_name is None
+
+    def test_circle_text_content_and_block_name_are_none(self, tmp_path):
+        """CIRCLE has no text or block — both must be None."""
+        import ezdxf
+
+        doc = ezdxf.new(dxfversion="R2018")
+        msp = doc.modelspace()
+        doc.layers.add("L", color=1)
+        msp.add_circle((50, 80), radius=15.0, dxfattribs={"layer": "L"})
+        path = tmp_path / "circle_none.dxf"
+        doc.saveas(str(path))
+
+        snaps = extract_snapshots(path)
+        circles = [s for s in snaps if s.entity_type == EntityType.CIRCLE]
+        assert len(circles) == 1
+        assert circles[0].text_content is None
+        assert circles[0].block_name is None
+
+    def test_arc_text_content_and_block_name_are_none(self, tmp_path):
+        """ARC has no text or block — both must be None."""
+        import ezdxf
+
+        doc = ezdxf.new(dxfversion="R2018")
+        msp = doc.modelspace()
+        doc.layers.add("L", color=1)
+        msp.add_arc(
+            (20, 40), radius=8.0, start_angle=15.0, end_angle=75.0, dxfattribs={"layer": "L"}
+        )
+        path = tmp_path / "arc_none.dxf"
+        doc.saveas(str(path))
+
+        snaps = extract_snapshots(path)
+        arcs = [s for s in snaps if s.entity_type == EntityType.ARC]
+        assert len(arcs) == 1
+        assert arcs[0].text_content is None
+        assert arcs[0].block_name is None
+
+    def test_insert_text_content_is_none(self, tmp_path):
+        """INSERT has a block_name but no text — text_content must be None."""
+        import ezdxf
+
+        doc = ezdxf.new(dxfversion="R2018")
+        msp = doc.modelspace()
+        doc.layers.add("L", color=1)
+        blk = doc.blocks.new("BLK_NONE_TEST")
+        blk.add_circle((0, 0), radius=1)
+        msp.add_blockref("BLK_NONE_TEST", insert=(10, 20), dxfattribs={"layer": "L"})
+        path = tmp_path / "insert_none.dxf"
+        doc.saveas(str(path))
+
+        snaps = extract_snapshots(path)
+        inserts = [s for s in snaps if s.entity_type == EntityType.INSERT]
+        assert len(inserts) == 1
+        assert inserts[0].text_content is None
+        # block_name must be the actual string, not None
+        assert inserts[0].block_name == "BLK_NONE_TEST"
+
+    def test_text_block_name_is_none(self, tmp_path):
+        """TEXT has text_content but no block — block_name must be None."""
+        import ezdxf
+
+        doc = ezdxf.new(dxfversion="R2018")
+        msp = doc.modelspace()
+        doc.layers.add("L", color=1)
+        msp.add_text("SomeLabel", dxfattribs={"layer": "L", "insert": (5, 5), "height": 2.0})
+        path = tmp_path / "text_block_none.dxf"
+        doc.saveas(str(path))
+
+        snaps = extract_snapshots(path)
+        texts = [s for s in snaps if s.entity_type == EntityType.TEXT]
+        assert len(texts) == 1
+        assert texts[0].block_name is None
+        assert texts[0].text_content == "SomeLabel"
+
+    def test_mtext_block_name_is_none(self, tmp_path):
+        """MTEXT has text_content but no block — block_name must be None."""
+        import ezdxf
+
+        doc = ezdxf.new(dxfversion="R2018")
+        msp = doc.modelspace()
+        doc.layers.add("L", color=1)
+        msp.add_mtext(
+            "MultilineText", dxfattribs={"layer": "L", "insert": (10, 10), "char_height": 2.5}
+        )
+        path = tmp_path / "mtext_block_none.dxf"
+        doc.saveas(str(path))
+
+        snaps = extract_snapshots(path)
+        mtexts = [s for s in snaps if s.entity_type == EntityType.MTEXT]
+        assert len(mtexts) == 1
+        assert mtexts[0].block_name is None
+
+
+class TestLwpolylineCoordinateSwapMutationKilling:
+    """Kill coordinate-swap mutants in LWPOLYLINE extraction.
+
+    Point2D(x=p[0], y=p[1]) — mutations swap to p[1],p[1].
+    Use points with different x and y so swapping is detectable.
+    """
+
+    def test_lwpolyline_points_x_y_not_swapped(self, tmp_path):
+        """LWPOLYLINE: x coordinate must come from p[0], y from p[1] — not swapped."""
+        import ezdxf
+
+        doc = ezdxf.new(dxfversion="R2018")
+        msp = doc.modelspace()
+        doc.layers.add("L", color=1)
+        # Deliberately asymmetric coordinates: x != y for every vertex
+        msp.add_lwpolyline([(100, 200), (300, 400), (500, 600)], dxfattribs={"layer": "L"})
+        path = tmp_path / "lwpoly_xy.dxf"
+        doc.saveas(str(path))
+
+        snaps = extract_snapshots(path)
+        polys = [s for s in snaps if s.entity_type == EntityType.LWPOLYLINE]
+        assert len(polys) == 1
+        pts = polys[0].points
+        assert len(pts) == 3
+        # Verify x from p[0], y from p[1] — not swapped
+        assert pts[0].x == pytest.approx(100.0)
+        assert pts[0].y == pytest.approx(200.0)
+        assert pts[1].x == pytest.approx(300.0)
+        assert pts[1].y == pytest.approx(400.0)
+        assert pts[2].x == pytest.approx(500.0)
+        assert pts[2].y == pytest.approx(600.0)
+        # If swapped (p[1],p[1]) first vertex would be x=200, y=200
+        assert pts[0].x != pytest.approx(200.0)
+
+    def test_lwpolyline_format_xy_used(self, tmp_path):
+        """get_points(format='xy') must extract x and y — not other formats."""
+        import ezdxf
+
+        doc = ezdxf.new(dxfversion="R2018")
+        msp = doc.modelspace()
+        doc.layers.add("L", color=1)
+        # Single vertex with bulge to exercise non-xy fields
+        msp.add_lwpolyline([(77, 33)], dxfattribs={"layer": "L"})
+        path = tmp_path / "lwpoly_format.dxf"
+        doc.saveas(str(path))
+
+        snaps = extract_snapshots(path)
+        polys = [s for s in snaps if s.entity_type == EntityType.LWPOLYLINE]
+        assert len(polys) == 1
+        # With format="xy" we get exactly 2 values per point (x, y)
+        assert polys[0].points[0].x == pytest.approx(77.0)
+        assert polys[0].points[0].y == pytest.approx(33.0)
+
+
+class TestMtextGeometryMutationKilling:
+    """Kill mutant that sets text_geometry = None instead of calling _extract_mtext_geometry."""
+
+    def test_mtext_text_geometry_is_not_none(self, tmp_path):
+        """MTEXT must have text_geometry populated (not None)."""
+        import ezdxf
+
+        doc = ezdxf.new(dxfversion="R2018")
+        msp = doc.modelspace()
+        doc.layers.add("L", color=1)
+        msp.add_mtext(
+            "GeometryTest",
+            dxfattribs={"layer": "L", "insert": (15, 25), "char_height": 3.0},
+        )
+        path = tmp_path / "mtext_geom.dxf"
+        doc.saveas(str(path))
+
+        snaps = extract_snapshots(path)
+        mtexts = [s for s in snaps if s.entity_type == EntityType.MTEXT]
+        assert len(mtexts) == 1
+        # text_geometry must be a real TextGeometry object, not None
+        assert mtexts[0].text_geometry is not None
+
+    def test_mtext_text_geometry_has_char_height(self, tmp_path):
+        """MTEXT text_geometry.char_height reflects the entity's char_height setting."""
+        import ezdxf
+
+        doc = ezdxf.new(dxfversion="R2018")
+        msp = doc.modelspace()
+        doc.layers.add("L", color=1)
+        msp.add_mtext(
+            "HeightTest",
+            dxfattribs={"layer": "L", "insert": (0, 0), "char_height": 4.5},
+        )
+        path = tmp_path / "mtext_height.dxf"
+        doc.saveas(str(path))
+
+        snaps = extract_snapshots(path)
+        mtexts = [s for s in snaps if s.entity_type == EntityType.MTEXT]
+        assert len(mtexts) == 1
+        geom = mtexts[0].text_geometry
+        assert geom is not None
+        # char_height or height must reflect 4.5
+        has_height = (geom.char_height is not None and geom.char_height == pytest.approx(4.5)) or (
+            geom.height is not None and geom.height == pytest.approx(4.5)
+        )
+        assert has_height
+
+    def test_mtext_text_content_is_not_none(self, tmp_path):
+        """MTEXT text_content must be populated from plain_text()."""
+        import ezdxf
+
+        doc = ezdxf.new(dxfversion="R2018")
+        msp = doc.modelspace()
+        doc.layers.add("L", color=1)
+        msp.add_mtext(
+            "SpecificContent",
+            dxfattribs={"layer": "L", "insert": (5, 5), "char_height": 2.0},
+        )
+        path = tmp_path / "mtext_content.dxf"
+        doc.saveas(str(path))
+
+        snaps = extract_snapshots(path)
+        mtexts = [s for s in snaps if s.entity_type == EntityType.MTEXT]
+        assert len(mtexts) == 1
+        assert mtexts[0].text_content is not None
+        assert "SpecificContent" in mtexts[0].text_content
+
+
+class TestInsertDefaultsMutationKilling:
+    """Kill mutants on INSERT entity.dxf.get() defaults.
+
+    When xscale/yscale/rotation are NOT explicitly set on the entity,
+    the defaults (1.0, 1.0, 0.0) must be used — not mutated values like 2.0 or 1.0 for rotation.
+    """
+
+    def test_insert_default_xscale_is_1(self, tmp_path):
+        """INSERT without explicit xscale must default to 1.0."""
+        import ezdxf
+
+        doc = ezdxf.new(dxfversion="R2018")
+        msp = doc.modelspace()
+        doc.layers.add("L", color=1)
+        blk = doc.blocks.new("DEFAULT_BLK_X")
+        blk.add_circle((0, 0), radius=1)
+        # No xscale, yscale, or rotation in dxfattribs
+        msp.add_blockref("DEFAULT_BLK_X", insert=(5, 10), dxfattribs={"layer": "L"})
+        path = tmp_path / "insert_default_x.dxf"
+        doc.saveas(str(path))
+
+        snaps = extract_snapshots(path)
+        inserts = [s for s in snaps if s.entity_type == EntityType.INSERT]
+        assert len(inserts) == 1
+        assert inserts[0].attributes["insert_xscale"] == pytest.approx(1.0)
+        # Must not be mutated default of 2.0
+        assert inserts[0].attributes["insert_xscale"] != pytest.approx(2.0)
+
+    def test_insert_default_yscale_is_1(self, tmp_path):
+        """INSERT without explicit yscale must default to 1.0."""
+        import ezdxf
+
+        doc = ezdxf.new(dxfversion="R2018")
+        msp = doc.modelspace()
+        doc.layers.add("L", color=1)
+        blk = doc.blocks.new("DEFAULT_BLK_Y")
+        blk.add_circle((0, 0), radius=1)
+        msp.add_blockref("DEFAULT_BLK_Y", insert=(5, 10), dxfattribs={"layer": "L"})
+        path = tmp_path / "insert_default_y.dxf"
+        doc.saveas(str(path))
+
+        snaps = extract_snapshots(path)
+        inserts = [s for s in snaps if s.entity_type == EntityType.INSERT]
+        assert len(inserts) == 1
+        assert inserts[0].attributes["insert_yscale"] == pytest.approx(1.0)
+        assert inserts[0].attributes["insert_yscale"] != pytest.approx(2.0)
+
+    def test_insert_default_rotation_is_zero(self, tmp_path):
+        """INSERT without explicit rotation must default to 0.0 (not 1.0)."""
+        import ezdxf
+
+        doc = ezdxf.new(dxfversion="R2018")
+        msp = doc.modelspace()
+        doc.layers.add("L", color=1)
+        blk = doc.blocks.new("DEFAULT_BLK_R")
+        blk.add_circle((0, 0), radius=1)
+        msp.add_blockref("DEFAULT_BLK_R", insert=(5, 10), dxfattribs={"layer": "L"})
+        path = tmp_path / "insert_default_r.dxf"
+        doc.saveas(str(path))
+
+        snaps = extract_snapshots(path)
+        inserts = [s for s in snaps if s.entity_type == EntityType.INSERT]
+        assert len(inserts) == 1
+        assert inserts[0].attributes["insert_rotation"] == pytest.approx(0.0)
+        # Mutated default of 1.0 would fail this check
+        assert inserts[0].attributes["insert_rotation"] != pytest.approx(1.0)
+
+    def test_insert_explicit_scale_not_confused_with_default(self, tmp_path):
+        """INSERT with xscale=2.5 must yield exactly 2.5, not the default 1.0."""
+        import ezdxf
+
+        doc = ezdxf.new(dxfversion="R2018")
+        msp = doc.modelspace()
+        doc.layers.add("L", color=1)
+        blk = doc.blocks.new("EXPLICIT_BLK")
+        blk.add_circle((0, 0), radius=1)
+        msp.add_blockref(
+            "EXPLICIT_BLK",
+            insert=(5, 10),
+            dxfattribs={"layer": "L", "xscale": 2.5, "yscale": 3.5},
+        )
+        path = tmp_path / "insert_explicit.dxf"
+        doc.saveas(str(path))
+
+        snaps = extract_snapshots(path)
+        inserts = [s for s in snaps if s.entity_type == EntityType.INSERT]
+        assert len(inserts) == 1
+        assert inserts[0].attributes["insert_xscale"] == pytest.approx(2.5)
+        assert inserts[0].attributes["insert_yscale"] == pytest.approx(3.5)
+        # Must not be confused with each other
+        assert inserts[0].attributes["insert_xscale"] != pytest.approx(3.5)
+        assert inserts[0].attributes["insert_yscale"] != pytest.approx(2.5)
+
+    def test_insert_coordinates_not_swapped(self, tmp_path):
+        """INSERT insert point: x and y must not be swapped (different values used)."""
+        import ezdxf
+
+        doc = ezdxf.new(dxfversion="R2018")
+        msp = doc.modelspace()
+        doc.layers.add("L", color=1)
+        blk = doc.blocks.new("POS_BLK")
+        blk.add_circle((0, 0), radius=1)
+        # x=111, y=222 — clearly different so swap is detectable
+        msp.add_blockref("POS_BLK", insert=(111, 222), dxfattribs={"layer": "L"})
+        path = tmp_path / "insert_pos.dxf"
+        doc.saveas(str(path))
+
+        snaps = extract_snapshots(path)
+        inserts = [s for s in snaps if s.entity_type == EntityType.INSERT]
+        assert len(inserts) == 1
+        assert inserts[0].points[0].x == pytest.approx(111.0)
+        assert inserts[0].points[0].y == pytest.approx(222.0)
+        assert inserts[0].points[0].x != pytest.approx(222.0)
+
+
+class TestEllipseAttributesMutationKilling:
+    """Kill mutants on ELLIPSE ratio and major_axis attribute extraction."""
+
+    def test_ellipse_ratio_exact_value(self, tmp_path):
+        """ELLIPSE ratio attribute must be the exact scalar, not a tuple."""
+        import ezdxf
+
+        doc = ezdxf.new(dxfversion="R2018")
+        msp = doc.modelspace()
+        doc.layers.add("L", color=1)
+        msp.add_ellipse(
+            center=(10, 20, 0), major_axis=(15, 0, 0), ratio=0.4, dxfattribs={"layer": "L"}
+        )
+        path = tmp_path / "ellipse_ratio.dxf"
+        doc.saveas(str(path))
+
+        snaps = extract_snapshots(path)
+        ellipses = [s for s in snaps if s.entity_type == EntityType.ELLIPSE]
+        assert len(ellipses) == 1
+        assert ellipses[0].attributes["ratio"] == pytest.approx(0.4)
+        assert ellipses[0].attributes["ratio"] != pytest.approx(0.0)
+        assert ellipses[0].attributes["ratio"] != pytest.approx(1.0)
+
+    def test_ellipse_major_axis_is_tuple(self, tmp_path):
+        """ELLIPSE major_axis must be extracted as a 3-tuple (x, y, z)."""
+        import ezdxf
+
+        doc = ezdxf.new(dxfversion="R2018")
+        msp = doc.modelspace()
+        doc.layers.add("L", color=1)
+        # major_axis with non-zero x component so we can verify it
+        msp.add_ellipse(
+            center=(0, 0, 0), major_axis=(8, 0, 0), ratio=0.5, dxfattribs={"layer": "L"}
+        )
+        path = tmp_path / "ellipse_major.dxf"
+        doc.saveas(str(path))
+
+        snaps = extract_snapshots(path)
+        ellipses = [s for s in snaps if s.entity_type == EntityType.ELLIPSE]
+        assert len(ellipses) == 1
+        maj = ellipses[0].attributes["major_axis"]
+        # Must be a sequence of length 3
+        assert len(maj) == 3
+        assert maj[0] == pytest.approx(8.0)
+        assert maj[1] == pytest.approx(0.0)
+
+    def test_ellipse_centre_point_correct(self, tmp_path):
+        """ELLIPSE centre point must use the actual center coordinates."""
+        import ezdxf
+
+        doc = ezdxf.new(dxfversion="R2018")
+        msp = doc.modelspace()
+        doc.layers.add("L", color=1)
+        msp.add_ellipse(
+            center=(35, 67, 0), major_axis=(5, 0, 0), ratio=0.6, dxfattribs={"layer": "L"}
+        )
+        path = tmp_path / "ellipse_centre.dxf"
+        doc.saveas(str(path))
+
+        snaps = extract_snapshots(path)
+        ellipses = [s for s in snaps if s.entity_type == EntityType.ELLIPSE]
+        assert len(ellipses) == 1
+        assert ellipses[0].points[0].x == pytest.approx(35.0)
+        assert ellipses[0].points[0].y == pytest.approx(67.0)
+        assert ellipses[0].points[0].x != pytest.approx(67.0)
+
+    def test_ellipse_ratio_not_swapped_with_major_axis(self, tmp_path):
+        """ELLIPSE ratio is a float; major_axis is a tuple — they must not be swapped."""
+        import ezdxf
+
+        doc = ezdxf.new(dxfversion="R2018")
+        msp = doc.modelspace()
+        doc.layers.add("L", color=1)
+        msp.add_ellipse(
+            center=(0, 0, 0), major_axis=(20, 0, 0), ratio=0.3, dxfattribs={"layer": "L"}
+        )
+        path = tmp_path / "ellipse_swap.dxf"
+        doc.saveas(str(path))
+
+        snaps = extract_snapshots(path)
+        ellipses = [s for s in snaps if s.entity_type == EntityType.ELLIPSE]
+        assert len(ellipses) == 1
+        ratio = ellipses[0].attributes["ratio"]
+        major = ellipses[0].attributes["major_axis"]
+        assert isinstance(ratio, float)
+        assert isinstance(major, tuple)
+        # ratio is 0.3; major_axis[0] is 20 — completely different
+        assert ratio == pytest.approx(0.3)
+        assert major[0] == pytest.approx(20.0)
+
+
+class TestSplineAttributesMutationKilling:
+    """Kill mutants in SPLINE control-point extraction."""
+
+    def test_spline_control_points_x_y_not_swapped(self, tmp_path):
+        """SPLINE: x and y of control points must not be swapped.
+
+        Note: splines built from fit_points have empty control_points after
+        save/reload (ezdxf behaviour).  We must set control_points directly.
+        """
+        import ezdxf
+
+        doc = ezdxf.new(dxfversion="R2018")
+        msp = doc.modelspace()
+        doc.layers.add("L", color=1)
+        sp = msp.add_spline(dxfattribs={"layer": "L"})
+        # Explicitly set non-symmetric control points so swap is detectable
+        sp.control_points = [(10, 50, 0), (30, 80, 0), (60, 20, 0)]
+        path = tmp_path / "spline_xy.dxf"
+        doc.saveas(str(path))
+
+        snaps = extract_snapshots(path)
+        splines = [s for s in snaps if s.entity_type == EntityType.SPLINE]
+        assert len(splines) == 1
+        pts = splines[0].points
+        assert len(pts) == 3
+        # x comes from p[0], y from p[1] — verify correct mapping
+        assert pts[0].x == pytest.approx(10.0)
+        assert pts[0].y == pytest.approx(50.0)
+        assert pts[1].x == pytest.approx(30.0)
+        assert pts[1].y == pytest.approx(80.0)
+        assert pts[2].x == pytest.approx(60.0)
+        assert pts[2].y == pytest.approx(20.0)
+        # If swapped (p[1],p[1]) first point would be x=50, y=50
+        assert pts[0].x != pytest.approx(50.0)
+
+    def test_spline_returns_snapshot_with_points(self, tmp_path):
+        """SPLINE extraction returns a snapshot with at least one point."""
+        import ezdxf
+
+        doc = ezdxf.new(dxfversion="R2018")
+        msp = doc.modelspace()
+        doc.layers.add("L", color=1)
+        sp = msp.add_spline(dxfattribs={"layer": "L"})
+        sp.control_points = [(0, 10, 0), (20, 50, 0), (40, 30, 0)]
+        path = tmp_path / "spline_basic.dxf"
+        doc.saveas(str(path))
+
+        snaps = extract_snapshots(path)
+        splines = [s for s in snaps if s.entity_type == EntityType.SPLINE]
+        assert len(splines) == 1
+        assert len(splines[0].points) == 3
+
+
+class TestHatchAttributesMutationKilling:
+    """Kill mutants in HATCH boundary path extraction."""
+
+    def test_hatch_vertices_extracted_with_correct_xy(self, tmp_path):
+        """HATCH boundary vertices: x from v[0], y from v[1], not swapped."""
+        import ezdxf
+
+        doc = ezdxf.new(dxfversion="R2018")
+        msp = doc.modelspace()
+        doc.layers.add("L", color=1)
+        hatch = msp.add_hatch(color=1, dxfattribs={"layer": "L"})
+        # Boundary with clearly non-square points
+        hatch.paths.add_polyline_path(
+            [(100, 200), (300, 200), (300, 400), (100, 400)], is_closed=True
+        )
+        path = tmp_path / "hatch_xy.dxf"
+        doc.saveas(str(path))
+
+        snaps = extract_snapshots(path)
+        hatches = [s for s in snaps if s.entity_type == EntityType.HATCH]
+        assert len(hatches) == 1
+        pts = hatches[0].points
+        assert len(pts) >= 4
+        xs = [p.x for p in pts]
+        ys = [p.y for p in pts]
+        # x values should include 100 and 300, y values should include 200 and 400
+        assert 100.0 in [pytest.approx(x) for x in xs] or any(abs(x - 100.0) < 1 for x in xs)
+        # The key check: xs != ys (not swapped)
+        assert xs != ys
+
+    def test_hatch_with_valid_boundary_returns_snapshot(self, tmp_path):
+        """HATCH with a valid closed boundary returns a non-None snapshot."""
+        import ezdxf
+
+        doc = ezdxf.new(dxfversion="R2018")
+        msp = doc.modelspace()
+        doc.layers.add("L", color=1)
+        hatch = msp.add_hatch(color=2, dxfattribs={"layer": "L"})
+        hatch.paths.add_polyline_path([(0, 10), (20, 10), (20, 30), (0, 30)], is_closed=True)
+        path = tmp_path / "hatch_valid.dxf"
+        doc.saveas(str(path))
+
+        snaps = extract_snapshots(path)
+        hatches = [s for s in snaps if s.entity_type == EntityType.HATCH]
+        assert len(hatches) == 1
+        assert hatches[0].points  # non-empty
+
+
+class TestSolidAttributesMutationKilling:
+    """Kill mutants in SOLID vertex extraction (_extract_one SOLID branch)."""
+
+    def test_solid_vertices_extracted_via_mock(self):
+        """SOLID: vtx0-vtx3 must all be extracted with correct x,y from dxf attributes."""
+        from unittest.mock import MagicMock
+
+        from cad_dxf_agent.core.comparison.geometry import _extract_one
+
+        class _Vtx:
+            def __init__(self, x: float, y: float):
+                self.x = x
+                self.y = y
+
+        entity = MagicMock()
+        entity.dxf.handle = "SOLID1"
+        entity.dxf.layer = "L0"
+        entity.dxf.vtx0 = _Vtx(10.0, 20.0)
+        entity.dxf.vtx1 = _Vtx(30.0, 20.0)
+        entity.dxf.vtx2 = _Vtx(30.0, 40.0)
+        entity.dxf.vtx3 = _Vtx(10.0, 40.0)
+
+        result = _extract_one(entity, "SOLID")
+        assert result is not None
+        assert len(result.points) == 4
+        # vtx0
+        assert result.points[0].x == pytest.approx(10.0)
+        assert result.points[0].y == pytest.approx(20.0)
+        # vtx1 — x differs from vtx0 y, ensuring no swap
+        assert result.points[1].x == pytest.approx(30.0)
+        assert result.points[1].y == pytest.approx(20.0)
+        # vtx2
+        assert result.points[2].x == pytest.approx(30.0)
+        assert result.points[2].y == pytest.approx(40.0)
+        # vtx3
+        assert result.points[3].x == pytest.approx(10.0)
+        assert result.points[3].y == pytest.approx(40.0)
+
+    def test_solid_none_vtx_skipped(self):
+        """SOLID: vtx that getattr returns None for must be skipped (not crash)."""
+        from unittest.mock import MagicMock
+
+        from cad_dxf_agent.core.comparison.geometry import _extract_one
+
+        class _Vtx:
+            def __init__(self, x: float, y: float):
+                self.x = x
+                self.y = y
+
+        entity = MagicMock()
+        entity.dxf.handle = "SOLID2"
+        entity.dxf.layer = "L0"
+        entity.dxf.vtx0 = _Vtx(5.0, 10.0)
+        entity.dxf.vtx1 = _Vtx(15.0, 10.0)
+        # vtx2 and vtx3 not set — getattr returns None
+        del entity.dxf.vtx2
+        del entity.dxf.vtx3
+        entity.dxf.vtx2 = None
+        entity.dxf.vtx3 = None
+
+        result = _extract_one(entity, "SOLID")
+        assert result is not None
+        assert len(result.points) == 2
+
+
+class TestDimensionAttributesMutationKilling:
+    """Kill mutants in DIMENSION text_content extraction via mock."""
+
+    def test_dimension_text_content_from_dxf_text(self):
+        """DIMENSION text_content must come from entity.dxf.get('text', '') — not hardcoded."""
+        from unittest.mock import MagicMock
+
+        from cad_dxf_agent.core.comparison.geometry import _extract_one
+
+        class _Coord:
+            def __init__(self, x: float, y: float):
+                self.x = x
+                self.y = y
+
+        entity = MagicMock()
+        entity.dxf.handle = "DIM1"
+        entity.dxf.layer = "DIMS"
+        entity.dxf.get = lambda attr, default=None: (
+            "DIM_LABEL" if attr == "text" else _Coord(50.0, 75.0) if attr == "insert" else default
+        )
+        entity.dxf.insert = _Coord(50.0, 75.0)
+
+        result = _extract_one(entity, "DIMENSION")
+        assert result is not None
+        assert result.text_content == "DIM_LABEL"
+        # Point coordinates
+        assert result.points[0].x == pytest.approx(50.0)
+        assert result.points[0].y == pytest.approx(75.0)
+
+    def test_dimension_empty_text_becomes_empty_string(self):
+        """DIMENSION with empty text attribute must yield text_content == '' (not None)."""
+        from unittest.mock import MagicMock
+
+        from cad_dxf_agent.core.comparison.geometry import _extract_one
+
+        class _Coord:
+            def __init__(self, x: float, y: float):
+                self.x = x
+                self.y = y
+
+        entity = MagicMock()
+        entity.dxf.handle = "DIM2"
+        entity.dxf.layer = "DIMS"
+        entity.dxf.get = lambda attr, default=None: (
+            "" if attr == "text" else _Coord(10.0, 20.0) if attr == "insert" else default
+        )
+        entity.dxf.insert = _Coord(10.0, 20.0)
+
+        result = _extract_one(entity, "DIMENSION")
+        assert result is not None
+        # text="" or None — both acceptable but code does `or ""` so it becomes ""
+        assert result.text_content == ""
+
+    def test_dimension_insert_coordinates_not_swapped(self):
+        """DIMENSION insert point x,y must not be swapped."""
+        from unittest.mock import MagicMock
+
+        from cad_dxf_agent.core.comparison.geometry import _extract_one
+
+        class _Coord:
+            def __init__(self, x: float, y: float):
+                self.x = x
+                self.y = y
+
+        entity = MagicMock()
+        entity.dxf.handle = "DIM3"
+        entity.dxf.layer = "DIMS"
+        entity.dxf.insert = _Coord(111.0, 222.0)
+        entity.dxf.get = lambda attr, default=None: (
+            "LABEL" if attr == "text" else _Coord(111.0, 222.0) if attr == "insert" else default
+        )
+
+        result = _extract_one(entity, "DIMENSION")
+        assert result is not None
+        assert result.points[0].x == pytest.approx(111.0)
+        assert result.points[0].y == pytest.approx(222.0)
+        assert result.points[0].x != pytest.approx(222.0)
+
+
+class TestLeaderCoordinatesMutationKilling:
+    """Kill LEADER coordinate-swap mutants in _extract_one."""
+
+    def test_leader_vertex_coordinates_not_swapped(self):
+        """LEADER vertices: x and y must not be swapped (use non-symmetric points)."""
+        from unittest.mock import MagicMock
+
+        from cad_dxf_agent.core.comparison.geometry import _extract_one
+
+        class _Vertex:
+            def __init__(self, x: float, y: float):
+                self.x = x
+                self.y = y
+
+        entity = MagicMock()
+        entity.dxf.handle = "LD2"
+        entity.dxf.layer = "NOTES"
+        # Vertices with x != y
+        entity.vertices = [_Vertex(10.0, 50.0), _Vertex(30.0, 80.0), _Vertex(60.0, 20.0)]
+
+        result = _extract_one(entity, "LEADER")
+        assert result is not None
+        assert len(result.points) == 3
+        assert result.points[0].x == pytest.approx(10.0)
+        assert result.points[0].y == pytest.approx(50.0)
+        assert result.points[1].x == pytest.approx(30.0)
+        assert result.points[1].y == pytest.approx(80.0)
+        assert result.points[2].x == pytest.approx(60.0)
+        assert result.points[2].y == pytest.approx(20.0)
+        # Verify no swap: first vertex x != first vertex y
+        assert result.points[0].x != pytest.approx(50.0)
+
+
+class TestPolylineAttributesMutationKilling:
+    """Kill mutants in POLYLINE vertex extraction via mock."""
+
+    def test_polyline_vertex_coordinates_not_swapped(self):
+        """POLYLINE vertices: x from location.x, y from location.y — not swapped."""
+        from unittest.mock import MagicMock
+
+        from cad_dxf_agent.core.comparison.geometry import _extract_one
+
+        class _Location:
+            def __init__(self, x: float, y: float):
+                self.x = x
+                self.y = y
+
+        class _Vertex:
+            def __init__(self, x: float, y: float):
+                self.dxf = MagicMock()
+                self.dxf.location = _Location(x, y)
+
+        entity = MagicMock()
+        entity.dxf.handle = "PL1"
+        entity.dxf.layer = "STRUCTURAL"
+        entity.vertices = [_Vertex(100.0, 200.0), _Vertex(300.0, 400.0), _Vertex(500.0, 150.0)]
+
+        result = _extract_one(entity, "POLYLINE")
+        assert result is not None
+        assert len(result.points) == 3
+        assert result.points[0].x == pytest.approx(100.0)
+        assert result.points[0].y == pytest.approx(200.0)
+        assert result.points[1].x == pytest.approx(300.0)
+        assert result.points[1].y == pytest.approx(400.0)
+        assert result.points[2].x == pytest.approx(500.0)
+        assert result.points[2].y == pytest.approx(150.0)
+        # Verify no swap
+        assert result.points[0].x != pytest.approx(200.0)
+
+
+class TestLineCoordinatesMutationKilling:
+    """Kill LINE start/end coordinate mutations."""
+
+    def test_line_start_end_coordinates_exact(self, tmp_path):
+        """LINE start and end points must have correct x,y in correct order."""
+        import ezdxf
+
+        doc = ezdxf.new(dxfversion="R2018")
+        msp = doc.modelspace()
+        doc.layers.add("L", color=1)
+        # Deliberately asymmetric: start x != start y, end x != end y
+        msp.add_line((100, 200), (300, 400), dxfattribs={"layer": "L"})
+        path = tmp_path / "line_coords.dxf"
+        doc.saveas(str(path))
+
+        snaps = extract_snapshots(path)
+        lines = [s for s in snaps if s.entity_type == EntityType.LINE]
+        assert len(lines) == 1
+        assert len(lines[0].points) == 2
+        # points[0] is start, points[1] is end
+        xs = {lines[0].points[0].x, lines[0].points[1].x}
+        ys = {lines[0].points[0].y, lines[0].points[1].y}
+        assert 100.0 in xs or 300.0 in xs
+        assert 200.0 in ys or 400.0 in ys
+        # Ensure x values are from the correct positions
+        start = lines[0].points[0]
+        end = lines[0].points[1]
+        # Together the two points must encode both start=(100,200) and end=(300,400)
+        coords = {(start.x, start.y), (end.x, end.y)}
+        assert (100.0, 200.0) in coords
+        assert (300.0, 400.0) in coords
+
+    def test_line_two_distinct_points(self, tmp_path):
+        """LINE must produce exactly 2 points for each entity."""
+        import ezdxf
+
+        doc = ezdxf.new(dxfversion="R2018")
+        msp = doc.modelspace()
+        doc.layers.add("L", color=1)
+        msp.add_line((0, 10), (20, 30), dxfattribs={"layer": "L"})
+        path = tmp_path / "line_two_pts.dxf"
+        doc.saveas(str(path))
+
+        snaps = extract_snapshots(path)
+        lines = [s for s in snaps if s.entity_type == EntityType.LINE]
+        assert len(lines) == 1
+        assert len(lines[0].points) == 2
+
+
+class TestTextEntityCoordinatesMutationKilling:
+    """Kill TEXT insert-point coordinate mutations."""
+
+    def test_text_insert_point_not_swapped(self, tmp_path):
+        """TEXT insert point: x and y must not be swapped."""
+        import ezdxf
+
+        doc = ezdxf.new(dxfversion="R2018")
+        msp = doc.modelspace()
+        doc.layers.add("L", color=1)
+        # x=123, y=456 — clearly different
+        msp.add_text(
+            "CoordCheck",
+            dxfattribs={"layer": "L", "insert": (123, 456), "height": 2.0},
+        )
+        path = tmp_path / "text_coords.dxf"
+        doc.saveas(str(path))
+
+        snaps = extract_snapshots(path)
+        texts = [s for s in snaps if s.entity_type == EntityType.TEXT]
+        assert len(texts) == 1
+        assert texts[0].points[0].x == pytest.approx(123.0)
+        assert texts[0].points[0].y == pytest.approx(456.0)
+        assert texts[0].points[0].x != pytest.approx(456.0)
+
+
+class TestCheckProfileWarningsMessagesMutationKilling:
+    """Kill mutations on warning message strings in check_profile_warnings."""
+
+    def test_all_excluded_warning_message_exact_phrases(self):
+        """'excluded all' warning must contain profile name and 'no geometry remains'."""
+        profile = ComparisonProfile(name="test-profile-name")
+        # 5 total → 0 remaining → 100% excluded → triggers "excluded all" path
+        warnings = check_profile_warnings(5, [], profile, source="")
+        assert len(warnings) == 1
+        msg = warnings[0]
+        # Must contain the profile name
+        assert "test-profile-name" in msg
+        # Must contain the entity count
+        assert "5" in msg
+        # Must contain the key phrase
+        assert "no geometry remains" in msg
+
+    def test_all_excluded_with_source_prefix(self):
+        """'excluded all' warning must include the source label as a prefix."""
+        profile = ComparisonProfile(name="tight-filter")
+        warnings = check_profile_warnings(3, [], profile, source="revision")
+        assert len(warnings) == 1
+        # Warning must start with 'revision: '
+        assert warnings[0].startswith("revision: ")
+
+    def test_high_exclusion_warning_message_exact_phrases(self):
+        """High-exclusion warning (>80%) must contain profile name and percentage."""
+        from tests.helpers.comparison_factory import make_geometry_snapshot
+
+        remaining = [make_geometry_snapshot(handle="A", layer="L", points=[(0, 0)])]
+        profile = ComparisonProfile(name="aggressive-profile")
+        # 10 total → 1 remaining = 9/10 = 90% excluded → >0.80 threshold
+        warnings = check_profile_warnings(10, remaining, profile, source="")
+        assert len(warnings) == 1
+        msg = warnings[0]
+        assert "aggressive-profile" in msg
+        # Must mention the percentage (90%)
+        assert "90%" in msg
+
+    def test_high_exclusion_warning_includes_count(self):
+        """High-exclusion warning must include both excluded_count and before_count."""
+        from tests.helpers.comparison_factory import make_geometry_snapshot
+
+        remaining = [make_geometry_snapshot(handle="A", layer="L", points=[(0, 0)])]
+        profile = ComparisonProfile(name="count-check")
+        # 20 total → 1 remaining = 19/20 = 95% excluded
+        warnings = check_profile_warnings(20, remaining, profile, source="")
+        assert len(warnings) >= 1
+        # Find the high-exclusion warning (not the LINE/LWPOLYLINE one)
+        high_excl = [w for w in warnings if "%" in w]
+        assert high_excl
+        msg = high_excl[0]
+        # Must mention 19 excluded and 20 total
+        assert "19" in msg
+        assert "20" in msg
+
+    def test_no_structural_warning_exact_phrase(self):
+        """Missing LINE/LWPOLYLINE warning must contain exact phrase."""
+        from tests.helpers.comparison_factory import make_geometry_snapshot
+
+        # Use only TEXT entities — no LINE or LWPOLYLINE
+        remaining = [
+            make_geometry_snapshot(
+                handle="T1", layer="L", entity_type=EntityType.TEXT, points=[(0, 0)]
+            )
+        ]
+        profile = ComparisonProfile(
+            name="text-only",
+            include_entity_types=[EntityType.TEXT],
+        )
+        # 5 total, 1 remaining TEXT only — no structural types present
+        warnings = check_profile_warnings(5, remaining, profile, source="")
+        structural_warnings = [w for w in warnings if "LINE" in w or "LWPOLYLINE" in w]
+        assert structural_warnings
+        msg = structural_warnings[0]
+        assert "LINE" in msg
+        assert "LWPOLYLINE" in msg
+
+    def test_before_count_zero_returns_empty(self):
+        """before_count == 0 must return empty list immediately."""
+        profile = ComparisonProfile(name="empty-before")
+        warnings = check_profile_warnings(0, [], profile, source="master")
+        assert warnings == []
+
+    def test_source_prefix_empty_string_no_colon(self):
+        """When source is empty, warning must NOT start with ': '."""
+        profile = ComparisonProfile(name="no-source")
+        warnings = check_profile_warnings(5, [], profile, source="")
+        assert len(warnings) == 1
+        # Must NOT start with ': ' when source is empty
+        assert not warnings[0].startswith(": ")
+        # Must start with "Profile '"
+        assert warnings[0].startswith("Profile '")
+
+
+class TestXrefWarningMessagesMutationKilling:
+    """Kill mutations on xref/dynblock warning message strings in _detect_xrefs_and_dynblocks."""
+
+    def test_xref_warning_contains_xref_count_exact(self):
+        """Xref count in warning must be the exact integer count."""
+        from unittest.mock import MagicMock
+
+        from cad_dxf_agent.core.comparison.geometry import _detect_xrefs_and_dynblocks
+        from cad_dxf_agent.models.cad_schema import Point2D
+        from cad_dxf_agent.models.comparison_schema import GeometrySnapshot
+
+        def _make_layout(name: str, flags: int):
+            layout = MagicMock()
+            layout.name = name
+            block_record = MagicMock()
+            block_record.dxf.get.return_value = flags
+            xdict = MagicMock()
+            xdict.__contains__ = lambda self, key: False
+            block_record.extension_dict = xdict
+            layout.block = block_record
+            return layout
+
+        doc = MagicMock()
+        doc.blocks = [_make_layout("XREF_ONE", 4)]
+
+        snaps = [
+            GeometrySnapshot(
+                handle="I1",
+                entity_type=EntityType.INSERT,
+                layer="0",
+                points=[Point2D(x=0, y=0)],
+                block_name="XREF_ONE",
+            ),
+            GeometrySnapshot(
+                handle="I2",
+                entity_type=EntityType.INSERT,
+                layer="0",
+                points=[Point2D(x=5, y=5)],
+                block_name="XREF_ONE",
+            ),
+        ]
+        warnings = _detect_xrefs_and_dynblocks(doc, snaps, "")
+        assert len(warnings) == 1
+        # Count is 2 (both snapshots reference XREF_ONE)
+        assert "2" in warnings[0]
+        assert "XREF_ONE" in warnings[0]
+
+    def test_xref_warning_phrase_not_resolved(self):
+        """Xref warning must contain 'not resolved' phrase exactly."""
+        from unittest.mock import MagicMock
+
+        from cad_dxf_agent.core.comparison.geometry import _detect_xrefs_and_dynblocks
+        from cad_dxf_agent.models.cad_schema import Point2D
+        from cad_dxf_agent.models.comparison_schema import GeometrySnapshot
+
+        def _make_xref_layout(name: str):
+            layout = MagicMock()
+            layout.name = name
+            block_record = MagicMock()
+            block_record.dxf.get.return_value = 4  # BLK_XREF
+            xdict = MagicMock()
+            xdict.__contains__ = lambda self, key: False
+            block_record.extension_dict = xdict
+            layout.block = block_record
+            return layout
+
+        doc = MagicMock()
+        doc.blocks = [_make_xref_layout("XREF_NR")]
+
+        snaps = [
+            GeometrySnapshot(
+                handle="I1",
+                entity_type=EntityType.INSERT,
+                layer="0",
+                points=[Point2D(x=0, y=0)],
+                block_name="XREF_NR",
+            )
+        ]
+        warnings = _detect_xrefs_and_dynblocks(doc, snaps, "")
+        assert len(warnings) == 1
+        assert "not resolved" in warnings[0]
+
+    def test_dynblock_warning_phrase_dynamic_properties(self):
+        """Dynamic block warning must contain 'Dynamic properties' (or 'dynamic properties')."""
+        from unittest.mock import MagicMock
+
+        from cad_dxf_agent.core.comparison.geometry import _detect_xrefs_and_dynblocks
+        from cad_dxf_agent.models.cad_schema import Point2D
+        from cad_dxf_agent.models.comparison_schema import GeometrySnapshot
+
+        def _make_dynblock_layout(name: str):
+            layout = MagicMock()
+            layout.name = name
+            block_record = MagicMock()
+            block_record.dxf.get.return_value = 0
+            xdict = MagicMock()
+            xdict.__contains__ = lambda self, key: key == "ACAD_ENHANCEDBLOCK"
+            block_record.extension_dict = xdict
+            layout.block = block_record
+            return layout
+
+        doc = MagicMock()
+        doc.blocks = [_make_dynblock_layout("DYN_X")]
+
+        snaps = [
+            GeometrySnapshot(
+                handle="I1",
+                entity_type=EntityType.INSERT,
+                layer="0",
+                points=[Point2D(x=0, y=0)],
+                block_name="DYN_X",
+            )
+        ]
+        warnings = _detect_xrefs_and_dynblocks(doc, snaps, "")
+        assert len(warnings) == 1
+        assert "dynamic" in warnings[0].lower()
+        assert "properties" in warnings[0].lower()
+
+    def test_dynblock_warning_contains_block_name(self):
+        """Dynamic block warning must include the block name."""
+        from unittest.mock import MagicMock
+
+        from cad_dxf_agent.core.comparison.geometry import _detect_xrefs_and_dynblocks
+        from cad_dxf_agent.models.cad_schema import Point2D
+        from cad_dxf_agent.models.comparison_schema import GeometrySnapshot
+
+        def _make_dynblock_layout(name: str):
+            layout = MagicMock()
+            layout.name = name
+            block_record = MagicMock()
+            block_record.dxf.get.return_value = 0
+            xdict = MagicMock()
+            xdict.__contains__ = lambda self, key: key == "ACAD_ENHANCEDBLOCK"
+            block_record.extension_dict = xdict
+            layout.block = block_record
+            return layout
+
+        doc = MagicMock()
+        doc.blocks = [_make_dynblock_layout("MY_DYNBLOCK_NAME")]
+
+        snaps = [
+            GeometrySnapshot(
+                handle="I1",
+                entity_type=EntityType.INSERT,
+                layer="0",
+                points=[Point2D(x=0, y=0)],
+                block_name="MY_DYNBLOCK_NAME",
+            )
+        ]
+        warnings = _detect_xrefs_and_dynblocks(doc, snaps, "")
+        assert len(warnings) == 1
+        assert "MY_DYNBLOCK_NAME" in warnings[0]
+
+    def test_xref_warning_no_source_no_prefix(self):
+        """Xref warning with source='' must NOT start with ': '."""
+        from unittest.mock import MagicMock
+
+        from cad_dxf_agent.core.comparison.geometry import _detect_xrefs_and_dynblocks
+        from cad_dxf_agent.models.cad_schema import Point2D
+        from cad_dxf_agent.models.comparison_schema import GeometrySnapshot
+
+        def _make_xref(name: str):
+            layout = MagicMock()
+            layout.name = name
+            block_record = MagicMock()
+            block_record.dxf.get.return_value = 4
+            xdict = MagicMock()
+            xdict.__contains__ = lambda self, key: False
+            block_record.extension_dict = xdict
+            layout.block = block_record
+            return layout
+
+        doc = MagicMock()
+        doc.blocks = [_make_xref("XREF_P")]
+        snaps = [
+            GeometrySnapshot(
+                handle="I1",
+                entity_type=EntityType.INSERT,
+                layer="0",
+                points=[Point2D(x=0, y=0)],
+                block_name="XREF_P",
+            )
+        ]
+        warnings = _detect_xrefs_and_dynblocks(doc, snaps, "")
+        assert len(warnings) == 1
+        assert not warnings[0].startswith(": ")
+
+    def test_xref_warning_with_source_has_prefix(self):
+        """Xref warning with source='master' must start with 'master: '."""
+        from unittest.mock import MagicMock
+
+        from cad_dxf_agent.core.comparison.geometry import _detect_xrefs_and_dynblocks
+        from cad_dxf_agent.models.cad_schema import Point2D
+        from cad_dxf_agent.models.comparison_schema import GeometrySnapshot
+
+        def _make_xref(name: str):
+            layout = MagicMock()
+            layout.name = name
+            block_record = MagicMock()
+            block_record.dxf.get.return_value = 4
+            xdict = MagicMock()
+            xdict.__contains__ = lambda self, key: False
+            block_record.extension_dict = xdict
+            layout.block = block_record
+            return layout
+
+        doc = MagicMock()
+        doc.blocks = [_make_xref("XREF_Q")]
+        snaps = [
+            GeometrySnapshot(
+                handle="I1",
+                entity_type=EntityType.INSERT,
+                layer="0",
+                points=[Point2D(x=0, y=0)],
+                block_name="XREF_Q",
+            )
+        ]
+        warnings = _detect_xrefs_and_dynblocks(doc, snaps, "master")
+        assert len(warnings) == 1
+        assert warnings[0].startswith("master: ")
+
+
+class TestExtractSnapshotsIgnoredLayersMutationKilling:
+    """Kill mutations in the ignored-layers filtering branch of extract_snapshots."""
+
+    def test_layer_filter_case_insensitive(self, tmp_path):
+        """Ignored layers matching is case-insensitive (upper() comparison used)."""
+        import ezdxf
+
+        doc = ezdxf.new(dxfversion="R2018")
+        msp = doc.modelspace()
+        doc.layers.add("MyLayer", color=1)
+        doc.layers.add("OtherLayer", color=2)
+        msp.add_line((0, 0), (10, 0), dxfattribs={"layer": "MyLayer"})
+        msp.add_line((20, 0), (30, 0), dxfattribs={"layer": "OtherLayer"})
+        path = tmp_path / "layer_case.dxf"
+        doc.saveas(str(path))
+
+        # Ignore in lowercase — must still match "MyLayer" via upper() comparison
+        config = ComparisonConfig(ignored_layers=["mylayer"])
+        snaps = extract_snapshots(path, config)
+        layers = {s.layer for s in snaps}
+        assert "MyLayer" not in layers
+        assert "OtherLayer" in layers
+
+    def test_focus_type_not_in_extractable_filters_out(self, tmp_path):
+        """focus_entity_types filters correctly — only specified types pass through."""
+        import ezdxf
+
+        doc = ezdxf.new(dxfversion="R2018")
+        msp = doc.modelspace()
+        doc.layers.add("L", color=1)
+        msp.add_line((0, 0), (10, 0), dxfattribs={"layer": "L"})
+        msp.add_text("T", dxfattribs={"layer": "L", "insert": (5, 5), "height": 2})
+        path = tmp_path / "focus.dxf"
+        doc.saveas(str(path))
+
+        config = ComparisonConfig(focus_entity_types=[EntityType.TEXT])
+        snaps = extract_snapshots(path, config)
+        assert all(s.entity_type == EntityType.TEXT for s in snaps)
+        assert len(snaps) == 1
+
+    def test_xref_warnings_accumulated_when_profile_warnings_given(self, tmp_path):
+        """_profile_warnings list receives xref warnings from _detect_xrefs_and_dynblocks."""
+        from tests.helpers.comparison_factory import make_xref_pair
+
+        master, _ = make_xref_pair(tmp_path)
+        collected: list[str] = []
+        extract_snapshots(master, _profile_warnings=collected)
+        # make_xref_pair sets BLK_XREF flag on GRID_REF
+        xref_msgs = [m for m in collected if "external reference" in m.lower()]
+        assert len(xref_msgs) >= 1
+
+    def test_no_profile_warnings_param_no_crash(self, tmp_path):
+        """_profile_warnings=None must not crash even when xrefs are present."""
+        from tests.helpers.comparison_factory import make_xref_pair
+
+        master, _ = make_xref_pair(tmp_path)
+        # Must not raise — _profile_warnings is None so extend is skipped
+        snaps = extract_snapshots(master, _profile_warnings=None)
+        assert isinstance(snaps, list)
+
+
+class TestInsertRotationModuloMutationKilling:
+    """Kill the '% 360.0' removal mutant on INSERT rotation."""
+
+    def test_rotation_zero_modulo_is_zero(self, tmp_path):
+        """rotation=0.0 % 360.0 == 0.0 (not 360.0 from a wrong modulo direction)."""
+        import ezdxf
+
+        doc = ezdxf.new(dxfversion="R2018")
+        msp = doc.modelspace()
+        doc.layers.add("L", color=1)
+        blk = doc.blocks.new("ZERO_ROT_BLK")
+        blk.add_line((0, 0), (1, 0))
+        msp.add_blockref("ZERO_ROT_BLK", insert=(0, 0), dxfattribs={"layer": "L", "rotation": 0.0})
+        path = tmp_path / "rot_zero.dxf"
+        doc.saveas(str(path))
+
+        snaps = extract_snapshots(path)
+        inserts = [s for s in snaps if s.entity_type == EntityType.INSERT]
+        assert len(inserts) == 1
+        assert inserts[0].attributes["insert_rotation"] == pytest.approx(0.0)
+
+    def test_rotation_360_normalised_to_zero(self, tmp_path):
+        """rotation=360.0 % 360.0 == 0.0."""
+        import ezdxf
+
+        doc = ezdxf.new(dxfversion="R2018")
+        msp = doc.modelspace()
+        doc.layers.add("L", color=1)
+        blk = doc.blocks.new("FULL_ROT_BLK")
+        blk.add_line((0, 0), (1, 0))
+        msp.add_blockref(
+            "FULL_ROT_BLK", insert=(0, 0), dxfattribs={"layer": "L", "rotation": 360.0}
+        )
+        path = tmp_path / "rot_360.dxf"
+        doc.saveas(str(path))
+
+        snaps = extract_snapshots(path)
+        inserts = [s for s in snaps if s.entity_type == EntityType.INSERT]
+        assert len(inserts) == 1
+        assert inserts[0].attributes["insert_rotation"] == pytest.approx(0.0)
+
+    def test_rotation_270_stays_270(self, tmp_path):
+        """rotation=270.0 % 360.0 == 270.0."""
+        import ezdxf
+
+        doc = ezdxf.new(dxfversion="R2018")
+        msp = doc.modelspace()
+        doc.layers.add("L", color=1)
+        blk = doc.blocks.new("ROT270_BLK")
+        blk.add_line((0, 0), (1, 0))
+        msp.add_blockref("ROT270_BLK", insert=(0, 0), dxfattribs={"layer": "L", "rotation": 270.0})
+        path = tmp_path / "rot_270.dxf"
+        doc.saveas(str(path))
+
+        snaps = extract_snapshots(path)
+        inserts = [s for s in snaps if s.entity_type == EntityType.INSERT]
+        assert len(inserts) == 1
+        assert inserts[0].attributes["insert_rotation"] == pytest.approx(270.0)
+
+
+class TestProfileFilteringLogicMutationKilling:
+    """Kill mutations in apply_profile filter predicates."""
+
+    def test_include_entity_types_keeps_only_matching(self):
+        """include_entity_types must KEEP only matching types, not exclude them."""
+        mk = make_geometry_snapshot
+        snaps = [
+            mk(handle="L1", entity_type=EntityType.LINE, layer="A", points=[(0, 0), (1, 0)]),
+            mk(handle="C1", entity_type=EntityType.CIRCLE, layer="A", points=[(5, 5)]),
+            mk(handle="T1", entity_type=EntityType.TEXT, layer="A", points=[(10, 10)]),
+        ]
+        profile = ComparisonProfile(include_entity_types=[EntityType.LINE, EntityType.CIRCLE])
+        result = apply_profile(snaps, profile)
+        handles = {s.handle for s in result}
+        assert "L1" in handles
+        assert "C1" in handles
+        assert "T1" not in handles
+
+    def test_exclude_layers_removes_matching(self):
+        """exclude_layers must REMOVE matching, not keep them."""
+        mk = make_geometry_snapshot
+        snaps = [
+            mk(handle="A", layer="TITLE", points=[(0, 0), (10, 0)]),
+            mk(handle="B", layer="STRUCTURAL", points=[(5, 5), (15, 5)]),
+        ]
+        profile = ComparisonProfile(exclude_layers=["^TITLE$"])
+        result = apply_profile(snaps, profile)
+        handles = {s.handle for s in result}
+        assert "A" not in handles
+        assert "B" in handles
+
+    def test_include_layers_empty_passes_all(self):
+        """Empty include_layers (None / not set) must pass all layers through."""
+        mk = make_geometry_snapshot
+        snaps = [
+            mk(handle="X", layer="ANY_LAYER", points=[(0, 0)]),
+            mk(handle="Y", layer="OTHER", points=[(5, 5)]),
+        ]
+        profile = ComparisonProfile()  # no include_layers set
+        result = apply_profile(snaps, profile)
+        assert len(result) == 2
+
+    def test_region_exclude_uses_centroid(self):
+        """Entities whose centroid is inside excluded region are removed."""
+        from cad_dxf_agent.models.comparison_schema import BBoxRegion
+
+        mk = make_geometry_snapshot
+        # Centroid of [(10,10), (20,10), (20,20), (10,20)] = (15, 15)
+        snap_inside = mk(handle="IN", layer="A", points=[(10, 10), (20, 10), (20, 20), (10, 20)])
+        # Centroid of [(100, 100)] = (100, 100)
+        snap_outside = mk(handle="OUT", layer="A", points=[(100, 100)])
+
+        profile = ComparisonProfile(
+            exclude_regions=[BBoxRegion(min_x=0, min_y=0, max_x=50, max_y=50)]
+        )
+        result = apply_profile([snap_inside, snap_outside], profile)
+        assert len(result) == 1
+        assert result[0].handle == "OUT"

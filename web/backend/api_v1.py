@@ -45,13 +45,9 @@ def _save_upload(file: UploadFile) -> Path:
 
     suffix = Path(file.filename).suffix.lower()
     if suffix not in (".dxf", ".dwg"):
-        raise HTTPException(
-            400, f"Unsupported file type: {suffix}. Expected .dxf or .dwg"
-        )
+        raise HTTPException(400, f"Unsupported file type: {suffix}. Expected .dxf or .dwg")
 
-    with tempfile.NamedTemporaryFile(
-        suffix=suffix, delete=False, prefix="cadv1_"
-    ) as tmp:
+    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False, prefix="cadv1_") as tmp:
         data = file.file.read()
         tmp.write(data)
         tmp.flush()
@@ -89,11 +85,13 @@ async def analyze(file: UploadFile = File(...)):
         layers = []
         for layer in context.layers:
             entities = index.get_by_layer(layer.name)
-            layers.append({
-                "name": layer.name,
-                "entity_count": len(entities),
-                "color": layer.color,
-            })
+            layers.append(
+                {
+                    "name": layer.name,
+                    "entity_count": len(entities),
+                    "color": layer.color,
+                }
+            )
 
         # Entity type distribution
         type_counts: dict[str, int] = {}
@@ -129,9 +127,7 @@ async def health_check(file: UploadFile = File(...)):
         try:
             from cad_dxf_agent.core.health_checker import check_drawing_health
         except ImportError:
-            raise HTTPException(
-                501, "Health checker not available"
-            ) from None
+            raise HTTPException(501, "Health checker not available") from None
 
         report = check_drawing_health(context, include_zones=False)
 
@@ -193,12 +189,8 @@ async def detect_zones(file: UploadFile = File(...)):
 async def search_entities(
     file: UploadFile = File(...),
     layer: str | None = Query(None, description="Filter by layer name"),
-    entity_type: str | None = Query(
-        None, description="Filter by entity type (LINE, TEXT, etc.)"
-    ),
-    text_contains: str | None = Query(
-        None, description="Filter TEXT/MTEXT by content substring"
-    ),
+    entity_type: str | None = Query(None, description="Filter by entity type (LINE, TEXT, etc.)"),
+    text_contains: str | None = Query(None, description="Filter TEXT/MTEXT by content substring"),
     limit: int = Query(100, ge=1, le=1000, description="Max entities to return"),
 ):
     """Search entities in a DXF file with optional filters.
@@ -215,9 +207,7 @@ async def search_entities(
         if text_contains:
             text_matches = index.search_text(text_contains)
             match_handles = {e.handle for e in text_matches}
-            candidates = [
-                e for e in candidates if e.handle in match_handles
-            ]
+            candidates = [e for e in candidates if e.handle in match_handles]
 
         total = len(candidates)
         entities = []

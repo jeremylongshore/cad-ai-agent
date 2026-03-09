@@ -73,3 +73,7 @@ test-results/
 # Dolt database files (added by bd init)
 .dolt/
 *.db
+
+# Mutation testing cache
+mutants/
+.mutmut-cache/

@@ -7,6 +7,7 @@ holds the durable, serializable subset. SessionManager bridges the two.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 from dataclasses import dataclass, field
@@ -109,7 +110,8 @@ class Session:
             created_at=meta.created_at,
             document_id=meta.document_id,
             original_path=(
-                Path(meta.original_path) if meta.original_path
+                Path(meta.original_path)
+                if meta.original_path
                 else DEFAULT_SESSION_DIR / meta.session_id / "original.dxf"
             ),
             working_path=Path(meta.working_path) if meta.working_path else None,
@@ -141,11 +143,23 @@ class SessionManager:
         self._store = store or InMemorySessionStore()
         self._sessions: dict[str, Session] = {}
         self._lock = Lock()
+        self._session_locks: dict[str, asyncio.Lock] = {}
 
     @property
     def store(self) -> SessionStore:
         """Access the underlying session store."""
         return self._store
+
+    def session_lock(self, session_id: str) -> asyncio.Lock:
+        """Get a per-session asyncio.Lock for serializing mutations.
+
+        Prevents concurrent /api/apply, /api/chat, /api/undo from
+        corrupting session state or DXF files.
+        """
+        with self._lock:
+            if session_id not in self._session_locks:
+                self._session_locks[session_id] = asyncio.Lock()
+            return self._session_locks[session_id]
 
     def create(self, user_id: str) -> Session:
         """Create a new session with a temp directory."""
@@ -159,7 +173,7 @@ class SessionManager:
         return session
 
     def get(self, session_id: str, user_id: str) -> Session:
-        """Get a session, validating ownership."""
+        """Get a session, validating ownership and refreshing TTL."""
         with self._lock:
             session = self._sessions.get(session_id)
 
@@ -190,6 +204,7 @@ class SessionManager:
         """Delete a session and its temp directory."""
         with self._lock:
             self._sessions.pop(session_id, None)
+            self._session_locks.pop(session_id, None)
 
         self._store.delete(session_id)
         logger.info("Deleted session %s", session_id)
@@ -250,6 +265,7 @@ class SessionManager:
             sessions = list(self._sessions.values())
 
         return [
-            s for s in sessions
+            s
+            for s in sessions
             if s.user_id == user_id and now - s.created_at <= SESSION_TTL_SECONDS
         ]

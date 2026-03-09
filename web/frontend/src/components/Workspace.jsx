@@ -17,6 +17,8 @@ export default function Workspace({ user, onSignOut }) {
 
   const isAuthenticated = !!user;
   const library = useDocumentLibrary(isAuthenticated);
+  const [reconnectFailed, setReconnectFailed] = useState(false);
+  const reconnectAttemptsRef = useRef(0);
 
   // Attempt to reconnect a previously active library session on mount
   useEffect(() => {
@@ -25,6 +27,12 @@ export default function Workspace({ user, onSignOut }) {
       if (data && data.session_id) {
         const savedDocId = localStorage.getItem('intentcad_active_document_id');
         session.loadFromLibraryData(data, savedDocId);
+        setReconnectFailed(false);
+      }
+    }).catch(() => {
+      reconnectAttemptsRef.current += 1;
+      if (reconnectAttemptsRef.current >= 3) {
+        setReconnectFailed(true);
       }
     });
     // Intentionally omit library and session from deps — run once on auth
@@ -77,6 +85,22 @@ export default function Workspace({ user, onSignOut }) {
           </div>
         </div>
       </header>
+
+      {reconnectFailed && (
+        <div style={{ background: 'var(--accent-warning-light, #332b00)', padding: 'var(--space-2) var(--space-4)', borderBottom: '1px solid var(--accent-warning, #b38600)' }}>
+          <div className="container--wide flex justify-between items-center">
+            <span className="text-sm" style={{ color: 'var(--accent-warning, #b38600)' }}>
+              Connection lost. Unable to reach the server.
+            </span>
+            <button
+              className="btn btn--ghost btn--sm"
+              onClick={() => { setReconnectFailed(false); reconnectAttemptsRef.current = 0; window.location.reload(); }}
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      )}
 
       {error && (
         <div style={{ background: 'var(--accent-danger-light)', padding: 'var(--space-2) var(--space-4)', borderBottom: '1px solid var(--accent-danger)' }}>

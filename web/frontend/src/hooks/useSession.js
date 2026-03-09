@@ -2,7 +2,7 @@ import { useState, useCallback, useRef } from 'react';
 import {
   uploadFile, planEdit, v2Prompt, applyChanges, downloadFile, getRenderBlob, getDxfBlob,
   clearHistory, compareFiles, revisionUpload, revisionAlign, revisionDiff,
-  revisionApprove, revisionApply, revisionDownloadUrl,
+  revisionApprove, revisionApply, revisionDownloadBlob,
   v2Preview, v2Approve, v2Apply,
 } from '../lib/api';
 
@@ -12,6 +12,11 @@ const NO_CHANGES_MESSAGE = "I couldn't plan any changes. Try being more specific
 /** Create a message object with a unique ID and timestamp */
 function msg(role, text, extra = {}) {
   return { id: crypto.randomUUID(), role, text, ts: Date.now(), ...extra };
+}
+
+/** Revoke a blob URL if it exists, preventing memory leaks. */
+function revokeIfBlob(url) {
+  if (url && url.startsWith('blob:')) URL.revokeObjectURL(url);
 }
 
 export function useSession() {
@@ -68,12 +73,18 @@ export function useSession() {
         getDxfBlob(data.session_id, 'original'),
       ]);
       if (renderResult.status === 'fulfilled') {
-        setPreviewUrls((prev) => ({ ...prev, original: URL.createObjectURL(renderResult.value) }));
+        setPreviewUrls((prev) => {
+          revokeIfBlob(prev.original);
+          return { ...prev, original: URL.createObjectURL(renderResult.value) };
+        });
       } else {
         console.warn('[cad] Original render fetch failed:', renderResult.reason?.message);
       }
       if (dxfResult.status === 'fulfilled') {
-        setDxfUrls((prev) => ({ ...prev, original: URL.createObjectURL(dxfResult.value) }));
+        setDxfUrls((prev) => {
+          revokeIfBlob(prev.original);
+          return { ...prev, original: URL.createObjectURL(dxfResult.value) };
+        });
       } else {
         console.warn('[cad] Original DXF fetch failed:', dxfResult.reason?.message);
       }
@@ -248,7 +259,10 @@ export function useSession() {
         getDxfBlob(sessionId, 'edited'),
       ]);
       if (renderRes.status === 'fulfilled') {
-        setPreviewUrls((prev) => ({ ...prev, edited: URL.createObjectURL(renderRes.value) }));
+        setPreviewUrls((prev) => {
+          revokeIfBlob(prev.edited);
+          return { ...prev, edited: URL.createObjectURL(renderRes.value) };
+        });
       } else {
         console.warn('[cad] Edited render fetch failed:', renderRes.reason?.message);
         setMessages((prev) => [...prev,
@@ -256,7 +270,10 @@ export function useSession() {
         ]);
       }
       if (dxfRes.status === 'fulfilled') {
-        setDxfUrls((prev) => ({ ...prev, edited: URL.createObjectURL(dxfRes.value) }));
+        setDxfUrls((prev) => {
+          revokeIfBlob(prev.edited);
+          return { ...prev, edited: URL.createObjectURL(dxfRes.value) };
+        });
       }
     } catch (err) {
       setError(err.message);
@@ -309,8 +326,10 @@ export function useSession() {
       if (data.render_available) {
         try {
           const blob = await getRenderBlob(sessionId, 'comparison');
-          const url = URL.createObjectURL(blob);
-          setPreviewUrls((prev) => ({ ...prev, comparison: url }));
+          setPreviewUrls((prev) => {
+            revokeIfBlob(prev.comparison);
+            return { ...prev, comparison: URL.createObjectURL(blob) };
+          });
         } catch (renderErr) {
           console.warn('[cad] Comparison render fetch failed:', renderErr.message);
         }
@@ -358,7 +377,10 @@ export function useSession() {
       // Fetch comparison DXF for interactive viewer
       try {
         const compBlob = await getDxfBlob(sessionId, 'comparison');
-        setDxfUrls((prev) => ({ ...prev, comparison: URL.createObjectURL(compBlob) }));
+        setDxfUrls((prev) => {
+          revokeIfBlob(prev.comparison);
+          return { ...prev, comparison: URL.createObjectURL(compBlob) };
+        });
       } catch (dxfErr) {
         console.warn('[cad] Comparison DXF fetch failed:', dxfErr.message);
       }
@@ -475,15 +497,21 @@ export function useSession() {
     }
   }, [sessionId]);
 
-  const handleBundleDownload = useCallback(() => {
+  const handleBundleDownload = useCallback(async () => {
     if (!sessionId) return;
-    const url = revisionDownloadUrl(sessionId);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = '';
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
+    try {
+      const blob = await revisionDownloadBlob(sessionId);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'revision_bundle.zip';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err.message);
+    }
   }, [sessionId]);
 
   // --- Structured edit plan preview/approve/apply (EPIC-CAD-08) ---
@@ -537,10 +565,16 @@ export function useSession() {
         getDxfBlob(sessionId, 'edited'),
       ]);
       if (renderRes.status === 'fulfilled') {
-        setPreviewUrls((prev) => ({ ...prev, edited: URL.createObjectURL(renderRes.value) }));
+        setPreviewUrls((prev) => {
+          revokeIfBlob(prev.edited);
+          return { ...prev, edited: URL.createObjectURL(renderRes.value) };
+        });
       }
       if (dxfRes.status === 'fulfilled') {
-        setDxfUrls((prev) => ({ ...prev, edited: URL.createObjectURL(dxfRes.value) }));
+        setDxfUrls((prev) => {
+          revokeIfBlob(prev.edited);
+          return { ...prev, edited: URL.createObjectURL(dxfRes.value) };
+        });
       }
     } catch (err) {
       setError(err.message);
@@ -567,10 +601,16 @@ export function useSession() {
         getDxfBlob(sessionId, 'edited'),
       ]);
       if (renderRes.status === 'fulfilled') {
-        setPreviewUrls((prev) => ({ ...prev, edited: URL.createObjectURL(renderRes.value) }));
+        setPreviewUrls((prev) => {
+          revokeIfBlob(prev.edited);
+          return { ...prev, edited: URL.createObjectURL(renderRes.value) };
+        });
       }
       if (dxfRes.status === 'fulfilled') {
-        setDxfUrls((prev) => ({ ...prev, edited: URL.createObjectURL(dxfRes.value) }));
+        setDxfUrls((prev) => {
+          revokeIfBlob(prev.edited);
+          return { ...prev, edited: URL.createObjectURL(dxfRes.value) };
+        });
       }
     } catch (err) {
       setError(err.message);
@@ -599,12 +639,18 @@ export function useSession() {
         getDxfBlob(data.session_id, 'original'),
       ]);
       if (renderResult.status === 'fulfilled') {
-        setPreviewUrls((prev) => ({ ...prev, original: URL.createObjectURL(renderResult.value) }));
+        setPreviewUrls((prev) => {
+          revokeIfBlob(prev.original);
+          return { ...prev, original: URL.createObjectURL(renderResult.value) };
+        });
       } else {
         console.warn('[cad] Library load render fetch failed:', renderResult.reason?.message);
       }
       if (dxfResult.status === 'fulfilled') {
-        setDxfUrls((prev) => ({ ...prev, original: URL.createObjectURL(dxfResult.value) }));
+        setDxfUrls((prev) => {
+          revokeIfBlob(prev.original);
+          return { ...prev, original: URL.createObjectURL(dxfResult.value) };
+        });
       } else {
         console.warn('[cad] Library load DXF fetch failed:', dxfResult.reason?.message);
       }
