@@ -450,5 +450,413 @@
       "No edit operations produced"
     ],
     "tags": ["tier3", "edge-case", "ambiguous"]
+  },
+  {
+    "entry_id": "compliance-ada-001",
+    "task_family": "needs_clarification",
+    "prompt": "Check this floor plan for ADA accessibility compliance",
+    "drawing_fixture": "structural",
+    "expected_response_type": "answer_only",
+    "expected_data_keys": [],
+    "must_not_produce_ops": true,
+    "must_have_evidence": true,
+    "expected_risk_level": "none",
+    "pass_criteria": [
+      "Intent classified as design_assist",
+      "Response includes compliance findings or clear pass result",
+      "No edit operations produced"
+    ],
+    "tags": ["tier3", "compliance"]
+  },
+  {
+    "entry_id": "compliance-egress-002",
+    "task_family": "design_assist",
+    "prompt": "Verify fire egress requirements for this layout",
+    "drawing_fixture": "structural",
+    "expected_response_type": "answer_only",
+    "expected_data_keys": [],
+    "must_not_produce_ops": true,
+    "must_have_evidence": true,
+    "expected_risk_level": "none",
+    "pass_criteria": [
+      "Intent classified as design_assist",
+      "Response addresses egress paths or corridors",
+      "No edit operations produced"
+    ],
+    "tags": ["tier3", "compliance", "fire"]
+  },
+  {
+    "entry_id": "compliance-code-003",
+    "task_family": "needs_clarification",
+    "prompt": "Run a building code compliance check",
+    "drawing_fixture": "structural",
+    "expected_response_type": "answer_only",
+    "expected_data_keys": [],
+    "must_not_produce_ops": true,
+    "must_have_evidence": true,
+    "expected_risk_level": "none",
+    "pass_criteria": [
+      "Intent classified as design_assist",
+      "Response lists compliance findings or confirms no violations",
+      "No edit operations produced"
+    ],
+    "tags": ["tier3", "compliance"]
+  },
+  {
+    "entry_id": "compliance-corridor-004",
+    "task_family": "needs_clarification",
+    "prompt": "Are the corridor widths compliant with ADA standards?",
+    "drawing_fixture": "structural",
+    "expected_response_type": "answer_only",
+    "expected_data_keys": [],
+    "must_not_produce_ops": true,
+    "must_have_evidence": true,
+    "expected_risk_level": "none",
+    "pass_criteria": [
+      "Intent classified as qna",
+      "Response references ADA corridor width requirement",
+      "No edit operations produced"
+    ],
+    "tags": ["tier3", "compliance", "qna"]
+  },
+  {
+    "entry_id": "compliance-room-005",
+    "task_family": "needs_clarification",
+    "prompt": "Does every room meet minimum egress requirements?",
+    "drawing_fixture": "structural",
+    "expected_response_type": "answer_only",
+    "expected_data_keys": [],
+    "must_not_produce_ops": true,
+    "must_have_evidence": true,
+    "expected_risk_level": "none",
+    "pass_criteria": [
+      "Intent classified as qna",
+      "Response evaluates each room or zone against egress criteria",
+      "No edit operations produced"
+    ],
+    "tags": ["tier3", "compliance"]
+  },
+  {
+    "entry_id": "health-general-001",
+    "task_family": "needs_clarification",
+    "prompt": "Run a drawing quality health check",
+    "drawing_fixture": "structural",
+    "expected_response_type": "answer_only",
+    "expected_data_keys": [],
+    "must_not_produce_ops": true,
+    "must_have_evidence": false,
+    "expected_risk_level": "none",
+    "pass_criteria": [
+      "Intent classified as design_assist",
+      "Response includes quality metrics or issue summary",
+      "No edit operations produced"
+    ],
+    "tags": ["tier3", "health"]
+  },
+  {
+    "entry_id": "health-overlap-002",
+    "task_family": "qna",
+    "prompt": "Are there overlapping or duplicate entities?",
+    "drawing_fixture": "structural",
+    "expected_response_type": "answer_only",
+    "expected_data_keys": [],
+    "must_not_produce_ops": true,
+    "must_have_evidence": true,
+    "expected_risk_level": "none",
+    "pass_criteria": [
+      "Intent classified as qna",
+      "Response reports duplicate or overlapping entity findings",
+      "No edit operations produced"
+    ],
+    "tags": ["tier3", "health"]
+  },
+  {
+    "entry_id": "health-orphan-003",
+    "task_family": "needs_clarification",
+    "prompt": "Check for orphan layers and missing references",
+    "drawing_fixture": "structural",
+    "expected_response_type": "answer_only",
+    "expected_data_keys": [],
+    "must_not_produce_ops": true,
+    "must_have_evidence": false,
+    "expected_risk_level": "none",
+    "pass_criteria": [
+      "Intent classified as design_assist",
+      "Response identifies orphan layers or missing block references if present",
+      "No edit operations produced"
+    ],
+    "tags": ["tier3", "health"]
+  },
+  {
+    "entry_id": "health-dims-004",
+    "task_family": "needs_clarification",
+    "prompt": "Audit this drawing for missing dimensions",
+    "drawing_fixture": "structural",
+    "expected_response_type": "answer_only",
+    "expected_data_keys": [],
+    "must_not_produce_ops": true,
+    "must_have_evidence": false,
+    "expected_risk_level": "none",
+    "pass_criteria": [
+      "Intent classified as design_assist",
+      "Response flags elements lacking dimension annotations",
+      "No edit operations produced"
+    ],
+    "tags": ["tier3", "health"]
+  },
+  {
+    "entry_id": "rfi-missing-001",
+    "task_family": "summary",
+    "prompt": "What information is missing from this drawing?",
+    "drawing_fixture": "structural",
+    "expected_response_type": "answer_only",
+    "expected_data_keys": [],
+    "must_not_produce_ops": true,
+    "must_have_evidence": true,
+    "expected_risk_level": "none",
+    "pass_criteria": [
+      "Intent classified as qna",
+      "Response enumerates missing information items",
+      "No edit operations produced"
+    ],
+    "tags": ["tier3", "rfi"]
+  },
+  {
+    "entry_id": "rfi-generate-002",
+    "task_family": "needs_clarification",
+    "prompt": "Generate RFIs for ambiguous details",
+    "drawing_fixture": "structural",
+    "expected_response_type": "answer_only",
+    "expected_data_keys": [],
+    "must_not_produce_ops": true,
+    "must_have_evidence": false,
+    "expected_risk_level": "none",
+    "pass_criteria": [
+      "Intent classified as design_assist",
+      "Response contains one or more RFI items",
+      "No edit operations produced"
+    ],
+    "tags": ["tier3", "rfi"]
+  },
+  {
+    "entry_id": "rfi-labels-003",
+    "task_family": "qna",
+    "prompt": "Are there any unlabeled rooms or spaces?",
+    "drawing_fixture": "structural",
+    "expected_response_type": "answer_only",
+    "expected_data_keys": [],
+    "must_not_produce_ops": true,
+    "must_have_evidence": true,
+    "expected_risk_level": "none",
+    "pass_criteria": [
+      "Intent classified as qna",
+      "Response identifies unlabeled zones or confirms all spaces are labeled",
+      "No edit operations produced"
+    ],
+    "tags": ["tier3", "rfi"]
+  },
+  {
+    "entry_id": "rfi-dims-004",
+    "task_family": "needs_clarification",
+    "prompt": "Which elements are missing dimension callouts?",
+    "drawing_fixture": "structural",
+    "expected_response_type": "answer_only",
+    "expected_data_keys": [],
+    "must_not_produce_ops": true,
+    "must_have_evidence": true,
+    "expected_risk_level": "none",
+    "pass_criteria": [
+      "Intent classified as qna",
+      "Response lists elements without dimension callouts",
+      "No edit operations produced"
+    ],
+    "tags": ["tier3", "rfi"]
+  },
+  {
+    "entry_id": "zone-count-001",
+    "task_family": "takeoff_estimate",
+    "prompt": "How many rooms are in this floor plan?",
+    "drawing_fixture": "structural",
+    "expected_response_type": "takeoff_report",
+    "expected_data_keys": ["items"],
+    "must_not_produce_ops": true,
+    "must_have_evidence": true,
+    "expected_risk_level": "none",
+    "pass_criteria": [
+      "Intent classified as takeoff_estimate",
+      "Response includes a numeric room count",
+      "No edit operations produced"
+    ],
+    "tags": ["tier3", "zone"]
+  },
+  {
+    "entry_id": "zone-area-002",
+    "task_family": "needs_clarification",
+    "prompt": "Calculate the area of each enclosed room",
+    "drawing_fixture": "structural",
+    "expected_response_type": "takeoff_report",
+    "expected_data_keys": ["items"],
+    "must_not_produce_ops": true,
+    "must_have_evidence": true,
+    "expected_risk_level": "none",
+    "pass_criteria": [
+      "Intent classified as takeoff_estimate",
+      "Response includes per-room area values",
+      "No edit operations produced"
+    ],
+    "tags": ["tier3", "zone"]
+  },
+  {
+    "entry_id": "zone-classify-003",
+    "task_family": "qna",
+    "prompt": "Identify all enclosed spaces and classify them",
+    "drawing_fixture": "structural",
+    "expected_response_type": "answer_only",
+    "expected_data_keys": [],
+    "must_not_produce_ops": true,
+    "must_have_evidence": true,
+    "expected_risk_level": "none",
+    "pass_criteria": [
+      "Intent classified as qna",
+      "Response lists detected zones with classification labels",
+      "No edit operations produced"
+    ],
+    "tags": ["tier3", "zone"]
+  },
+  {
+    "entry_id": "zone-hallway-004",
+    "task_family": "qna",
+    "prompt": "Is there a hallway connecting the rooms?",
+    "drawing_fixture": "structural",
+    "expected_response_type": "answer_only",
+    "expected_data_keys": [],
+    "must_not_produce_ops": true,
+    "must_have_evidence": true,
+    "expected_risk_level": "none",
+    "pass_criteria": [
+      "Intent classified as qna",
+      "Response confirms or denies presence of a hallway zone",
+      "No edit operations produced"
+    ],
+    "tags": ["tier3", "zone"]
+  },
+  {
+    "entry_id": "transform-rotate-001",
+    "task_family": "edit_plan",
+    "prompt": "Rotate the block at grid B-2 by 45 degrees",
+    "drawing_fixture": "structural",
+    "expected_response_type": "changeset",
+    "expected_data_keys": ["operations"],
+    "must_not_produce_ops": false,
+    "must_have_evidence": false,
+    "expected_risk_level": "low",
+    "pass_criteria": [
+      "Intent classified as edit_plan",
+      "ChangeSet contains rotate_entity op",
+      "Op targets a non-protected layer"
+    ],
+    "tags": ["tier3", "transform", "rotate"]
+  },
+  {
+    "entry_id": "transform-copy-002",
+    "task_family": "needs_clarification",
+    "prompt": "Copy the column mark and place it 30 units east",
+    "drawing_fixture": "structural",
+    "expected_response_type": "changeset",
+    "expected_data_keys": ["operations"],
+    "must_not_produce_ops": false,
+    "must_have_evidence": false,
+    "expected_risk_level": "low",
+    "pass_criteria": [
+      "Intent classified as edit_plan",
+      "ChangeSet contains copy_entity op",
+      "Op targets a non-protected layer"
+    ],
+    "tags": ["tier3", "transform", "copy"]
+  },
+  {
+    "entry_id": "transform-scale-003",
+    "task_family": "edit_plan",
+    "prompt": "Scale all entities on STRUCTURAL layer by 1.5",
+    "drawing_fixture": "structural",
+    "expected_response_type": "changeset",
+    "expected_data_keys": ["operations"],
+    "must_not_produce_ops": false,
+    "must_have_evidence": false,
+    "expected_risk_level": "medium",
+    "pass_criteria": [
+      "Intent classified as edit_plan",
+      "ChangeSet contains one or more scale_entity ops",
+      "All ops target STRUCTURAL layer"
+    ],
+    "tags": ["tier3", "transform", "scale"]
+  },
+  {
+    "entry_id": "transform-mirror-004",
+    "task_family": "needs_clarification",
+    "prompt": "Mirror the drawing across the center axis",
+    "drawing_fixture": "structural",
+    "expected_response_type": "changeset",
+    "expected_data_keys": ["operations"],
+    "must_not_produce_ops": false,
+    "must_have_evidence": false,
+    "expected_risk_level": "medium",
+    "pass_criteria": [
+      "Intent classified as edit_plan",
+      "ChangeSet contains one or more mirror_entity ops",
+      "No ops target protected layers"
+    ],
+    "tags": ["tier3", "transform", "mirror"]
+  },
+  {
+    "entry_id": "batch-move-001",
+    "task_family": "edit_plan",
+    "prompt": "Move all entities on layer NOTES 10 units north",
+    "drawing_fixture": "structural",
+    "expected_response_type": "changeset",
+    "expected_data_keys": ["operations"],
+    "must_not_produce_ops": false,
+    "must_have_evidence": false,
+    "expected_risk_level": "medium",
+    "pass_criteria": [
+      "Intent classified as edit_plan",
+      "ChangeSet contains one or more move_entity ops",
+      "All ops target NOTES layer"
+    ],
+    "tags": ["tier3", "batch", "move"]
+  },
+  {
+    "entry_id": "batch-delete-002",
+    "task_family": "edit_plan",
+    "prompt": "Delete all text containing 'DRAFT'",
+    "drawing_fixture": "structural",
+    "expected_response_type": "changeset",
+    "expected_data_keys": ["operations"],
+    "must_not_produce_ops": false,
+    "must_have_evidence": false,
+    "expected_risk_level": "medium",
+    "pass_criteria": [
+      "Intent classified as edit_plan",
+      "ChangeSet contains one or more delete_entity ops",
+      "Targeted entities are text type containing DRAFT"
+    ],
+    "tags": ["tier3", "batch", "delete"]
+  },
+  {
+    "entry_id": "batch-rotate-003",
+    "task_family": "edit_plan",
+    "prompt": "Rotate all block references by 90 degrees",
+    "drawing_fixture": "structural",
+    "expected_response_type": "changeset",
+    "expected_data_keys": ["operations"],
+    "must_not_produce_ops": false,
+    "must_have_evidence": false,
+    "expected_risk_level": "high",
+    "pass_criteria": [
+      "Intent classified as edit_plan",
+      "ChangeSet contains one or more rotate_entity ops targeting INSERT entities",
+      "No ops target protected layers"
+    ],
+    "tags": ["tier3", "batch", "rotate"]
   }
 ]
