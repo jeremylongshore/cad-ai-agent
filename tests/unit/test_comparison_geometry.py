@@ -853,6 +853,302 @@ class TestExtractOneExceptionPaths:
         assert result is None
 
 
+# ---------------------------------------------------------------------------
+# Mutation-killing tests — _extract_one attribute detail assertions,
+# INSERT xscale/yscale/rotation, ARC angles, CIRCLE radius,
+# TEXT text_geometry extracted, xref warning message content,
+# extract_snapshots profile filtering with count verification
+# ---------------------------------------------------------------------------
+
+
+class TestExtractOneAttributeDetailsMutationKilling:
+    """Kill attribute-value mutations in _extract_one branches."""
+
+    def test_arc_start_angle_exact_value(self, tmp_path):
+        """ARC start_angle must be extracted exactly (not end_angle)."""
+        import ezdxf
+
+        doc = ezdxf.new(dxfversion="R2018")
+        msp = doc.modelspace()
+        doc.layers.add("L", color=1)
+        msp.add_arc(
+            (10, 20), radius=5.0, start_angle=30.0, end_angle=120.0, dxfattribs={"layer": "L"}
+        )
+        path = tmp_path / "arc_angles.dxf"
+        doc.saveas(str(path))
+
+        snaps = extract_snapshots(path)
+        arcs = [s for s in snaps if s.entity_type == EntityType.ARC]
+        assert len(arcs) == 1
+        assert arcs[0].attributes["start_angle"] == pytest.approx(30.0)
+        assert arcs[0].attributes["end_angle"] == pytest.approx(120.0)
+        # Verify they are NOT swapped
+        assert arcs[0].attributes["start_angle"] != pytest.approx(120.0)
+
+    def test_arc_radius_exact_value(self, tmp_path):
+        """ARC radius attribute must hold the precise radius value."""
+        import ezdxf
+
+        doc = ezdxf.new(dxfversion="R2018")
+        msp = doc.modelspace()
+        doc.layers.add("L", color=1)
+        msp.add_arc((0, 0), radius=7.5, start_angle=0, end_angle=90, dxfattribs={"layer": "L"})
+        path = tmp_path / "arc_radius.dxf"
+        doc.saveas(str(path))
+
+        snaps = extract_snapshots(path)
+        arcs = [s for s in snaps if s.entity_type == EntityType.ARC]
+        assert len(arcs) == 1
+        assert arcs[0].attributes["radius"] == pytest.approx(7.5)
+
+    def test_arc_centre_point_exact_coordinates(self, tmp_path):
+        """ARC centre point must match the actual centre (not a different corner)."""
+        import ezdxf
+
+        doc = ezdxf.new(dxfversion="R2018")
+        msp = doc.modelspace()
+        doc.layers.add("L", color=1)
+        msp.add_arc(
+            (15, 25), radius=3.0, start_angle=45, end_angle=135, dxfattribs={"layer": "L"}
+        )
+        path = tmp_path / "arc_centre.dxf"
+        doc.saveas(str(path))
+
+        snaps = extract_snapshots(path)
+        arcs = [s for s in snaps if s.entity_type == EntityType.ARC]
+        assert len(arcs) == 1
+        assert arcs[0].points[0].x == pytest.approx(15.0)
+        assert arcs[0].points[0].y == pytest.approx(25.0)
+
+    def test_circle_radius_exact_value(self, tmp_path):
+        """CIRCLE radius attribute must hold the precise value."""
+        import ezdxf
+
+        doc = ezdxf.new(dxfversion="R2018")
+        msp = doc.modelspace()
+        doc.layers.add("L", color=1)
+        msp.add_circle((0, 0), radius=12.5, dxfattribs={"layer": "L"})
+        path = tmp_path / "circle_radius.dxf"
+        doc.saveas(str(path))
+
+        snaps = extract_snapshots(path)
+        circles = [s for s in snaps if s.entity_type == EntityType.CIRCLE]
+        assert len(circles) == 1
+        assert circles[0].attributes["radius"] == pytest.approx(12.5)
+
+    def test_circle_centre_point_exact_coordinates(self, tmp_path):
+        """CIRCLE centre point must match the actual centre."""
+        import ezdxf
+
+        doc = ezdxf.new(dxfversion="R2018")
+        msp = doc.modelspace()
+        doc.layers.add("L", color=1)
+        msp.add_circle((33.0, 44.0), radius=5.0, dxfattribs={"layer": "L"})
+        path = tmp_path / "circle_centre.dxf"
+        doc.saveas(str(path))
+
+        snaps = extract_snapshots(path)
+        circles = [s for s in snaps if s.entity_type == EntityType.CIRCLE]
+        assert len(circles) == 1
+        assert circles[0].points[0].x == pytest.approx(33.0)
+        assert circles[0].points[0].y == pytest.approx(44.0)
+
+    def test_insert_xscale_extracted_correctly(self, tmp_path):
+        """INSERT xscale attribute must be extracted (not confused with yscale)."""
+        import ezdxf
+
+        doc = ezdxf.new(dxfversion="R2018")
+        msp = doc.modelspace()
+        doc.layers.add("L", color=1)
+        blk = doc.blocks.new("SCALED_BLK")
+        blk.add_circle((0, 0), radius=1)
+        msp.add_blockref(
+            "SCALED_BLK",
+            insert=(5, 5),
+            dxfattribs={"layer": "L", "xscale": 2.0, "yscale": 3.0, "rotation": 45.0},
+        )
+        path = tmp_path / "insert_scale.dxf"
+        doc.saveas(str(path))
+
+        snaps = extract_snapshots(path)
+        inserts = [s for s in snaps if s.entity_type == EntityType.INSERT]
+        assert len(inserts) == 1
+        assert inserts[0].attributes["insert_xscale"] == pytest.approx(2.0)
+        assert inserts[0].attributes["insert_yscale"] == pytest.approx(3.0)
+        # xscale != yscale ensures they are not swapped
+        assert inserts[0].attributes["insert_xscale"] != pytest.approx(3.0)
+
+    def test_insert_rotation_extracted_and_normalised(self, tmp_path):
+        """INSERT rotation must be extracted modulo 360."""
+        import ezdxf
+
+        doc = ezdxf.new(dxfversion="R2018")
+        msp = doc.modelspace()
+        doc.layers.add("L", color=1)
+        blk = doc.blocks.new("ROT_BLK")
+        blk.add_circle((0, 0), radius=1)
+        # rotation = 90.0
+        msp.add_blockref(
+            "ROT_BLK",
+            insert=(0, 0),
+            dxfattribs={"layer": "L", "rotation": 90.0},
+        )
+        path = tmp_path / "insert_rot.dxf"
+        doc.saveas(str(path))
+
+        snaps = extract_snapshots(path)
+        inserts = [s for s in snaps if s.entity_type == EntityType.INSERT]
+        assert len(inserts) == 1
+        assert inserts[0].attributes["insert_rotation"] == pytest.approx(90.0)
+
+    def test_insert_rotation_above_360_normalised(self, tmp_path):
+        """INSERT rotation > 360 must be reduced modulo 360."""
+        import ezdxf
+
+        doc = ezdxf.new(dxfversion="R2018")
+        msp = doc.modelspace()
+        doc.layers.add("L", color=1)
+        blk = doc.blocks.new("ROT2_BLK")
+        blk.add_circle((0, 0), radius=1)
+        # 450 % 360 == 90
+        msp.add_blockref(
+            "ROT2_BLK",
+            insert=(0, 0),
+            dxfattribs={"layer": "L", "rotation": 450.0},
+        )
+        path = tmp_path / "insert_rot2.dxf"
+        doc.saveas(str(path))
+
+        snaps = extract_snapshots(path)
+        inserts = [s for s in snaps if s.entity_type == EntityType.INSERT]
+        assert len(inserts) == 1
+        assert inserts[0].attributes["insert_rotation"] == pytest.approx(90.0)
+
+    def test_text_entity_text_geometry_extracted(self, tmp_path):
+        """TEXT entity must have text_geometry populated (not None)."""
+        import ezdxf
+
+        doc = ezdxf.new(dxfversion="R2018")
+        msp = doc.modelspace()
+        doc.layers.add("L", color=1)
+        msp.add_text("Hello", dxfattribs={"layer": "L", "insert": (0, 0), "height": 2.5})
+        path = tmp_path / "text_geo.dxf"
+        doc.saveas(str(path))
+
+        snaps = extract_snapshots(path)
+        texts = [s for s in snaps if s.entity_type == EntityType.TEXT]
+        assert len(texts) == 1
+        assert texts[0].text_content == "Hello"
+        # text_geometry must be populated (not None) for TEXT entities
+        assert texts[0].text_geometry is not None
+
+
+class TestXrefWarningContentMutationKilling:
+    """Kill mutations on xref warning message content (block name, count, 'external reference')."""
+
+    def test_xref_warning_contains_external_reference_phrase(self, tmp_path):
+        """The xref warning must contain the exact phrase 'external reference'."""
+        from tests.helpers.comparison_factory import make_xref_pair
+
+        master, _ = make_xref_pair(tmp_path)
+        warnings: list[str] = []
+        extract_snapshots(master, _profile_warnings=warnings)
+
+        xref_warnings = [w for w in warnings if "external reference" in w.lower()]
+        assert xref_warnings
+        # Must contain 'external reference' (not just 'xref' or 'reference')
+        assert "external reference" in xref_warnings[0].lower()
+
+    def test_xref_warning_contains_xref_count(self, tmp_path):
+        """The xref warning must mention the count of xref blocks found."""
+        from tests.helpers.comparison_factory import make_xref_pair
+
+        master, _ = make_xref_pair(tmp_path)
+        warnings: list[str] = []
+        extract_snapshots(master, _profile_warnings=warnings)
+
+        xref_warnings = [w for w in warnings if "external reference" in w.lower()]
+        assert xref_warnings
+        # The factory creates 1 xref block (GRID_REF) — '1' must appear in the warning
+        assert "1" in xref_warnings[0]
+
+    def test_xref_warning_contains_block_name_not_just_count(self, tmp_path):
+        """Warning must contain the specific block name 'GRID_REF', not just a count."""
+        from tests.helpers.comparison_factory import make_xref_pair
+
+        master, _ = make_xref_pair(tmp_path)
+        warnings: list[str] = []
+        extract_snapshots(master, _profile_warnings=warnings)
+
+        xref_warnings = [w for w in warnings if "external reference" in w.lower()]
+        assert xref_warnings
+        assert "GRID_REF" in xref_warnings[0]
+
+
+class TestExtractSnapshotsProfileFilteringCount:
+    """Kill mutations on profile filtering logic in extract_snapshots."""
+
+    def test_focus_type_filter_exact_count(self, tmp_path):
+        """focus_entity_types=LINE should return exactly the LINE count, not all entities."""
+        master, _ = make_identical_pair(tmp_path)
+        # _build_base creates: 2 lines, 1 text, 1 lwpolyline = 4 total
+        all_snaps = extract_snapshots(master)
+        total = len(all_snaps)
+
+        config = ComparisonConfig(focus_entity_types=[EntityType.LINE])
+        filtered = extract_snapshots(master, config)
+        assert len(filtered) == 2  # Exactly the 2 LINE entities
+        assert len(filtered) < total  # Must be fewer than all entities
+
+    def test_ignored_layers_exact_count(self, tmp_path):
+        """Ignoring NOTES layer should reduce the snapshot count by exactly the NOTES count."""
+        master, _ = make_identical_pair(tmp_path)
+        all_snaps = extract_snapshots(master)
+        notes_count = sum(1 for s in all_snaps if s.layer == "NOTES")
+
+        config = ComparisonConfig(ignored_layers=["NOTES"])
+        filtered = extract_snapshots(master, config)
+        assert len(filtered) == len(all_snaps) - notes_count
+
+    def test_no_config_returns_all_entities(self, tmp_path):
+        """No config → no filtering → all 4 entities from _build_base returned."""
+        master, _ = make_identical_pair(tmp_path)
+        snaps = extract_snapshots(master)
+        # _build_base: 2 lines + 1 text + 1 lwpolyline = 4
+        assert len(snaps) == 4
+
+    def test_profile_via_config_reduces_count(self, tmp_path):
+        """Profile in ComparisonConfig must actually filter entities."""
+        master, _ = make_identical_pair(tmp_path)
+        all_snaps = extract_snapshots(master)
+
+        config = ComparisonConfig(profile=ComparisonProfile(include_entity_types=[EntityType.LINE]))
+        filtered = extract_snapshots(master, config)
+        assert len(filtered) < len(all_snaps)
+        assert all(s.entity_type == EntityType.LINE for s in filtered)
+
+    def test_ellipse_ratio_not_equal_to_major_axis_value(self, tmp_path):
+        """ELLIPSE ratio and major_axis must not be swapped — they are different types."""
+        import ezdxf
+
+        doc = ezdxf.new(dxfversion="R2018")
+        msp = doc.modelspace()
+        doc.layers.add("L", color=1)
+        msp.add_ellipse(
+            center=(0, 0), major_axis=(10, 0, 0), ratio=0.25, dxfattribs={"layer": "L"}
+        )
+        path = tmp_path / "ellipse_ratio.dxf"
+        doc.saveas(str(path))
+
+        snaps = extract_snapshots(path)
+        ellipses = [s for s in snaps if s.entity_type == EntityType.ELLIPSE]
+        assert len(ellipses) == 1
+        # ratio must be the scalar 0.25, not the major_axis tuple
+        assert ellipses[0].attributes["ratio"] == pytest.approx(0.25)
+        # major_axis is a tuple/sequence — not the same as ratio
+        assert ellipses[0].attributes["ratio"] != ellipses[0].attributes["major_axis"]
+
+
 class TestDetectXrefsAndDynblocksDirectly:
     """Cover _detect_xrefs_and_dynblocks branches via mock ezdxf documents."""
 
