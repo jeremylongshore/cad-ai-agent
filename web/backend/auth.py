@@ -199,9 +199,12 @@ def _check_email_allowed(email: str) -> bool:
             return allowed
 
     # 1. Check env var (fast, no network)
+    # Supports both comma and semicolon separators (semicolons avoid
+    # conflicts with gcloud's env var delimiter on Cloud Run deploys)
     env_list = os.getenv("CAD_ALLOWED_EMAILS", "")
     if env_list:
-        allowed_emails = [e.strip().lower() for e in env_list.split(",") if e.strip()]
+        raw = env_list.replace(";", ",")
+        allowed_emails = [e.strip().lower() for e in raw.split(",") if e.strip()]
         if email in allowed_emails:
             _allowlist_cache[email] = (True, now)
             return True

@@ -244,7 +244,7 @@ All settings via environment variables (`.env` file, `.gitignore`d):
 | `CAD_REVISION_NOTES_ENABLED` | `true` | Insert revision notes after edits |
 | `CAD_REVISION_NOTES_LAYER` | `AI_REV_NOTES` | Layer name for revision notes |
 | `CAD_WEB_DEV_MODE` | _(unset)_ | Skip Firebase auth for local backend testing |
-| `CAD_ALLOWED_EMAILS` | _(unset)_ | Comma-separated emails allowed to auto-provision (also checks Firestore `allowlist` collection) |
+| `CAD_ALLOWED_EMAILS` | _(unset)_ | Semicolon-separated emails allowed to auto-provision (also checks Firestore `allowlist` collection) |
 | `OTEL_ENABLED` | _(unset)_ | Enable OpenTelemetry tracing (`1`, `true`, `yes`) |
 | `OTEL_EXPORTER` | `console` | Span exporter: `console`, `otlp`, or `gcp-trace` |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | _(unset)_ | OTLP collector endpoint (e.g., `http://localhost:4317`) |

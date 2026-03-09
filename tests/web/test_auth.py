@@ -296,6 +296,27 @@ class TestAllowlist:
         mock_provision.assert_called_once()
 
     @pytest.mark.asyncio
+    async def test_env_var_semicolon_separator(self):
+        """Semicolons work as separators (avoids gcloud delimiter conflicts)."""
+        from unittest.mock import MagicMock, patch
+
+        from web.backend.auth import check_license
+
+        os.environ["CAD_ALLOWED_EMAILS"] = "alpha@test.com;beta@test.com"
+        user = {
+            "uid": "beta-user",
+            "email": "beta@test.com",
+            "firebase": {"sign_in_provider": "google.com"},
+        }
+        mock_provision = MagicMock()
+        with (
+            patch("web.backend.auth._fetch_license", return_value=False),
+            patch("web.backend.auth._provision_license", mock_provision),
+        ):
+            await check_license(user)
+        mock_provision.assert_called_once()
+
+    @pytest.mark.asyncio
     async def test_env_var_case_insensitive(self):
         """Allowlist matching is case-insensitive."""
         from unittest.mock import MagicMock, patch
