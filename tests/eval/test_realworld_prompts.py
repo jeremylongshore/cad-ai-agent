@@ -164,7 +164,7 @@ class TestRealWorldGapAnalysis:
         """Extract the should_be_X family from tags."""
         for tag in entry.get("tags", []):
             if tag.startswith("should_be_"):
-                return tag[len("should_be_"):]
+                return tag[len("should_be_") :]
         return None
 
     @pytest.mark.xfail(reason="Documents classification gaps — not yet fixed")
@@ -252,9 +252,7 @@ class TestRealWorldCoverageReport:
 
             # Gap summary
             gap_prompts = [
-                p
-                for p in PROMPTS
-                if any(t.startswith("should_be_") for t in p.get("tags", []))
+                p for p in PROMPTS if any(t.startswith("should_be_") for t in p.get("tags", []))
             ]
             print(f"\nGaps documented: {len(gap_prompts)} prompts with should_be_* tags")
             gap_types = Counter(
