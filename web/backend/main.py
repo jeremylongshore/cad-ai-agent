@@ -112,7 +112,7 @@ async def lifespan(app: FastAPI):
     if dev_mode and otel_enabled:
         # Dev mode: use InMemorySpanExporter for trace capture via debug endpoints
         try:
-            from opentelemetry.sdk.trace.export.in_memory import InMemorySpanExporter
+            from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
             from cad_dxf_agent.otel import init_otel_testing
 

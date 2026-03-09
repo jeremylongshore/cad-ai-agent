@@ -91,7 +91,7 @@ test.describe('Real-World Prompts (Gemini E2E)', () => {
       await page.goto('/');
       await expect(page.locator('h2')).toContainText('Upload a drawing', { timeout: 15_000 });
 
-      await page.locator('input[type="file"]').setInputFiles(fixturePath);
+      await page.locator('input[type="file"][accept*=".pdf"]').setInputFiles(fixturePath);
       await expect(
         page.locator('.message--system').filter({ hasText: 'Loaded' })
       ).toBeVisible({ timeout: 30_000 });

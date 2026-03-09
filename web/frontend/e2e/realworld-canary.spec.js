@@ -63,7 +63,7 @@ test.describe('Production Canary (Gemini E2E)', () => {
       await page.goto('/');
       await expect(page.locator('h2')).toContainText('Upload a drawing', { timeout: 15_000 });
 
-      await page.locator('input[type="file"]').setInputFiles(CANARY_FIXTURE);
+      await page.locator('input[type="file"][accept*=".pdf"]').setInputFiles(CANARY_FIXTURE);
       await expect(
         page.locator('.message--system').filter({ hasText: 'Loaded' })
       ).toBeVisible({ timeout: 30_000 });

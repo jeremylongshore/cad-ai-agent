@@ -9,12 +9,23 @@ import {
   onAuthStateChanged,
 } from '../lib/firebase';
 
+// Dev-mode auth bypass — when VITE_DEV_AUTH=1 (set by Playwright), skip Firebase
+// and use a synthetic user that matches backend's CAD_WEB_DEV_MODE dev-user.
+const DEV_AUTH = import.meta.env.VITE_DEV_AUTH === '1';
+const DEV_USER = DEV_AUTH ? {
+  uid: 'dev-user',
+  email: 'dev@localhost',
+  displayName: 'Dev User',
+  getIdToken: async () => 'dev-token',
+} : null;
+
 export function useAuth() {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState(DEV_USER);
+  const [loading, setLoading] = useState(!DEV_AUTH);
   const [error, setError] = useState(null);
 
   useEffect(() => {
+    if (DEV_AUTH) return; // Skip Firebase listener in dev auth mode
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       setUser(firebaseUser);
       setLoading(false);

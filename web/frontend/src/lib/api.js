@@ -5,6 +5,8 @@ const DEFAULT_TIMEOUT_MS = 60_000;   // 60s for most requests
 const UPLOAD_TIMEOUT_MS = 300_000;   // 5min for large PDF uploads
 
 async function getToken() {
+  // Dev-mode auth bypass — matches backend CAD_WEB_DEV_MODE
+  if (import.meta.env.VITE_DEV_AUTH === '1') return 'dev-token';
   const user = auth.currentUser;
   if (!user) throw new Error('Not authenticated');
   return user.getIdToken();

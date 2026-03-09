@@ -76,7 +76,7 @@ export default defineConfig({
         stderr: 'pipe',
       },
       {
-        command: 'npm run dev',
+        command: 'VITE_DEV_AUTH=1 npm run dev',
         port: 3000,
         reuseExistingServer: !process.env.CI,
         timeout: 30_000,
