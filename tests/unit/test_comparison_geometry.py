@@ -1013,3 +1013,197 @@ class TestDetectXrefsAndDynblocksDirectly:
         )
         warnings = _detect_xrefs_and_dynblocks(doc, [snap], "")
         assert warnings == []
+
+
+# ---------------------------------------------------------------------------
+# New tests — coverage gaps + semantic edge cases
+# ---------------------------------------------------------------------------
+
+
+class TestExtractSnapshotsProfileWarnings:
+    """Line 92: check_profile_warnings called when both profile and _profile_warnings given."""
+
+    def test_profile_warnings_collected_via_extract_snapshots(self, tmp_path):
+        """Passing _profile_warnings to extract_snapshots accumulates warning strings.
+
+        Exercises the branch at line 92 where both config.profile and
+        _profile_warnings are set at the same time.
+        """
+        from tests.helpers.comparison_factory import make_complex_pair
+
+        master, _ = make_complex_pair(tmp_path)
+        # A profile that excludes everything forces check_profile_warnings to fire.
+        config = ComparisonConfig(
+            profile=ComparisonProfile(
+                name="nuke-all",
+                exclude_layers=[r".*"],  # matches every layer
+            )
+        )
+        collected: list[str] = []
+        extract_snapshots(master, config, _profile_warnings=collected, _source="master")
+        # At least one warning should have been appended (all entities excluded).
+        assert len(collected) >= 1
+        assert any("master" in w for w in collected)
+
+
+class TestBBoxRegionValidation:
+    """BBoxRegion raises ValueError when bounds are inverted."""
+
+    def test_inverted_x_bounds_raises(self):
+        """min_x > max_x must raise ValueError."""
+        with pytest.raises(ValueError, match="min_x"):
+            BBoxRegion(min_x=50.0, min_y=0.0, max_x=10.0, max_y=10.0)
+
+    def test_inverted_y_bounds_raises(self):
+        """min_y > max_y must raise ValueError."""
+        with pytest.raises(ValueError, match="min_y"):
+            BBoxRegion(min_x=0.0, min_y=20.0, max_x=10.0, max_y=5.0)
+
+    def test_zero_area_bbox_is_valid(self):
+        """A point region (min==max on both axes) is valid and contains its own centre."""
+        region = BBoxRegion(min_x=7.0, min_y=3.0, max_x=7.0, max_y=3.0)
+        assert region.contains(7.0, 3.0)
+        assert not region.contains(7.0001, 3.0)
+
+
+class TestDetectTitleblockRegionNegativeCoords:
+    """detect_titleblock_region handles drawings with negative coordinate origins."""
+
+    def test_negative_coordinate_titleblock(self):
+        """Title-block entities at negative positions still produce a valid BBoxRegion."""
+        from tests.helpers.comparison_factory import make_geometry_snapshot
+
+        snaps = [
+            make_geometry_snapshot(handle="T1", layer="TITLE", points=[(-200, -100), (-50, -10)]),
+        ]
+        region = detect_titleblock_region(snaps, padding=2.0)
+        assert region is not None
+        assert region.min_x == pytest.approx(-202.0)
+        assert region.min_y == pytest.approx(-102.0)
+        assert region.max_x == pytest.approx(-48.0)
+        assert region.max_y == pytest.approx(-8.0)
+
+    def test_multiple_exclude_regions_independent(self):
+        """apply_profile drops entities whose centroid falls in ANY of several regions."""
+        from tests.helpers.comparison_factory import make_geometry_snapshot
+
+        snap_a = make_geometry_snapshot(
+            handle="A",
+            layer="X",
+            points=[(5, 5)],  # centroid inside region 1
+        )
+        snap_b = make_geometry_snapshot(
+            handle="B",
+            layer="X",
+            points=[(95, 95)],  # centroid inside region 2
+        )
+        snap_c = make_geometry_snapshot(
+            handle="C",
+            layer="X",
+            points=[(50, 50)],  # centroid outside both
+        )
+        profile = ComparisonProfile(
+            exclude_regions=[
+                BBoxRegion(min_x=0, min_y=0, max_x=10, max_y=10),
+                BBoxRegion(min_x=90, min_y=90, max_x=100, max_y=100),
+            ]
+        )
+        result = apply_profile([snap_a, snap_b, snap_c], profile)
+        handles = {s.handle for s in result}
+        assert handles == {"C"}
+
+
+class TestCheckProfileWarningsExact80Boundary:
+    """Exactly 80% excluded sits at the threshold boundary — no warning expected."""
+
+    def test_exactly_80_pct_no_warning(self):
+        """Excluded fraction == 0.80 does not exceed > 0.80, so no warning is issued."""
+        from tests.helpers.comparison_factory import make_geometry_snapshot
+
+        # 10 total, 2 remaining = 80% excluded — boundary, NOT over the limit.
+        remaining = [
+            make_geometry_snapshot(handle=f"L{i}", layer="A", points=[(i, 0)]) for i in range(2)
+        ]
+        profile = ComparisonProfile(name="boundary")
+        warnings = check_profile_warnings(10, remaining, profile)
+        assert len(warnings) == 0, f"Expected no warnings at exact 80%, got: {warnings}"
+
+    def test_just_over_80_pct_warns(self):
+        """81% excluded (9/11 removed) triggers the high-exclusion warning."""
+        from tests.helpers.comparison_factory import make_geometry_snapshot
+
+        remaining = [
+            make_geometry_snapshot(handle="L1", layer="A", points=[(0, 0)]),
+            make_geometry_snapshot(handle="L2", layer="A", points=[(1, 0)]),
+        ]
+        profile = ComparisonProfile(name="just-over")
+        # 11 total, 2 remaining = 9/11 ≈ 81.8% excluded
+        warnings = check_profile_warnings(11, remaining, profile)
+        assert len(warnings) == 1
+        assert "just-over" in warnings[0]
+
+
+class TestExtractOnePrivateApi:
+    """Cover _extract_one branches that remain uncovered after the main test suite."""
+
+    def test_insert_rotation_normalised_to_360(self):
+        """INSERT rotation is stored modulo 360 — confirm wrap-around is handled."""
+        from unittest.mock import MagicMock
+
+        from cad_dxf_agent.core.comparison.geometry import _extract_one
+
+        class _Coord:
+            def __init__(self, x, y):
+                self.x = x
+                self.y = y
+
+        entity = MagicMock()
+        entity.dxf.handle = "INS1"
+        entity.dxf.layer = "STRUCTURAL"
+        entity.dxf.insert = _Coord(5.0, 10.0)
+        entity.dxf.name = "COLUMN"
+        entity.dxf.get = lambda attr, default=None: {
+            "xscale": 1.0,
+            "yscale": 1.0,
+            "rotation": 450.0,  # 450 % 360 == 90
+        }.get(attr, default)
+
+        result = _extract_one(entity, "INSERT")
+        assert result is not None
+        assert result.attributes["insert_rotation"] == pytest.approx(90.0)
+
+    def test_leader_success_path_returns_snapshot(self):
+        """LEADER branch: vertices list succeeds — line 403 must be hit."""
+        from unittest.mock import MagicMock
+
+        from cad_dxf_agent.core.comparison.geometry import _extract_one
+
+        class _Vertex:
+            def __init__(self, x, y):
+                self.x = x
+                self.y = y
+
+        entity = MagicMock()
+        entity.dxf.handle = "LD1"
+        entity.dxf.layer = "NOTES"
+        entity.vertices = [_Vertex(0, 0), _Vertex(5, 5), _Vertex(10, 0)]
+
+        result = _extract_one(entity, "LEADER")
+        assert result is not None
+        assert len(result.points) == 3
+        assert result.points[1].x == pytest.approx(5.0)
+        assert result.points[1].y == pytest.approx(5.0)
+
+    def test_truly_unknown_type_returns_none(self):
+        """The final else-branch (line 419) returns None for a type not handled by any branch."""
+        from unittest.mock import MagicMock
+
+        from cad_dxf_agent.core.comparison.geometry import _extract_one
+
+        entity = MagicMock()
+        entity.dxf.handle = "XX1"
+        entity.dxf.layer = "LAYER0"
+
+        # "WIPEOUT" is a real DXF type outside the handler set
+        result = _extract_one(entity, "WIPEOUT")
+        assert result is None
