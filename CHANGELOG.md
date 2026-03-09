@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-03-08
+
+### Added
+- **EPIC-CAD-13: Objective Intelligence**: Document family abstraction, objective-driven intent layer, zone inference with closed-loop detection and area calculation (#94, #95, #96)
+- **EPIC-CAD-14: Professional Precision Controls**: Rotate, copy, scale, mirror transforms with configurable precision (#97)
+- **EPIC-CAD-15: Document Persistence**: Upload-once access-always with session durability and persistence UX (#93, #96)
+- **Phase 1 Drafting Vocabulary**: R-tree spatial index, entity creation (add_line, add_polyline, add_circle, add_arc, add_text), ENTITY_CAP raised to 5000 (#98)
+- **EPIC-CAD-19: Drawing Health Report**: Instant second-opinion diagnostics for drawing quality (#99)
+- **EPIC-CAD-20: Intelligent Batch Operations**: Multi-entity operations with spatial awareness (#100)
+- **EPIC-CAD-21: Compliance Validation Engine**: Regulation-aware checking with stage handler and endpoint (#102, #108)
+- **EPIC-CAD-22: Cross-Drawing Consistency Checker**: Multi-sheet consistency analysis (#107)
+- **EPIC-CAD-23: Automated Takeoff Engine**: Count everything — entity quantification pipeline (#103)
+- **EPIC-CAD-24: Plain-English Drawing Summary**: Natural language description of drawing contents (#105)
+- **EPIC-CAD-25: RFI Generator**: Detect what's missing and generate requests for information (#104)
+- **EPIC-CAD-26: Revision Summary Report**: Zone-based area deltas for revision comparison (#106)
+- **EPIC-CAD-27: Session Undo/Redo**: Named snapshots with full undo/redo history (#109)
+- **EPIC-CAD-29: Agent-Mode API v1**: Stateless API for compliance, takeoff, summary, RFI workflows (#101, #110)
+- Beta badge and app audit embed on login page
+- 573 new tests: 138 core module tests + 161 mutation-killing tests (Round 2) + 258 mutation-killing tests (Round 3) + 16 hardened/adversarial tests
+
+### Fixed
+- Close session auth bypass, memory leaks, and crash vectors (security hardening)
+- Eliminate flaky auth tests caused by env var pollution
+- Firebase config validation: all 6 vars now required with fail-fast error
+- Selected ops deduplication using `set()` to prevent duplicate operations
+- Lint and version consistency for release readiness
+
+### Changed
+- Test count: 2468 → 4036 tests
+- Version bump: 0.7.0 → 0.8.0 (11 new features, major capability expansion)
+- Mutation testing kill rate target: 85%
+
+### Documentation
+- Phase 6 planning documents for EPIC-CAD-13, 14, 15 (#92)
+- v0.7.0 release report
+- Mutation testing practices guide (060-TQ-GUID)
+
 ## [0.7.0] - 2026-03-07
 
 ### Added
