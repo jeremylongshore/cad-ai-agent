@@ -233,8 +233,9 @@ export async function revisionApply(sessionId) {
   return res.json();
 }
 
-export function revisionDownloadUrl(sessionId) {
-  return `${API_BASE}/api/revision/download?session_id=${sessionId}`;
+export async function revisionDownloadBlob(sessionId) {
+  const res = await request(`/api/revision/download?session_id=${sessionId}`);
+  return res.blob();
 }
 
 // --- Document Library (EPIC-CAD-15) ---

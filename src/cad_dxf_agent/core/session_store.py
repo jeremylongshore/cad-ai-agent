@@ -41,6 +41,7 @@ class SessionMetadata:
     session_id: str
     user_id: str
     created_at: float
+    last_accessed_at: float = 0.0  # Updated on every get(); 0 means use created_at
     state: str = "active"  # active | expired | completed
     file_info: dict = field(default_factory=dict)
     conversation_history: list[dict] = field(default_factory=list)
@@ -69,7 +70,8 @@ class SessionMetadata:
 
     @property
     def is_expired(self) -> bool:
-        return self.state == "expired" or time.time() - self.created_at > SESSION_TTL_SECONDS
+        reference = self.last_accessed_at if self.last_accessed_at > 0 else self.created_at
+        return self.state == "expired" or time.time() - reference > SESSION_TTL_SECONDS
 
 
 # ---------------------------------------------------------------------------
@@ -161,6 +163,7 @@ class InMemorySessionStore(SessionStore):
             self.delete(session_id)
             return None
 
+        metadata.last_accessed_at = time.time()
         return metadata
 
     def save(self, metadata: SessionMetadata) -> None:
@@ -177,12 +180,11 @@ class InMemorySessionStore(SessionStore):
         logger.info("Deleted session %s", session_id)
 
     def cleanup_expired(self) -> int:
-        now = time.time()
         expired = []
 
         with self._lock:
             for sid, meta in self._sessions.items():
-                if now - meta.created_at > SESSION_TTL_SECONDS:
+                if meta.is_expired:
                     expired.append(sid)
 
         for sid in expired:
@@ -196,8 +198,7 @@ class InMemorySessionStore(SessionStore):
         with self._lock:
             sessions = list(self._sessions.values())
 
-        now = time.time()
-        active = [s for s in sessions if now - s.created_at <= SESSION_TTL_SECONDS]
+        active = [s for s in sessions if not s.is_expired]
 
         if user_id is not None:
             active = [s for s in active if s.user_id == user_id]

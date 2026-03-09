@@ -67,16 +67,24 @@ export default function DxfViewerComponent({ dxfUrl, onPointClick, className, pi
     setLoading(true);
     setError(null);
 
-    const viewer = new DxfViewer(container, {
-      autoResize: true,
-      clearColor: new Color(isDark ? '#1a1a2e' : '#ffffff'),
-      antialias: true,
-      colorCorrection: true,
-      blackWhiteInversion: true,
-    });
+    let viewer;
+    try {
+      viewer = new DxfViewer(container, {
+        autoResize: true,
+        clearColor: new Color(isDark ? '#1a1a2e' : '#ffffff'),
+        antialias: true,
+        colorCorrection: true,
+        blackWhiteInversion: true,
+      });
+    } catch (err) {
+      console.error('[DxfViewer] WebGL init failed:', err);
+      setError('WebGL unavailable — try a different browser');
+      setLoading(false);
+      return;
+    }
 
     if (!viewer.HasRenderer()) {
-      setError('WebGL not available');
+      setError('WebGL unavailable — try a different browser');
       setLoading(false);
       return;
     }

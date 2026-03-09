@@ -21,7 +21,15 @@ export function useDocumentLibrary(isAuthenticated) {
     setLibraryLoading(true);
     try {
       const data = await listDocuments();
-      setDocuments(data.documents || []);
+      const docs = data.documents || [];
+      setDocuments(docs);
+
+      // Validate persisted activeDocumentId — clear if document was deleted server-side
+      const savedId = localStorage.getItem('intentcad_active_document_id');
+      if (savedId && !docs.some((d) => d.id === savedId)) {
+        localStorage.removeItem('intentcad_active_document_id');
+        setActiveDocumentId(null);
+      }
     } catch (err) {
       setLibraryError(err.message);
     } finally {
