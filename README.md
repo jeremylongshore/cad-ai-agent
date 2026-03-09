@@ -51,6 +51,7 @@ Drawing Intelligence Platform for AEC professionals — edit, analyze, and valid
 | OpenTelemetry tracing (console, OTLP, GCP Trace) | |
 
 For full details see:
+- [Full Application Audit (v0.9.0)](https://gist.github.com/jeremylongshore/0303189683f9547c79e1fc1fc68be711) — complete feature documentation, architecture, and DevOps playbook
 - [000-docs/ index](000-docs/000-INDEX.md) — complete documentation inventory (60+ docs)
 - [V1 Blueprint](000-docs/007-AT-ARCH-v1-blueprint.md) — engineering architecture and module map
 - [ADR: LLM Plans, Not DXF Edits](000-docs/005-AT-ADEC-llm-plans-not-dxf.md) — core architectural decision
