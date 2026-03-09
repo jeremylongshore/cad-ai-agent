@@ -1,0 +1,327 @@
+[
+  {
+    "id": "conv-edit-followup-001",
+    "title": "Move bolt, repeat for another, adjust distance",
+    "drawing_fixture": "tests/fixtures/dxf_zoo/r2000_blocks.dxf",
+    "turns": [
+      {
+        "prompt": "Move the bolt at B21 east by 5 units",
+        "expected_family": "edit_plan",
+        "expected_behavior": "produces_ops",
+        "apply": true
+      },
+      {
+        "prompt": "Do the same for B31",
+        "expected_family": "edit_plan",
+        "expected_behavior": "produces_ops",
+        "apply": true
+      },
+      {
+        "prompt": "Actually make that last move 10 units instead of 5",
+        "expected_family": "edit_plan",
+        "expected_behavior": "produces_ops",
+        "apply": true
+      }
+    ]
+  },
+  {
+    "id": "conv-edit-followup-002",
+    "title": "Delete annotation, undo, delete a different one",
+    "drawing_fixture": "tests/fixtures/dxf_zoo/r2000_blocks.dxf",
+    "turns": [
+      {
+        "prompt": "Delete the text label B00",
+        "expected_family": "edit_plan",
+        "expected_behavior": "produces_ops",
+        "apply": true
+      },
+      {
+        "prompt": "Undo that, I still need it",
+        "expected_family": "edit_plan",
+        "expected_behavior": "produces_ops",
+        "apply": true
+      },
+      {
+        "prompt": "Delete B44 instead",
+        "expected_family": "edit_plan",
+        "expected_behavior": "produces_ops",
+        "apply": true
+      }
+    ]
+  },
+  {
+    "id": "conv-edit-followup-003",
+    "title": "Rename label, rename another, verify result",
+    "drawing_fixture": "tests/fixtures/dxf_zoo/r2000_blocks.dxf",
+    "turns": [
+      {
+        "prompt": "Rename text B10 to B10-REV",
+        "expected_family": "edit_plan",
+        "expected_behavior": "produces_ops",
+        "apply": true
+      },
+      {
+        "prompt": "Also rename B20 to B20-REV",
+        "expected_family": "edit_plan",
+        "expected_behavior": "produces_ops",
+        "apply": true
+      },
+      {
+        "prompt": "What text labels contain REV now?",
+        "expected_family": "qna",
+        "expected_behavior": "answer_only"
+      }
+    ]
+  },
+  {
+    "id": "conv-analysis-drilldown-001",
+    "title": "Layer inventory, entity count, text listing",
+    "drawing_fixture": "tests/fixtures/dxf_zoo/r2000_blocks.dxf",
+    "turns": [
+      {
+        "prompt": "What layers exist in this drawing?",
+        "expected_family": "qna",
+        "expected_behavior": "answer_only"
+      },
+      {
+        "prompt": "How many entities are on the STRUCT layer?",
+        "expected_family": "qna",
+        "expected_behavior": "answer_only"
+      },
+      {
+        "prompt": "List all the text labels on the ANNOT layer",
+        "expected_family": "qna",
+        "expected_behavior": "answer_only"
+      }
+    ]
+  },
+  {
+    "id": "conv-analysis-drilldown-002",
+    "title": "Drawing summary, grid focus, bolt mark details",
+    "drawing_fixture": "tests/fixtures/dxf_zoo/r2000_blocks.dxf",
+    "turns": [
+      {
+        "prompt": "Give me a summary of this drawing",
+        "expected_family": "summary",
+        "expected_behavior": "answer_only"
+      },
+      {
+        "prompt": "Tell me more about the bolt layout pattern",
+        "expected_family": "qna",
+        "expected_behavior": "answer_only"
+      },
+      {
+        "prompt": "What are the bolt mark labels in the bottom row?",
+        "expected_family": "qna",
+        "expected_behavior": "answer_only"
+      }
+    ]
+  },
+  {
+    "id": "conv-analysis-drilldown-003",
+    "title": "Entity type count, show inserts, layer query",
+    "drawing_fixture": "tests/fixtures/dxf_zoo/r2000_blocks.dxf",
+    "turns": [
+      {
+        "prompt": "How many entities of each type are in this drawing?",
+        "expected_family": "qna",
+        "expected_behavior": "answer_only"
+      },
+      {
+        "prompt": "Show me the INSERT block references",
+        "expected_family": "qna",
+        "expected_behavior": "answer_only"
+      },
+      {
+        "prompt": "What layer are those block references on?",
+        "expected_family": "qna",
+        "expected_behavior": "answer_only"
+      }
+    ]
+  },
+  {
+    "id": "conv-mixed-001",
+    "title": "Ask about drawing, edit it, verify change",
+    "drawing_fixture": "tests/fixtures/dxf_zoo/r2000_blocks.dxf",
+    "turns": [
+      {
+        "prompt": "Where is the bolt labeled B22 located?",
+        "expected_family": "qna",
+        "expected_behavior": "answer_only"
+      },
+      {
+        "prompt": "Move that bolt 10 units to the right",
+        "expected_family": "edit_plan",
+        "expected_behavior": "produces_ops",
+        "apply": true
+      },
+      {
+        "prompt": "What is the new position of B22?",
+        "expected_family": "qna",
+        "expected_behavior": "answer_only"
+      }
+    ]
+  },
+  {
+    "id": "conv-mixed-002",
+    "title": "Try protected layer edit, ask why blocked, edit allowed layer",
+    "drawing_fixture": "tests/fixtures/dxf_zoo/r2000_blocks.dxf",
+    "turns": [
+      {
+        "prompt": "Delete everything on the TITLE layer",
+        "expected_family": "edit_plan",
+        "expected_behavior": "produces_ops"
+      },
+      {
+        "prompt": "Why can't I modify that layer?",
+        "expected_family": "qna",
+        "expected_behavior": "answer_only"
+      },
+      {
+        "prompt": "Fine, delete the text B43 on the ANNOT layer instead",
+        "expected_family": "edit_plan",
+        "expected_behavior": "produces_ops",
+        "apply": true
+      }
+    ]
+  },
+  {
+    "id": "conv-mixed-003",
+    "title": "Ask about layers, delete entities, check count",
+    "drawing_fixture": "tests/fixtures/dxf_zoo/r2000_blocks.dxf",
+    "turns": [
+      {
+        "prompt": "How many text entities are on the ANNOT layer?",
+        "expected_family": "qna",
+        "expected_behavior": "answer_only"
+      },
+      {
+        "prompt": "Delete the text labels B00, B01, and B02",
+        "expected_family": "edit_plan",
+        "expected_behavior": "produces_ops",
+        "apply": true
+      },
+      {
+        "prompt": "How many text entities are on ANNOT now?",
+        "expected_family": "qna",
+        "expected_behavior": "answer_only"
+      }
+    ]
+  },
+  {
+    "id": "conv-error-001",
+    "title": "Reference nonexistent entity, clarify, succeed",
+    "drawing_fixture": "tests/fixtures/dxf_zoo/r2000_blocks.dxf",
+    "turns": [
+      {
+        "prompt": "Move bolt B99 east by 10 units",
+        "expected_family": "edit_plan",
+        "expected_behavior": "needs_clarification"
+      },
+      {
+        "prompt": "Sorry, I meant B42 — move it east by 10 units",
+        "expected_family": "edit_plan",
+        "expected_behavior": "produces_ops",
+        "apply": true
+      }
+    ]
+  },
+  {
+    "id": "conv-error-002",
+    "title": "Ambiguous prompt, clarify with specifics, succeed",
+    "drawing_fixture": "tests/fixtures/dxf_zoo/r2000_blocks.dxf",
+    "turns": [
+      {
+        "prompt": "Move the bolt over a bit",
+        "expected_family": "needs_clarification",
+        "expected_behavior": "needs_clarification"
+      },
+      {
+        "prompt": "Move bolt B13 east by 15 units",
+        "expected_family": "edit_plan",
+        "expected_behavior": "produces_ops",
+        "apply": true
+      }
+    ]
+  },
+  {
+    "id": "conv-error-003",
+    "title": "Typo in command, rephrase correctly, succeed",
+    "drawing_fixture": "tests/fixtures/dxf_zoo/r2000_blocks.dxf",
+    "turns": [
+      {
+        "prompt": "Delet the text labl B33",
+        "expected_family": "needs_clarification",
+        "expected_behavior": "needs_clarification"
+      },
+      {
+        "prompt": "Delete the text label B33",
+        "expected_family": "edit_plan",
+        "expected_behavior": "produces_ops",
+        "apply": true
+      }
+    ]
+  },
+  {
+    "id": "conv-undo-001",
+    "title": "Move entity, reverse direction, apply correction",
+    "drawing_fixture": "tests/fixtures/dxf_zoo/r2000_blocks.dxf",
+    "turns": [
+      {
+        "prompt": "Move bolt B11 east by 20 units",
+        "expected_family": "edit_plan",
+        "expected_behavior": "produces_ops",
+        "apply": true
+      },
+      {
+        "prompt": "Actually move it west by 20 units instead — back to where it was",
+        "expected_family": "edit_plan",
+        "expected_behavior": "produces_ops",
+        "apply": true
+      }
+    ]
+  },
+  {
+    "id": "conv-undo-002",
+    "title": "Delete entity, want it back, re-add it",
+    "drawing_fixture": "tests/fixtures/dxf_zoo/r2000_blocks.dxf",
+    "turns": [
+      {
+        "prompt": "Delete the BOLT block reference at position (40, 60)",
+        "expected_family": "edit_plan",
+        "expected_behavior": "produces_ops",
+        "apply": true
+      },
+      {
+        "prompt": "Wait, I need that bolt back — add a BOLT block insert at (40, 60) on the STRUCT layer",
+        "expected_family": "edit_plan",
+        "expected_behavior": "produces_ops",
+        "apply": true
+      }
+    ]
+  },
+  {
+    "id": "conv-undo-003",
+    "title": "Edit text to wrong value, correct it, apply",
+    "drawing_fixture": "tests/fixtures/dxf_zoo/r2000_blocks.dxf",
+    "turns": [
+      {
+        "prompt": "Change the text B14 to read B14-HOLD",
+        "expected_family": "edit_plan",
+        "expected_behavior": "produces_ops",
+        "apply": true
+      },
+      {
+        "prompt": "That should be B14-APPROVED not B14-HOLD",
+        "expected_family": "edit_plan",
+        "expected_behavior": "produces_ops",
+        "apply": true
+      },
+      {
+        "prompt": "Confirm the label now reads B14-APPROVED",
+        "expected_family": "qna",
+        "expected_behavior": "answer_only"
+      }
+    ]
+  }
+]

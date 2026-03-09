@@ -106,9 +106,35 @@ async def _session_cleanup_loop():
 async def lifespan(app: FastAPI):
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 
-    from cad_dxf_agent.otel import init_otel
+    dev_mode = os.getenv("CAD_WEB_DEV_MODE", "").strip() in ("1", "true", "yes")
+    otel_enabled = os.getenv("OTEL_ENABLED", "").strip() in ("1", "true", "yes")
 
-    init_otel(service_name="cad-dxf-web")
+    if dev_mode and otel_enabled:
+        # Dev mode: use InMemorySpanExporter for trace capture via debug endpoints
+        try:
+            from opentelemetry.sdk.trace.export.in_memory import InMemorySpanExporter
+
+            from cad_dxf_agent.otel import init_otel_testing
+
+            _debug_exporter = InMemorySpanExporter()
+            init_otel_testing(_debug_exporter)
+
+            from .debug_routes import router as debug_router
+            from .debug_routes import set_exporter
+
+            set_exporter(_debug_exporter)
+            app.include_router(debug_router)
+            logger.info("OTel debug trace capture enabled (InMemorySpanExporter)")
+        except ImportError:
+            logger.warning("OTel packages not installed, debug traces unavailable")
+            from cad_dxf_agent.otel import init_otel
+
+            init_otel(service_name="cad-dxf-web")
+    else:
+        from cad_dxf_agent.otel import init_otel
+
+        init_otel(service_name="cad-dxf-web")
+
     logger.info("CAD DXF Web Backend starting")
 
     cleanup_task = asyncio.create_task(_session_cleanup_loop())

@@ -1,0 +1,5 @@
+{
+  "min_accuracy": 0.80,
+  "max_p95_ms": 30000,
+  "max_regression_pct": 5
+}
