@@ -1,0 +1,817 @@
+[
+  {
+    "id": "profile-01",
+    "title": "Profile 01 — Senior Structural Engineer — column layout review and coordination",
+    "drawing_fixture": "tests/fixtures/revision/nasty/real_columns/master.dxf",
+    "profile": {
+      "id": "01",
+      "role": "Senior Structural Engineer",
+      "context": "Reviewing column layout, coordination deadline tomorrow"
+    },
+    "turns": [
+      {
+        "prompt": "Give me a summary of this column layout",
+        "expected_family": "summary",
+        "expected_behavior": "report"
+      },
+      {
+        "prompt": "Run a health check — any issues I should flag for the architect?",
+        "expected_family": "summary",
+        "expected_behavior": "report"
+      },
+      {
+        "prompt": "Move the column nearest to grid line A-3 about 6 inches to the east",
+        "expected_family": "edit_plan",
+        "expected_behavior": "produces_ops",
+        "apply": true
+      },
+      {
+        "prompt": "Confirm the updated position of that column",
+        "expected_family": "qna",
+        "expected_behavior": "answer_only"
+      }
+    ]
+  },
+  {
+    "id": "profile-02",
+    "title": "Profile 02 — Structural Drafter — bolt pattern annotation cleanup",
+    "drawing_fixture": "tests/fixtures/dxf_zoo/r2000_blocks.dxf",
+    "profile": {
+      "id": "02",
+      "role": "Structural Drafter",
+      "context": "Cleaning up bolt pattern annotations for shop drawing"
+    },
+    "turns": [
+      {
+        "prompt": "What bolt marks are in this drawing and how are they organized?",
+        "expected_family": "qna",
+        "expected_behavior": "answer_only"
+      },
+      {
+        "prompt": "Rename the text label B10 to B10-REV-A",
+        "expected_family": "edit_plan",
+        "expected_behavior": "produces_ops",
+        "apply": true
+      },
+      {
+        "prompt": "Copy the bolt at B21 to a new position 30 units east",
+        "expected_family": "edit_plan",
+        "expected_behavior": "produces_ops",
+        "apply": true
+      },
+      {
+        "prompt": "What text labels contain 'REV' now?",
+        "expected_family": "qna",
+        "expected_behavior": "answer_only"
+      }
+    ]
+  },
+  {
+    "id": "profile-03",
+    "title": "Profile 03 — Residential Architect — kitchen remodel client prep",
+    "drawing_fixture": "tests/fixtures/dxf_zoo/sourced/jscad-floorplan.dxf",
+    "profile": {
+      "id": "03",
+      "role": "Residential Architect",
+      "context": "Kitchen remodel, client meeting in 2 days"
+    },
+    "turns": [
+      {
+        "prompt": "Summarize this floor plan for my client — plain English please",
+        "expected_family": "summary",
+        "expected_behavior": "report"
+      },
+      {
+        "prompt": "Detect the rooms and zones in this plan",
+        "expected_family": "summary",
+        "expected_behavior": "report"
+      },
+      {
+        "prompt": "Check this plan for building code egress compliance",
+        "expected_family": "summary",
+        "expected_behavior": "report"
+      },
+      {
+        "prompt": "Add a text label 'KITCHEN' at the center of the largest room",
+        "expected_family": "edit_plan",
+        "expected_behavior": "produces_ops",
+        "apply": true
+      }
+    ]
+  },
+  {
+    "id": "profile-04",
+    "title": "Profile 04 — Commercial Architect — hospital wing CD submittal",
+    "drawing_fixture": "tests/fixtures/dxf_zoo/sourced/gds-api-cw750-details.dxf",
+    "profile": {
+      "id": "04",
+      "role": "Commercial Architect",
+      "context": "Hospital wing, 60% CD submittal next week"
+    },
+    "turns": [
+      {
+        "prompt": "Summarize this detail set — what construction details are included?",
+        "expected_family": "summary",
+        "expected_behavior": "report"
+      },
+      {
+        "prompt": "Check these details for ADA accessibility compliance",
+        "expected_family": "summary",
+        "expected_behavior": "report"
+      },
+      {
+        "prompt": "Run a health check on this drawing",
+        "expected_family": "summary",
+        "expected_behavior": "report"
+      },
+      {
+        "prompt": "Generate a material takeoff from these details",
+        "expected_family": "takeoff_estimate",
+        "expected_behavior": "report"
+      }
+    ]
+  },
+  {
+    "id": "profile-05",
+    "title": "Profile 05 — MEP Coordinator — equipment block coordination",
+    "drawing_fixture": "tests/fixtures/dxf_zoo/sourced/jscad-CustomBlocks.dxf",
+    "profile": {
+      "id": "05",
+      "role": "MEP Coordinator",
+      "context": "Clash detection meeting in 3 days"
+    },
+    "turns": [
+      {
+        "prompt": "How many equipment blocks are in this drawing? List them by type",
+        "expected_family": "qna",
+        "expected_behavior": "answer_only"
+      },
+      {
+        "prompt": "Where are the custom blocks positioned? Any overlapping?",
+        "expected_family": "qna",
+        "expected_behavior": "answer_only"
+      },
+      {
+        "prompt": "Add a new equipment block at position (100, 50) on layer 0",
+        "expected_family": "edit_plan",
+        "expected_behavior": "produces_ops",
+        "apply": true
+      },
+      {
+        "prompt": "Confirm the block was added — how many blocks total now?",
+        "expected_family": "qna",
+        "expected_behavior": "answer_only"
+      }
+    ]
+  },
+  {
+    "id": "profile-06",
+    "title": "Profile 06 — Electrical Designer — panel symbol layout for permit",
+    "drawing_fixture": "tests/fixtures/dxf_zoo/sourced/jscad-blocks1.dxf",
+    "profile": {
+      "id": "06",
+      "role": "Electrical Designer",
+      "context": "Electrical permit drawings due"
+    },
+    "turns": [
+      {
+        "prompt": "What symbol blocks are available in this drawing?",
+        "expected_family": "qna",
+        "expected_behavior": "answer_only"
+      },
+      {
+        "prompt": "Add a panel symbol block at position (200, 100)",
+        "expected_family": "edit_plan",
+        "expected_behavior": "produces_ops",
+        "apply": true
+      },
+      {
+        "prompt": "Copy that new block to (200, 200) and (200, 300)",
+        "expected_family": "edit_plan",
+        "expected_behavior": "produces_ops",
+        "apply": true
+      },
+      {
+        "prompt": "Generate a symbol takeoff — count all blocks by type",
+        "expected_family": "takeoff_estimate",
+        "expected_behavior": "report"
+      }
+    ]
+  },
+  {
+    "id": "profile-07",
+    "title": "Profile 07 — Mechanical Engineer — equipment repositioning review",
+    "drawing_fixture": "tests/fixtures/dxf_zoo/sourced/jscad-blocks2.dxf",
+    "profile": {
+      "id": "07",
+      "role": "Mechanical Engineer",
+      "context": "Design development review, equipment repositioning"
+    },
+    "turns": [
+      {
+        "prompt": "What equipment blocks are in this drawing and where?",
+        "expected_family": "qna",
+        "expected_behavior": "answer_only"
+      },
+      {
+        "prompt": "Move the block nearest to (50, 50) to position (80, 50)",
+        "expected_family": "edit_plan",
+        "expected_behavior": "produces_ops",
+        "apply": true
+      },
+      {
+        "prompt": "Rotate that block 90 degrees clockwise",
+        "expected_family": "edit_plan",
+        "expected_behavior": "produces_ops",
+        "apply": true
+      },
+      {
+        "prompt": "Is there enough clearance around that equipment now?",
+        "expected_family": "qna",
+        "expected_behavior": "answer_only"
+      }
+    ]
+  },
+  {
+    "id": "profile-08",
+    "title": "Profile 08 — Plumbing Designer — rough-in line layout",
+    "drawing_fixture": "tests/fixtures/dxf_zoo/sourced/jscad-2Dlines.dxf",
+    "profile": {
+      "id": "08",
+      "role": "Plumbing Designer",
+      "context": "Plumbing rough-in package due"
+    },
+    "turns": [
+      {
+        "prompt": "What line entities are in this drawing? How many on each layer?",
+        "expected_family": "qna",
+        "expected_behavior": "answer_only"
+      },
+      {
+        "prompt": "Add a line from (0, 100) to (200, 100) on layer 0",
+        "expected_family": "edit_plan",
+        "expected_behavior": "produces_ops",
+        "apply": true
+      },
+      {
+        "prompt": "Delete the shortest line in the drawing",
+        "expected_family": "edit_plan",
+        "expected_behavior": "produces_ops",
+        "apply": true
+      },
+      {
+        "prompt": "How many lines remain in the drawing now?",
+        "expected_family": "qna",
+        "expected_behavior": "answer_only"
+      }
+    ]
+  },
+  {
+    "id": "profile-09",
+    "title": "Profile 09 — Fire Protection Engineer — sprinkler spacing review",
+    "drawing_fixture": "tests/fixtures/dxf_zoo/sourced/jscad-2Dcircles.dxf",
+    "profile": {
+      "id": "09",
+      "role": "Fire Protection Engineer",
+      "context": "Fire marshal review, NFPA 13 spacing"
+    },
+    "turns": [
+      {
+        "prompt": "How many circles are in this drawing? What are their radii?",
+        "expected_family": "qna",
+        "expected_behavior": "answer_only"
+      },
+      {
+        "prompt": "Check if the circle spacing meets fire protection coverage requirements",
+        "expected_family": "summary",
+        "expected_behavior": "report"
+      },
+      {
+        "prompt": "Add a circle with radius 10 at position (150, 150)",
+        "expected_family": "edit_plan",
+        "expected_behavior": "produces_ops",
+        "apply": true
+      },
+      {
+        "prompt": "Now how many circles total? Does the new one overlap with any existing ones?",
+        "expected_family": "qna",
+        "expected_behavior": "answer_only"
+      }
+    ]
+  },
+  {
+    "id": "profile-10",
+    "title": "Profile 10 — GC Superintendent — structural plan review on iPad",
+    "drawing_fixture": "tests/fixtures/test_pdfs/structural_plan.pdf",
+    "profile": {
+      "id": "10",
+      "role": "GC Superintendent",
+      "context": "Pour scheduled for Thursday, reviewing on iPad"
+    },
+    "turns": [
+      {
+        "prompt": "What is this drawing showing? Give me a quick summary",
+        "expected_family": "summary",
+        "expected_behavior": "report"
+      },
+      {
+        "prompt": "Are there any footing callouts or foundation details visible?",
+        "expected_family": "qna",
+        "expected_behavior": "answer_only"
+      },
+      {
+        "prompt": "Flag any issues or concerns with this drawing",
+        "expected_family": "summary",
+        "expected_behavior": "report"
+      }
+    ]
+  },
+  {
+    "id": "profile-11",
+    "title": "Profile 11 — Estimator — foundation detail bid takeoff",
+    "drawing_fixture": "tests/fixtures/test_pdfs/foundation_detail.pdf",
+    "profile": {
+      "id": "11",
+      "role": "Estimator",
+      "context": "Bid due in 48 hours"
+    },
+    "turns": [
+      {
+        "prompt": "Summarize what this foundation detail shows",
+        "expected_family": "summary",
+        "expected_behavior": "report"
+      },
+      {
+        "prompt": "Generate a material takeoff from this detail",
+        "expected_family": "takeoff_estimate",
+        "expected_behavior": "report"
+      },
+      {
+        "prompt": "What concrete specifications are called out?",
+        "expected_family": "qna",
+        "expected_behavior": "answer_only"
+      }
+    ]
+  },
+  {
+    "id": "profile-12",
+    "title": "Profile 12 — Code Compliance Officer — plan check review",
+    "drawing_fixture": "000-docs/aMULBERRYdsn01.1-STAMPED-SEALED.pdf",
+    "profile": {
+      "id": "12",
+      "role": "Code Compliance Officer",
+      "context": "Review queue backlog, plan check"
+    },
+    "turns": [
+      {
+        "prompt": "Check this submitted plan for building code compliance",
+        "expected_family": "summary",
+        "expected_behavior": "report"
+      },
+      {
+        "prompt": "Generate an RFI for any deficiencies found",
+        "expected_family": "summary",
+        "expected_behavior": "report"
+      },
+      {
+        "prompt": "Run a health check on this drawing set",
+        "expected_family": "summary",
+        "expected_behavior": "report"
+      },
+      {
+        "prompt": "What egress provisions are shown?",
+        "expected_family": "qna",
+        "expected_behavior": "answer_only"
+      }
+    ]
+  },
+  {
+    "id": "profile-13",
+    "title": "Profile 13 — Interior Designer — restaurant TI annotation updates",
+    "drawing_fixture": "tests/fixtures/dxf_zoo/sourced/jscad-texts.dxf",
+    "profile": {
+      "id": "13",
+      "role": "Interior Designer",
+      "context": "Restaurant TI, client presentation tomorrow"
+    },
+    "turns": [
+      {
+        "prompt": "Summarize what text annotations are in this drawing",
+        "expected_family": "summary",
+        "expected_behavior": "report"
+      },
+      {
+        "prompt": "Change the text 'HELLO WORLD' to 'DINING AREA - FINISH SCHEDULE'",
+        "expected_family": "edit_plan",
+        "expected_behavior": "produces_ops",
+        "apply": true
+      },
+      {
+        "prompt": "Add a text label 'BAR AREA' at position (50, 50)",
+        "expected_family": "edit_plan",
+        "expected_behavior": "produces_ops",
+        "apply": true
+      },
+      {
+        "prompt": "Detect any rooms or zones in this drawing",
+        "expected_family": "summary",
+        "expected_behavior": "report"
+      }
+    ]
+  },
+  {
+    "id": "profile-14",
+    "title": "Profile 14 — Civil Engineer — grading permit polyline edits",
+    "drawing_fixture": "tests/fixtures/dxf_zoo/sourced/jscad-2Dpolylines.dxf",
+    "profile": {
+      "id": "14",
+      "role": "Civil Engineer",
+      "context": "Grading permit submittal"
+    },
+    "turns": [
+      {
+        "prompt": "What polylines are in this drawing? Describe the layout",
+        "expected_family": "qna",
+        "expected_behavior": "answer_only"
+      },
+      {
+        "prompt": "Add a polyline from (0,0) to (50,50) to (100,0) on layer 0",
+        "expected_family": "edit_plan",
+        "expected_behavior": "produces_ops",
+        "apply": true
+      },
+      {
+        "prompt": "Move the longest polyline 20 units north",
+        "expected_family": "edit_plan",
+        "expected_behavior": "produces_ops",
+        "apply": true
+      },
+      {
+        "prompt": "Scale the entire drawing by a factor of 2",
+        "expected_family": "edit_plan",
+        "expected_behavior": "produces_ops",
+        "apply": true
+      }
+    ]
+  },
+  {
+    "id": "profile-15",
+    "title": "Profile 15 — Landscape Designer (HeyFlora) — water-efficient landscape proposal",
+    "drawing_fixture": "tests/fixtures/dxf_zoo/sourced/jscad-floorplan.dxf",
+    "profile": {
+      "id": "15",
+      "role": "Landscape Designer",
+      "context": "HeyFlora.ai partner firm, water-efficient commercial landscape design, client proposal due"
+    },
+    "turns": [
+      {
+        "prompt": "Summarize this landscape plan for a client proposal — include key features, planting areas, and hardscape elements",
+        "expected_family": "summary",
+        "expected_behavior": "report"
+      },
+      {
+        "prompt": "Check this plan against water-efficient landscape requirements — MWELO compliance",
+        "expected_family": "summary",
+        "expected_behavior": "report"
+      },
+      {
+        "prompt": "Count all symbols and blocks — give me quantities by type for the bid",
+        "expected_family": "takeoff_estimate",
+        "expected_behavior": "report"
+      },
+      {
+        "prompt": "Move the planting group nearest to the entrance 3 feet north",
+        "expected_family": "edit_plan",
+        "expected_behavior": "produces_ops",
+        "apply": true
+      },
+      {
+        "prompt": "Generate an updated summary reflecting the changes for the FloraDocs proposal",
+        "expected_family": "summary",
+        "expected_behavior": "report"
+      }
+    ]
+  },
+  {
+    "id": "profile-16",
+    "title": "Profile 16 — Construction Manager — revision briefing for project team",
+    "drawing_fixture": "tests/fixtures/revision/clean_realworld/master.dxf",
+    "profile": {
+      "id": "16",
+      "role": "Construction Manager",
+      "context": "Architect issued a revision, needs to brief project team"
+    },
+    "turns": [
+      {
+        "prompt": "Summarize this structural drawing for the project team",
+        "expected_family": "summary",
+        "expected_behavior": "report"
+      },
+      {
+        "prompt": "What layers and entity types are in this drawing?",
+        "expected_family": "qna",
+        "expected_behavior": "answer_only"
+      },
+      {
+        "prompt": "Are there any quality issues or inconsistencies?",
+        "expected_family": "summary",
+        "expected_behavior": "report"
+      },
+      {
+        "prompt": "How many structural elements are shown?",
+        "expected_family": "qna",
+        "expected_behavior": "answer_only"
+      }
+    ]
+  },
+  {
+    "id": "profile-17",
+    "title": "Profile 17 — Project Manager — board presentation plain English review",
+    "drawing_fixture": "tests/fixtures/test_pdfs/simple_geometry.pdf",
+    "profile": {
+      "id": "17",
+      "role": "Project Manager",
+      "context": "Board presentation Friday, needs plain English"
+    },
+    "turns": [
+      {
+        "prompt": "What am I looking at here? Explain in simple terms",
+        "expected_family": "summary",
+        "expected_behavior": "report"
+      },
+      {
+        "prompt": "How many distinct shapes or elements are visible?",
+        "expected_family": "qna",
+        "expected_behavior": "answer_only"
+      },
+      {
+        "prompt": "What materials or specifications are mentioned?",
+        "expected_family": "qna",
+        "expected_behavior": "answer_only"
+      }
+    ]
+  },
+  {
+    "id": "profile-18",
+    "title": "Profile 18 — Plan Reviewer — municipal permit compliance check",
+    "drawing_fixture": "000-docs/032-TQ-TEST-sawcuts-sample-drawing.pdf",
+    "profile": {
+      "id": "18",
+      "role": "Plan Reviewer",
+      "context": "Processing permit applications"
+    },
+    "turns": [
+      {
+        "prompt": "Check this drawing for compliance with municipal standards",
+        "expected_family": "summary",
+        "expected_behavior": "report"
+      },
+      {
+        "prompt": "Generate an RFI for any issues found",
+        "expected_family": "summary",
+        "expected_behavior": "report"
+      },
+      {
+        "prompt": "Run a health check — any missing information?",
+        "expected_family": "summary",
+        "expected_behavior": "report"
+      },
+      {
+        "prompt": "What utility connections are shown on this drawing?",
+        "expected_family": "qna",
+        "expected_behavior": "answer_only"
+      }
+    ]
+  },
+  {
+    "id": "profile-19",
+    "title": "Profile 19 — Permit Expediter — submittal requirements check",
+    "drawing_fixture": "tests/fixtures/dxf_zoo/r12_basic.dxf",
+    "profile": {
+      "id": "19",
+      "role": "Permit Expediter",
+      "context": "Permit application deadline"
+    },
+    "turns": [
+      {
+        "prompt": "Summarize this drawing — what's included?",
+        "expected_family": "summary",
+        "expected_behavior": "report"
+      },
+      {
+        "prompt": "Does this meet minimum permit submittal requirements?",
+        "expected_family": "summary",
+        "expected_behavior": "report"
+      },
+      {
+        "prompt": "Run a health check for drawing quality",
+        "expected_family": "summary",
+        "expected_behavior": "report"
+      },
+      {
+        "prompt": "What format version is this DXF and are there any compatibility concerns?",
+        "expected_family": "qna",
+        "expected_behavior": "answer_only"
+      }
+    ]
+  },
+  {
+    "id": "profile-20",
+    "title": "Profile 20 — Facility Manager — annual audit annotation updates",
+    "drawing_fixture": "tests/fixtures/dxf_zoo/sourced/gds-mtext-test.dxf",
+    "profile": {
+      "id": "20",
+      "role": "Facility Manager",
+      "context": "Annual facility audit, maintenance records"
+    },
+    "turns": [
+      {
+        "prompt": "What maintenance notes and annotations are in this drawing?",
+        "expected_family": "qna",
+        "expected_behavior": "answer_only"
+      },
+      {
+        "prompt": "Summarize the overall condition notes in this drawing",
+        "expected_family": "summary",
+        "expected_behavior": "report"
+      },
+      {
+        "prompt": "Update any text that mentions a date — change it to '2024-03-15'",
+        "expected_family": "edit_plan",
+        "expected_behavior": "produces_ops",
+        "apply": true
+      },
+      {
+        "prompt": "Run a health check — any data quality issues?",
+        "expected_family": "summary",
+        "expected_behavior": "report"
+      }
+    ]
+  },
+  {
+    "id": "profile-21",
+    "title": "Profile 21 — Shop Fabricator — CNC bracket fabrication prep",
+    "drawing_fixture": "tests/fixtures/dxf_zoo/sourced/gds-polylines.dxf",
+    "profile": {
+      "id": "21",
+      "role": "Shop Fabricator",
+      "context": "CNC programming for bracket fabrication"
+    },
+    "turns": [
+      {
+        "prompt": "What are the overall dimensions of the shapes in this drawing?",
+        "expected_family": "qna",
+        "expected_behavior": "answer_only"
+      },
+      {
+        "prompt": "Scale the largest polyline by a factor of 2",
+        "expected_family": "edit_plan",
+        "expected_behavior": "produces_ops",
+        "apply": true
+      },
+      {
+        "prompt": "Mirror that scaled shape across the Y axis for the left-hand version",
+        "expected_family": "edit_plan",
+        "expected_behavior": "produces_ops",
+        "apply": true
+      },
+      {
+        "prompt": "Generate a parts takeoff — count each unique shape",
+        "expected_family": "takeoff_estimate",
+        "expected_behavior": "report"
+      }
+    ]
+  },
+  {
+    "id": "profile-22",
+    "title": "Profile 22 — Solar Installer — commercial rooftop panel layout",
+    "drawing_fixture": "tests/fixtures/dxf_zoo/sourced/jscad-2Drectangles.dxf",
+    "profile": {
+      "id": "22",
+      "role": "Solar Installer",
+      "context": "Solar panel layout for commercial flat roof"
+    },
+    "turns": [
+      {
+        "prompt": "How many rectangles are in this drawing? What are their sizes?",
+        "expected_family": "qna",
+        "expected_behavior": "answer_only"
+      },
+      {
+        "prompt": "Add a block representing a solar panel at position (100, 100)",
+        "expected_family": "edit_plan",
+        "expected_behavior": "produces_ops",
+        "apply": true
+      },
+      {
+        "prompt": "Copy that panel block to (150, 100) and (200, 100)",
+        "expected_family": "edit_plan",
+        "expected_behavior": "produces_ops",
+        "apply": true
+      },
+      {
+        "prompt": "Generate a panel count takeoff",
+        "expected_family": "takeoff_estimate",
+        "expected_behavior": "report"
+      }
+    ]
+  },
+  {
+    "id": "profile-23",
+    "title": "Profile 23 — BIM Coordinator — DXF export quality check",
+    "drawing_fixture": "tests/fixtures/dxf_zoo/r2018_polylines.dxf",
+    "profile": {
+      "id": "23",
+      "role": "BIM Coordinator",
+      "context": "Model coordination, checking 2D export quality"
+    },
+    "turns": [
+      {
+        "prompt": "Run a health check on this DXF — any issues with the export?",
+        "expected_family": "summary",
+        "expected_behavior": "report"
+      },
+      {
+        "prompt": "What layers are defined and which have entities?",
+        "expected_family": "qna",
+        "expected_behavior": "answer_only"
+      },
+      {
+        "prompt": "Summarize this drawing for the coordination team",
+        "expected_family": "summary",
+        "expected_behavior": "report"
+      },
+      {
+        "prompt": "What entity types are present and how many of each?",
+        "expected_family": "qna",
+        "expected_behavior": "answer_only"
+      }
+    ]
+  },
+  {
+    "id": "profile-24",
+    "title": "Profile 24 — Junior Drafter/Intern — CAD standards training exercise",
+    "drawing_fixture": "tests/fixtures/dxf_zoo/sourced/jscad-layers.dxf",
+    "profile": {
+      "id": "24",
+      "role": "Junior Drafter/Intern",
+      "context": "Training, learning CAD standards"
+    },
+    "turns": [
+      {
+        "prompt": "What layers are in this drawing and what do they contain?",
+        "expected_family": "qna",
+        "expected_behavior": "answer_only"
+      },
+      {
+        "prompt": "Move any entity on layer 0 about 10 units to the right",
+        "expected_family": "edit_plan",
+        "expected_behavior": "produces_ops",
+        "apply": true
+      },
+      {
+        "prompt": "Change any text in the drawing to say 'TRAINING EXERCISE'",
+        "expected_family": "edit_plan",
+        "expected_behavior": "produces_ops",
+        "apply": true
+      },
+      {
+        "prompt": "Summarize what this drawing contains now",
+        "expected_family": "summary",
+        "expected_behavior": "report"
+      }
+    ]
+  },
+  {
+    "id": "profile-25",
+    "title": "Profile 25 — Landscape Field Crew Lead (HeyFlora FieldSmart) — hardscape installation brief",
+    "drawing_fixture": "tests/fixtures/dxf_zoo/sourced/jscad-2Darcs.dxf",
+    "profile": {
+      "id": "25",
+      "role": "Landscape Field Crew Lead",
+      "context": "On-site for hardscape installation, using tablet"
+    },
+    "turns": [
+      {
+        "prompt": "What's in this drawing? Quick overview for the field crew",
+        "expected_family": "summary",
+        "expected_behavior": "report"
+      },
+      {
+        "prompt": "What arc or curved elements are shown? List their positions",
+        "expected_family": "qna",
+        "expected_behavior": "answer_only"
+      },
+      {
+        "prompt": "Give me a field crew brief — what do we need to install today?",
+        "expected_family": "summary",
+        "expected_behavior": "report"
+      },
+      {
+        "prompt": "Any issues with this drawing I should flag for the office?",
+        "expected_family": "summary",
+        "expected_behavior": "report"
+      }
+    ]
+  }
+]
