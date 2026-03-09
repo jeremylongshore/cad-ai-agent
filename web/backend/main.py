@@ -548,7 +548,10 @@ async def get_profile(user: dict = Depends(get_user)):
 async def update_profile(body: ProfileUpdateRequest, user: dict = Depends(get_user)):
     """Update the current user's display name and/or company."""
     if os.getenv("CAD_WEB_DEV_MODE", "").lower() in ("1", "true"):
-        return {"profile": {"uid": user["uid"], "display_name": body.display_name or ""}}
+        profile = {"uid": user["uid"], "display_name": body.display_name or ""}
+        if body.company is not None:
+            profile["company"] = body.company
+        return {"profile": profile}
 
     updates = {}
     if body.display_name is not None:

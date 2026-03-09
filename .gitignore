@@ -77,3 +77,6 @@ test-results/
 # Mutation testing cache
 mutants/
 .mutmut-cache/
+
+# Large test fixtures (not for version control)
+000-docs/*.pdf

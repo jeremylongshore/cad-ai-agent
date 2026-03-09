@@ -104,3 +104,4 @@ class TestUpdateProfile:
         assert resp.status_code == 200
         profile = resp.json()["profile"]
         assert profile["display_name"] == "Dana Lee"
+        assert profile["company"] == "Blueprint Inc"

@@ -236,12 +236,11 @@ class TestMultipleDocumentIsolation:
         assert store.get_work_progress("u1", doc_b.doc_id) is not None
 
     def test_progress_is_isolated_per_user(self, store: InMemoryDocumentStore) -> None:
-        """Two users can each have progress under the same doc_id without collision.
+        """Two users can each have progress on different documents without collision.
 
-        In practice doc_ids are globally unique (uuid hex), but the store keys
-        progress by doc_id alone — this test documents that the get/clear APIs
-        accept a user_id argument which is also used for the document ownership
-        check, even though the underlying progress dict is keyed by doc_id.
+        The InMemoryDocumentStore keys work progress by (user_id, doc_id) tuples,
+        ensuring that progress is isolated between users even if doc_ids were
+        somehow not globally unique.
         """
         doc_u1 = store.save_document("u1", "floor.dxf", SAMPLE_DXF)
         doc_u2 = store.save_document("u2", "section.dxf", SAMPLE_DXF)

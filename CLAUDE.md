@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Project Is
 
-Local-first DXF layout editor that uses LLM-assisted planning to edit 2D CAD drawings via natural-language prompts. The LLM returns structured JSON operations (never raw DXF) which are validated and applied deterministically. Original files are never modified (save-as workflow).
+Drawing Intelligence Platform built on DXF. Started as a local-first DXF layout editor with LLM-assisted planning; now a multi-capability platform that handles edits, compliance checks, quantity takeoffs, health reports, drawing summaries, RFI generation, and zone detection — all via natural-language prompts. The LLM returns structured JSON operations (never raw DXF) which are validated and applied deterministically. Original files are never modified (save-as workflow).
 
 ## Commands
 
@@ -27,6 +27,10 @@ make security      # bandit -r src/ -ll && pip-audit
 # Run single test
 pytest tests/unit/test_validators.py -v
 pytest tests/unit/test_validators.py::test_name -v
+
+# Eval scorecard (intent classification accuracy)
+make scorecard          # mock mode
+make scorecard-live     # real Gemini
 
 # Launch desktop app (requires PySide6: pip install -e ".[gui]")
 make run           # python -m cad_dxf_agent.app
@@ -89,55 +93,144 @@ CAD_GCP_PROJECT=cad-dxf-agent pytest tests/live/ -v -m live_api -s
 
 ## Architecture
 
-### Pipeline Flow
+### Request Flow (v0.8.0)
 
 ```
-User Prompt → Planner → ChangeSet → Validator → Preview → EditEngine → Save-As DXF
-                                                                    ↘ RevisionNotes
+User Prompt
+  → ObjectiveClassifier (2-axis: RequestClass × ObjectiveTag)
+  → StrategyRegistry (maps classification → StagePipelineDefinition)
+  → StageExecutor (runs ordered stages: deterministic + LLM)
+  → ResponseBuilder (PlatformResponse envelope)
 ```
+
+For **edit requests**, the stage pipeline includes the original edit flow:
+
+```
+Planner → ChangeSet → Validator → Preview → EditEngine → Save-As DXF
+                                                       ↘ RevisionNotes
+```
+
+For **analysis requests** (compliance, health, takeoff, summary, RFI), the pipeline runs deterministic extractors without the edit flow.
+
+### Two-Axis Intent Classification
+
+Every prompt is classified on two independent axes:
+
+1. **RequestClass** — *what* the user wants done: `edit`, `analyze`, `compare`, `query`, `generate`
+2. **ObjectiveTag** — *why* they want it: `compliance`, `coordination`, `documentation`, `estimation`, `quality`, `general`
+
+The `StrategyRegistry` maps each (RequestClass, ObjectiveTag) pair to a `StagePipelineDefinition` — an ordered list of `StageHandler` implementations. This replaces the original one-shot planner model with composable multi-stage pipelines.
+
+### Agent-Mode (Tool-Use Loop)
+
+For complex requests, the `AgentProvider` (`llm/agent_provider.py`) runs an iterative tool-use loop:
+
+1. Sends prompt + drawing context + tool definitions to Gemini
+2. Gemini returns tool calls (query tools: list entities, find by layer; edit tools: move, delete, add)
+3. `ToolExecutor` (`llm/tool_executor.py`) dispatches each call, enforcing protected-layer rules at the executor level
+4. Results feed back to Gemini for next iteration (max 10 turns)
+5. Final ChangeSet extracted from accumulated tool calls
+
+Tool definitions in `llm/tool_definitions.py` — 20+ tools split into query (read-only) and edit (state-changing) categories.
+
+### Core Pipeline Steps
 
 1. **dxf_reader** loads DXF via `ezdxf` into a `DrawingContext` (Pydantic model with `EntityRef` list)
-2. **semantic_model** builds a JSON-serializable context summary for the planner (no raw DXF exposed)
-3. **planner** routes to a `PlannerProvider` (Gemini in prod/dev, mock in CI) which returns a `ChangeSet`
-4. **validators** check every operation against `RuleConfig` — protected layers block edits, move distances warn
-5. **preview_model** generates human-readable descriptions of proposed changes
-6. **edit_engine** applies validated ops to a working copy of the DXF via `ezdxf`
-7. **revision_notes** inserts deterministic (never LLM-generated) notes on the `AI_REV_NOTES` layer
+2. **semantic_model** builds a JSON-serializable context summary; `build_enriched_context()` adds family detection, primitive extraction, and zone data
+3. **objective_classifier** classifies prompt intent on 2 axes → `ObjectiveClassification`
+4. **strategy_registry** selects a `StagePipelineDefinition` for the classification
+5. **stage_executor** runs each stage handler in order, with `StageGate` checkpoints between stages
+6. For edit pipelines: **validators** check ops against `RuleConfig`, **edit_engine** applies to working copy, **revision_notes** adds deterministic notes
+7. **response_builder** wraps outputs in `PlatformResponse` envelope (includes `TaskFamily`, `ResponseType`, `RiskLevel`, `AuditMetadata`)
 8. **dxf_writer** saves to a new file path (original untouched)
 
 ### Key Architectural Rules
 
-- **LLM never touches DXF directly** (see `000-docs/005-AT-ADEC-llm-plans-not-dxf.md`). It returns structured `EditOperation` objects with `OpType` enum: `move_entity`, `edit_text`, `delete_entity`, `add_block`. Invalid/unsupported ops reject the entire changeset.
-- **Protected layers** (TITLE, TITLEBLOCK, SEAL, REVISION) cannot be edited. The validator blocks any operation targeting entities on these layers.
+- **LLM never touches DXF directly** (see `000-docs/005-AT-ADEC-llm-plans-not-dxf.md`). It returns structured `EditOperation` objects with `OpType` enum: `move_entity`, `edit_text`, `delete_entity`, `add_block`, `rotate_entity`, `copy_entity`, `scale_entity`, `mirror_entity`, `add_line`, `add_polyline`, `add_circle`, `add_arc`, `add_text`. Invalid/unsupported ops reject the entire changeset.
+- **Protected layers** (TITLE, TITLEBLOCK, SEAL, REVISION) cannot be edited. Enforced at both validator and ToolExecutor levels.
 - **Revision notes are deterministic** — generated from operation metadata, never from freeform LLM output.
-- **V1 entity types**: LINE, LWPOLYLINE, TEXT, MTEXT, INSERT only. All other types are skipped during load.
+- **Supported entity types**: LINE, LWPOLYLINE, TEXT, MTEXT, INSERT, CIRCLE, ARC. Other types are skipped during load.
+- **Response contracts** — every API response wraps in `PlatformResponse` with `TaskFamily` (11 categories), `ResponseType` (7 kinds), and `AuditMetadata` for traceability.
 
 ### Source Layout
 
 ```
 src/cad_dxf_agent/
-  models/         # Pydantic schemas: cad_schema, ops_schema, config_schema, changes_schema
-  core/           # DXF I/O, validation, editing, preview, revision notes, entity index
-    comparison/   # Revision diff engine: alignment, matching, changelog, bundle, overlay
-  llm/            # Planner orchestrator, provider ABC, mock/gemini providers, prompt templates
-  cli/            # Revision CLI (cad-revision diff/align/apply/bundle/explain)
-  ui/             # PySide6 desktop shell (MainWindow)
-  settings.py     # Env-based config (all CAD_* prefixed)
-  app.py          # Desktop entry point
+  models/              # 27 Pydantic schemas
+    cad_schema         #   DrawingContext, EntityRef, LayerInfo, BlockInfo
+    ops_schema         #   EditOperation, OpType enum, ChangeSet
+    objective_schema   #   RequestClass, ObjectiveTag, ObjectiveClassification
+    response_schema    #   PlatformResponse, TaskFamily, ResponseType, RiskLevel
+    compliance_schema  #   ComplianceProfile, ComplianceFinding
+    takeoff_schema     #   TakeoffResult, quantity extraction models
+    health_schema      #   HealthReport, quality metrics
+    zone_schema        #   Zone, room/area detection models
+    document_schema    #   UserDocument metadata for persistence
+    config_schema      #   RuleConfig, ValidationResult
+    ...                #   + comparison, region, qna, precision, rfi, stats, etc.
+
+  core/                # 41 modules — DXF I/O, validation, editing, platform services
+    dxf_reader         #   Load DXF → DrawingContext
+    dxf_writer         #   Save working copy to new path
+    edit_engine        #   Apply validated ops to DXF
+    entity_index       #   R-tree spatial index (nearest, find_in_radius)
+    semantic_model     #   Drawing context → planner-ready summary
+    validators         #   RuleConfig enforcement (blockers + warnings)
+    preview_builder    #   Human-readable change descriptions
+    revision_notes     #   Deterministic notes on AI_REV_NOTES layer
+    family_detector    #   20 architectural families, 150+ signal patterns
+    primitive_extractors  # Symbol detection, label extraction, layer classification
+    zone_detector      #   Closed-loop room/zone detection, area calc
+    compliance_rules   #   Deterministic ADA/IBC/custom compliance checker
+    takeoff_engine     #   Automated quantity extraction
+    health_checker     #   Drawing quality metrics
+    drawing_summarizer #   Structured narrative summaries
+    rfi_generator      #   Request For Information generation
+    session_store      #   ABC + InMemory + GCS (2h TTL ephemeral sessions)
+    document_store     #   ABC + InMemory + GCS (persistent user documents)
+    edit_history       #   Undo/redo + named snapshots
+    comparison/        #   Revision diff engine (alignment, matching, changelog, bundle, overlay)
+
+  llm/                 # 22 modules — intent classification, planning, agent loop
+    planner            #   Orchestrator: prompt → ChangeSet
+    providers          #   PlannerProvider ABC
+    gemini_provider    #   Vertex AI tool-use with vision
+    mock_provider      #   Keyword-matching (CI/tests only)
+    agent_provider     #   Iterative tool-use loop (max 10 turns)
+    tool_executor      #   Dispatches 20+ tools with safety enforcement
+    tool_definitions   #   Query + edit tool schemas for Gemini function calling
+    objective_classifier  # 2-axis intent classification
+    strategy_registry  #   (RequestClass, ObjectiveTag) → StagePipelineDefinition
+    stage_executor     #   Runs ordered stage handlers with gate checkpoints
+    stage_handlers/    #   analyze, summarize, compliance, health, detect_zones
+    response_builder   #   Builds PlatformResponse envelopes
+    intent_router      #   Routes prompts to intent families
+    capability_registry   # Declares tool capabilities per RequestClass
+    prompt_templates   #   System prompts + AGENT_SYSTEM_PROMPT
+
+  cli/                 # Revision CLI (cad-revision diff/align/apply/bundle/explain)
+  ui/                  # PySide6 desktop shell (MainWindow, pipeline_worker)
+  settings.py          # Env-based config (all CAD_* prefixed)
+  app.py               # Desktop entry point
+  otel.py              # OpenTelemetry bootstrap
+
+web/
+  backend/             # FastAPI on Cloud Run
+    main.py            #   App + 20+ endpoints (upload, plan, apply, compare, documents)
+    api_v1.py          #   /api/v1 router
+    session.py         #   SessionManager for ephemeral work
+    auth.py            #   Firebase auth validation
+  frontend/            # React + Vite SPA on Firebase Hosting
 ```
-
-### Data Models (Pydantic)
-
-- `DrawingContext` — normalized view of a loaded DXF (entities, layers, blocks, metadata)
-- `EntityRef` — single entity with handle, type, layer, position, text content, block name, attributes
-- `EditOperation` — one op with `OpType`, target handle, layer, params dict
-- `ChangeSet` — batch of operations from a single prompt
-- `ValidationResult` — blockers (prevent apply) and warnings (informational)
-- `RuleConfig` — protected layers, max move distance, coordinate tolerance
 
 ### Provider Pattern
 
-`PlannerProvider` ABC in `llm/providers.py` → implement `plan(prompt, drawing_context) → ChangeSet`. Two providers: `GeminiProvider` (Vertex AI tool-use with vision, used in dev and prod) and `MockProvider` (keyword-matching, CI/tests only). Set via `CAD_LLM_PROVIDER=gemini|mock`.
+`PlannerProvider` ABC in `llm/providers.py` → implement `plan(prompt, drawing_context) → ChangeSet`. Three providers:
+- `GeminiProvider` — Vertex AI tool-use with vision (dev and prod)
+- `AgentProvider` — iterative tool-use loop for complex multi-step requests
+- `MockProvider` — keyword-matching (CI/tests only)
+
+Set via `CAD_LLM_PROVIDER=gemini|mock`.
 
 ## Configuration
 
@@ -146,9 +239,12 @@ All settings via environment variables (`.env` file, `.gitignore`d):
 | Variable | Default | Purpose |
 |----------|---------|---------|
 | `CAD_LLM_PROVIDER` | `mock` | Planner backend (`gemini` for dev/prod, `mock` for CI only) |
+| `CAD_GCP_PROJECT` | _(unset)_ | GCP project for Vertex AI (`cad-dxf-agent`) |
 | `CAD_PROTECTED_LAYERS` | `TITLE,TITLEBLOCK,SEAL,REVISION` | Comma-separated protected layers |
 | `CAD_REVISION_NOTES_ENABLED` | `true` | Insert revision notes after edits |
 | `CAD_REVISION_NOTES_LAYER` | `AI_REV_NOTES` | Layer name for revision notes |
+| `CAD_WEB_DEV_MODE` | _(unset)_ | Skip Firebase auth for local backend testing |
+| `CAD_ALLOWED_EMAILS` | _(unset)_ | Comma-separated emails allowed to auto-provision (also checks Firestore `allowlist` collection) |
 | `OTEL_ENABLED` | _(unset)_ | Enable OpenTelemetry tracing (`1`, `true`, `yes`) |
 | `OTEL_EXPORTER` | `console` | Span exporter: `console`, `otlp`, or `gcp-trace` |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | _(unset)_ | OTLP collector endpoint (e.g., `http://localhost:4317`) |
@@ -163,16 +259,18 @@ Optional tracing via `otel.py` bootstrap module. Off by default, CI-safe (no net
 
 | Tier | Location | Count | What |
 |------|----------|-------|------|
-| Unit | `tests/unit/` | ~1069 | Schemas, validators, reader, writer, engine, preview, settings, semantic model, snapshots, comparison |
-| Integration | `tests/integration/` | ~78 | Full pipeline, undo/redo, agent loop with ScriptedAgentProvider |
-| Web | `tests/web/` | ~123 | FastAPI backend endpoints (TestClient) |
-| Benchmark | `tests/benchmark/` | ~15 | Performance micro-benchmarks (pytest-benchmark) |
+| Unit | `tests/unit/` | ~3570 | Schemas, validators, reader, writer, engine, preview, semantic model, snapshots, comparison, compliance, takeoff, zones, families |
+| Integration | `tests/integration/` | ~102 | Full pipeline, undo/redo, agent loop with ScriptedAgentProvider |
+| Web | `tests/web/` | ~362 | FastAPI backend endpoints (TestClient), document library, session management |
+| Eval | `tests/eval/` | ~42 | Intent classification accuracy scorecard |
+| Live | `tests/live/` | ~42 | Real Gemini API tests (require ADC + `cad-dxf-agent` GCP project) |
+| E2E | `tests/e2e/` | ~33 | End-to-end tests with real DXF files |
+| Benchmark | `tests/benchmark/` | ~19 | Performance micro-benchmarks (pytest-benchmark) |
 | GUI | `tests/gui/` | ~10 | PySide6 UI tests (require `QT_QPA_PLATFORM=offscreen`) |
 | Property | `tests/property/` | ~7 | Fuzz/property tests (randomized, bounded runtime) |
 | Smoke | `tests/smoke/` + `scripts/smoke_test.py` | ~7 | End-to-end pipeline via mock planner |
-| Live | `tests/live/` | varies | Real Gemini API tests (require ADC + `cad-dxf-agent` GCP project) |
 
-Total: ~1351 tests collected.
+Total: ~4194 tests collected.
 
 ### LLM Testing Patterns
 
@@ -193,11 +291,14 @@ make test              # All tests
 make test-unit         # Unit tests only
 make test-integration  # Integration tests only
 make test-web          # Web backend API tests only
+make test-e2e          # E2E tests (need scripts/download_e2e_fixtures.sh first)
 make test-live         # Live Gemini API tests (require ADC)
 make test-cov          # All tests with coverage report
+make scorecard         # Eval scorecard (mock mode)
+make scorecard-live    # Eval scorecard (real Gemini)
 ```
 
-- Pytest markers: `@pytest.mark.smoke`, `@pytest.mark.slow`, `@pytest.mark.integration`
+- Pytest markers: `@pytest.mark.smoke`, `@pytest.mark.slow`, `@pytest.mark.integration`, `@pytest.mark.web`, `@pytest.mark.live_api`, `@pytest.mark.e2e`, `@pytest.mark.benchmark`, `@pytest.mark.property`, `@pytest.mark.gui`
 - Coverage threshold: 65% (`fail_under` in pyproject.toml)
 
 ## CI
@@ -263,21 +364,35 @@ This project uses `bd` (beads) for issue tracking. Run `bd ready` to find availa
 
 ### Epic Registry
 
-| Epic | Bead | Title | Phase |
-|------|------|-------|-------|
-| EPIC-CAD-01 | cad-uns | Capability Audit + Architecture Baseline | 1 |
-| EPIC-CAD-02 | cad-d9a | Core Contracts + Routing Foundation | 1 |
-| EPIC-CAD-03 | cad-wd2 | Selection + Markup Interpretation Foundation | 1 |
-| EPIC-CAD-04 | cad-grx | Region Q&A Vertical Slice | 2 |
-| EPIC-CAD-05 | cad-ccd | Repeated-Condition Detection | 2 |
-| EPIC-CAD-06 | cad-3e4 | Compare + Diff Service Hardening | 2 |
-| ARCH-REVIEW-01 | cad-sfw | Post-EPIC-06 Architecture Review | — |
-| EPIC-CAD-07 | cad-9ug | Structured Edit Planning | 3 |
-| EPIC-CAD-08 | cad-6zz | Preview + Apply Workflow | 3 |
-| EPIC-CAD-09 | cad-ady | Design Operations Workflow Pack | 4 |
-| EPIC-CAD-10 | cad-8p2 | Construction Drawing Workflow Pack | 4 |
-| EPIC-CAD-11 | cad-36p | Session Durability + Scale Readiness | 5 |
-| EPIC-CAD-12 | cad-m7d | Evaluation Harness + Quality Governance | 5 |
-| EPIC-CAD-13 | cad-dxf-agent-lk9 | Objective Intelligence | 6 |
-| EPIC-CAD-14 | cad-dxf-agent-bmw | Professional Precision Controls | 6 |
-| EPIC-CAD-15 | cad-dxf-agent-aqw | Document Persistence | 6 |
+| Epic | Bead | Title | Phase | Status |
+|------|------|-------|-------|--------|
+| EPIC-CAD-01 | cad-uns | Capability Audit + Architecture Baseline | 1 | Done |
+| EPIC-CAD-02 | cad-d9a | Core Contracts + Routing Foundation | 1 | Done |
+| EPIC-CAD-03 | cad-wd2 | Selection + Markup Interpretation Foundation | 1 | Done |
+| EPIC-CAD-04 | cad-grx | Region Q&A Vertical Slice | 2 | Done |
+| EPIC-CAD-05 | cad-ccd | Repeated-Condition Detection | 2 | Done |
+| EPIC-CAD-06 | cad-3e4 | Compare + Diff Service Hardening | 2 | Done |
+| ARCH-REVIEW-01 | cad-sfw | Post-EPIC-06 Architecture Review | — | Done |
+| EPIC-CAD-07 | cad-9ug | Structured Edit Planning | 3 | Done |
+| EPIC-CAD-08 | cad-6zz | Preview + Apply Workflow | 3 | Done |
+| EPIC-CAD-09 | cad-ady | Design Operations Workflow Pack | 4 | Done |
+| EPIC-CAD-10 | cad-8p2 | Construction Drawing Workflow Pack | 4 | Done |
+| EPIC-CAD-11 | cad-36p | Session Durability + Scale Readiness | 5 | Done |
+| EPIC-CAD-12 | cad-m7d | Evaluation Harness + Quality Governance | 5 | Done |
+| EPIC-CAD-13 | cad-dxf-agent-lk9 | Objective Intelligence | 6 | Done |
+| EPIC-CAD-14 | cad-dxf-agent-bmw | Professional Precision Controls | 6 | Done |
+| EPIC-CAD-15 | cad-dxf-agent-aqw | Document Persistence | 6 | Done |
+| EPIC-CAD-16 | cad-dxf-agent-5ds | Drafting Vocabulary Foundation | 7 | Done |
+| EPIC-CAD-17 | cad-dxf-agent-ofi | Entity Creation Pipeline | 7 | Done |
+| EPIC-CAD-18 | cad-dxf-agent-omx | Scale + Entity Cap | 7 | Done |
+| EPIC-CAD-19 | cad-dxf-agent-xz4 | Drawing Health Report | 8 | Done |
+| EPIC-CAD-20 | cad-dxf-agent-50c | Intelligent Batch Operations | 8 | Done |
+| EPIC-CAD-21 | cad-dxf-agent-ons | Compliance Validation Engine | 8 | Done |
+| EPIC-CAD-22 | cad-dxf-agent-76v | Cross-Drawing Consistency Checker | 8 | Done |
+| EPIC-CAD-23 | cad-dxf-agent-bqt | Automated Takeoff Engine | 8 | Done |
+| EPIC-CAD-24 | cad-dxf-agent-a6b | Plain-English Drawing Summary | 8 | Done |
+| EPIC-CAD-25 | cad-dxf-agent-owv | RFI Generator | 8 | Done |
+| EPIC-CAD-26 | cad-dxf-agent-4xc | Revision Summary Report | 8 | Done |
+| EPIC-CAD-27 | cad-dxf-agent-xvs | Session Undo/Redo + Snapshots | 8 | Done |
+| EPIC-CAD-29 | cad-dxf-agent-9cd | Agent-Mode API v1 | 8 | Done |
+| EPIC-CAD-30 | cad-dxf-agent-qvf | User Accounts, Workspaces & Persistent Work Progress | 9 | Done |

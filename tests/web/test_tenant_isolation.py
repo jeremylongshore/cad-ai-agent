@@ -244,11 +244,11 @@ class TestDeleteIsolation:
 class TestWorkProgressIsolation:
     """User B cannot access work progress saved by user A.
 
-    Work progress isolation is enforced at the store layer: InMemoryDocumentStore
-    uses ``doc_id`` as the key but ``get_work_progress`` requires the correct
-    ``user_id`` because the document lookup (which gates file access) is already
-    scoped by user.  We test the invariant here directly via the store API to
-    confirm the contract without relying on an explicit HTTP endpoint for reads.
+    Work progress isolation is enforced at multiple layers.  At the storage
+    layer, ``InMemoryDocumentStore`` keys progress data by ``(user_id, doc_id)``
+    tuples.  At the application layer, endpoints validate document ownership by
+    the requesting user's ID before accessing or modifying data.  These tests
+    verify isolation at both the store API and the HTTP endpoint level.
     """
 
     def test_user_b_get_work_progress_returns_none(self, _use_inmemory_doc_store):
