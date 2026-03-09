@@ -1655,7 +1655,7 @@ async def apply_changes(body: ApplyRequest, user: dict = Depends(get_user)):
             if body.selected_ops is not None:
                 selected = [
                     changeset.operations[i]
-                    for i in body.selected_ops
+                    for i in sorted(set(body.selected_ops))
                     if 0 <= i < len(changeset.operations)
                 ]
                 changeset = ChangeSet(
