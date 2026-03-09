@@ -795,9 +795,7 @@ class TestAnalyzeDensityMutationKilling:
         # and density rec stays at 0.70 minus sparse penalty (0.15) = 0.55 (after penalty).
         # To get raw 0.70, supply 3 text entities and spread entities enough not to be sparse.
         native = TextGeometry.for_provenance(TextProvenance.NATIVE_CAD_TEXT)
-        text_entities = [
-            _text(f"T{i}", text=f"Label {i}", text_geometry=native) for i in range(3)
-        ]
+        text_entities = [_text(f"T{i}", text=f"Label {i}", text_geometry=native) for i in range(3)]
         # 5 non-text entities all at same point → triggers density rec
         line_entities = [_entity(f"L{i}", x=0.0, y=0.0) for i in range(5)]
         ctx = _context(text_entities + line_entities)
@@ -846,9 +844,7 @@ class TestPlainDescriptionExactText:
 
     def test_text_hint_uses_single_quotes(self):
         """Text hint must appear as ('preview') with single quotes."""
-        cr = _comparison_result(
-            _change(ChangeCategory.ADDED, handle="T1", text_content="Beam B-3")
-        )
+        cr = _comparison_result(_change(ChangeCategory.ADDED, handle="T1", text_content="Beam B-3"))
         result = RevisionSummarizer().summarize(comparison_result=cr)
         desc = result.key_changes[0].plain_description
         assert "'Beam B-3'" in desc
@@ -1104,9 +1100,7 @@ class TestAnalyzeTextLabelsLowTrust:
     def test_low_trust_rec_mentions_entity_count(self):
         """Low-trust recommendation description must mention the count of affected entities."""
         ocr_geo = TextGeometry.for_provenance(TextProvenance.RASTER_OCR_TEXT)
-        entities = [
-            _text(f"T{i}", f"LABEL {i}", text_geometry=ocr_geo) for i in range(2)
-        ]
+        entities = [_text(f"T{i}", f"LABEL {i}", text_geometry=ocr_geo) for i in range(2)]
         ctx = _context(entities)
         result = LayoutRecommender().recommend(ctx, "check labels")
         low_trust_recs = [r for r in result.recommendations if "low-trust" in r.title.lower()]
@@ -1189,9 +1183,7 @@ class TestBuildSummaryEntityTypes:
 
     def test_summary_includes_entity_type_names(self):
         """Summary must list the most-common entity types."""
-        entities = [
-            _entity(f"L{i}", entity_type=EntityType.LINE) for i in range(5)
-        ] + [
+        entities = [_entity(f"L{i}", entity_type=EntityType.LINE) for i in range(5)] + [
             _entity(f"P{i}", entity_type=EntityType.LWPOLYLINE) for i in range(3)
         ]
         ctx = _context(entities)
@@ -1274,3 +1266,1276 @@ class TestScopeBuilderSectionContentAndConfidence:
         ]
         assert rev_sections
         assert rev_sections[0].confidence == pytest.approx(0.5)
+
+
+# ---------------------------------------------------------------------------
+# NEW MUTATION-KILLING TESTS — targeting the 191 surviving mutants
+# ---------------------------------------------------------------------------
+
+# ===========================================================================
+# ScopeBuilder.build — propagation of prompt, region, confidence, caveats
+# ===========================================================================
+
+
+class TestScopeBuilderPropagation:
+    """Kill argument-swapping/removal mutants and field-omission mutants in ScopeBuilder.build."""
+
+    def test_region_propagates_partial_region_flag_into_scope(self):
+        """partial_region ambiguity flag from LayoutRecommender must reach the scope summary."""
+        entities = [_insert(f"B{i}", block_name="COL", x=float(i * 5)) for i in range(3)]
+        ctx = _context(entities)
+        region = RegionContext(entities=entities, is_whole_drawing=False, ambiguity_flags=[])
+        result = ScopeBuilder().build(ctx, "scope", region=region)
+        assert "partial_region" in result.ambiguity_flags
+
+    def test_region_context_truncated_flag_propagates_into_scope(self):
+        """context_truncated from a region ambiguity_flags must appear in scope ambiguity_flags."""
+        entities = [_insert(f"B{i}", block_name="COL", x=float(i * 5)) for i in range(3)]
+        ctx = _context(entities)
+        region = RegionContext(
+            entities=entities,
+            is_whole_drawing=False,
+            ambiguity_flags=["context_truncated"],
+        )
+        result = ScopeBuilder().build(ctx, "scope", region=region)
+        assert "context_truncated" in result.ambiguity_flags
+
+    def test_layout_section_confidence_equals_layout_result_aggregate(self):
+        """LAYOUT_RECOMMENDATIONS section.confidence must equal layout_result.aggregate_confidence."""
+        # Many entities concentrated on one layer → triggers recommendation with known confidence
+        entities = [_entity(f"E{i}", layer="WALLS") for i in range(12)]
+        ctx = _context(entities)
+        # Compute expected confidence independently
+        layout_result = LayoutRecommender().recommend(ctx, "scope")
+        result = ScopeBuilder().build(ctx, "scope")
+        layout_sections = [
+            s for s in result.sections if s.section_type == ScopeSectionType.LAYOUT_RECOMMENDATIONS
+        ]
+        assert layout_sections
+        assert layout_sections[0].confidence == pytest.approx(
+            layout_result.aggregate_confidence, abs=0.01
+        )
+
+    def test_layout_section_caveats_equal_layout_limitations(self):
+        """LAYOUT_RECOMMENDATIONS section.caveats must equal layout_result.limitations."""
+        entities = [_entity(f"E{i}", layer="WALLS") for i in range(12)]
+        ctx = _context(entities)
+        layout_result = LayoutRecommender().recommend(ctx, "scope")
+        result = ScopeBuilder().build(ctx, "scope")
+        layout_sections = [
+            s for s in result.sections if s.section_type == ScopeSectionType.LAYOUT_RECOMMENDATIONS
+        ]
+        assert layout_sections
+        assert layout_sections[0].caveats == layout_result.limitations
+
+    def test_revision_summary_caveats_propagate_to_scope_all_caveats(self):
+        """Caveats from revision summary must appear in the scope's top-level caveats."""
+        entities = [_insert("B1", block_name="COL", x=0.0)]
+        ctx = _context(entities)
+        cr = _comparison_result(
+            _change(ChangeCategory.ADDED, handle="A1"),
+            warnings=["Profile filtered some entities."],
+        )
+        result = ScopeBuilder().build(ctx, "scope", comparison_result=cr)
+        assert any("filtered" in c for c in result.caveats)
+
+    def test_takeoff_caveats_propagate_to_scope_all_caveats(self):
+        """Caveats from takeoff result must appear in the scope's top-level caveats."""
+        entities = [_insert(f"B{i}", block_name="COL", x=float(i * 5)) for i in range(3)]
+        ctx = _context(entities)
+        region = RegionContext(entities=entities, is_whole_drawing=False, ambiguity_flags=[])
+        result = ScopeBuilder().build(ctx, "scope", region=region)
+        # partial-region takeoff generates "Counts are from the selected region only..." caveat
+        assert any("selected region" in c for c in result.caveats)
+
+    def test_takeoff_section_confidence_maps_high_to_0_95(self):
+        """TakeoffConfidence.HIGH must map to 0.95 in the section confidence."""
+        entities = [_insert(f"B{i}", block_name="COL", x=float(i * 5)) for i in range(3)]
+        ctx = _context(entities)
+        result = ScopeBuilder().build(ctx, "scope")
+        takeoff_sections = [
+            s for s in result.sections if s.section_type == ScopeSectionType.TAKEOFF_CANDIDATES
+        ]
+        assert takeoff_sections
+        assert takeoff_sections[0].confidence == pytest.approx(0.95)
+
+    def test_scope_aggregate_confidence_is_rounded_to_2dp(self):
+        """aggregate_confidence must be rounded to 2 decimal places."""
+        entities = [_entity(f"E{i}", layer="WALLS") for i in range(12)]
+        ctx = _context(entities)
+        result = ScopeBuilder().build(ctx, "scope")
+        # round(x, 2) should equal the value (i.e. no unrounded floating point artifact)
+        assert result.aggregate_confidence == round(result.aggregate_confidence, 2)
+
+    def test_no_revision_data_appends_revision_summary_to_omitted(self):
+        """Without revision data, 'revision_summary' must be in omitted_sections."""
+        ctx = _context([_entity("E1", layer="WALLS")])
+        result = ScopeBuilder().build(ctx, "scope")
+        assert "revision_summary" in result.omitted_sections
+
+    def test_empty_drawing_all_three_sections_omitted(self):
+        """Empty drawing with no revision data must omit all three sections."""
+        result = ScopeBuilder().build(_context([]), "scope")
+        assert "layout_recommendations" in result.omitted_sections
+        assert "revision_summary" in result.omitted_sections
+        assert "takeoff_candidates" in result.omitted_sections
+
+    def test_layout_section_title_is_layout_recommendations(self):
+        """LAYOUT_RECOMMENDATIONS section title must be exactly 'Layout Recommendations'."""
+        entities = [_entity(f"E{i}", layer="WALLS") for i in range(12)]
+        ctx = _context(entities)
+        result = ScopeBuilder().build(ctx, "scope")
+        layout_sections = [
+            s for s in result.sections if s.section_type == ScopeSectionType.LAYOUT_RECOMMENDATIONS
+        ]
+        assert layout_sections
+        assert layout_sections[0].title == "Layout Recommendations"
+
+    def test_revision_section_title_is_revision_summary(self):
+        """REVISION_SUMMARY section title must be exactly 'Revision Summary'."""
+        ctx = _context([_entity("E1", layer="WALLS")])
+        op = EditOperation(
+            op_type=OpType.MOVE_ENTITY,
+            target_handle="E1",
+            target_layer="WALLS",
+        )
+        cs = ChangeSet(operations=[op], prompt="move")
+        result = ScopeBuilder().build(ctx, "scope", changeset=cs)
+        rev_sections = [
+            s for s in result.sections if s.section_type == ScopeSectionType.REVISION_SUMMARY
+        ]
+        assert rev_sections
+        assert rev_sections[0].title == "Revision Summary"
+
+    def test_takeoff_section_title_is_takeoff_candidates(self):
+        """TAKEOFF_CANDIDATES section title must be exactly 'Takeoff Candidates'."""
+        entities = [_insert(f"B{i}", block_name="COL", x=float(i * 5)) for i in range(3)]
+        ctx = _context(entities)
+        result = ScopeBuilder().build(ctx, "scope")
+        takeoff_sections = [
+            s for s in result.sections if s.section_type == ScopeSectionType.TAKEOFF_CANDIDATES
+        ]
+        assert takeoff_sections
+        assert takeoff_sections[0].title == "Takeoff Candidates"
+
+    def test_scope_aggregate_conf_is_min_of_sections(self):
+        """aggregate_confidence must be the minimum of all section confidences."""
+        # Build a scope with layout + takeoff sections and verify min is used
+        entities = [_entity(f"E{i}", layer="WALLS") for i in range(12)]
+        ctx = _context(entities)
+        result = ScopeBuilder().build(ctx, "scope")
+        if result.sections:
+            expected = min(s.confidence for s in result.sections if s.available)
+            assert result.aggregate_confidence == pytest.approx(expected, abs=0.01)
+
+    def test_region_entities_used_not_context_entities(self):
+        """When region is provided, entities come from region not context."""
+        # Context has 20 entities (all on WALLS, concentrated)
+        ctx_entities = [_entity(f"E{i}", layer="WALLS") for i in range(20)]
+        ctx = _context(ctx_entities)
+        # Region has only 2 entities (no concentration → no layout rec)
+        region_entities = [
+            _entity("R1", layer="ZONE_A"),
+            _entity("R2", layer="ZONE_B"),
+        ]
+        region = RegionContext(entities=region_entities, is_whole_drawing=False, ambiguity_flags=[])
+        result = ScopeBuilder().build(ctx, "scope", region=region)
+        # If region is used, summary should mention 2 entities (region), not 20 (context)
+        layout_sections = [
+            s for s in result.sections if s.section_type == ScopeSectionType.LAYOUT_RECOMMENDATIONS
+        ]
+        # Layout result drawing_summary reflects region entity count (2)
+        if layout_sections:
+            assert "2" in layout_sections[0].content.get("drawing_summary", "")
+
+
+# ===========================================================================
+# LayoutRecommender.recommend — exact string content of empty-drawing result
+# ===========================================================================
+
+
+class TestLayoutRecommenderEmptyDrawingExactStrings:
+    """Kill string-mutation survivors in the empty-drawing early return."""
+
+    def test_empty_drawing_summary_exact_string(self):
+        """drawing_summary for empty drawing must be the exact no-entities string."""
+        result = LayoutRecommender().recommend(_context([]), "prompt")
+        assert result.drawing_summary == "Empty drawing — no entities to analyze."
+
+    def test_empty_drawing_ambiguity_flag_exact_value(self):
+        """ambiguity_flags for empty drawing must be exactly ['empty_drawing']."""
+        result = LayoutRecommender().recommend(_context([]), "prompt")
+        assert result.ambiguity_flags == ["empty_drawing"]
+
+    def test_empty_drawing_limitations_exact_string(self):
+        """limitations for empty drawing must contain 'No entities available for analysis.'."""
+        result = LayoutRecommender().recommend(_context([]), "prompt")
+        assert result.limitations == ["No entities available for analysis."]
+
+
+# ===========================================================================
+# LayoutRecommender._analyze_layer_distribution — exact string content
+# ===========================================================================
+
+
+class TestLayerDistributionExactStrings:
+    """Kill string-mutation survivors in _analyze_layer_distribution."""
+
+    def test_layer_title_exact_format(self):
+        """Title must be exactly \"High entity concentration on layer 'WALLS'\"."""
+        entities = [_entity(f"E{i}", layer="WALLS") for i in range(12)]
+        ctx = _context(entities)
+        result = LayoutRecommender().recommend(ctx, "check")
+        recs = [r for r in result.recommendations if "WALLS" in r.title]
+        assert recs
+        assert recs[0].title == "High entity concentration on layer 'WALLS'"
+
+    def test_layer_description_exact_format(self):
+        """Description must follow exact template with count, total, ratio, and sub-layer advice."""
+        entities = [_entity(f"E{i}", layer="BEAMS") for i in range(12)]
+        ctx = _context(entities)
+        result = LayoutRecommender().recommend(ctx, "check")
+        recs = [r for r in result.recommendations if "BEAMS" in r.title]
+        assert recs
+        assert recs[0].description == (
+            "Layer 'BEAMS' contains 12 of 12 entities (100%). Consider splitting into sub-layers."
+        )
+
+    def test_layer_rationale_exact_string(self):
+        """Rationale must be 'Concentrated layers can be harder to manage and filter.'."""
+        entities = [_entity(f"E{i}", layer="COLS") for i in range(12)]
+        ctx = _context(entities)
+        result = LayoutRecommender().recommend(ctx, "check")
+        recs = [r for r in result.recommendations if "COLS" in r.title]
+        assert recs
+        assert recs[0].rationale == "Concentrated layers can be harder to manage and filter."
+
+    def test_layer_ratio_threshold_boundary_above(self):
+        """With ratio > 0.6 and total > 10, recommendation must fire."""
+        # 7 of 10 on HEAVY → 70% > 60%, but total=10 which is NOT > 10 → no trigger
+        # Use 11 total, 8 on HEAVY → 72.7% > 60%, total=11 > 10 → triggers
+        heavy = [_entity(f"H{i}", layer="HEAVY") for i in range(8)]
+        light = [_entity(f"L{i}", layer="LIGHT") for i in range(3)]
+        ctx = _context(heavy + light)
+        result = LayoutRecommender().recommend(ctx, "check")
+        recs = [r for r in result.recommendations if "HEAVY" in r.title]
+        assert recs, "8/11 entities on HEAVY (73%) with total>10 must trigger recommendation"
+
+    def test_layer_ratio_threshold_exactly_60_percent_no_trigger(self):
+        """Exactly 60% on one layer must NOT trigger the recommendation (> 0.6, not >= 0.6)."""
+        # 6 of 10 on LAYER_A = 60%, but total=10 is not > 10 either
+        # Need total > 10: 12 on LAYER_A, 8 on LAYER_B = 12/20 = 60% exactly
+        layer_a = [_entity(f"A{i}", layer="LAYER_A") for i in range(12)]
+        layer_b = [_entity(f"B{i}", layer="LAYER_B") for i in range(8)]
+        ctx = _context(layer_a + layer_b)
+        result = LayoutRecommender().recommend(ctx, "check")
+        recs = [r for r in result.recommendations if "LAYER_A" in r.title]
+        # 60% is NOT > 0.6 → no recommendation
+        assert recs == []
+
+    def test_layer_total_threshold_exactly_10_no_trigger(self):
+        """Total == 10 must NOT trigger the recommendation (needs > 10, not >= 10)."""
+        # 9 of 10 on WALLS = 90% > 60%, but total=10 is not > 10
+        entities = [_entity(f"W{i}", layer="WALLS") for i in range(9)] + [
+            _entity("X1", layer="OTHER")
+        ]
+        ctx = _context(entities)
+        result = LayoutRecommender().recommend(ctx, "check")
+        recs = [r for r in result.recommendations if "WALLS" in r.title]
+        assert recs == []
+
+    def test_layer_only_most_concentrated_layer_reported(self):
+        """Only the single most-concentrated layer is reported (break after first match)."""
+        # It is mathematically impossible for two layers to each have >60% of the total.
+        # The break ensures we never report more than one layer concentration rec.
+        # Set up: ALPHA has 8/11 = 73%, BETA has 3/11 = 27%.  Both total > 10.
+        # Only ALPHA fires.
+        layer_a = [_entity(f"A{i}", layer="ALPHA") for i in range(8)]
+        layer_b = [_entity(f"B{i}", layer="BETA") for i in range(3)]
+        ctx = _context(layer_a + layer_b)
+        result = LayoutRecommender().recommend(ctx, "check")
+        layer_recs = [
+            r
+            for r in result.recommendations
+            if r.type.value == "general_observation" and "concentration" in r.title.lower()
+        ]
+        # Exactly one layer concentration rec should be emitted
+        assert len(layer_recs) == 1
+        assert "ALPHA" in layer_recs[0].title
+
+    def test_layer_description_partial_ratio(self):
+        """Description with non-100% ratio must show correct percentage."""
+        # 8 of 11 total → 72.7% rounds to 73%
+        heavy = [_entity(f"H{i}", layer="STEEL") for i in range(8)]
+        light = [_entity(f"L{i}", layer="OTHER") for i in range(3)]
+        ctx = _context(heavy + light)
+        result = LayoutRecommender().recommend(ctx, "check")
+        recs = [r for r in result.recommendations if "STEEL" in r.title]
+        assert recs
+        assert "73%" in recs[0].description
+
+
+# ===========================================================================
+# LayoutRecommender._analyze_density — exact string content
+# ===========================================================================
+
+
+class TestDensityExactStrings:
+    """Kill string-mutation survivors in _analyze_density."""
+
+    def test_density_title_exact_string(self):
+        """Title must be exactly 'High entity density detected'."""
+        entities = [_entity(f"E{i}", x=float(i * 0.1), y=0.0) for i in range(5)]
+        ctx = _context(entities)
+        result = LayoutRecommender().recommend(ctx, "check")
+        placement_recs = [r for r in result.recommendations if r.type.value == "placement_guidance"]
+        assert placement_recs
+        assert placement_recs[0].title == "High entity density detected"
+
+    def test_density_description_contains_area_range(self):
+        """Description must contain 'across NxM area' part."""
+        # 5 entities spread along x-axis, y=0 → x_range=0.8, y_range=0
+        entities = [_entity(f"E{i}", x=float(i * 0.2), y=0.0) for i in range(5)]
+        ctx = _context(entities)
+        result = LayoutRecommender().recommend(ctx, "check")
+        placement_recs = [r for r in result.recommendations if r.type.value == "placement_guidance"]
+        assert placement_recs
+        desc = placement_recs[0].description
+        assert "across" in desc
+        assert "area" in desc
+
+    def test_density_description_contains_unit_sq(self):
+        """Description must contain the '/unit²' unicode suffix."""
+        entities = [_entity(f"E{i}", x=float(i * 0.1), y=0.0) for i in range(5)]
+        ctx = _context(entities)
+        result = LayoutRecommender().recommend(ctx, "check")
+        placement_recs = [r for r in result.recommendations if r.type.value == "placement_guidance"]
+        assert placement_recs
+        assert "/unit\u00b2" in placement_recs[0].description
+
+    def test_density_rationale_exact_string(self):
+        """Rationale must be 'Dense areas may benefit from spacing adjustments.'."""
+        entities = [_entity(f"E{i}", x=float(i * 0.1), y=0.0) for i in range(5)]
+        ctx = _context(entities)
+        result = LayoutRecommender().recommend(ctx, "check")
+        placement_recs = [r for r in result.recommendations if r.type.value == "placement_guidance"]
+        assert placement_recs
+        assert placement_recs[0].rationale == "Dense areas may benefit from spacing adjustments."
+
+    def test_density_threshold_boundary_just_above(self):
+        """density just above 0.1 must trigger the recommendation."""
+        # 5 entities at x=[0,1,2,3,4], y=[0,1,2,3,4] → area=16, density=5/16=0.3125 > 0.1
+        entities = [_entity(f"E{i}", x=float(i), y=float(i)) for i in range(5)]
+        ctx = _context(entities)
+        result = LayoutRecommender().recommend(ctx, "check")
+        placement_recs = [r for r in result.recommendations if r.type.value == "placement_guidance"]
+        assert placement_recs, "density 0.31 must trigger recommendation"
+
+    def test_density_threshold_boundary_just_below(self):
+        """density just below 0.1 must NOT trigger the recommendation."""
+        # 5 entities spread 100 units apart → x_range=400, y_range=0, area=max(1)=1
+        # Wait — y_range=0 makes area = max(0,1)=1, density=5/1=5 >> 0.1
+        # Need 2D spread: x_range=100, y_range=100, area=10000, density=5/10000=0.0005 < 0.1
+        entities = [_entity(f"E{i}", x=float(i * 25), y=float(i * 25)) for i in range(5)]
+        ctx = _context(entities)
+        result = LayoutRecommender().recommend(ctx, "check")
+        placement_recs = [r for r in result.recommendations if r.type.value == "placement_guidance"]
+        assert placement_recs == [], "density 0.0005 must NOT trigger recommendation"
+
+    def test_density_description_uses_three_decimal_places(self):
+        """Density value in description must be formatted to 3 decimal places."""
+        entities = [_entity(f"E{i}", x=float(i * 0.1), y=0.0) for i in range(6)]
+        ctx = _context(entities)
+        result = LayoutRecommender().recommend(ctx, "check")
+        placement_recs = [r for r in result.recommendations if r.type.value == "placement_guidance"]
+        assert placement_recs
+        # Pattern: "density: X.XXX/unit²"
+        assert "density: " in placement_recs[0].description
+        # Verify three decimal places (e.g. 6.000 not 6.0 or 6)
+        import re
+
+        m = re.search(r"density: (\d+\.\d+)", placement_recs[0].description)
+        assert m is not None
+        decimal_part = m.group(1).split(".")[1]
+        assert len(decimal_part) == 3
+
+
+# ===========================================================================
+# LayoutRecommender._analyze_block_placement — exact string content
+# ===========================================================================
+
+
+class TestBlockPlacementExactStrings:
+    """Kill string-mutation survivors in _analyze_block_placement."""
+
+    def test_block_title_exact_format(self):
+        """Title must be exactly \"Repeated block 'DOOR_A' (4 instances)\"."""
+        entities = [_insert(f"B{i}", block_name="DOOR_A", x=float(i * 5)) for i in range(4)]
+        ctx = _context(entities)
+        result = LayoutRecommender().recommend(ctx, "check")
+        recs = [r for r in result.recommendations if "DOOR_A" in r.title]
+        assert recs
+        assert recs[0].title == "Repeated block 'DOOR_A' (4 instances)"
+
+    def test_block_description_exact_format(self):
+        """Description must follow exact block-placement template."""
+        entities = [_insert(f"C{i}", block_name="COL_MK", x=float(i * 10)) for i in range(5)]
+        ctx = _context(entities)
+        result = LayoutRecommender().recommend(ctx, "check")
+        recs = [r for r in result.recommendations if "COL_MK" in r.title]
+        assert recs
+        assert recs[0].description == (
+            "Block 'COL_MK' appears 5 times. Placement pattern analysis available."
+        )
+
+    def test_block_rationale_exact_string(self):
+        """Rationale must be 'Repeated blocks often indicate structural grid or fixture.'."""
+        entities = [_insert(f"B{i}", block_name="FOOTING", x=float(i * 5)) for i in range(3)]
+        ctx = _context(entities)
+        result = LayoutRecommender().recommend(ctx, "check")
+        recs = [r for r in result.recommendations if "FOOTING" in r.title]
+        assert recs
+        assert recs[0].rationale == "Repeated blocks often indicate structural grid or fixture."
+
+    def test_block_confidence_is_0_90(self):
+        """Block placement recommendation confidence must be 0.90 (before sparse-text penalty)."""
+        native = TextGeometry.for_provenance(TextProvenance.NATIVE_CAD_TEXT)
+        text_entities = [_text(f"T{i}", f"Label {i}", text_geometry=native) for i in range(3)]
+        inserts = [_insert(f"B{i}", block_name="SLAB", x=float(i * 5)) for i in range(4)]
+        ctx = _context(text_entities + inserts)
+        result = LayoutRecommender().recommend(ctx, "check")
+        recs = [r for r in result.recommendations if "SLAB" in r.title]
+        assert recs
+        assert recs[0].confidence == pytest.approx(0.90)
+
+    def test_block_threshold_exactly_two_no_recommendation(self):
+        """Block appearing exactly twice must NOT trigger a recommendation (threshold is >= 3)."""
+        entities = [_insert("B1", block_name="RARE"), _insert("B2", block_name="RARE", x=5.0)]
+        ctx = _context(entities)
+        result = LayoutRecommender().recommend(ctx, "check")
+        recs = [r for r in result.recommendations if "RARE" in r.title]
+        assert recs == []
+
+    def test_block_threshold_exactly_three_triggers(self):
+        """Block appearing exactly 3 times must trigger a recommendation (>= 3)."""
+        entities = [
+            _insert("B1", block_name="BEAM", x=0.0),
+            _insert("B2", block_name="BEAM", x=5.0),
+            _insert("B3", block_name="BEAM", x=10.0),
+        ]
+        ctx = _context(entities)
+        result = LayoutRecommender().recommend(ctx, "check")
+        recs = [r for r in result.recommendations if "BEAM" in r.title]
+        assert recs, "Exactly 3 instances of BEAM must trigger recommendation"
+
+    def test_block_most_common_three_blocks_reported(self):
+        """At most 3 blocks are reported (most_common(3) in source)."""
+        # 4 different blocks each appearing >= 3 times
+        entities = []
+        for block_name, count in [("A", 5), ("B", 4), ("C", 3), ("D", 3)]:
+            entities.extend(
+                [
+                    _insert(f"{block_name}{i}", block_name=block_name, x=float(i))
+                    for i in range(count)
+                ]
+            )
+        ctx = _context(entities)
+        result = LayoutRecommender().recommend(ctx, "check")
+        block_recs = [r for r in result.recommendations if r.type.value == "region_usage"]
+        assert len(block_recs) <= 3
+
+
+# ===========================================================================
+# LayoutRecommender._analyze_text_labels — exact string content
+# ===========================================================================
+
+
+class TestTextLabelsExactStrings:
+    """Kill string-mutation survivors in _analyze_text_labels."""
+
+    def test_low_trust_title_exact_format(self):
+        """Title must be exactly 'Low-trust text detected (N entities)'."""
+        ocr_geo = TextGeometry.for_provenance(TextProvenance.RASTER_OCR_TEXT)
+        native = TextGeometry.for_provenance(TextProvenance.NATIVE_CAD_TEXT)
+        entities = [
+            _text("T1", "LABEL", text_geometry=ocr_geo),
+            _text("N1", "NATIVE", text_geometry=native),
+            _text("N2", "NATIVE2", text_geometry=native),
+            _text("N3", "NATIVE3", text_geometry=native),
+        ]
+        ctx = _context(entities)
+        result = LayoutRecommender().recommend(ctx, "check")
+        recs = [r for r in result.recommendations if "low-trust" in r.title.lower()]
+        assert recs
+        assert recs[0].title == "Low-trust text detected (1 entities)"
+
+    def test_low_trust_description_exact_format(self):
+        """Description must follow exact template with OCR or vector-outline mention."""
+        native = TextGeometry.for_provenance(TextProvenance.NATIVE_CAD_TEXT)
+        ocr_geo = TextGeometry.for_provenance(TextProvenance.RASTER_OCR_TEXT)
+        entities = [
+            _text("T1", "OCR1", text_geometry=ocr_geo),
+            _text("T2", "OCR2", text_geometry=ocr_geo),
+            _text("N1", "NATIVE1", text_geometry=native),
+            _text("N2", "NATIVE2", text_geometry=native),
+            _text("N3", "NATIVE3", text_geometry=native),
+        ]
+        ctx = _context(entities)
+        result = LayoutRecommender().recommend(ctx, "check")
+        recs = [r for r in result.recommendations if "low-trust" in r.title.lower()]
+        assert recs
+        assert recs[0].description == (
+            "2 text entities have OCR or vector-outline provenance. Labels may be inaccurate."
+        )
+
+    def test_low_trust_rationale_exact_string(self):
+        """Rationale must be 'OCR-derived text has lower confidence for identification.'."""
+        ocr_geo = TextGeometry.for_provenance(TextProvenance.RASTER_OCR_TEXT)
+        native = TextGeometry.for_provenance(TextProvenance.NATIVE_CAD_TEXT)
+        entities = [
+            _text("T1", "LABEL", text_geometry=ocr_geo),
+            _text("N1", "N", text_geometry=native),
+            _text("N2", "N2", text_geometry=native),
+            _text("N3", "N3", text_geometry=native),
+        ]
+        ctx = _context(entities)
+        result = LayoutRecommender().recommend(ctx, "check")
+        recs = [r for r in result.recommendations if "low-trust" in r.title.lower()]
+        assert recs
+        assert recs[0].rationale == "OCR-derived text has lower confidence for identification."
+
+    def test_low_trust_caveat_exact_string(self):
+        """Caveats must contain exact message about text content accuracy."""
+        ocr_geo = TextGeometry.for_provenance(TextProvenance.RASTER_OCR_TEXT)
+        native = TextGeometry.for_provenance(TextProvenance.NATIVE_CAD_TEXT)
+        entities = [
+            _text("T1", "LABEL", text_geometry=ocr_geo),
+            _text("N1", "N", text_geometry=native),
+            _text("N2", "N2", text_geometry=native),
+            _text("N3", "N3", text_geometry=native),
+        ]
+        ctx = _context(entities)
+        result = LayoutRecommender().recommend(ctx, "check")
+        recs = [r for r in result.recommendations if "low-trust" in r.title.lower()]
+        assert recs
+        assert "Text content may not exactly match the original drawing." in recs[0].caveats
+
+
+# ===========================================================================
+# LayoutRecommender._build_summary — exact format
+# ===========================================================================
+
+
+class TestBuildSummaryExactFormat:
+    """Kill string-mutation survivors in _build_summary."""
+
+    def test_summary_format_n_entities_across_m_layers(self):
+        """First segment must be exactly 'N entities across M layers'."""
+        entities = [_entity(f"L{i}", layer="A") for i in range(3)] + [
+            _entity(f"M{i}", layer="B") for i in range(2)
+        ]
+        ctx = _context(entities)
+        result = LayoutRecommender().recommend(ctx, "check")
+        assert result.drawing_summary.startswith("5 entities across 2 layers")
+
+    def test_summary_top3_entity_types_in_order(self):
+        """Summary must list the top 3 entity types by count, separated by '; '."""
+        entities = (
+            [_entity(f"L{i}", entity_type=EntityType.LINE) for i in range(5)]
+            + [_entity(f"P{i}", entity_type=EntityType.LWPOLYLINE) for i in range(3)]
+            + [_entity(f"T{i}", entity_type=EntityType.TEXT) for i in range(2)]
+            + [_entity(f"I{i}", entity_type=EntityType.INSERT) for i in range(1)]
+        )
+        ctx = _context(entities)
+        result = LayoutRecommender().recommend(ctx, "check")
+        summary = result.drawing_summary
+        # Must include top 3: LINE(5), LWPOLYLINE(3), TEXT(2) — not INSERT(1)
+        assert "5 LINE" in summary
+        assert "3 LWPOLYLINE" in summary
+        assert "2 TEXT" in summary
+        assert "1 INSERT" not in summary
+
+    def test_summary_single_layer(self):
+        """With one layer, summary includes '1 layers'."""
+        entities = [_entity(f"E{i}", layer="ONLY") for i in range(4)]
+        ctx = _context(entities)
+        result = LayoutRecommender().recommend(ctx, "check")
+        assert "across 1 layers" in result.drawing_summary
+
+    def test_summary_three_layers(self):
+        """With three layers, summary includes '3 layers'."""
+        entities = [
+            _entity("E1", layer="A"),
+            _entity("E2", layer="B"),
+            _entity("E3", layer="C"),
+        ]
+        ctx = _context(entities)
+        result = LayoutRecommender().recommend(ctx, "check")
+        assert "across 3 layers" in result.drawing_summary
+
+
+# ===========================================================================
+# RevisionSummarizer._op_to_plain — exact template strings
+# ===========================================================================
+
+
+class TestOpToPlainExactTemplates:
+    """Kill string-mutation survivors in _op_to_plain template values."""
+
+    def test_move_entity_exact_base_string(self):
+        """move_entity must produce exactly 'An element was repositioned'."""
+        op = EditOperation(op_type=OpType.MOVE_ENTITY, target_handle="H1", target_layer="L1")
+        cs = ChangeSet(operations=[op], prompt="test")
+        result = RevisionSummarizer().summarize(changeset=cs)
+        assert result.key_changes[0].plain_description == "An element was repositioned"
+
+    def test_delete_entity_exact_base_string(self):
+        """delete_entity must produce exactly 'An element was removed'."""
+        op = EditOperation(op_type=OpType.DELETE_ENTITY, target_handle="H1", target_layer="L1")
+        cs = ChangeSet(operations=[op], prompt="test")
+        result = RevisionSummarizer().summarize(changeset=cs)
+        assert result.key_changes[0].plain_description == "An element was removed"
+
+    def test_edit_text_exact_base_string(self):
+        """edit_text must produce exactly 'A text label was updated'."""
+        op = EditOperation(op_type=OpType.EDIT_TEXT, target_handle="H1", target_layer="NOTES")
+        cs = ChangeSet(operations=[op], prompt="test")
+        result = RevisionSummarizer().summarize(changeset=cs)
+        assert result.key_changes[0].plain_description == "A text label was updated"
+
+    def test_add_block_exact_base_string(self):
+        """add_block must produce exactly 'A new block was inserted'."""
+        op = EditOperation(op_type=OpType.ADD_BLOCK, target_handle="H1", target_layer="L1")
+        cs = ChangeSet(operations=[op], prompt="test")
+        result = RevisionSummarizer().summarize(changeset=cs)
+        assert result.key_changes[0].plain_description == "A new block was inserted"
+
+    def test_unknown_op_type_uses_operation_prefix(self):
+        """Unknown op type must produce 'Operation: <op_type>'."""
+        op = EditOperation(op_type=OpType.ROTATE_ENTITY, target_handle="H1", target_layer="L1")
+        cs = ChangeSet(operations=[op], prompt="test")
+        result = RevisionSummarizer().summarize(changeset=cs)
+        assert result.key_changes[0].plain_description.startswith("Operation:")
+
+    def test_op_to_plain_with_context_uses_em_dash_separator(self):
+        """With a context entity found, separator must be ' — ' (em dash with spaces)."""
+        entity = _entity("H1", layer="STRUCTURAL", entity_type=EntityType.LINE)
+        ctx = _context([entity])
+        op = EditOperation(
+            op_type=OpType.MOVE_ENTITY,
+            target_handle="H1",
+            target_layer="STRUCTURAL",
+        )
+        cs = ChangeSet(operations=[op], prompt="test")
+        result = RevisionSummarizer().summarize(changeset=cs, context=ctx)
+        desc = result.key_changes[0].plain_description
+        assert " \u2014 " in desc
+
+
+# ===========================================================================
+# RevisionSummarizer._from_changeset — exact headline and overall_assessment
+# ===========================================================================
+
+
+class TestFromChangesetExactStrings:
+    """Kill string-mutation survivors in _from_changeset."""
+
+    def test_single_op_headline_exact(self):
+        """Headline for 1 op must be exactly '1 planned operation(s).'."""
+        op = EditOperation(op_type=OpType.MOVE_ENTITY, target_handle="H1", target_layer="L1")
+        cs = ChangeSet(operations=[op], prompt="test")
+        result = RevisionSummarizer().summarize(changeset=cs)
+        assert result.headline == "1 planned operation(s)."
+
+    def test_three_op_headline_exact(self):
+        """Headline for 3 ops must be exactly '3 planned operation(s).'."""
+        ops = [
+            EditOperation(op_type=OpType.MOVE_ENTITY, target_handle=f"H{i}", target_layer="L1")
+            for i in range(3)
+        ]
+        cs = ChangeSet(operations=ops, prompt="test")
+        result = RevisionSummarizer().summarize(changeset=cs)
+        assert result.headline == "3 planned operation(s)."
+
+    def test_zero_ops_headline_exact(self):
+        """Headline for 0 ops must be exactly 'No operations planned.'."""
+        cs = ChangeSet(operations=[], prompt="nothing")
+        result = RevisionSummarizer().summarize(changeset=cs)
+        assert result.headline == "No operations planned."
+
+    def test_overall_assessment_exact_format_with_ops(self):
+        """overall_assessment must follow '{N} edit operation(s) from the change plan.'."""
+        ops = [
+            EditOperation(op_type=OpType.MOVE_ENTITY, target_handle=f"H{i}", target_layer="L1")
+            for i in range(4)
+        ]
+        cs = ChangeSet(operations=ops, prompt="test")
+        result = RevisionSummarizer().summarize(changeset=cs)
+        assert result.overall_assessment == "4 edit operation(s) from the change plan."
+
+    def test_overall_assessment_zero_ops_exact(self):
+        """overall_assessment for 0 ops must be '0 edit operation(s) from the change plan.'."""
+        cs = ChangeSet(operations=[], prompt="nothing")
+        result = RevisionSummarizer().summarize(changeset=cs)
+        assert result.overall_assessment == "0 edit operation(s) from the change plan."
+
+    def test_change_count_matches_op_count_exactly(self):
+        """change_count must equal the exact number of operations, not N+1 or N-1."""
+        for n in [1, 2, 5, 10]:
+            ops = [
+                EditOperation(op_type=OpType.MOVE_ENTITY, target_handle=f"H{i}", target_layer="L1")
+                for i in range(n)
+            ]
+            cs = ChangeSet(operations=ops, prompt="test")
+            result = RevisionSummarizer().summarize(changeset=cs)
+            assert result.change_count == n, f"Expected {n}, got {result.change_count}"
+
+
+# ===========================================================================
+# RevisionSummarizer._from_comparison — exact headline and total count
+# ===========================================================================
+
+
+class TestFromComparisonExactStrings:
+    """Kill string-mutation survivors in _from_comparison."""
+
+    def test_headline_format_with_total_and_breakdown(self):
+        """Headline must follow 'N change(s) detected: X added, Y removed, ...'."""
+        cr = _comparison_result(
+            _change(ChangeCategory.ADDED, "A1"),
+            _change(ChangeCategory.REMOVED, "R1"),
+            _change(ChangeCategory.MODIFIED, "M1"),
+        )
+        result = RevisionSummarizer().summarize(comparison_result=cr)
+        assert result.headline == "3 change(s) detected: 1 added, 1 removed, 1 modified"
+
+    def test_headline_order_added_removed_modified_moved(self):
+        """Headline parts must appear in order: added, removed, modified, moved."""
+        cr = _comparison_result(
+            _change(ChangeCategory.MOVED, "V1"),
+            _change(ChangeCategory.ADDED, "A1"),
+        )
+        result = RevisionSummarizer().summarize(comparison_result=cr)
+        headline = result.headline
+        added_pos = headline.find("added")
+        moved_pos = headline.find("moved")
+        assert added_pos < moved_pos, "added must precede moved in headline"
+
+    def test_unchanged_not_counted_in_total(self):
+        """UNCHANGED changes must not increment the total in the headline."""
+        cr = _comparison_result(
+            _change(ChangeCategory.UNCHANGED, "U1"),
+            _change(ChangeCategory.UNCHANGED, "U2"),
+            _change(ChangeCategory.ADDED, "A1"),
+        )
+        result = RevisionSummarizer().summarize(comparison_result=cr)
+        assert result.change_count == 1
+        assert result.headline.startswith("1 change(s) detected")
+
+    def test_text_preview_truncated_to_40_chars(self):
+        """Text content preview must be truncated to 40 characters."""
+        long_text = "X" * 50
+        cr = _comparison_result(_change(ChangeCategory.ADDED, "A1", text_content=long_text))
+        result = RevisionSummarizer().summarize(comparison_result=cr)
+        desc = result.key_changes[0].plain_description
+        # The preview should have 40 X's, not 50
+        assert "X" * 40 in desc
+        assert "X" * 50 not in desc
+
+    def test_areas_affected_is_sorted(self):
+        """areas_affected must be sorted alphabetically."""
+        cr = _comparison_result(
+            _change(ChangeCategory.ADDED, "A1", layer="ZONE_C"),
+            _change(ChangeCategory.ADDED, "A2", layer="ZONE_A"),
+            _change(ChangeCategory.ADDED, "A3", layer="ZONE_B"),
+        )
+        result = RevisionSummarizer().summarize(comparison_result=cr)
+        assert result.areas_affected == ["ZONE_A", "ZONE_B", "ZONE_C"]
+
+    def test_evidence_entity_type_set_correctly(self):
+        """EvidenceRef entity_type must match the snapshot entity_type.value string."""
+        snap = _snapshot(handle="EV1", entity_type=EntityType.LWPOLYLINE, layer="STRUCT")
+        change = EntityChange(category=ChangeCategory.ADDED, revision_snapshot=snap, confidence=0.9)
+        cr = _comparison_result(change)
+        result = RevisionSummarizer().summarize(comparison_result=cr)
+        evidence = result.key_changes[0].evidence
+        assert evidence
+        # entity_type.value for EntityType.LWPOLYLINE is "LWPOLYLINE"
+        assert evidence[0].entity_type == EntityType.LWPOLYLINE.value
+
+    def test_evidence_layer_matches_snapshot_layer(self):
+        """EvidenceRef layer must match the snapshot layer."""
+        snap = _snapshot(handle="EV2", layer="NOTES")
+        change = EntityChange(category=ChangeCategory.ADDED, revision_snapshot=snap, confidence=0.9)
+        cr = _comparison_result(change)
+        result = RevisionSummarizer().summarize(comparison_result=cr)
+        assert result.key_changes[0].evidence[0].layer == "NOTES"
+
+    def test_no_evidence_when_snapshot_has_empty_handle(self):
+        """When snapshot handle is empty string, evidence list must be empty."""
+        snap = GeometrySnapshot(
+            handle="",
+            entity_type=EntityType.LINE,
+            layer="STRUCTURAL",
+            points=[Point2D(x=0, y=0)],
+        )
+        change = EntityChange(category=ChangeCategory.ADDED, revision_snapshot=snap, confidence=0.9)
+        cr = _comparison_result(change)
+        result = RevisionSummarizer().summarize(comparison_result=cr)
+        # Empty handle is falsy → evidence must be empty
+        assert result.key_changes[0].evidence == []
+
+    def test_warnings_all_propagated_to_caveats(self):
+        """All warnings from comparison result must appear verbatim in caveats."""
+        warnings = ["Warning one.", "Warning two.", "Warning three."]
+        cr = _comparison_result(_change(ChangeCategory.ADDED, "A1"), warnings=warnings)
+        result = RevisionSummarizer().summarize(comparison_result=cr)
+        for w in warnings:
+            assert w in result.caveats
+
+
+# ===========================================================================
+# RevisionSummarizer._plain_description — exact template strings
+# ===========================================================================
+
+
+class TestPlainDescriptionExactTemplates:
+    """Kill string-mutation survivors in _plain_description."""
+
+    def test_added_entity_type_in_description(self):
+        """The entity_type.value must appear in the description between 'A ' and ' was added'."""
+        snap = _snapshot(handle="S1", entity_type=EntityType.LINE, layer="L1")
+        change = EntityChange(category=ChangeCategory.ADDED, revision_snapshot=snap, confidence=0.9)
+        cr = _comparison_result(change)
+        result = RevisionSummarizer().summarize(comparison_result=cr)
+        # entity_type.value is "LINE" (uppercase from StrEnum)
+        assert result.key_changes[0].plain_description == "A LINE was added"
+
+    def test_removed_entity_type_in_description(self):
+        """Removed: description must be 'A <TYPE> was removed' (type is uppercase)."""
+        snap = _snapshot(handle="S1", entity_type=EntityType.TEXT, layer="L1")
+        change = EntityChange(category=ChangeCategory.REMOVED, master_snapshot=snap, confidence=0.9)
+        cr = _comparison_result(change)
+        result = RevisionSummarizer().summarize(comparison_result=cr)
+        assert result.key_changes[0].plain_description == "A TEXT was removed"
+
+    def test_modified_entity_type_in_description(self):
+        """Modified: description must be 'A <TYPE> was modified' (type is uppercase)."""
+        snap = _snapshot(handle="S1", entity_type=EntityType.MTEXT, layer="L1")
+        change = EntityChange(
+            category=ChangeCategory.MODIFIED, revision_snapshot=snap, confidence=0.9
+        )
+        cr = _comparison_result(change)
+        result = RevisionSummarizer().summarize(comparison_result=cr)
+        assert result.key_changes[0].plain_description == "A MTEXT was modified"
+
+    def test_moved_description_says_repositioned_not_moved(self):
+        """Moved category must use 'repositioned', NOT 'moved'."""
+        snap = _snapshot(handle="S1", entity_type=EntityType.LINE, layer="L1")
+        change = EntityChange(
+            category=ChangeCategory.MOVED,
+            revision_snapshot=snap,
+            master_snapshot=snap,
+            confidence=0.9,
+        )
+        cr = _comparison_result(change)
+        result = RevisionSummarizer().summarize(comparison_result=cr)
+        assert "repositioned" in result.key_changes[0].plain_description
+        assert "moved" not in result.key_changes[0].plain_description.lower()
+
+    def test_text_hint_truncated_exactly_40_chars(self):
+        """Text preview must be exactly min(len(text), 40) characters in the hint."""
+        text_42 = "A" * 42
+        cr = _comparison_result(_change(ChangeCategory.ADDED, "A1", text_content=text_42))
+        result = RevisionSummarizer().summarize(comparison_result=cr)
+        desc = result.key_changes[0].plain_description
+        assert "(" + "'" + "A" * 40 + "'" + ")" in desc
+
+    def test_no_text_hint_when_text_content_is_none(self):
+        """When text_content is None, description must not contain text hint."""
+        cr = _comparison_result(_change(ChangeCategory.ADDED, "A1", text_content=None))
+        result = RevisionSummarizer().summarize(comparison_result=cr)
+        desc = result.key_changes[0].plain_description
+        # No parenthetical hint expected
+        assert "(" not in desc
+
+
+# ===========================================================================
+# RevisionSummarizer._technical_detail — exact displacement format
+# ===========================================================================
+
+
+class TestTechnicalDetailExactFormat:
+    """Kill string-mutation survivors in _technical_detail."""
+
+    def test_displacement_format_exact_template(self):
+        """displacement must be formatted as 'displacement=(X.Y, Y.Y)' with 1dp."""
+        snap = _snapshot(handle="MV1", entity_type=EntityType.LINE, layer="L1")
+        change = EntityChange(
+            category=ChangeCategory.MOVED,
+            master_snapshot=snap,
+            revision_snapshot=snap,
+            displacement=Point2D(x=3.5, y=-7.2),
+            confidence=0.9,
+        )
+        cr = _comparison_result(change)
+        result = RevisionSummarizer().summarize(comparison_result=cr)
+        tech = result.key_changes[0].technical_detail
+        assert tech == "displacement=(3.5, -7.2)"
+
+    def test_displacement_x_negative(self):
+        """Negative x displacement must be represented with minus sign."""
+        snap = _snapshot(handle="MV2", layer="L1")
+        change = EntityChange(
+            category=ChangeCategory.MOVED,
+            master_snapshot=snap,
+            revision_snapshot=snap,
+            displacement=Point2D(x=-12.0, y=0.0),
+            confidence=0.9,
+        )
+        cr = _comparison_result(change)
+        result = RevisionSummarizer().summarize(comparison_result=cr)
+        assert "-12.0" in result.key_changes[0].technical_detail
+
+    def test_displacement_zero_values_formatted(self):
+        """Zero displacement must render as '0.0' not '0'."""
+        snap = _snapshot(handle="MV3", layer="L1")
+        change = EntityChange(
+            category=ChangeCategory.MOVED,
+            master_snapshot=snap,
+            revision_snapshot=snap,
+            displacement=Point2D(x=0.0, y=0.0),
+            confidence=0.9,
+        )
+        cr = _comparison_result(change)
+        result = RevisionSummarizer().summarize(comparison_result=cr)
+        tech = result.key_changes[0].technical_detail
+        assert tech == "displacement=(0.0, 0.0)"
+
+    def test_modifications_list_in_technical_detail(self):
+        """When modifications are present, fields list must appear in technical_detail."""
+        snap = _snapshot(handle="M1", layer="L1")
+        change = EntityChange(
+            category=ChangeCategory.MODIFIED,
+            revision_snapshot=snap,
+            modifications={"color": "red", "linetype": "DASHED"},
+            confidence=0.9,
+        )
+        cr = _comparison_result(change)
+        result = RevisionSummarizer().summarize(comparison_result=cr)
+        tech = result.key_changes[0].technical_detail
+        assert "fields=" in tech
+        assert "color" in tech or "linetype" in tech
+
+
+# ===========================================================================
+# TakeoffGenerator._count_by_layer — exact item fields
+# ===========================================================================
+
+
+class TestCountByLayerExactFields:
+    """Kill string-mutation survivors in _count_by_layer."""
+
+    def test_layer_item_name_exact_format(self):
+        """Item name must be exactly \"Entities on 'WALLS'\"."""
+        entities = [
+            _entity("L1", layer="WALLS", entity_type=EntityType.LINE),
+            _entity("L2", layer="WALLS", entity_type=EntityType.LINE),
+        ]
+        ctx = _context(entities)
+        result = TakeoffGenerator().generate(ctx, "count")
+        items = [it for it in result.items if it.source_layer == "WALLS"]
+        assert items
+        assert items[0].name == "Entities on 'WALLS'"
+
+    def test_layer_item_caveat_exact_string(self):
+        """Layer item caveat must be exactly the layer-membership note."""
+        entities = [
+            _entity("L1", layer="SLAB", entity_type=EntityType.LWPOLYLINE),
+            _entity("L2", layer="SLAB", entity_type=EntityType.LWPOLYLINE),
+        ]
+        ctx = _context(entities)
+        result = TakeoffGenerator().generate(ctx, "count")
+        items = [it for it in result.items if it.source_layer == "SLAB"]
+        assert items
+        assert "Count based on layer membership, not element type." in items[0].caveats
+
+    def test_layer_item_threshold_one_entity_excluded(self):
+        """Layer with exactly 1 entity must NOT produce a takeoff item (threshold >= 2)."""
+        entities = [_entity("L1", layer="SOLE", entity_type=EntityType.LINE)]
+        ctx = _context(entities)
+        result = TakeoffGenerator().generate(ctx, "count")
+        items = [it for it in result.items if it.source_layer == "SOLE"]
+        assert items == []
+
+    def test_layer_item_threshold_two_entities_included(self):
+        """Layer with exactly 2 entities must produce a takeoff item."""
+        entities = [
+            _entity("L1", layer="PAIR", entity_type=EntityType.LINE),
+            _entity("L2", layer="PAIR", entity_type=EntityType.LINE),
+        ]
+        ctx = _context(entities)
+        result = TakeoffGenerator().generate(ctx, "count")
+        items = [it for it in result.items if it.source_layer == "PAIR"]
+        assert items
+
+    def test_layer_handles_capped_at_20(self):
+        """entity_handles in layer item must contain at most 20 handles."""
+        entities = [_entity(f"L{i}", layer="BIG", entity_type=EntityType.LINE) for i in range(30)]
+        ctx = _context(entities)
+        result = TakeoffGenerator().generate(ctx, "count")
+        items = [it for it in result.items if it.source_layer == "BIG"]
+        assert items
+        assert len(items[0].entity_handles) <= 20
+
+    def test_insert_entities_excluded_from_layer_counting(self):
+        """INSERT entities must be excluded from layer-based counting."""
+        entities = [
+            _insert("I1", block_name="COL", layer="STRUCTURAL"),
+            _insert("I2", block_name="COL", layer="STRUCTURAL"),
+            _insert("I3", block_name="COL", layer="STRUCTURAL"),
+            _entity("L1", layer="STRUCTURAL", entity_type=EntityType.LINE),
+            _entity("L2", layer="STRUCTURAL", entity_type=EntityType.LINE),
+        ]
+        ctx = _context(entities)
+        result = TakeoffGenerator().generate(ctx, "count")
+        # Block items cover STRUCTURAL layer → layer items should exclude STRUCTURAL
+        struct_layer_items = [
+            it
+            for it in result.items
+            if it.source_layer == "STRUCTURAL" and it.source_block_name is None
+        ]
+        # STRUCTURAL is in block_layers → should be excluded from layer counting
+        assert struct_layer_items == []
+
+
+# ===========================================================================
+# TakeoffGenerator._extract_text_quantities — exact item fields
+# ===========================================================================
+
+
+class TestExtractTextQuantitiesExactFields:
+    """Kill string-mutation survivors in _extract_text_quantities."""
+
+    def test_text_item_name_prefix_exact(self):
+        """Item name must start with \"Text-derived: '\"."""
+        entities = [_text("T1", "5 ea girders")]
+        ctx = _context(entities)
+        result = TakeoffGenerator().generate(ctx, "count")
+        items = [it for it in result.items if "girders" in it.name]
+        assert items
+        assert items[0].name.startswith("Text-derived: '")
+
+    def test_text_item_caveat_non_ocr_exact_string(self):
+        """Non-OCR text item caveat must contain the verify-against-schedule note."""
+        entities = [_text("T1", "5 ea girders")]
+        ctx = _context(entities)
+        result = TakeoffGenerator().generate(ctx, "count")
+        items = [it for it in result.items if "girders" in it.name]
+        assert items
+        expected = "Quantity derived from text label \u2014 verify against schedule."
+        assert expected in items[0].caveats
+
+    def test_text_item_caveat_ocr_first_caveat_exact(self):
+        """OCR text item first caveat must be the OCR inaccuracy warning."""
+        ocr_geo = TextGeometry.for_provenance(TextProvenance.RASTER_OCR_TEXT)
+        entities = [_text("T1", "3 ea doors", text_geometry=ocr_geo)]
+        ctx = _context(entities)
+        result = TakeoffGenerator().generate(ctx, "count")
+        items = [it for it in result.items if "3 ea doors" in it.name]
+        assert items
+        assert "Quantity extracted from OCR text \u2014 may be inaccurate." in items[0].caveats
+
+    def test_text_item_ocr_second_caveat_includes_provenance(self):
+        """OCR text item second caveat must include 'Text provenance:'."""
+        ocr_geo = TextGeometry.for_provenance(TextProvenance.RASTER_OCR_TEXT)
+        entities = [_text("T1", "3 ea doors", text_geometry=ocr_geo)]
+        ctx = _context(entities)
+        result = TakeoffGenerator().generate(ctx, "count")
+        items = [it for it in result.items if "3 ea doors" in it.name]
+        assert items
+        assert any("Text provenance:" in c for c in items[0].caveats)
+
+    def test_ocr_warning_exact_format(self):
+        """OCR provenance warning must follow exact template."""
+        ocr_geo = TextGeometry.for_provenance(TextProvenance.RASTER_OCR_TEXT)
+        entities = [_text("T1", "3 ea doors", layer="NOTES", text_geometry=ocr_geo)]
+        ctx = _context(entities)
+        result = TakeoffGenerator().generate(ctx, "count")
+        assert any(
+            "OCR-derived quantity '3 ea doors' on layer 'NOTES'" in w
+            for w in result.provenance_warnings
+        )
+        assert any("ESTIMATE_ONLY" in w for w in result.provenance_warnings)
+
+    def test_text_label_truncated_to_60_chars_in_name(self):
+        """Label in item name must be truncated to 60 characters."""
+        long_text = "5 ea " + "X" * 60  # total > 60 chars but qty still matches
+        entities = [_text("T1", long_text)]
+        ctx = _context(entities)
+        result = TakeoffGenerator().generate(ctx, "count")
+        items = [it for it in result.items if "5 ea" in it.name]
+        assert items
+        # The label in the name should not exceed 60 chars
+        label_in_name = items[0].name[len("Text-derived: '") : -1]
+        assert len(label_in_name) <= 60
+
+    def test_pcs_pattern_extracts_quantity(self):
+        """'pcs' suffix pattern must match and extract quantity."""
+        entities = [_text("T1", "10 pcs screws")]
+        ctx = _context(entities)
+        result = TakeoffGenerator().generate(ctx, "count")
+        items = [it for it in result.items if "10 pcs screws" in it.name]
+        assert items
+        assert items[0].quantity == 10
+
+    def test_x_pattern_extracts_quantity(self):
+        """'x' suffix pattern must match (e.g., '4x beams')."""
+        entities = [_text("T1", "4x beams")]
+        ctx = _context(entities)
+        result = TakeoffGenerator().generate(ctx, "count")
+        items = [it for it in result.items if "4x beams" in it.name]
+        assert items
+        assert items[0].quantity == 4
+
+
+# ===========================================================================
+# TakeoffGenerator.generate — aggregate fields
+# ===========================================================================
+
+
+class TestTakeoffGeneratorGenerateFields:
+    """Kill field-mutation survivors in TakeoffGenerator.generate."""
+
+    def test_total_items_matches_len_items(self):
+        """total_items field must equal len(items), not len+1 or something else."""
+        entities = [_insert(f"B{i}", block_name="COL", x=float(i * 5)) for i in range(3)]
+        ctx = _context(entities)
+        result = TakeoffGenerator().generate(ctx, "count")
+        assert result.total_items == len(result.items)
+
+    def test_total_quantity_items_is_sum_of_quantities(self):
+        """total_quantity_items must equal sum of all item quantities."""
+        entities = [_insert(f"B{i}", block_name="COL", x=float(i * 5)) for i in range(3)]
+        ctx = _context(entities)
+        result = TakeoffGenerator().generate(ctx, "count")
+        assert result.total_quantity_items == sum(it.quantity for it in result.items)
+
+    def test_empty_drawing_caveat_exact_string(self):
+        """Empty drawing caveat must be exactly 'No entities in drawing.'."""
+        result = TakeoffGenerator().generate(_context([]), "count")
+        assert "No entities in drawing." in result.caveats
+
+    def test_empty_drawing_flag_exact_value(self):
+        """Empty drawing ambiguity flag must be exactly 'empty_drawing'."""
+        result = TakeoffGenerator().generate(_context([]), "count")
+        assert "empty_drawing" in result.ambiguity_flags
+
+    def test_region_caveat_exact_string(self):
+        """Region caveat must be the selected-region-only note."""
+        entities = [_insert(f"B{i}", block_name="COL", x=float(i * 5)) for i in range(3)]
+        ctx = _context(entities)
+        region = RegionContext(entities=entities, is_whole_drawing=False, ambiguity_flags=[])
+        result = TakeoffGenerator().generate(ctx, "count", region=region)
+        assert "Counts are from the selected region only, not the entire drawing." in result.caveats
+
+    def test_region_flag_exact_value(self):
+        """Region ambiguity flag must be exactly 'partial_region'."""
+        entities = [_insert(f"B{i}", block_name="COL", x=float(i * 5)) for i in range(3)]
+        ctx = _context(entities)
+        region = RegionContext(entities=entities, is_whole_drawing=False, ambiguity_flags=[])
+        result = TakeoffGenerator().generate(ctx, "count", region=region)
+        assert "partial_region" in result.ambiguity_flags
+
+    def test_aggregate_confidence_is_high_for_block_only_drawing(self):
+        """All-block drawing (no text items) must yield HIGH aggregate confidence."""
+        entities = [_insert(f"B{i}", block_name="COL", x=float(i * 5)) for i in range(3)]
+        ctx = _context(entities)
+        result = TakeoffGenerator().generate(ctx, "count")
+        assert result.aggregate_confidence == TakeoffConfidence.HIGH
+
+    def test_aggregate_confidence_no_items_defaults_to_medium(self):
+        """With no items (entities present but no blocks/text patterns), agg defaults to MEDIUM."""
+        # A single line entity — no blocks, no text patterns, layer count < 2
+        entities = [_entity("L1", layer="WALLS", entity_type=EntityType.LINE)]
+        ctx = _context(entities)
+        result = TakeoffGenerator().generate(ctx, "count")
+        assert result.aggregate_confidence == TakeoffConfidence.MEDIUM
+
+    def test_region_entities_used_not_context_entities(self):
+        """When region is provided, its entities are counted, not context's."""
+        ctx_entities = [_insert(f"B{i}", block_name="BIG", x=float(i)) for i in range(10)]
+        ctx = _context(ctx_entities)
+        region_entities = [_entity("R1", layer="SMALL", entity_type=EntityType.LINE)]
+        region = RegionContext(entities=region_entities, is_whole_drawing=False, ambiguity_flags=[])
+        result = TakeoffGenerator().generate(ctx, "count", region=region)
+        # Region has no blocks → no block items
+        block_items = [it for it in result.items if it.source_block_name == "BIG"]
+        assert block_items == []
+
+
+# ===========================================================================
+# RevisionSummarizer.summarize — no-data path exact strings
+# ===========================================================================
+
+
+class TestRevisionSummarizerNoDataExactStrings:
+    """Kill string-mutation survivors in the no-data early return."""
+
+    def test_no_data_headline_exact(self):
+        """No-data headline must be exactly 'No revision data available.'."""
+        result = RevisionSummarizer().summarize()
+        assert result.headline == "No revision data available."
+
+    def test_no_data_caveats_exact(self):
+        """No-data caveats must contain 'Neither comparison result nor changeset was provided.'."""
+        result = RevisionSummarizer().summarize()
+        assert "Neither comparison result nor changeset was provided." in result.caveats
+
+    def test_no_data_missing_context_exact(self):
+        """missing_context must be exactly ['comparison_result', 'changeset']."""
+        result = RevisionSummarizer().summarize()
+        assert result.missing_context == ["comparison_result", "changeset"]
+
+
+# ===========================================================================
+# RevisionSummarizer._overall_assessment — edge cases
+# ===========================================================================
+
+
+class TestOverallAssessmentEdgeCases:
+    """Kill remaining mutation survivors in _overall_assessment."""
+
+    def test_no_changes_exact_string(self):
+        """Zero changes must produce 'No changes were detected between the drawings.'."""
+        result = RevisionSummarizer().summarize(comparison_result=_comparison_result())
+        assert result.overall_assessment == "No changes were detected between the drawings."
+
+    def test_all_four_categories_in_assessment(self):
+        """Assessment with all 4 categories must list them all joined by '. '."""
+        cr = _comparison_result(
+            _change(ChangeCategory.ADDED, "A1"),
+            _change(ChangeCategory.REMOVED, "R1"),
+            _change(ChangeCategory.MODIFIED, "M1"),
+            _change(ChangeCategory.MOVED, "V1"),
+        )
+        result = RevisionSummarizer().summarize(comparison_result=cr)
+        oa = result.overall_assessment
+        assert "1 element(s) were added" in oa
+        assert "1 element(s) were removed" in oa
+        assert "1 element(s) were modified" in oa
+        assert "1 element(s) were repositioned" in oa
+        assert oa.endswith(".")
+
+    def test_assessment_uses_period_join_not_comma(self):
+        """Parts must be joined with '. ' not ', '."""
+        cr = _comparison_result(
+            _change(ChangeCategory.ADDED, "A1"),
+            _change(ChangeCategory.REMOVED, "R1"),
+        )
+        result = RevisionSummarizer().summarize(comparison_result=cr)
+        oa = result.overall_assessment
+        # ". " must appear between the two parts
+        assert ". " in oa
+        # Comma joining must not appear
+        assert ", 1 element" not in oa

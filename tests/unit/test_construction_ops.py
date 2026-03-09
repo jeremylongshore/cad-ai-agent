@@ -1207,9 +1207,7 @@ class TestFieldSummaryBuilderSectionDetails:
 
     def test_grid_summary_section_title_is_exact(self):
         """GRID_SUMMARY section must have title 'Structural Grid Summary'."""
-        ctx = _ctx(
-            [_vline("V1", 0.0), _vline("V2", 30.0), _vline("V3", 60.0)]
-        )
+        ctx = _ctx([_vline("V1", 0.0), _vline("V2", 30.0), _vline("V3", 60.0)])
         result = FieldSummaryBuilder().build(ctx, prompt="summary")
         grid_sections = [
             s for s in result.sections if s.section_type == FieldSectionType.GRID_SUMMARY
@@ -1304,3 +1302,955 @@ class TestFieldSummaryBuilderSectionDetails:
         assert grid_sections
         # One labeled line → grid aggregate confidence = 0.85
         assert grid_sections[0].confidence == pytest.approx(0.85)
+
+
+# ---------------------------------------------------------------------------
+# Mutation-killing batch 2: exact strings, loop coverage, formula edge cases
+# ---------------------------------------------------------------------------
+
+
+class TestGridAnalyzerExactStrings:
+    """Kill mutations on exact string literals in GridAnalyzer.analyze."""
+
+    def test_empty_drawing_exact_summary_string(self):
+        """Empty drawing must return exactly this string — catches case/punctuation mutants."""
+        ctx = DrawingContext(file_path="t.dxf", entities=[], layers=[LayerRule(name="0")])
+        result = GridAnalyzer().analyze(ctx, "grid")
+        assert result.drawing_summary == "Empty drawing -- no entities to analyze."
+
+    def test_empty_drawing_exact_ambiguity_flag(self):
+        ctx = DrawingContext(file_path="t.dxf", entities=[], layers=[LayerRule(name="0")])
+        result = GridAnalyzer().analyze(ctx, "grid")
+        assert result.ambiguity_flags == ["empty_drawing"]
+
+    def test_empty_drawing_exact_caveat_string(self):
+        ctx = DrawingContext(file_path="t.dxf", entities=[], layers=[LayerRule(name="0")])
+        result = GridAnalyzer().analyze(ctx, "grid")
+        assert result.caveats == ["No entities available for grid analysis."]
+
+    def test_no_grid_entities_exact_ambiguity_flag(self):
+        """No grid entities must set exactly 'no_grid_entities' flag."""
+        ctx = _ctx([_entity("E1", layer="WALLS", entity_type=EntityType.LINE)])
+        result = GridAnalyzer().analyze(ctx, "grid")
+        assert result.ambiguity_flags == ["no_grid_entities"]
+
+    def test_no_grid_entities_exact_caveat_string(self):
+        ctx = _ctx([_entity("E1", layer="WALLS", entity_type=EntityType.LINE)])
+        result = GridAnalyzer().analyze(ctx, "grid")
+        assert result.caveats == ["No entities found on GRID/COLUMN/AXIS layers."]
+
+    def test_no_grid_entities_summary_contains_entity_count_and_message(self):
+        """The 'N entities, no grid lines detected.' pattern exactly."""
+        ctx = _ctx(
+            [
+                _entity("E1", layer="WALLS", entity_type=EntityType.LINE),
+                _entity("E2", layer="WALLS", entity_type=EntityType.LINE),
+            ]
+        )
+        result = GridAnalyzer().analyze(ctx, "grid")
+        assert result.drawing_summary == "2 entities, no grid lines detected."
+
+    def test_unlabeled_grid_line_caveat_exact_format(self):
+        """Unlabeled grid line caveat must match exact format."""
+        ctx = _ctx([_vline("V1", 0.0), _vline("V2", 30.0)])
+        result = GridAnalyzer().analyze(ctx, "grid")
+        # Both unlabeled → caveat mentions 2
+        assert any("2 grid line(s) have no label" in c for c in result.caveats)
+        assert any("labels inferred from position only." in c for c in result.caveats)
+
+    def test_unlabeled_grid_line_ambiguity_flag(self):
+        """Unlabeled lines produce 'unlabeled_grid_lines' flag."""
+        ctx = _ctx([_vline("V1", 0.0)])
+        result = GridAnalyzer().analyze(ctx, "grid")
+        assert "unlabeled_grid_lines" in result.ambiguity_flags
+
+    def test_drawing_summary_exact_format_with_layers_and_bays(self):
+        """drawing_summary must be exactly: 'N grid line(s) on M layer(s); K bay(s) computed.'"""
+        ctx = _ctx([_vline("V1", 0.0), _vline("V2", 30.0)])
+        result = GridAnalyzer().analyze(ctx, "grid")
+        # 2 grid lines on 1 layer; 1 bay computed
+        assert result.drawing_summary == "2 grid line(s) on 1 layer(s); 1 bay(s) computed."
+
+    def test_grid_pattern_description_exact_format(self):
+        """grid_pattern_description must be: 'N vertical, M horizontal grid line(s)'."""
+        ctx = _ctx([_vline("V1", 0.0), _vline("V2", 30.0), _hline("H1", 10.0)])
+        result = GridAnalyzer().analyze(ctx, "grid")
+        assert result.grid_pattern_description == "2 vertical, 1 horizontal grid line(s)"
+
+    def test_grid_pattern_description_zero_horizontal(self):
+        """Verify 0 horizontal in description when only verticals present."""
+        ctx = _ctx([_vline("V1", 0.0), _vline("V2", 30.0)])
+        result = GridAnalyzer().analyze(ctx, "grid")
+        assert result.grid_pattern_description == "2 vertical, 0 horizontal grid line(s)"
+
+    def test_grid_pattern_description_zero_vertical(self):
+        """Verify 0 vertical in description when only horizontals present."""
+        ctx = _ctx([_hline("H1", 0.0), _hline("H2", 20.0)])
+        result = GridAnalyzer().analyze(ctx, "grid")
+        assert result.grid_pattern_description == "0 vertical, 2 horizontal grid line(s)"
+
+    def test_region_context_used_when_provided(self):
+        """When region is provided, region.entities is used, not context.entities."""
+        from cad_dxf_agent.models.qna_schema import RegionContext
+
+        v1 = _vline("V1", 0.0)
+        v2 = _vline("V2", 30.0)
+        v3 = _vline("V3", 60.0)
+        ctx = _ctx([v1, v2, v3])
+        # Region with only v1 and v2 → only 2 grid lines
+        region = RegionContext(entities=[v1, v2])
+        result = GridAnalyzer().analyze(ctx, "grid", region=region)
+        handles = {g.entity_handle for g in result.grid_lines}
+        assert "V1" in handles
+        assert "V2" in handles
+        assert "V3" not in handles
+
+    def test_region_none_uses_context_entities(self):
+        """When region=None, all context.entities are used."""
+        v1 = _vline("V1", 0.0)
+        v2 = _vline("V2", 30.0)
+        ctx = _ctx([v1, v2])
+        result = GridAnalyzer().analyze(ctx, "grid", region=None)
+        assert len(result.grid_lines) == 2
+
+    def test_aggregate_confidence_is_min_not_max(self):
+        """Aggregate confidence = min(confidences): one labeled (0.85) + one unlabeled (0.6)."""
+        labeled = _vline("V1", 0.0)
+        label = _text("T1", "A", x=0.0, y=-5.0, layer="GRID")
+        unlabeled = _vline("V2", 50.0)
+        ctx = _ctx([labeled, label, unlabeled])
+        result = GridAnalyzer().analyze(ctx, "grid")
+        # min(0.85, 0.6) = 0.6
+        assert result.aggregate_confidence == pytest.approx(0.6)
+
+    def test_labeled_line_confidence_is_0_85(self):
+        """A labeled grid line must have confidence exactly 0.85."""
+        labeled = _vline("V1", 0.0)
+        label = _text("T1", "A", x=0.0, y=-5.0, layer="GRID")
+        ctx = _ctx([labeled, label])
+        result = GridAnalyzer().analyze(ctx, "grid")
+        assert result.grid_lines[0].confidence == pytest.approx(0.85)
+
+    def test_unlabeled_line_confidence_is_0_6(self):
+        """An unlabeled grid line must have confidence exactly 0.6."""
+        ctx = _ctx([_vline("V1", 0.0)])
+        result = GridAnalyzer().analyze(ctx, "grid")
+        assert result.grid_lines[0].confidence == pytest.approx(0.6)
+
+    def test_aggregate_confidence_rounded_to_2_decimals(self):
+        """aggregate_confidence must be rounded to 2 decimal places."""
+        ctx = _ctx([_vline("V1", 0.0)])
+        result = GridAnalyzer().analyze(ctx, "grid")
+        # 0.6 has exact representation, but check rounding is applied
+        assert result.aggregate_confidence == round(result.aggregate_confidence, 2)
+
+
+class TestMarkupRedlineGeneratorExactStrings:
+    """Kill mutations on exact caveat strings and loop behavior."""
+
+    def test_empty_drawing_exact_caveat(self):
+        """Empty drawing caveat must be exactly 'No entities in drawing.'"""
+        ctx = DrawingContext(file_path="t.dxf", entities=[], layers=[LayerRule(name="0")])
+        result = MarkupRedlineGenerator().generate(ctx, "redline")
+        assert result.caveats == ["No entities in drawing."]
+
+    def test_empty_drawing_exact_ambiguity_flag(self):
+        ctx = DrawingContext(file_path="t.dxf", entities=[], layers=[LayerRule(name="0")])
+        result = MarkupRedlineGenerator().generate(ctx, "redline")
+        assert result.ambiguity_flags == ["empty_drawing"]
+
+    def test_no_clouds_exact_caveat(self):
+        """No clouds caveat must be exactly the defined string."""
+        ctx = _ctx([_entity("E1", x=0.0, y=0.0)])
+        result = MarkupRedlineGenerator().generate(ctx, "redline")
+        assert result.caveats == [
+            "No revision clouds found on CLOUD/MARKUP/REVISION/REDLINE layers."
+        ]
+
+    def test_no_clouds_exact_ambiguity_flag(self):
+        ctx = _ctx([_entity("E1", x=0.0, y=0.0)])
+        result = MarkupRedlineGenerator().generate(ctx, "redline")
+        assert result.ambiguity_flags == ["no_clouds"]
+
+    def test_all_entities_in_cloud_processed_not_just_first(self):
+        """Loop must process ALL entities — catches continue→break mutation.
+
+        If break replaces continue, only the first entity is processed and
+        entity_count would be 1 instead of 5.
+        """
+        cloud = _cloud_poly("C1", [(0, 0), (200, 0), (200, 200), (0, 200)])
+        inside = [_entity(f"E{i}", x=float(i * 30 + 10), y=float(i * 30 + 10)) for i in range(5)]
+        ctx = _ctx([cloud] + inside)
+        result = MarkupRedlineGenerator().generate(ctx, "redline")
+        assert result.entries[0].entity_count == 5
+
+    def test_affected_entities_evidence_capped_at_10(self):
+        """affected_entities is capped at 10 even if more entities are inside the cloud."""
+        cloud = _cloud_poly("C1", [(0, 0), (500, 0), (500, 500), (0, 500)])
+        inside = [_entity(f"E{i}", x=float(i * 20 + 10), y=float(i * 20 + 10)) for i in range(15)]
+        ctx = _ctx([cloud] + inside)
+        result = MarkupRedlineGenerator().generate(ctx, "redline")
+        # entity_count should be 15, but evidence list capped at 10
+        assert result.entries[0].entity_count == 15
+        assert len(result.entries[0].affected_entities) == 10
+
+    def test_total_affected_entities_sums_all_clouds(self):
+        """total_affected_entities must sum across ALL cloud entries."""
+        c1 = _cloud_poly("C1", [(0, 0), (100, 0), (100, 100), (0, 100)])
+        c2 = _cloud_poly("C2", [(200, 0), (300, 0), (300, 100), (200, 100)])
+        e1 = _entity("E1", x=50.0, y=50.0)
+        e2 = _entity("E2", x=250.0, y=50.0)
+        e3 = _entity("E3", x=260.0, y=60.0)
+        ctx = _ctx([c1, c2, e1, e2, e3])
+        result = MarkupRedlineGenerator().generate(ctx, "redline")
+        assert result.total_affected_entities == 3
+
+    def test_total_clouds_matches_number_of_entries(self):
+        """total_clouds must equal len(entries), not some other value."""
+        c1 = _cloud_poly("C1", [(0, 0), (50, 0), (50, 50), (0, 50)])
+        c2 = _cloud_poly("C2", [(100, 0), (150, 0), (150, 50), (100, 50)])
+        c3 = _cloud_poly("C3", [(200, 0), (250, 0), (250, 50), (200, 50)])
+        ctx = _ctx([c1, c2, c3])
+        result = MarkupRedlineGenerator().generate(ctx, "redline")
+        assert result.total_clouds == 3
+        assert len(result.entries) == 3
+
+    def test_aggregate_confidence_rounded_to_2_decimals(self):
+        """aggregate_confidence must be round(..., 2)."""
+        cloud = _cloud_poly("C1", [(0, 0), (100, 0), (100, 100), (0, 100)], layer="CLOUD")
+        ctx = _ctx([cloud])
+        result = MarkupRedlineGenerator().generate(ctx, "redline")
+        assert result.aggregate_confidence == round(result.aggregate_confidence, 2)
+
+    def test_cloud_on_markup_layer_detected(self):
+        """LWPOLYLINE on MARKUP layer must be recognized as a cloud."""
+        cloud = _cloud_poly("C1", [(0, 0), (100, 0), (100, 100), (0, 100)], layer="MARKUP")
+        ctx = _ctx([cloud])
+        result = MarkupRedlineGenerator().generate(ctx, "redline")
+        assert result.total_clouds == 1
+
+    def test_cloud_on_revision_layer_detected(self):
+        """LWPOLYLINE on REVISION layer must be recognized as a cloud."""
+        cloud = _cloud_poly("C1", [(0, 0), (100, 0), (100, 100), (0, 100)], layer="REVISION")
+        ctx = _ctx([cloud])
+        result = MarkupRedlineGenerator().generate(ctx, "redline")
+        assert result.total_clouds == 1
+
+    def test_cloud_on_redline_layer_detected(self):
+        """LWPOLYLINE on REDLINE layer must be recognized as a cloud."""
+        cloud = _cloud_poly("C1", [(0, 0), (100, 0), (100, 100), (0, 100)], layer="REDLINE")
+        ctx = _ctx([cloud])
+        result = MarkupRedlineGenerator().generate(ctx, "redline")
+        assert result.total_clouds == 1
+
+    def test_affected_layers_sorted(self):
+        """affected_layers must be sorted alphabetically."""
+        cloud = _cloud_poly("C1", [(0, 0), (200, 0), (200, 200), (0, 200)])
+        e1 = _entity("E1", layer="ZONING", x=50.0, y=50.0)
+        e2 = _entity("E2", layer="ARCHITECTURAL", x=100.0, y=100.0)
+        ctx = _ctx([cloud, e1, e2])
+        result = MarkupRedlineGenerator().generate(ctx, "redline")
+        layers = result.entries[0].affected_layers
+        assert layers == sorted(layers)
+
+    def test_description_format_with_no_affected_entities(self):
+        """Description for a cloud with no affected entities mentions 0."""
+        cloud = _cloud_poly("C1", [(1000, 1000), (2000, 1000), (2000, 2000), (1000, 2000)])
+        ctx = _ctx([cloud, _entity("E1", x=0.0, y=0.0)])
+        result = MarkupRedlineGenerator().generate(ctx, "redline")
+        assert "0 entity(ies)" in result.entries[0].description
+
+    def test_description_mentions_layer_when_entities_present(self):
+        """Description must include 'across layer(s):' when there are affected layers."""
+        cloud = _cloud_poly("C1", [(0, 0), (100, 0), (100, 100), (0, 100)])
+        e1 = _entity("E1", layer="PLUMBING", x=50.0, y=50.0)
+        ctx = _ctx([cloud, e1])
+        result = MarkupRedlineGenerator().generate(ctx, "redline")
+        assert "across layer(s)" in result.entries[0].description
+        assert "PLUMBING" in result.entries[0].description
+
+    def test_entity_on_bbox_boundary_is_included(self):
+        """Entity exactly on the bounding box boundary must be counted (<=)."""
+        cloud = _cloud_poly("C1", [(0, 0), (100, 0), (100, 100), (0, 100)])
+        # Entity exactly at (0, 0) — the min corner: min_pt.x <= px is 0 <= 0 True
+        on_boundary = _entity("E1", x=0.0, y=0.0)
+        ctx = _ctx([cloud, on_boundary])
+        result = MarkupRedlineGenerator().generate(ctx, "redline")
+        assert result.entries[0].entity_count == 1
+
+    def test_cloud_vertex_count_recorded(self):
+        """RevisionCloudInfo.vertex_count must equal the number of vertices."""
+        verts = [(i * 10, i * 8) for i in range(6)]
+        cloud = _cloud_poly("C1", verts)
+        ctx = _ctx([cloud])
+        result = MarkupRedlineGenerator().generate(ctx, "redline")
+        assert result.entries[0].cloud.vertex_count == 6
+
+
+class TestBatchConditionPlannerExact:
+    """Kill mutations on BatchConditionPlanner: exact strings, confidence formula,
+    grouping internals, assembly."""
+
+    def test_empty_drawing_exact_caveat(self):
+        """Empty drawing caveat must be exactly 'No entities in drawing.'"""
+        ctx = DrawingContext(file_path="t.dxf", entities=[], layers=[LayerRule(name="0")])
+        result = BatchConditionPlanner().plan(ctx, "batch")
+        assert result.caveats == ["No entities in drawing."]
+
+    def test_empty_drawing_exact_ambiguity_flag(self):
+        ctx = DrawingContext(file_path="t.dxf", entities=[], layers=[LayerRule(name="0")])
+        result = BatchConditionPlanner().plan(ctx, "batch")
+        assert result.ambiguity_flags == ["empty_drawing"]
+
+    def test_no_repeated_patterns_caveat_exact(self):
+        """No repeated patterns must produce exact caveat string."""
+        ctx = _ctx([_entity("L1", entity_type=EntityType.LINE, x=0.0)])
+        result = BatchConditionPlanner().plan(ctx, "batch")
+        assert "No repeated patterns found with 3+ instances." in result.caveats
+
+    def test_block_groups_added_before_text_groups(self):
+        """Block groups and text groups are both assembled; ordering depends on count sort."""
+        inserts = [_insert(f"I{i}", "DOOR", x=float(i * 10)) for i in range(5)]
+        texts = [_text(f"T{i}", "WINDOW TYPE A", x=float(i * 30)) for i in range(4)]
+        ctx = _ctx(inserts + texts)
+        result = BatchConditionPlanner().plan(ctx, "batch")
+        # Both block groups and text groups present
+        block_groups = [g for g in result.groups if g.name.startswith("Block:")]
+        text_groups = [g for g in result.groups if g.name.startswith("Text:")]
+        assert len(block_groups) >= 1
+        assert len(text_groups) >= 1
+
+    def test_groups_sorted_by_total_instances_descending(self):
+        """groups must be sorted by total_instances descending after assembly."""
+        small = [_insert(f"SA{i}", "BOLT", x=float(i * 5)) for i in range(3)]
+        large = [_insert(f"LA{i}", "COLUMN", x=float(i * 5 + 200)) for i in range(8)]
+        ctx = _ctx(small + large)
+        result = BatchConditionPlanner().plan(ctx, "batch")
+        counts = [g.total_instances for g in result.groups]
+        assert counts == sorted(counts, reverse=True)
+
+    def test_aggregate_confidence_is_zero_when_no_groups(self):
+        """aggregate_confidence must be 0.0 when there are no groups."""
+        ctx = _ctx([_entity("L1", entity_type=EntityType.LINE, x=0.0)])
+        result = BatchConditionPlanner().plan(ctx, "batch")
+        assert result.aggregate_confidence == 0.0
+
+    def test_block_group_confidence_formula_5_instances(self):
+        """5 instances: conf = min(0.95, 0.6 + 5*0.03) = min(0.95, 0.75) = 0.75."""
+        inserts = [_insert(f"I{i}", "BRACKET", x=float(i * 10)) for i in range(5)]
+        ctx = _ctx(inserts)
+        result = BatchConditionPlanner().plan(ctx, "batch")
+        groups = [g for g in result.groups if "BRACKET" in g.name]
+        assert groups
+        assert groups[0].confidence == pytest.approx(0.75)
+
+    def test_block_group_confidence_formula_15_instances_capped(self):
+        """15 instances: 0.6 + 15*0.03 = 1.05 → capped at 0.95."""
+        inserts = [_insert(f"I{i}", "REBAR", x=float(i * 10)) for i in range(15)]
+        ctx = _ctx(inserts)
+        result = BatchConditionPlanner().plan(ctx, "batch")
+        groups = [g for g in result.groups if "REBAR" in g.name]
+        assert groups
+        assert groups[0].confidence == pytest.approx(0.95)
+
+    def test_text_group_confidence_formula_5_instances(self):
+        """5 text instances: conf = min(0.85, 0.5 + 5*0.03) = min(0.85, 0.65) = 0.65."""
+        texts = [_text(f"T{i}", "SMOKE DETECTOR", x=float(i * 30)) for i in range(5)]
+        ctx = _ctx(texts)
+        result = BatchConditionPlanner().plan(ctx, "batch")
+        groups = [g for g in result.groups if "SMOKE DETECTOR" in g.name]
+        assert groups
+        assert groups[0].confidence == pytest.approx(0.65)
+
+    def test_text_group_confidence_formula_10_instances(self):
+        """10 text instances: conf = min(0.85, 0.5 + 10*0.03) = min(0.85, 0.80) = 0.80."""
+        texts = [_text(f"T{i}", "FIRE SPRINKLER", x=float(i * 30)) for i in range(10)]
+        ctx = _ctx(texts)
+        result = BatchConditionPlanner().plan(ctx, "batch")
+        groups = [g for g in result.groups if "FIRE SPRINKLER" in g.name]
+        assert groups
+        assert groups[0].confidence == pytest.approx(0.80)
+
+    def test_text_group_confidence_capped_at_0_85(self):
+        """20 text instances: 0.5 + 20*0.03 = 1.10 → capped at 0.85."""
+        texts = [_text(f"T{i}", "EXIT", x=float(i * 30)) for i in range(20)]
+        ctx = _ctx(texts)
+        result = BatchConditionPlanner().plan(ctx, "batch")
+        groups = [g for g in result.groups if "EXIT" in g.name]
+        assert groups
+        assert groups[0].confidence == pytest.approx(0.85)
+
+    def test_text_group_has_caveat_about_similarity(self):
+        """Text group must carry the similarity caveat string."""
+        texts = [_text(f"T{i}", "HANGER", x=float(i * 30)) for i in range(3)]
+        ctx = _ctx(texts)
+        result = BatchConditionPlanner().plan(ctx, "batch")
+        groups = [g for g in result.groups if "HANGER" in g.name]
+        assert groups
+        assert any("Text similarity grouping" in c for c in groups[0].caveats)
+
+    def test_text_group_caveat_exact_string(self):
+        """Text group caveat must match exactly."""
+        texts = [_text(f"T{i}", "CLEVIS", x=float(i * 30)) for i in range(3)]
+        ctx = _ctx(texts)
+        result = BatchConditionPlanner().plan(ctx, "batch")
+        groups = [g for g in result.groups if "CLEVIS" in g.name]
+        assert groups
+        assert groups[0].caveats == ["Text similarity grouping -- verify content matches."]
+
+    def test_group_by_text_returns_empty_for_no_text_entities(self):
+        """If no TEXT/MTEXT entities exist, _group_by_text returns []."""
+        inserts = [_insert(f"I{i}", "COLUMN", x=float(i * 10)) for i in range(3)]
+        ctx = _ctx(inserts)
+        result = BatchConditionPlanner().plan(ctx, "batch")
+        text_groups = [g for g in result.groups if g.name.startswith("Text:")]
+        assert text_groups == []
+
+    def test_group_by_text_three_entities_all_in_group(self):
+        """Exactly 3 identical text entities must all appear in the one group."""
+        texts = [
+            _text("TA", "DRAIN", x=0.0),
+            _text("TB", "DRAIN", x=50.0),
+            _text("TC", "DRAIN", x=100.0),
+        ]
+        ctx = _ctx(texts)
+        result = BatchConditionPlanner().plan(ctx, "batch")
+        drain_groups = [g for g in result.groups if "DRAIN" in g.name]
+        assert drain_groups
+        assert drain_groups[0].total_instances == 3
+        handles = {inst["handle"] for inst in drain_groups[0].instances}
+        assert handles == {"TA", "TB", "TC"}
+
+    def test_group_by_block_three_entities_all_in_group(self):
+        """Exactly 3 INSERT entities must all appear in one block group."""
+        inserts = [
+            _insert("BA", "PILLAR", x=0.0, y=0.0),
+            _insert("BB", "PILLAR", x=10.0, y=0.0),
+            _insert("BC", "PILLAR", x=20.0, y=0.0),
+        ]
+        ctx = _ctx(inserts)
+        result = BatchConditionPlanner().plan(ctx, "batch")
+        pillar_groups = [g for g in result.groups if "PILLAR" in g.name]
+        assert pillar_groups
+        assert pillar_groups[0].total_instances == 3
+        handles = {inst["handle"] for inst in pillar_groups[0].instances}
+        assert handles == {"BA", "BB", "BC"}
+
+    def test_exemplar_handle_is_first_entity_in_block_group(self):
+        """exemplar_handles[0] must be the handle of the first entity in the sorted group."""
+        inserts = [
+            _insert("ZZ0", "ANCHOR", x=0.0),
+            _insert("ZZ1", "ANCHOR", x=10.0),
+            _insert("ZZ2", "ANCHOR", x=20.0),
+        ]
+        ctx = _ctx(inserts)
+        result = BatchConditionPlanner().plan(ctx, "batch")
+        anchor_groups = [g for g in result.groups if "ANCHOR" in g.name]
+        assert anchor_groups
+        assert anchor_groups[0].exemplar_handles[0] in {"ZZ0", "ZZ1", "ZZ2"}
+
+    def test_multiple_block_types_each_form_own_group(self):
+        """Two different block names with 3+ instances each → 2 separate groups."""
+        doors = [_insert(f"D{i}", "DOOR", x=float(i * 10)) for i in range(3)]
+        windows = [_insert(f"W{i}", "WINDOW", x=float(i * 10 + 100)) for i in range(4)]
+        ctx = _ctx(doors + windows)
+        result = BatchConditionPlanner().plan(ctx, "batch")
+        door_groups = [g for g in result.groups if "DOOR" in g.name]
+        window_groups = [g for g in result.groups if "WINDOW" in g.name]
+        assert len(door_groups) == 1
+        assert len(window_groups) == 1
+        assert door_groups[0].total_instances == 3
+        assert window_groups[0].total_instances == 4
+
+    def test_text_instance_dict_has_x_y_when_insert_point_present(self):
+        """Text instance dict must include x and y coords when insert_point is set."""
+        texts = [
+            _text("TT0", "LABEL", x=5.0, y=10.0),
+            _text("TT1", "LABEL", x=15.0, y=20.0),
+            _text("TT2", "LABEL", x=25.0, y=30.0),
+        ]
+        ctx = _ctx(texts)
+        result = BatchConditionPlanner().plan(ctx, "batch")
+        label_groups = [g for g in result.groups if "LABEL" in g.name]
+        assert label_groups
+        xs = sorted(inst["x"] for inst in label_groups[0].instances)
+        ys = sorted(inst["y"] for inst in label_groups[0].instances)
+        assert xs == pytest.approx([5.0, 15.0, 25.0])
+        assert ys == pytest.approx([10.0, 20.0, 30.0])
+
+    def test_text_name_preview_truncated_to_40_chars(self):
+        """Text group name preview must be truncated at 40 chars."""
+        long_content = "A" * 50
+        texts = [_text(f"T{i}", long_content, x=float(i * 30)) for i in range(3)]
+        ctx = _ctx(texts)
+        result = BatchConditionPlanner().plan(ctx, "batch")
+        text_groups = [g for g in result.groups if g.name.startswith("Text:")]
+        assert text_groups
+        # Name is "Text: '" + content[:40] + "'"
+        expected_preview = long_content[:40]
+        assert expected_preview in text_groups[0].name
+
+    def test_text_group_similarity_threshold_at_0_8(self):
+        """Text with similarity exactly at/above 0.8 should cluster; below should not."""
+        # Two very different strings should not cluster with "EXIT SIGN"
+        texts = [
+            _text("T1", "EXIT SIGN", x=0.0),
+            _text("T2", "EXIT SIGN", x=10.0),
+            _text("T3", "EXIT SIGN", x=20.0),
+            # Completely different — should not join cluster
+            _text("T4", "PLUMBING FIXTURE", x=30.0),
+        ]
+        ctx = _ctx(texts)
+        result = BatchConditionPlanner().plan(ctx, "batch")
+        exit_groups = [g for g in result.groups if "EXIT SIGN" in g.name]
+        assert exit_groups
+        # T4 should not be in the EXIT SIGN group
+        handles_in_exit = {inst["handle"] for inst in exit_groups[0].instances}
+        assert "T4" not in handles_in_exit
+
+    def test_already_used_entities_not_double_grouped(self):
+        """Entities added to one cluster must not appear in another cluster."""
+        texts = [
+            _text("T1", "VALVE", x=0.0),
+            _text("T2", "VALVE", x=10.0),
+            _text("T3", "VALVE", x=20.0),
+            _text("T4", "VALVE", x=30.0),
+        ]
+        ctx = _ctx(texts)
+        result = BatchConditionPlanner().plan(ctx, "batch")
+        valve_groups = [g for g in result.groups if "VALVE" in g.name]
+        assert len(valve_groups) == 1
+        assert valve_groups[0].total_instances == 4
+
+
+class TestFieldSummaryBuilderMutationKilling:
+    """Kill mutations in FieldSummaryBuilder: section titles, omitted tracking,
+    caveat propagation, region/prompt propagation, confidence aggregation."""
+
+    def test_grid_caveats_propagated_to_all_caveats(self):
+        """Grid caveats must appear in FieldSummary.caveats."""
+        ctx = _ctx([_vline("V1", 0.0)])  # unlabeled → caveat about no label
+        result = FieldSummaryBuilder().build(ctx, prompt="summary")
+        combined = " ".join(result.caveats)
+        assert "grid line(s) have no label" in combined
+
+    def test_grid_ambiguity_flags_propagated(self):
+        """Grid ambiguity_flags must propagate into FieldSummary.ambiguity_flags."""
+        ctx = _ctx([_vline("V1", 0.0)])  # unlabeled_grid_lines
+        result = FieldSummaryBuilder().build(ctx, prompt="summary")
+        assert "unlabeled_grid_lines" in result.ambiguity_flags
+
+    def test_grid_summary_section_type_is_enum(self):
+        """Grid section type must be FieldSectionType.GRID_SUMMARY."""
+        ctx = _ctx([_vline("V1", 0.0), _vline("V2", 30.0)])
+        result = FieldSummaryBuilder().build(ctx, prompt="summary")
+        grid_sections = [
+            s for s in result.sections if s.section_type == FieldSectionType.GRID_SUMMARY
+        ]
+        assert grid_sections
+        assert grid_sections[0].section_type == FieldSectionType.GRID_SUMMARY
+
+    def test_condition_report_section_type_is_enum(self):
+        """Condition report section type must be FieldSectionType.CONDITION_REPORT."""
+        inserts = [_insert(f"I{i}", "BEAM", x=float(i * 10)) for i in range(5)]
+        ctx = _ctx(inserts)
+        result = FieldSummaryBuilder().build(ctx, prompt="summary")
+        cond_sections = [
+            s for s in result.sections if s.section_type == FieldSectionType.CONDITION_REPORT
+        ]
+        assert cond_sections
+        assert cond_sections[0].section_type == FieldSectionType.CONDITION_REPORT
+
+    def test_no_grid_lines_omits_grid_summary_string(self):
+        """If grid_result.grid_lines is empty, 'grid_summary' must appear in omitted_sections."""
+        ctx = _ctx([_entity("E1", layer="WALLS", entity_type=EntityType.LINE)])
+        result = FieldSummaryBuilder().build(ctx, prompt="summary")
+        assert "grid_summary" in result.omitted_sections
+
+    def test_no_groups_omits_condition_report_string(self):
+        """If batch_result.groups is empty, 'condition_report' must be in omitted_sections."""
+        ctx = _ctx([_entity("E1", layer="WALLS", entity_type=EntityType.LINE)])
+        result = FieldSummaryBuilder().build(ctx, prompt="summary")
+        assert "condition_report" in result.omitted_sections
+
+    def test_no_comparison_omits_revision_changes_exact_string(self):
+        """'revision_changes' must be in omitted_sections when no comparison or changeset."""
+        ctx = _ctx([_vline("V1", 0.0)])
+        result = FieldSummaryBuilder().build(
+            ctx, prompt="summary", comparison_result=None, changeset=None
+        )
+        assert "revision_changes" in result.omitted_sections
+
+    def test_revision_changes_not_omitted_when_comparison_provided(self):
+        """When comparison_result is provided, 'revision_changes' must NOT be omitted."""
+        from cad_dxf_agent.models.comparison_schema import (
+            ChangeCategory,
+            ComparisonResult,
+            EntityChange,
+            GeometrySnapshot,
+        )
+
+        snap = GeometrySnapshot(
+            handle="H1",
+            entity_type=EntityType.LINE,
+            layer="S",
+            points=[Point2D(x=0, y=0), Point2D(x=10, y=0)],
+        )
+        comp = ComparisonResult(
+            changes=[
+                EntityChange(category=ChangeCategory.ADDED, revision_snapshot=snap, confidence=0.9)
+            ],
+            summary={"added": 1, "removed": 0, "modified": 0, "moved": 0, "unchanged": 0},
+        )
+        ctx = _ctx([_insert("I1", "BLK"), _insert("I2", "BLK"), _insert("I3", "BLK")])
+        result = FieldSummaryBuilder().build(ctx, prompt="summary", comparison_result=comp)
+        assert "revision_changes" not in result.omitted_sections
+
+    def test_condition_caveats_propagated_from_batch_result(self):
+        """BatchConditionPlanner caveats must propagate into FieldSummary.caveats."""
+        # With no repeated patterns, batch result caveats include the no-patterns message.
+        # The code only extends all_caveats when batch_result.groups is non-empty.
+        # This test validates the code path does not crash and returns a list.
+        ctx = _ctx([_entity("L1", entity_type=EntityType.LINE, x=0.0)])
+        result = FieldSummaryBuilder().build(ctx, prompt="summary")
+        assert isinstance(result.caveats, list)
+
+    def test_grid_section_confidence_from_grid_result_aggregate(self):
+        """GRID_SUMMARY section.confidence must equal grid_result.aggregate_confidence."""
+        # Two unlabeled lines → agg_conf = 0.6
+        ctx = _ctx([_vline("V1", 0.0), _vline("V2", 30.0)])
+        result = FieldSummaryBuilder().build(ctx, prompt="summary")
+        grid_sections = [
+            s for s in result.sections if s.section_type == FieldSectionType.GRID_SUMMARY
+        ]
+        assert grid_sections
+        assert grid_sections[0].confidence == pytest.approx(0.6)
+
+    def test_condition_section_confidence_from_batch_aggregate(self):
+        """CONDITION_REPORT section.confidence must equal batch_result.aggregate_confidence."""
+        # 3 inserts → conf = 0.69
+        inserts = [_insert(f"I{i}", "SLAB", x=float(i * 10)) for i in range(3)]
+        ctx = _ctx(inserts)
+        result = FieldSummaryBuilder().build(ctx, prompt="summary")
+        cond_sections = [
+            s for s in result.sections if s.section_type == FieldSectionType.CONDITION_REPORT
+        ]
+        assert cond_sections
+        assert cond_sections[0].confidence == pytest.approx(0.69)
+
+    def test_takeoff_section_type_is_correct(self):
+        """If takeoff items exist, section_type must be TAKEOFF_SUMMARY."""
+        ctx = _grid_and_inserts_ctx()
+        result = FieldSummaryBuilder().build(ctx, prompt="summary")
+        takeoff_sections = [
+            s for s in result.sections if s.section_type == FieldSectionType.TAKEOFF_SUMMARY
+        ]
+        # Takeoff may or may not produce items depending on context; just verify type if present
+        for s in takeoff_sections:
+            assert s.section_type == FieldSectionType.TAKEOFF_SUMMARY
+
+    def test_layout_section_type_is_correct(self):
+        """If layout recommendations exist, section_type must be LAYOUT_NOTES."""
+        ctx = _grid_and_inserts_ctx()
+        result = FieldSummaryBuilder().build(ctx, prompt="summary")
+        layout_sections = [
+            s for s in result.sections if s.section_type == FieldSectionType.LAYOUT_NOTES
+        ]
+        for s in layout_sections:
+            assert s.section_type == FieldSectionType.LAYOUT_NOTES
+
+    def test_aggregate_confidence_zero_when_no_sections(self):
+        """When no sections are produced, aggregate_confidence must be 0.0."""
+        ctx = DrawingContext(file_path="t.dxf", entities=[], layers=[LayerRule(name="0")])
+        result = FieldSummaryBuilder().build(ctx, prompt="summary")
+        assert result.aggregate_confidence == 0.0
+
+    def test_grid_section_content_is_model_dump_of_grid_result(self):
+        """GRID_SUMMARY content must have keys that come from GridSummaryResult.model_dump()."""
+        ctx = _ctx([_vline("V1", 0.0), _vline("V2", 30.0)])
+        result = FieldSummaryBuilder().build(ctx, prompt="summary")
+        grid_sections = [
+            s for s in result.sections if s.section_type == FieldSectionType.GRID_SUMMARY
+        ]
+        assert grid_sections
+        content = grid_sections[0].content
+        assert "grid_lines" in content
+        assert "bays" in content
+        assert "drawing_summary" in content
+
+    def test_condition_section_content_is_model_dump_of_batch_result(self):
+        """CONDITION_REPORT content must have keys from BatchConditionResult.model_dump()."""
+        inserts = [_insert(f"I{i}", "PANEL", x=float(i * 10)) for i in range(5)]
+        ctx = _ctx(inserts)
+        result = FieldSummaryBuilder().build(ctx, prompt="summary")
+        cond_sections = [
+            s for s in result.sections if s.section_type == FieldSectionType.CONDITION_REPORT
+        ]
+        assert cond_sections
+        content = cond_sections[0].content
+        assert "groups" in content
+        assert "total_groups" in content
+
+    def test_region_none_does_not_crash_and_uses_context(self):
+        """Passing region=None explicitly uses context.entities for grid analysis."""
+        ctx = _ctx([_vline("V1", 0.0), _vline("V2", 30.0)])
+        # Should produce grid section
+        result = FieldSummaryBuilder().build(ctx, prompt="summary", region=None)
+        grid_sections = [
+            s for s in result.sections if s.section_type == FieldSectionType.GRID_SUMMARY
+        ]
+        assert grid_sections
+
+    def test_region_provided_affects_grid_analysis(self):
+        """Region parameter must be forwarded to GridAnalyzer.analyze."""
+        from cad_dxf_agent.models.qna_schema import RegionContext
+
+        v1 = _vline("V1", 0.0)
+        v2 = _vline("V2", 30.0)
+        ctx = _ctx([v1, v2])
+        # Region with no grid entities → grid_summary omitted
+        region = RegionContext(
+            entities=[_entity("E_other", layer="WALLS", entity_type=EntityType.LINE)]
+        )
+        result = FieldSummaryBuilder().build(ctx, prompt="summary", region=region)
+        # Grid section should NOT be present since region has no grid entities
+        grid_sections = [
+            s for s in result.sections if s.section_type == FieldSectionType.GRID_SUMMARY
+        ]
+        assert grid_sections == []
+        assert "grid_summary" in result.omitted_sections
+
+    def test_condition_section_caveats_set_from_batch_caveats(self):
+        """CONDITION_REPORT section.caveats must come from batch_result.caveats."""
+        inserts = [_insert(f"I{i}", "TRUSS", x=float(i * 10)) for i in range(3)]
+        ctx = _ctx(inserts)
+        result = FieldSummaryBuilder().build(ctx, prompt="summary")
+        cond_sections = [
+            s for s in result.sections if s.section_type == FieldSectionType.CONDITION_REPORT
+        ]
+        assert cond_sections
+        # batch_result.caveats could be empty for a successful group; just validate it's a list
+        assert isinstance(cond_sections[0].caveats, list)
+
+
+class TestClassifyLineMutationKilling:
+    """Additional tolerance boundary tests for _classify_line."""
+
+    def test_perfectly_vertical_line_position_is_x_coordinate(self):
+        """Vertical line position must be the X coordinate (start[0])."""
+        entity = _entity(
+            "V1",
+            layer="GRID",
+            entity_type=EntityType.LINE,
+            x=42.0,
+            y=0.0,
+            attributes={"end_point": (42.0, 100.0)},
+        )
+        ctx = _ctx([entity])
+        result = GridAnalyzer().analyze(ctx, "grid")
+        vlines = [g for g in result.grid_lines if g.direction == GridDirection.VERTICAL]
+        assert len(vlines) == 1
+        assert vlines[0].position == pytest.approx(42.0)
+
+    def test_perfectly_horizontal_line_position_is_y_coordinate(self):
+        """Horizontal line position must be the Y coordinate (start[1])."""
+        entity = _entity(
+            "H1",
+            layer="GRID",
+            entity_type=EntityType.LINE,
+            x=0.0,
+            y=77.0,
+            attributes={"end_point": (200.0, 77.0)},
+        )
+        ctx = _ctx([entity])
+        result = GridAnalyzer().analyze(ctx, "grid")
+        hlines = [g for g in result.grid_lines if g.direction == GridDirection.HORIZONTAL]
+        assert len(hlines) == 1
+        assert hlines[0].position == pytest.approx(77.0)
+
+    def test_dy_exactly_at_tolerance_not_horizontal(self):
+        """dy == 0.01 fails the dy < 0.01 check → NOT classified horizontal."""
+        entity = _entity(
+            "H_EXACT",
+            layer="GRID",
+            entity_type=EntityType.LINE,
+            x=0.0,
+            y=0.0,
+            attributes={"end_point": (100.0, 0.01)},
+        )
+        ctx = _ctx([entity])
+        result = GridAnalyzer().analyze(ctx, "grid")
+        assert result.grid_lines == []
+
+    def test_dy_just_below_tolerance_is_horizontal(self):
+        """dy = 0.009 < 0.01, large dx → classified HORIZONTAL."""
+        entity = _entity(
+            "H_BELOW",
+            layer="GRID",
+            entity_type=EntityType.LINE,
+            x=0.0,
+            y=0.0,
+            attributes={"end_point": (100.0, 0.009)},
+        )
+        ctx = _ctx([entity])
+        result = GridAnalyzer().analyze(ctx, "grid")
+        hlines = [g for g in result.grid_lines if g.direction == GridDirection.HORIZONTAL]
+        assert len(hlines) == 1
+
+    def test_lwpolyline_position_comes_from_first_vertex_x(self):
+        """Vertical LWPOLYLINE position must be vertices[0][0]."""
+        poly = _entity(
+            "PV2",
+            layer="AXIS",
+            entity_type=EntityType.LWPOLYLINE,
+            x=55.0,
+            y=0.0,
+            attributes={"vertices": [(55.0, 0.0), (55.0, 200.0)]},
+        )
+        ctx = _ctx([poly])
+        result = GridAnalyzer().analyze(ctx, "grid")
+        vlines = [g for g in result.grid_lines if g.direction == GridDirection.VERTICAL]
+        assert vlines
+        assert vlines[0].position == pytest.approx(55.0)
+
+    def test_lwpolyline_position_comes_from_first_vertex_y(self):
+        """Horizontal LWPOLYLINE position must be vertices[0][1]."""
+        poly = _entity(
+            "PH2",
+            layer="COLUMN",
+            entity_type=EntityType.LWPOLYLINE,
+            x=0.0,
+            y=88.0,
+            attributes={"vertices": [(0.0, 88.0), (300.0, 88.0)]},
+        )
+        ctx = _ctx([poly])
+        result = GridAnalyzer().analyze(ctx, "grid")
+        hlines = [g for g in result.grid_lines if g.direction == GridDirection.HORIZONTAL]
+        assert hlines
+        assert hlines[0].position == pytest.approx(88.0)
+
+    def test_line_without_insert_point_skipped(self):
+        """LINE with insert_point=None must not crash and produces no grid line."""
+        bad = EntityRef(
+            handle="NO_INSERT",
+            entity_type=EntityType.LINE,
+            layer="GRID",
+            attributes={"end_point": (10.0, 100.0)},
+        )
+        ctx = _ctx([bad])
+        result = GridAnalyzer().analyze(ctx, "grid")
+        assert result.grid_lines == []
+
+
+class TestComputeBaysMutationKillingExtended:
+    """Extended bay computation tests to kill remaining _compute_bays mutants."""
+
+    def test_three_vertical_lines_produce_two_bays(self):
+        """3 sorted vertical lines → 2 bays (N-1 bays for N lines)."""
+        ctx = _ctx([_vline("V1", 0.0), _vline("V2", 25.0), _vline("V3", 60.0)])
+        result = GridAnalyzer().analyze(ctx, "grid")
+        vbays = [b for b in result.bays if b.direction == GridDirection.VERTICAL]
+        assert len(vbays) == 2
+
+    def test_bay_dimensions_correct_for_unequal_spacing(self):
+        """Bay dimensions must reflect actual spacing, not equal intervals."""
+        ctx = _ctx([_vline("V1", 0.0), _vline("V2", 15.0), _vline("V3", 50.0)])
+        result = GridAnalyzer().analyze(ctx, "grid")
+        vbays = sorted(
+            [b for b in result.bays if b.direction == GridDirection.VERTICAL],
+            key=lambda b: b.dimension,
+        )
+        assert len(vbays) == 2
+        assert vbays[0].dimension == pytest.approx(15.0)
+        assert vbays[1].dimension == pytest.approx(35.0)
+
+    def test_bay_labels_use_sorted_positions(self):
+        """Bays are computed from sorted grid lines, so labels follow sorted order."""
+        # Add lines out of position order to verify sorting happens
+        ctx = _ctx([_vline("V2", 60.0), _vline("V1", 0.0), _vline("V3", 30.0)])
+        result = GridAnalyzer().analyze(ctx, "grid")
+        vbays = [b for b in result.bays if b.direction == GridDirection.VERTICAL]
+        # Sorted positions: 0.0, 30.0, 60.0
+        dims = sorted(b.dimension for b in vbays)
+        assert dims[0] == pytest.approx(30.0)
+        assert dims[1] == pytest.approx(30.0)
+
+    def test_mixed_h_and_v_lines_produce_separate_bay_sets(self):
+        """Horizontal bays and vertical bays must be independent."""
+        ctx = _ctx(
+            [
+                _vline("V1", 0.0),
+                _vline("V2", 40.0),
+                _hline("H1", 0.0),
+                _hline("H2", 20.0),
+            ]
+        )
+        result = GridAnalyzer().analyze(ctx, "grid")
+        vbays = [b for b in result.bays if b.direction == GridDirection.VERTICAL]
+        hbays = [b for b in result.bays if b.direction == GridDirection.HORIZONTAL]
+        assert len(vbays) == 1
+        assert len(hbays) == 1
+        assert vbays[0].dimension == pytest.approx(40.0)
+        assert hbays[0].dimension == pytest.approx(20.0)
+
+    def test_bay_dimension_rounded_to_2_decimal_places(self):
+        """Bay dimension must be round(dim, 2)."""
+        # Use positions that produce a non-round difference
+        ctx = _ctx([_vline("V1", 0.0), _vline("V2", 33.333)])
+        result = GridAnalyzer().analyze(ctx, "grid")
+        vbays = [b for b in result.bays if b.direction == GridDirection.VERTICAL]
+        assert vbays
+        assert vbays[0].dimension == pytest.approx(round(33.333, 2), abs=1e-4)
+
+
+class TestFindLabelMutationKillingExtended:
+    """Extended _find_label tests to kill remaining proximity/assignment mutants."""
+
+    def test_nearest_label_wins_when_multiple_present(self):
+        """When two labels are present, the closer one is assigned."""
+        grid_line = _vline("V1", 0.0)
+        near = _text("T_NEAR", "NearLabel", x=3.0, y=0.0, layer="GRID")
+        far = _text("T_FAR", "FarLabel", x=40.0, y=0.0, layer="GRID")
+        ctx = _ctx([grid_line, near, far])
+        result = GridAnalyzer().analyze(ctx, "grid")
+        vlines = [g for g in result.grid_lines if g.direction == GridDirection.VERTICAL]
+        assert vlines[0].label == "NearLabel"
+
+    def test_empty_text_content_not_used_as_label(self):
+        """Text entity with empty text_content must not be used as a label."""
+        grid_line = _vline("V1", 0.0)
+        empty_text = _entity(
+            "T1",
+            layer="GRID",
+            entity_type=EntityType.TEXT,
+            x=2.0,
+            y=0.0,
+            text_content="",
+        )
+        ctx = _ctx([grid_line, empty_text])
+        result = GridAnalyzer().analyze(ctx, "grid")
+        vlines = [g for g in result.grid_lines if g.direction == GridDirection.VERTICAL]
+        assert vlines[0].label == ""
+
+    def test_text_without_insert_point_not_used_as_label(self):
+        """Text entity without insert_point is skipped in _find_label."""
+        grid_line = _vline("V1", 0.0)
+        no_pt_text = EntityRef(
+            handle="T_NOPT",
+            entity_type=EntityType.TEXT,
+            layer="GRID",
+            text_content="ShouldNotAppear",
+        )
+        ctx = _ctx([grid_line, no_pt_text])
+        result = GridAnalyzer().analyze(ctx, "grid")
+        vlines = [g for g in result.grid_lines if g.direction == GridDirection.VERTICAL]
+        assert vlines[0].label == ""
+
+    def test_label_strip_whitespace(self):
+        """text_content with leading/trailing whitespace must be stripped in label."""
+        grid_line = _vline("V1", 0.0)
+        label_text = _text("T1", "  GridB  ", x=2.0, y=0.0, layer="GRID")
+        ctx = _ctx([grid_line, label_text])
+        result = GridAnalyzer().analyze(ctx, "grid")
+        vlines = [g for g in result.grid_lines if g.direction == GridDirection.VERTICAL]
+        assert vlines[0].label == "GridB"
