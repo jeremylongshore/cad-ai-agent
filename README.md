@@ -1,16 +1,30 @@
 # cad-dxf-agent
 
-Local-first DXF layout editor with LLM-assisted prompt-to-edit planning, validation, preview, and safe save-as DXF workflow.
+Drawing Intelligence Platform for AEC professionals — edit, analyze, and validate 2D DXF drawings using natural-language prompts. The LLM returns structured JSON operations (never raw DXF), which are validated and applied deterministically. Original files are never modified (save-as workflow).
 
 ## What Is This?
 
-**cad-dxf-agent** lets you edit 2D DXF drawings using natural-language prompts. Describe what you want changed, and the tool plans, validates, previews, and applies the edit — saving the result as a new DXF file. Your original drawing is never modified.
+**cad-dxf-agent** is a multi-capability platform that handles DXF drawings through natural language. Describe what you need — an edit, a compliance check, a quantity takeoff, a health report — and the platform classifies your intent, selects the right processing pipeline, and delivers structured results.
+
+### Capabilities
+
+| Capability | Description |
+|------------|-------------|
+| **Edit** | Move, rotate, copy, scale, mirror, delete entities; add lines, polylines, circles, arcs, text, blocks |
+| **Compliance** | ADA/IBC/custom rule validation with findings and remediation guidance |
+| **Health Report** | Drawing quality metrics — layer hygiene, entity stats, potential issues |
+| **Quantity Takeoff** | Automated extraction of counts, lengths, areas from drawing entities |
+| **Summary** | Plain-English structured narrative of drawing contents |
+| **RFI Generation** | Automated Request For Information based on detected ambiguities |
+| **Zone Detection** | Closed-loop room/area detection with area calculation |
+| **Revision Comparison** | Diff two DXF versions, review changes, apply approved edits |
+| **Agent Mode** | Iterative multi-turn tool-use loop for complex requests (max 10 turns) |
 
 ### Key Principles
 
-- **Local-first** — DXF processing happens entirely on your machine. No cloud required.
 - **Safe edits** — The LLM planner returns structured operations only. It never touches raw DXF data.
-- **Protected layers** — Configurable layers (TITLE, TITLEBLOCK, SEAL, REVISION) cannot be edited.
+- **Two-axis intent classification** — Every prompt is classified by *what* (edit, analyze, compare, query, generate) and *why* (compliance, coordination, documentation, estimation, quality, general).
+- **Protected layers** — Configurable layers (TITLE, TITLEBLOCK, SEAL, REVISION) cannot be edited. Enforced at both validator and tool executor levels.
 - **Save-as workflow** — Original files are always preserved.
 - **Mock mode** — The full pipeline works without an API key for testing and development.
 
@@ -18,21 +32,28 @@ Local-first DXF layout editor with LLM-assisted prompt-to-edit planning, validat
 
 | Supported | Not Yet |
 |-----------|---------|
-| DXF files | DWG native editing |
+| DXF files (2D) | DWG native editing |
 | Model space + paper space layouts | 3D entities |
-| LINE, LWPOLYLINE, TEXT, MTEXT, INSERT, CIRCLE, ARC, etc. | Dimension regeneration |
-| move, edit_text, delete, add_block | Xrefs |
-| Protected layers | Title block revision table |
-| AI revision notes (safe layer) | |
-| Revision comparison pipeline (CLI + web) | |
-| Web app (Firebase + Cloud Run) | |
+| LINE, LWPOLYLINE, TEXT, MTEXT, INSERT, CIRCLE, ARC | Dimension regeneration |
+| 13 edit operations (move, edit_text, delete, add_block, rotate, copy, scale, mirror, add_line, add_polyline, add_circle, add_arc, add_text) | Xrefs |
+| Compliance validation (ADA/IBC/custom) | Title block revision table |
+| Health reports + quality metrics | |
+| Automated quantity takeoff | |
+| Plain-English drawing summaries | |
+| RFI generation | |
+| Zone/room detection with area calc | |
+| Agent-mode iterative tool-use | |
+| Protected layers + AI revision notes | |
+| Revision comparison (CLI + web) | |
+| Web app (Firebase + Cloud Run, auto-deploy) | |
 | Desktop app (Windows + Linux) | |
 | Gemini vision pipeline (Vertex AI) | |
+| OpenTelemetry tracing (console, OTLP, GCP Trace) | |
 
 For full details see:
-- [Full Application Audit (v0.6.0)](https://gist.github.com/jeremylongshore/0303189683f9547c79e1fc1fc68be711) — complete feature documentation, architecture, API reference, and tech stack
+- [000-docs/ index](000-docs/000-INDEX.md) — complete documentation inventory (60+ docs)
 - [V1 Blueprint](000-docs/007-AT-ARCH-v1-blueprint.md) — engineering architecture and module map
-- [PRD Addendum](000-docs/008-PP-PROD-prd-addendum.md) — product requirements and acceptance criteria
+- [ADR: LLM Plans, Not DXF Edits](000-docs/005-AT-ADEC-llm-plans-not-dxf.md) — core architectural decision
 
 ## Quickstart
 
@@ -55,21 +76,25 @@ pre-commit install
 ### Run Tests (Mock Mode — No API Key Needed)
 
 ```bash
-# All tests (~1375 tests)
+# All tests (~4500 tests across 10 tiers)
 make test
 
-# With coverage (95%)
+# With coverage (65% threshold)
 make test-cov
 
-# Web API tests only
-make test-web
+# By tier
+make test-unit         # ~3600 unit tests
+make test-integration  # ~100 integration tests
+make test-web          # ~420 web API tests
+make test-e2e          # ~33 end-to-end tests
+make test-live         # ~42 live Gemini API tests (requires ADC)
 
-# Smoke test only
+# Eval scorecard (intent classification accuracy)
+make scorecard         # mock mode
+make scorecard-live    # real Gemini
+
+# Smoke test
 make smoke
-
-# Or directly:
-pytest -v
-python scripts/smoke_test.py
 ```
 
 ### Run All Quality Checks
@@ -118,14 +143,7 @@ cd web/frontend && npm run dev    # http://localhost:3000
 CAD_WEB_DEV_MODE=1 uvicorn web.backend.main:app --port 8322
 ```
 
-Deploy:
-```bash
-# Frontend to Firebase Hosting
-cd web/frontend && npm run build && firebase deploy --only hosting
-
-# Backend to Cloud Run
-gcloud builds submit --config web/backend/cloudbuild.yaml .
-```
+**Deploy:** Push to `main` → GitHub Actions auto-deploys both frontend (Firebase Hosting) and backend (Cloud Run) via Workload Identity Federation. No manual deploy steps needed. Check status: `gh run list --workflow=deploy-web.yml`
 
 ## Testing Without an API Key (Mock Mode)
 
@@ -157,7 +175,7 @@ export CAD_GCP_PROJECT=cad-dxf-agent
 python -m cad_dxf_agent.app
 ```
 
-The planner uses tool-use with vision capabilities — it can analyze DXF renders and plan operations based on visual inspection.
+The planner uses tool-use with vision capabilities — it can analyze DXF renders and plan operations based on visual inspection. For complex multi-step requests, the agent mode runs an iterative tool-use loop (up to 10 turns) with 20+ query and edit tools.
 
 **Notes:**
 - Requires `google-cloud-aiplatform` (included in `[gemini]` extras)
@@ -265,8 +283,11 @@ pip install -e ".[otel]"
 # Enable console exporter (prints spans to stdout)
 OTEL_ENABLED=1 python scripts/smoke_test.py
 
-# Or send to an OTLP collector (Jaeger, Grafana Tempo, etc.)
-OTEL_ENABLED=1 OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317 python scripts/smoke_test.py
+# Send to an OTLP collector (Jaeger, Grafana Tempo, etc.)
+OTEL_ENABLED=1 OTEL_EXPORTER=otlp OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317 python scripts/smoke_test.py
+
+# GCP Cloud Trace (production)
+OTEL_ENABLED=1 OTEL_EXPORTER=gcp-trace python scripts/smoke_test.py
 ```
 
 ### Spans Emitted
@@ -288,8 +309,48 @@ OTEL_ENABLED=1 OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317 python scripts/
 | Variable | Default | Purpose |
 |----------|---------|---------|
 | `OTEL_ENABLED` | _(unset)_ | Enable tracing (`1`, `true`, `yes`) |
-| `OTEL_EXPORTER` | `console` | Exporter type: `console` or `otlp` |
+| `OTEL_EXPORTER` | `console` | Exporter type: `console`, `otlp`, or `gcp-trace` |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | _(unset)_ | OTLP collector URL |
+
+## Architecture
+
+### Request Flow
+
+```
+User Prompt
+  → ObjectiveClassifier (2-axis: RequestClass × ObjectiveTag)
+  → StrategyRegistry (maps classification → StagePipelineDefinition)
+  → StageExecutor (runs ordered stages: deterministic + LLM)
+  → ResponseBuilder (PlatformResponse envelope)
+```
+
+For **edit requests**, the stage pipeline includes:
+```
+Planner → ChangeSet → Validator → Preview → EditEngine → Save-As DXF + RevisionNotes
+```
+
+For **analysis requests** (compliance, health, takeoff, summary, RFI, zones), the pipeline runs deterministic extractors without the edit flow.
+
+### Two-Axis Intent Classification
+
+Every prompt is classified on two independent axes:
+
+1. **RequestClass** — *what* the user wants done: `edit`, `analyze`, `compare`, `query`, `generate`
+2. **ObjectiveTag** — *why* they want it: `compliance`, `coordination`, `documentation`, `estimation`, `quality`, `general`
+
+The `StrategyRegistry` maps each (RequestClass, ObjectiveTag) pair to a `StagePipelineDefinition` — an ordered list of `StageHandler` implementations.
+
+### Agent Mode
+
+For complex requests, the `AgentProvider` runs an iterative tool-use loop:
+
+1. Sends prompt + drawing context + tool definitions to Gemini
+2. Gemini returns tool calls (query tools: list entities, find by layer; edit tools: move, delete, add)
+3. `ToolExecutor` dispatches each call, enforcing protected-layer rules
+4. Results feed back to Gemini for next iteration (max 10 turns)
+5. Final ChangeSet extracted from accumulated tool calls
+
+20+ tools split into query (read-only) and edit (state-changing) categories.
 
 ## Project Structure
 
@@ -299,34 +360,39 @@ cad-dxf-agent/
     app.py                  # Desktop entry point
     settings.py             # Env-based configuration
     otel.py                 # OpenTelemetry bootstrap
-    core/                   # DXF processing, validation, editing
-    llm/                    # Planner, providers, prompts
-    models/                 # Pydantic schemas
+    core/                   # 41 modules — DXF I/O, validation, editing, analysis
+    llm/                    # 22 modules — intent classification, planning, agent loop
+    models/                 # 30 Pydantic schemas
+    cli/                    # Revision CLI (cad-revision)
     ui/                     # PySide6 desktop UI
   web/
     frontend/               # React + Vite SPA (Firebase Hosting)
-    backend/                # FastAPI (Cloud Run)
+    backend/                # FastAPI on Cloud Run (20+ endpoints)
   tests/
-    unit/                   # ~270 unit tests
-    integration/            # ~15 integration tests
-    web/                    # ~65 web API tests
-    live/                   # Live Gemini API tests
+    unit/                   # ~3600 unit tests
+    integration/            # ~100 integration tests
+    web/                    # ~420 web API tests
+    eval/                   # ~240 eval scorecard tests
+    live/                   # ~42 live Gemini API tests
+    e2e/                    # ~33 end-to-end tests
+    benchmark/              # ~19 performance benchmarks
+    gui/                    # ~10 PySide6 UI tests
+    property/               # ~7 fuzz/property tests
+    smoke/                  # ~7 smoke tests
   scripts/
     smoke_test.py           # Standalone smoke test
-  000-docs/                 # All project docs
+  000-docs/                 # All project docs (60+ files)
 ```
 
 ## Documentation
 
 All docs live in [`000-docs/`](000-docs/000-INDEX.md) using flat chronological filing.
 
+Key references:
 - [V1 Blueprint](000-docs/007-AT-ARCH-v1-blueprint.md) — architecture, module map, scope
-- [PRD Addendum](000-docs/008-PP-PROD-prd-addendum.md) — product requirements, acceptance criteria
-- [Beads V1 Plan](000-docs/009-PM-TASK-v1-beads-plan.md) — epics, tasks, dependencies
-- [ADR 0001: Local-First Architecture](000-docs/004-AT-ADEC-local-first-architecture.md)
-- [ADR 0002: LLM Plans, Not DXF Edits](000-docs/005-AT-ADEC-llm-plans-not-dxf.md)
-- [ADR 0003: AI Revision Notes on Safe Layer](000-docs/006-AT-ADEC-ai-revision-notes.md)
-- [Phase 1 AAR](000-docs/010-AA-AACR-phase-01-aar.md) — after action review
+- [ADR: Local-First Architecture](000-docs/004-AT-ADEC-local-first-architecture.md)
+- [ADR: LLM Plans, Not DXF Edits](000-docs/005-AT-ADEC-llm-plans-not-dxf.md)
+- [ADR: AI Revision Notes on Safe Layer](000-docs/006-AT-ADEC-ai-revision-notes.md)
 
 ## License
 
