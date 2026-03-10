@@ -55,6 +55,7 @@ sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from cad_dxf_agent.core.edit_history import EditHistory  # noqa: E402
 from cad_dxf_agent.otel import span as otel_span  # noqa: E402
+from cad_dxf_agent.settings import settings as cad_settings  # noqa: E402
 
 from .api_v1 import router as v1_router  # noqa: E402
 from .auth import _get_profile, _get_tenant, _update_profile, get_licensed_user  # noqa: E402
@@ -1013,8 +1014,6 @@ async def upload(
 
     # Initialize edit history for undo/redo (EPIC-CAD-27)
     try:
-        from cad_dxf_agent.settings import settings as cad_settings
-
         session.edit_history = EditHistory(
             session.working_path, max_snapshots=cad_settings.max_undo_snapshots
         )
@@ -1106,10 +1105,12 @@ async def plan(body: PlanRequest, user: dict = Depends(get_user)):
 
         planner_context = build_planner_context(session.context)
         rule_config = RuleConfig()
+        image_path = session.original_render if cad_settings.vision_enabled else None
 
         changeset = run_planner(
             prompt=body.prompt,
             drawing_context=planner_context,
+            image_path=image_path,
             context=session.context,
             rule_config=rule_config,
             conversation_history=session.conversation_history or None,
@@ -1554,11 +1555,13 @@ async def v2_prompt(body: PromptRequest, user: dict = Depends(get_user)):
                 planner_context = build_planner_context(session.context)
                 rule_config = RuleConfig()
                 audit.context_build_time_ms = (_time.monotonic() - ctx_start) * 1000
+                image_path = session.original_render if cad_settings.vision_enabled else None
 
                 llm_start = _time.monotonic()
                 changeset = run_planner(
                     prompt=body.prompt,
                     drawing_context=planner_context,
+                    image_path=image_path,
                     context=session.context,
                     rule_config=rule_config,
                     conversation_history=session.conversation_history or None,
