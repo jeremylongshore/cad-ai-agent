@@ -372,13 +372,6 @@ PDF_TEXT_HEIGHT_RATIO = 0.7
 _DXF_LW_MIN = 13
 _DXF_LW_MAX = 211
 
-# Standard DXF linetypes mapped from common PDF dash patterns
-_STANDARD_LINETYPES = {
-    "DASHED": "DASHED",
-    "DOTTED": "DOT",
-    "DASHDOT": "DASHDOT",
-    "CENTER": "CENTER",
-}
 
 
 def _parse_pdf_dashes(dashes) -> list[float]:
