@@ -55,6 +55,7 @@ sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from cad_dxf_agent.core.edit_history import EditHistory  # noqa: E402
 from cad_dxf_agent.otel import span as otel_span  # noqa: E402
+from cad_dxf_agent.settings import settings as cad_settings  # noqa: E402
 
 from .api_v1 import router as v1_router  # noqa: E402
 from .auth import _get_profile, _get_tenant, _update_profile, get_licensed_user  # noqa: E402
@@ -1013,8 +1014,6 @@ async def upload(
 
     # Initialize edit history for undo/redo (EPIC-CAD-27)
     try:
-        from cad_dxf_agent.settings import settings as cad_settings
-
         session.edit_history = EditHistory(
             session.working_path, max_snapshots=cad_settings.max_undo_snapshots
         )
@@ -1103,7 +1102,6 @@ async def plan(body: PlanRequest, user: dict = Depends(get_user)):
         from cad_dxf_agent.core.validators import validate_changeset
         from cad_dxf_agent.llm.planner import run_planner
         from cad_dxf_agent.models.config_schema import RuleConfig
-        from cad_dxf_agent.settings import settings as cad_settings
 
         planner_context = build_planner_context(session.context)
         rule_config = RuleConfig()
@@ -1552,7 +1550,6 @@ async def v2_prompt(body: PromptRequest, user: dict = Depends(get_user)):
                 from cad_dxf_agent.core.validators import validate_changeset
                 from cad_dxf_agent.llm.planner import run_planner
                 from cad_dxf_agent.models.config_schema import RuleConfig
-                from cad_dxf_agent.settings import settings as cad_settings
 
                 ctx_start = _time.monotonic()
                 planner_context = build_planner_context(session.context)
