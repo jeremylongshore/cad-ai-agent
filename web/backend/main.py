@@ -1103,13 +1103,16 @@ async def plan(body: PlanRequest, user: dict = Depends(get_user)):
         from cad_dxf_agent.core.validators import validate_changeset
         from cad_dxf_agent.llm.planner import run_planner
         from cad_dxf_agent.models.config_schema import RuleConfig
+        from cad_dxf_agent.settings import settings as cad_settings
 
         planner_context = build_planner_context(session.context)
         rule_config = RuleConfig()
+        image_path = session.original_render if cad_settings.vision_enabled else None
 
         changeset = run_planner(
             prompt=body.prompt,
             drawing_context=planner_context,
+            image_path=image_path,
             context=session.context,
             rule_config=rule_config,
             conversation_history=session.conversation_history or None,
@@ -1549,16 +1552,19 @@ async def v2_prompt(body: PromptRequest, user: dict = Depends(get_user)):
                 from cad_dxf_agent.core.validators import validate_changeset
                 from cad_dxf_agent.llm.planner import run_planner
                 from cad_dxf_agent.models.config_schema import RuleConfig
+                from cad_dxf_agent.settings import settings as cad_settings
 
                 ctx_start = _time.monotonic()
                 planner_context = build_planner_context(session.context)
                 rule_config = RuleConfig()
                 audit.context_build_time_ms = (_time.monotonic() - ctx_start) * 1000
+                image_path = session.original_render if cad_settings.vision_enabled else None
 
                 llm_start = _time.monotonic()
                 changeset = run_planner(
                     prompt=body.prompt,
                     drawing_context=planner_context,
+                    image_path=image_path,
                     context=session.context,
                     rule_config=rule_config,
                     conversation_history=session.conversation_history or None,
