@@ -10,6 +10,7 @@ PDF conversion extracts vector geometry from CAD-generated PDFs only.
 from __future__ import annotations
 
 import logging
+import re
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -363,6 +364,10 @@ PDF_PAGE_GAP = 50.0  # gap between pages in DXF units (~17.6mm)
 PDF_MIN_ENTITY_SIZE = 1.0
 PDF_MAX_HATCH_ENTITIES = 500
 
+# PDF bbox height includes ascenders/descenders and line spacing padding.
+# Empirical ratio to approximate the actual glyph cap-height from bbox height.
+PDF_TEXT_HEIGHT_RATIO = 0.7
+
 # DXF lineweight range (hundredths of mm): 13 (0.13mm) to 211 (2.11mm)
 _DXF_LW_MIN = 13
 _DXF_LW_MAX = 211
@@ -394,8 +399,6 @@ def _parse_pdf_dashes(dashes) -> list[float]:
             return []
     if isinstance(dashes, str):
         # Parse "[3 2] 0" format — extract numbers inside brackets
-        import re
-
         match = re.search(r"\[([^\]]*)\]", dashes)
         if not match:
             return []
@@ -429,27 +432,29 @@ def _classify_dash_pattern(dash_values: list[float]) -> str:
 
     ratio = dash_len / gap_len
 
-    # Dot pattern: very short dash relative to gap
+    # Dot: dash segment < 1pt is a rendered dot (typical PDF dot = 0.5pt or less)
     if dash_len < 1.0:
         return "DOT"
 
-    # Dash-dot: 4+ element pattern (dash, gap, dot, gap)
+    # Multi-element patterns: [dash, gap, dot, gap, ...] indicate dash-dot styles.
+    # The 3rd element being < 30% of the 1st indicates a "dot" between dashes.
     if len(dash_values) >= 4:
         dot_len = dash_values[2]
         if dot_len < dash_len * 0.3:
+            # 6+ elements = CENTER (dash-dot-dash), 4 = DASHDOT (dash-dot)
             if len(dash_values) >= 6:
-                return "CENTER"  # dash-dot-dash pattern
+                return "CENTER"
             return "DASHDOT"
 
-    # Short dashes (ratio near 1:1)
-    if 0.3 < ratio < 3.0:
+    # 2-element patterns: classify by dash/gap ratio.
+    # Ratio 0.3-3.0 covers standard dashed lines (e.g., [3,2]=1.5, [6,3]=2.0).
+    # Ratio ≥3.0 = long dashes with tight gaps — still reads as dashed.
+    if ratio >= 0.3:
         return "DASHED"
 
-    # Long dashes with short gaps
-    if ratio >= 3.0:
-        return "DASHED"
-
-    return "DASHED"
+    # Ratio < 0.3 = very short dash, long gap — unusual, treat as continuous
+    # rather than guessing wrong.
+    return "CONTINUOUS"
 
 
 def _create_fill_hatch(msp, path_item, x_offset, page_height, layer, hatch_count):
@@ -513,7 +518,6 @@ def _extract_pdf_fitz(msp, source_path: Path, doc=None) -> int:
     import math
 
     import fitz
-    from ezdxf.math import Bezier4P, Vec2, bezier_to_bspline
 
     min_size = settings.pdf_min_entity_size
     pdf_doc = fitz.open(str(source_path))
@@ -610,9 +614,6 @@ def _extract_pdf_fitz(msp, source_path: Path, doc=None) -> int:
                             page_height,
                             x_offset,
                             attribs,
-                            Bezier4P,
-                            Vec2,
-                            bezier_to_bspline,
                         )
                     if entity is not None:
                         _set_entity_rgb(entity, stroke_rgb)
@@ -656,7 +657,7 @@ def _extract_pdf_fitz(msp, source_path: Path, doc=None) -> int:
                     if font_size and float(font_size) > 0:
                         height = float(font_size)
                     else:
-                        height = max(float(bbox[3]) - float(bbox[1]), 1.0) * 0.7
+                        height = max(float(bbox[3]) - float(bbox[1]), 1.0) * PDF_TEXT_HEIGHT_RATIO
 
                     # Extract text color from PyMuPDF packed int
                     span_color_int = span.get("color", 0)
@@ -787,32 +788,22 @@ def _fit_arc_from_bezier(p1, p2, p3, p4, page_height: float):
     return (ux, uy, radius, start_angle, end_angle)
 
 
-def _bezier_to_spline(
-    msp,
-    p1,
-    p2,
-    p3,
-    p4,
-    page_height,
-    x_offset,
-    attribs,
-    bezier4p_cls,
-    vec2_cls,
-    bspline_fn,
-):
+def _bezier_to_spline(msp, p1, p2, p3, p4, page_height, x_offset, attribs):
     """Create a native DXF SPLINE from cubic Bezier control points.
 
     Uses ezdxf's bezier_to_bspline() for exact curve preservation. Falls back
     to an adaptive polyline if the BSpline conversion fails unexpectedly.
     """
+    from ezdxf.math import Bezier4P, Vec2, bezier_to_bspline
+
     try:
         ctrl = [
-            vec2_cls(x_offset + float(p1.x), page_height - float(p1.y)),
-            vec2_cls(x_offset + float(p2.x), page_height - float(p2.y)),
-            vec2_cls(x_offset + float(p3.x), page_height - float(p3.y)),
-            vec2_cls(x_offset + float(p4.x), page_height - float(p4.y)),
+            Vec2(x_offset + float(p1.x), page_height - float(p1.y)),
+            Vec2(x_offset + float(p2.x), page_height - float(p2.y)),
+            Vec2(x_offset + float(p3.x), page_height - float(p3.y)),
+            Vec2(x_offset + float(p4.x), page_height - float(p4.y)),
         ]
-        bsp = bspline_fn([bezier4p_cls(ctrl)])
+        bsp = bezier_to_bspline([Bezier4P(ctrl)])
         entity = msp.add_spline(dxfattribs=attribs)
         entity.apply_construction_tool(bsp)
         return entity
@@ -904,7 +895,7 @@ def _extract_pdf_page_plumber(msp, page, page_num: int, x_offset: float = 0.0) -
         height = max(float(word["bottom"]) - float(word["top"]), 1.0)
         msp.add_text(
             text,
-            height=height * 0.7,  # approximate PDF text height to DXF
+            height=height * PDF_TEXT_HEIGHT_RATIO,
             dxfattribs={"layer": layer, "color": PDF_ENTITY_COLOR, "insert": (x, y)},
         )
         count += 1

@@ -1505,7 +1505,6 @@ class TestSplineCreation:
     def test_bezier_to_spline_creates_spline_entity(self):
         """_bezier_to_spline should create a SPLINE entity with correct control points."""
         import ezdxf
-        from ezdxf.math import Bezier4P, Vec2, bezier_to_bspline
 
         from cad_dxf_agent.core.converter import _bezier_to_spline
 
@@ -1525,9 +1524,6 @@ class TestSplineCreation:
             page_height=200,
             x_offset=0,
             attribs={"layer": "0", "color": 7},
-            bezier4p_cls=Bezier4P,
-            vec2_cls=Vec2,
-            bspline_fn=bezier_to_bspline,
         )
         assert entity is not None
         assert entity.dxftype() == "SPLINE"
@@ -1536,7 +1532,6 @@ class TestSplineCreation:
     def test_bezier_to_spline_with_offset(self):
         """SPLINE control points should be offset by x_offset."""
         import ezdxf
-        from ezdxf.math import Bezier4P, Vec2, bezier_to_bspline
 
         from cad_dxf_agent.core.converter import _bezier_to_spline
 
@@ -1556,9 +1551,6 @@ class TestSplineCreation:
             page_height=100,
             x_offset=500,
             attribs={"layer": "0"},
-            bezier4p_cls=Bezier4P,
-            vec2_cls=Vec2,
-            bspline_fn=bezier_to_bspline,
         )
         assert entity is not None
         # First control point X should be >= 500 (offset)
