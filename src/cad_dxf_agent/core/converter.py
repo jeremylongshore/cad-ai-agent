@@ -358,98 +358,14 @@ def _rgb_to_aci(rgb_tuple) -> int:
 
 PDF_PAGE_GAP = 50.0  # gap between pages in DXF units (~17.6mm)
 
-# Legacy module-level constants — kept for backward compatibility with tests
-# that import them directly. At runtime, _extract_pdf_fitz reads from settings.
+# Minimum entity length in PDF points.  PDF path decomposition produces
+# thousands of sub-pixel strokes (fill patterns, hatch artifacts, stroke caps)
+# that add density without readable information.  Filtering these reduces the
+# "black blob" effect when viewing dense structural PDFs at auto-fit zoom.
 PDF_MIN_ENTITY_SIZE = 1.0
+
+# Maximum HATCH entities per page to avoid bloating files with fill patterns.
 PDF_MAX_HATCH_ENTITIES = 500
-
-# DXF lineweight range (hundredths of mm): 13 (0.13mm) to 211 (2.11mm)
-_DXF_LW_MIN = 13
-_DXF_LW_MAX = 211
-
-# Standard DXF linetypes mapped from common PDF dash patterns
-_STANDARD_LINETYPES = {
-    "DASHED": "DASHED",
-    "DOTTED": "DOT",
-    "DASHDOT": "DASHDOT",
-    "CENTER": "CENTER",
-}
-
-
-def _parse_pdf_dashes(dashes) -> list[float]:
-    """Parse PDF dash pattern into a list of numeric dash/gap lengths.
-
-    PyMuPDF returns dashes as a string like ``"[3 2] 0"`` (PDF array + phase)
-    or sometimes as an actual list/tuple. Handles both.
-
-    Returns:
-        List of dash/gap lengths, or empty list if no pattern.
-    """
-    if dashes is None:
-        return []
-    if isinstance(dashes, (list, tuple)):
-        try:
-            return [float(v) for v in dashes if float(v) != 0]
-        except (TypeError, ValueError):
-            return []
-    if isinstance(dashes, str):
-        # Parse "[3 2] 0" format — extract numbers inside brackets
-        import re
-
-        match = re.search(r"\[([^\]]*)\]", dashes)
-        if not match:
-            return []
-        inner = match.group(1).strip()
-        if not inner:
-            return []
-        try:
-            return [float(v) for v in inner.split()]
-        except ValueError:
-            return []
-    return []
-
-
-def _classify_dash_pattern(dash_values: list[float]) -> str:
-    """Map parsed PDF dash lengths to a standard DXF linetype name.
-
-    Args:
-        dash_values: List of dash/gap lengths (already parsed).
-
-    Returns:
-        DXF linetype name: DASHED, DOT, DASHDOT, CENTER, or CONTINUOUS.
-    """
-    if len(dash_values) < 2:
-        return "CONTINUOUS"
-
-    dash_len = dash_values[0]
-    gap_len = dash_values[1]
-
-    if dash_len <= 0 or gap_len <= 0:
-        return "CONTINUOUS"
-
-    ratio = dash_len / gap_len
-
-    # Dot pattern: very short dash relative to gap
-    if dash_len < 1.0:
-        return "DOT"
-
-    # Dash-dot: 4+ element pattern (dash, gap, dot, gap)
-    if len(dash_values) >= 4:
-        dot_len = dash_values[2]
-        if dot_len < dash_len * 0.3:
-            if len(dash_values) >= 6:
-                return "CENTER"  # dash-dot-dash pattern
-            return "DASHDOT"
-
-    # Short dashes (ratio near 1:1)
-    if 0.3 < ratio < 3.0:
-        return "DASHED"
-
-    # Long dashes with short gaps
-    if ratio >= 3.0:
-        return "DASHED"
-
-    return "DASHED"
 
 
 def _create_fill_hatch(msp, path_item, x_offset, page_height, layer, hatch_count):
@@ -458,7 +374,7 @@ def _create_fill_hatch(msp, path_item, x_offset, page_height, layer, hatch_count
     Returns (hatch_or_none, updated_hatch_count).
     """
     fill_rgb = path_item.get("fill")
-    if fill_rgb is None or hatch_count >= settings.pdf_max_hatch_entities:
+    if fill_rgb is None or hatch_count >= PDF_MAX_HATCH_ENTITIES:
         return None, hatch_count
 
     items = path_item.get("items", [])
@@ -513,9 +429,7 @@ def _extract_pdf_fitz(msp, source_path: Path, doc=None) -> int:
     import math
 
     import fitz
-    from ezdxf.math import Bezier4P, Vec2, bezier_to_bspline
 
-    min_size = settings.pdf_min_entity_size
     pdf_doc = fitz.open(str(source_path))
     total = 0
     x_offset = 0.0
@@ -534,20 +448,6 @@ def _extract_pdf_fitz(msp, source_path: Path, doc=None) -> int:
             stroke_color = _rgb_to_aci(path_item.get("color"))
             stroke_rgb = path_item.get("color")
 
-            # Extract stroke width and dash pattern from PDF path
-            stroke_width = path_item.get("width", 0)
-
-            # Build base attribs with optional lineweight and linetype
-            base_attribs: dict = {}
-            if stroke_width and float(stroke_width) > 0:
-                lw = max(_DXF_LW_MIN, min(_DXF_LW_MAX, int(float(stroke_width) * 25)))
-                base_attribs["lineweight"] = lw
-            dash_values = _parse_pdf_dashes(path_item.get("dashes", None))
-            if dash_values:
-                lt = _classify_dash_pattern(dash_values)
-                if lt != "CONTINUOUS":
-                    base_attribs["linetype"] = lt
-
             # Create fill HATCH if path has a fill color
             if path_item.get("fill") is not None:
                 hatch, hatch_count = _create_fill_hatch(
@@ -558,13 +458,13 @@ def _extract_pdf_fitz(msp, source_path: Path, doc=None) -> int:
 
             for item in path_item.get("items", []):
                 kind = item[0]
-                attribs = {"layer": layer, "color": stroke_color, **base_attribs}
+                attribs = {"layer": layer, "color": stroke_color}
 
                 if kind == "l":  # Line
                     p1, p2 = item[1], item[2]
                     x0, y0 = x_offset + float(p1.x), page_height - float(p1.y)
                     x1, y1 = x_offset + float(p2.x), page_height - float(p2.y)
-                    if math.hypot(x1 - x0, y1 - y0) < min_size:
+                    if math.hypot(x1 - x0, y1 - y0) < PDF_MIN_ENTITY_SIZE:
                         continue
                     entity = msp.add_line((x0, y0), (x1, y1), dxfattribs=attribs)
                     _set_entity_rgb(entity, stroke_rgb)
@@ -576,7 +476,7 @@ def _extract_pdf_fitz(msp, source_path: Path, doc=None) -> int:
                     y0 = page_height - float(rect.y0)
                     x1 = x_offset + float(rect.x1)
                     y1 = page_height - float(rect.y1)
-                    if abs(x1 - x0) < min_size and abs(y1 - y0) < min_size:
+                    if abs(x1 - x0) < PDF_MIN_ENTITY_SIZE and abs(y1 - y0) < PDF_MIN_ENTITY_SIZE:
                         continue
                     points = [(x0, y0), (x1, y0), (x1, y1), (x0, y1)]
                     entity = msp.add_lwpolyline(points, close=True, dxfattribs=attribs)
@@ -587,7 +487,7 @@ def _extract_pdf_fitz(msp, source_path: Path, doc=None) -> int:
                     p1, p2, p3, p4 = item[1], item[2], item[3], item[4]
                     # Skip tiny curves (fill artifacts)
                     chord = math.hypot(float(p4.x) - float(p1.x), float(p4.y) - float(p1.y))
-                    if chord < min_size:
+                    if chord < PDF_MIN_ENTITY_SIZE:
                         continue
                     arc = _fit_arc_from_bezier(p1, p2, p3, p4, page_height)
                     if arc:
@@ -600,20 +500,13 @@ def _extract_pdf_fitz(msp, source_path: Path, doc=None) -> int:
                             dxfattribs=attribs,
                         )
                     else:
-                        # Create native DXF SPLINE from Bezier control points
-                        entity = _bezier_to_spline(
-                            msp,
-                            p1,
-                            p2,
-                            p3,
-                            p4,
-                            page_height,
-                            x_offset,
-                            attribs,
-                            Bezier4P,
-                            Vec2,
-                            bezier_to_bspline,
-                        )
+                        # Approximate as polyline segments
+                        pts = _bezier_to_points(p1, p2, p3, p4, page_height, segments=8)
+                        if len(pts) >= 2:
+                            shifted = [(x_offset + px, py) for px, py in pts]
+                            entity = msp.add_lwpolyline(shifted, dxfattribs=attribs)
+                        else:
+                            entity = None
                     if entity is not None:
                         _set_entity_rgb(entity, stroke_rgb)
                     total += 1
@@ -650,13 +543,7 @@ def _extract_pdf_fitz(msp, source_path: Path, doc=None) -> int:
                     bbox = span.get("bbox", (0, 0, 0, 0))
                     x = x_offset + float(bbox[0])
                     y = page_height - float(bbox[1])
-
-                    # Prefer span font size over bbox-derived height
-                    font_size = span.get("size", None)
-                    if font_size and float(font_size) > 0:
-                        height = float(font_size)
-                    else:
-                        height = max(float(bbox[3]) - float(bbox[1]), 1.0) * 0.7
+                    height = max(float(bbox[3]) - float(bbox[1]), 1.0)
 
                     # Extract text color from PyMuPDF packed int
                     span_color_int = span.get("color", 0)
@@ -666,7 +553,7 @@ def _extract_pdf_fitz(msp, source_path: Path, doc=None) -> int:
 
                     text_entity = msp.add_text(
                         text,
-                        height=height,
+                        height=height * 0.7,
                         dxfattribs={
                             "layer": layer,
                             "color": PDF_ENTITY_COLOR,
@@ -686,150 +573,51 @@ def _extract_pdf_fitz(msp, source_path: Path, doc=None) -> int:
 def _fit_arc_from_bezier(p1, p2, p3, p4, page_height: float):
     """Try to fit a circular arc to a cubic Bezier curve.
 
-    Samples 5 points along the Bezier (t=0, 0.25, 0.5, 0.75, 1.0) and uses
-    the Kåsa algebraic least-squares method to fit a circle. Checks that the
-    maximum deviation from the fitted circle is within tolerance.
-
     Returns (cx, cy, radius, start_angle, end_angle) if the Bezier is
     near-circular, or None if it's a general curve.
     """
     import math
 
-    tolerance = settings.pdf_arc_tolerance
+    # Convert to DXF coords (flip Y)
+    x0, y0 = float(p1.x), page_height - float(p1.y)
+    x1, y1 = float(p2.x), page_height - float(p2.y)
+    x2, y2 = float(p3.x), page_height - float(p3.y)
+    x3, y3 = float(p4.x), page_height - float(p4.y)
 
-    # Convert control points to DXF coords (flip Y)
-    cp = [
-        (float(p1.x), page_height - float(p1.y)),
-        (float(p2.x), page_height - float(p2.y)),
-        (float(p3.x), page_height - float(p3.y)),
-        (float(p4.x), page_height - float(p4.y)),
-    ]
+    # Mid-point of the Bezier (t=0.5)
+    mx = 0.125 * (x0 + 3 * x1 + 3 * x2 + x3)
+    my = 0.125 * (y0 + 3 * y1 + 3 * y2 + y3)
 
-    # Sample 5 points along the Bezier at t = 0, 0.25, 0.5, 0.75, 1.0
-    sample_pts = []
-    for t in (0.0, 0.25, 0.5, 0.75, 1.0):
-        mt = 1 - t
-        mt2 = mt * mt
-        mt3 = mt2 * mt
-        t2 = t * t
-        t3 = t2 * t
-        sx = mt3 * cp[0][0] + 3 * mt2 * t * cp[1][0] + 3 * mt * t2 * cp[2][0] + t3 * cp[3][0]
-        sy = mt3 * cp[0][1] + 3 * mt2 * t * cp[1][1] + 3 * mt * t2 * cp[2][1] + t3 * cp[3][1]
-        sample_pts.append((sx, sy))
+    # Try to find circumscribed circle of start, mid, end points
+    ax, ay = x0, y0
+    bx, by = mx, my
+    cx, cy = x3, y3
 
-    n = len(sample_pts)
+    d = 2 * (ax * (by - cy) + bx * (cy - ay) + cx * (ay - by))
+    if abs(d) < 1e-10:
+        return None  # Collinear — not an arc
 
-    # Kåsa algebraic least-squares circle fit
-    # Solve: [sum(xi²) sum(xi*yi) sum(xi)] [A]   [sum(xi³ + xi*yi²)]
-    #        [sum(xi*yi) sum(yi²) sum(yi)] [B] = [sum(xi²*yi + yi³)]
-    #        [sum(xi)    sum(yi)  n      ] [C]   [sum(xi² + yi²)    ]
-    sx = sum(p[0] for p in sample_pts)
-    sy = sum(p[1] for p in sample_pts)
-    sx2 = sum(p[0] ** 2 for p in sample_pts)
-    sy2 = sum(p[1] ** 2 for p in sample_pts)
-    sxy = sum(p[0] * p[1] for p in sample_pts)
-    sx3 = sum(p[0] ** 3 for p in sample_pts)
-    sy3 = sum(p[1] ** 3 for p in sample_pts)
-    sx2y = sum(p[0] ** 2 * p[1] for p in sample_pts)
-    sxy2 = sum(p[0] * p[1] ** 2 for p in sample_pts)
+    a_sq = ax * ax + ay * ay
+    b_sq = bx * bx + by * by
+    c_sq = cx * cx + cy * cy
+    ux = (a_sq * (by - cy) + b_sq * (cy - ay) + c_sq * (ay - by)) / d
+    uy = (a_sq * (cx - bx) + b_sq * (ax - cx) + c_sq * (bx - ax)) / d
 
-    # 3x3 linear system: M * [A, B, C]^T = rhs
-    m00, m01, m02 = sx2, sxy, sx
-    m10, m11, m12 = sxy, sy2, sy
-    m20, m21, m22 = sx, sy, float(n)
-    rhs0 = sx3 + sxy2
-    rhs1 = sx2y + sy3
-    rhs2 = sx2 + sy2
+    r1 = math.hypot(ax - ux, ay - uy)
+    r2 = math.hypot(bx - ux, by - uy)
+    r3 = math.hypot(cx - ux, cy - uy)
 
-    # Solve via Cramer's rule
-    det = (
-        m00 * (m11 * m22 - m12 * m21)
-        - m01 * (m10 * m22 - m12 * m20)
-        + m02 * (m10 * m21 - m11 * m20)
-    )
-    if abs(det) < 1e-10:
-        return None  # Degenerate — points are collinear
-
-    a_val = (
-        rhs0 * (m11 * m22 - m12 * m21)
-        - m01 * (rhs1 * m22 - m12 * rhs2)
-        + m02 * (rhs1 * m21 - m11 * rhs2)
-    ) / det
-    b_val = (
-        m00 * (rhs1 * m22 - m12 * rhs2)
-        - rhs0 * (m10 * m22 - m12 * m20)
-        + m02 * (m10 * rhs2 - rhs1 * m20)
-    ) / det
-    c_val = (
-        m00 * (m11 * rhs2 - rhs1 * m21)
-        - m01 * (m10 * rhs2 - rhs1 * m20)
-        + rhs0 * (m10 * m21 - m11 * m20)
-    ) / det
-
-    ux = a_val / 2
-    uy = b_val / 2
-    r_sq = c_val + ux * ux + uy * uy
-    if r_sq <= 0:
+    # Check if all three radii match (within 5% tolerance)
+    avg_r = (r1 + r2 + r3) / 3
+    if avg_r < 0.1:
         return None
-    radius = math.sqrt(r_sq)
-
-    if radius < 0.1:
-        return None
-
-    # Check max deviation from fitted circle
-    max_dev = max(abs(math.hypot(px - ux, py - uy) - radius) for px, py in sample_pts)
-    if max_dev / radius > tolerance:
+    if max(abs(r1 - avg_r), abs(r2 - avg_r), abs(r3 - avg_r)) / avg_r > 0.05:
         return None  # Not circular enough
 
-    start_angle = math.atan2(sample_pts[0][1] - uy, sample_pts[0][0] - ux)
-    end_angle = math.atan2(sample_pts[-1][1] - uy, sample_pts[-1][0] - ux)
+    start_angle = math.atan2(ay - uy, ax - ux)
+    end_angle = math.atan2(cy - uy, cx - ux)
 
-    return (ux, uy, radius, start_angle, end_angle)
-
-
-def _bezier_to_spline(
-    msp,
-    p1,
-    p2,
-    p3,
-    p4,
-    page_height,
-    x_offset,
-    attribs,
-    bezier4p_cls,
-    vec2_cls,
-    bspline_fn,
-):
-    """Create a native DXF SPLINE from cubic Bezier control points.
-
-    Uses ezdxf's bezier_to_bspline() for exact curve preservation. Falls back
-    to an adaptive polyline if the BSpline conversion fails unexpectedly.
-    """
-    try:
-        ctrl = [
-            vec2_cls(x_offset + float(p1.x), page_height - float(p1.y)),
-            vec2_cls(x_offset + float(p2.x), page_height - float(p2.y)),
-            vec2_cls(x_offset + float(p3.x), page_height - float(p3.y)),
-            vec2_cls(x_offset + float(p4.x), page_height - float(p4.y)),
-        ]
-        bsp = bspline_fn([bezier4p_cls(ctrl)])
-        entity = msp.add_spline(dxfattribs=attribs)
-        entity.apply_construction_tool(bsp)
-        return entity
-    except Exception:
-        # Fallback: adaptive polyline
-        pts = _bezier_to_points(
-            p1,
-            p2,
-            p3,
-            p4,
-            page_height,
-            segments=settings.pdf_bezier_segments,
-        )
-        if len(pts) >= 2:
-            shifted = [(x_offset + px, py) for px, py in pts]
-            return msp.add_lwpolyline(shifted, dxfattribs=attribs)
-        return None
+    return (ux, uy, avg_r, start_angle, end_angle)
 
 
 def _bezier_to_points(p1, p2, p3, p4, page_height: float, segments: int = 8):
@@ -875,7 +663,7 @@ def _extract_pdf_page_plumber(msp, page, page_num: int, x_offset: float = 0.0) -
         page_height = float(page.height)
         y0 = page_height - y0
         y1 = page_height - y1
-        if math.hypot(x1 - x0, y1 - y0) < settings.pdf_min_entity_size:
+        if math.hypot(x1 - x0, y1 - y0) < PDF_MIN_ENTITY_SIZE:
             continue
         msp.add_line((x0, y0), (x1, y1), dxfattribs=attribs)
         count += 1
@@ -888,8 +676,7 @@ def _extract_pdf_page_plumber(msp, page, page_num: int, x_offset: float = 0.0) -
         page_height = float(page.height)
         y0 = page_height - y0
         y1 = page_height - y1
-        min_sz = settings.pdf_min_entity_size
-        if abs(x1 - x0) < min_sz and abs(y1 - y0) < min_sz:
+        if abs(x1 - x0) < PDF_MIN_ENTITY_SIZE and abs(y1 - y0) < PDF_MIN_ENTITY_SIZE:
             continue
         points = [(x0, y0), (x1, y0), (x1, y1), (x0, y1)]
         msp.add_lwpolyline(points, close=True, dxfattribs=attribs)
