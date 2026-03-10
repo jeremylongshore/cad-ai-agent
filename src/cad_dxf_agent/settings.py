@@ -84,6 +84,12 @@ class Settings:
             os.getenv("CAD_ROUTER_CONFIDENCE_THRESHOLD", "0.9")
         )
 
+        # PDF conversion tuning
+        self.pdf_arc_tolerance: float = float(os.getenv("CAD_PDF_ARC_TOLERANCE", "0.05"))
+        self.pdf_bezier_segments: int = int(os.getenv("CAD_PDF_BEZIER_SEGMENTS", "8"))
+        self.pdf_max_hatch_entities: int = int(os.getenv("CAD_PDF_MAX_HATCH_ENTITIES", "500"))
+        self.pdf_min_entity_size: float = float(os.getenv("CAD_PDF_MIN_ENTITY_SIZE", "1.0"))
+
         # Edit history
         self.max_undo_snapshots: int = int(os.getenv("CAD_MAX_UNDO_SNAPSHOTS", "50"))
 
