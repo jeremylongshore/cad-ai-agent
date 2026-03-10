@@ -1,3 +1,3 @@
 """cad-dxf-agent: Local-first DXF layout editor with LLM-assisted prompt-to-edit planning."""
 
-__version__ = "0.8.0"
+__version__ = "0.9.0"

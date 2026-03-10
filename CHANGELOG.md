@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-03-09
+
+### Added
+- **EPIC-CAD-30: User Accounts, Workspaces & Persistent Work Progress**: Tenant + UserProfile auto-provisioned on first login via Firestore, WorkProgress auto-saves on apply and restores on document load (#113)
+- Profile and workspace caches with in-process TTL (5min/10min)
+- New endpoints: GET/PUT `/api/profile`, GET `/api/workspace`, save-progress, clear-progress
+- Document list now shows `has_work_progress` flag, load/reconnect has `restored` flag
+
+### Fixed
+- Add rtree + libspatialindex to Docker image for spatial indexing
+- Use semicolons in CAD_ALLOWED_EMAILS to avoid gcloud delimiter conflict
+
+### Changed
+- README rewrite for v0.9.0 Drawing Intelligence Platform (#114)
+- GCS paths now use `documents/{tenant_id}/{user_id}/{doc_id}/` with legacy fallback
+
+### Documentation
+- Comprehensive README update with new positioning as "Drawing Intelligence Platform"
+
 ## [0.8.0] - 2026-03-08
 
 ### Added
