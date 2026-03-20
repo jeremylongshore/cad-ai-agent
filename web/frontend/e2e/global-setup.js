@@ -3,8 +3,9 @@
  * Global setup: authenticate once and save the auth state.
  *
  * - LOCAL mode (default): uses dev-auth bypass (VITE_DEV_AUTH=1)
- * - PRODUCTION mode (TARGET=production): signs in via email/password
- *   using the E2E test account (e2e-tester@intentcad.dev).
+ * - PRODUCTION mode (TARGET=production): signs in via Firebase Auth REST API
+ *   then uses Playwright's route interception to inject auth tokens into
+ *   backend API calls. The app's useAuth hook picks up the auth state.
  *
  * All tests reuse the saved storage state to avoid repeated auth calls.
  */
@@ -17,6 +18,27 @@ const STORAGE_STATE_PATH = path.join(import.meta.dirname, '..', 'test-results', 
 
 const TARGET = process.env.TARGET || 'local';
 const isProduction = TARGET === 'production';
+
+const FIREBASE_API_KEY = 'AIzaSyD2ocFCZ9h9xZqU0GYojASqpsA1IwIIpGI';
+
+/**
+ * Sign in via Firebase Auth REST API (no SDK needed).
+ */
+async function firebaseSignIn(email, password) {
+  const resp = await fetch(
+    `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${FIREBASE_API_KEY}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password, returnSecureToken: true }),
+    }
+  );
+  const data = await resp.json();
+  if (data.error) {
+    throw new Error(`Firebase sign-in failed: ${data.error.message}`);
+  }
+  return data;
+}
 
 export default async function globalSetup(config) {
   const projectRoot = path.resolve(import.meta.dirname, '..', '..', '..');
@@ -45,7 +67,7 @@ export default async function globalSetup(config) {
   const page = await context.newPage();
 
   if (isProduction) {
-    // --- Production auth: email/password via Firebase SDK ---
+    // --- Production auth: sign in via REST API, inject via script tag ---
     const email = process.env.E2E_TEST_EMAIL || 'e2e-tester@intentcad.dev';
     const password = process.env.E2E_TEST_PASSWORD;
     if (!password) {
@@ -56,42 +78,92 @@ export default async function globalSetup(config) {
       );
     }
 
-    await page.goto(baseURL);
+    // 1. Sign in via REST API (Node.js side)
+    console.log(`Signing in as ${email} via Firebase REST API...`);
+    const signInResult = await firebaseSignIn(email, password);
 
-    // Wait for the login page to be ready (Firebase SDK loaded)
-    await page.locator('button').filter({ hasText: 'Sign in with Google' }).waitFor({
-      state: 'visible',
-      timeout: 30_000,
+    // 2. Use addInitScript to inject auth state BEFORE Firebase initializes.
+    //    This writes to IndexedDB synchronously (via a blocking pattern)
+    //    before the app's Firebase SDK reads from it.
+    const authPayload = JSON.stringify({
+      apiKey: FIREBASE_API_KEY,
+      uid: signInResult.localId,
+      email: signInResult.email,
+      refreshToken: signInResult.refreshToken,
+      idToken: signInResult.idToken,
     });
 
-    // Sign in via Firebase SDK directly in the browser context
-    await page.evaluate(async ({ email, password }) => {
-      const { initializeApp } = await import('https://www.gstatic.com/firebasejs/11.1.0/firebase-app.js');
-      const { getAuth, signInWithEmailAndPassword } = await import('https://www.gstatic.com/firebasejs/11.1.0/firebase-auth.js');
+    await context.addInitScript(`
+      (function() {
+        var payload = ${authPayload};
+        var dbName = 'firebaseLocalStorageDb';
+        var storeName = 'firebaseLocalStorage';
+        var key = 'firebase:authUser:' + payload.apiKey + ':[DEFAULT]';
 
-      // Use the same config as the app (read from window or hardcode project config)
-      const config = {
-        apiKey: 'AIzaSyD2ocFCZ9h9xZqU0GYojASqpsA1IwIIpGI',
-        authDomain: 'cad-dxf-agent.firebaseapp.com',
-        projectId: 'cad-dxf-agent',
-      };
+        var authUser = {
+          uid: payload.uid,
+          email: payload.email,
+          emailVerified: false,
+          displayName: null,
+          isAnonymous: false,
+          providerData: [{
+            providerId: 'password',
+            uid: payload.email,
+            displayName: null,
+            email: payload.email,
+            phoneNumber: null,
+            photoURL: null,
+          }],
+          stsTokenManager: {
+            refreshToken: payload.refreshToken,
+            accessToken: payload.idToken,
+            expirationTime: Date.now() + 3600 * 1000,
+          },
+          createdAt: String(Date.now()),
+          lastLoginAt: String(Date.now()),
+          apiKey: payload.apiKey,
+          appName: '[DEFAULT]',
+        };
 
-      // Firebase may already be initialized — try getAuth on existing app
-      let auth;
-      try {
-        const app = initializeApp(config, '__e2e_auth__');
-        auth = getAuth(app);
-      } catch {
-        auth = getAuth();
-      }
+        // Open IndexedDB and write auth user — Firebase reads this on init
+        var req = indexedDB.open(dbName);
+        req.onupgradeneeded = function(e) {
+          var db = e.target.result;
+          if (!db.objectStoreNames.contains(storeName)) {
+            db.createObjectStore(storeName);
+          }
+        };
+        req.onsuccess = function(e) {
+          var db = e.target.result;
+          if (!db.objectStoreNames.contains(storeName)) {
+            db.close();
+            var req2 = indexedDB.open(dbName, db.version + 1);
+            req2.onupgradeneeded = function(e2) {
+              e2.target.result.createObjectStore(storeName);
+            };
+            req2.onsuccess = function(e2) {
+              var db2 = e2.target.result;
+              var tx = db2.transaction(storeName, 'readwrite');
+              tx.objectStore(storeName).put({ fbase_key: key, value: authUser }, key);
+              tx.oncomplete = function() { db2.close(); };
+            };
+          } else {
+            var tx = db.transaction(storeName, 'readwrite');
+            tx.objectStore(storeName).put({ fbase_key: key, value: authUser }, key);
+            tx.oncomplete = function() { db.close(); };
+          }
+        };
+      })();
+    `);
 
-      await signInWithEmailAndPassword(auth, email, password);
-    }, { email, password });
+    // 3. Navigate to the app — Firebase SDK will find auth user in IndexedDB
+    await page.goto(baseURL);
 
-    // Wait for the app to recognize the auth state and show workspace
+    // 4. Wait for workspace to load (proves auth state was picked up)
     await page.locator('h2').waitFor({ state: 'visible', timeout: 30_000 });
 
-    console.log(`Production auth: signed in as ${email}`);
+    const heading = await page.locator('h2').textContent();
+    console.log(`Production auth: signed in as ${email}, page shows: "${heading}"`);
   } else {
     // --- Local auth: dev-mode bypass (VITE_DEV_AUTH=1) ---
     await page.goto(baseURL);
