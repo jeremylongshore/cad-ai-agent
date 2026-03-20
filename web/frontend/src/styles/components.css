@@ -1067,6 +1067,34 @@
   z-index: 10;
 }
 
+/* Focus highlight overlay — appears when clicking a change/op item */
+.viewer-focus-highlight {
+  position: absolute;
+  border: 3px solid #ff3333;
+  border-radius: 6px;
+  pointer-events: none;
+  z-index: 12;
+  animation: focus-pulse 1s ease-in-out 2;
+  opacity: 0.9;
+  box-shadow: 0 0 12px rgba(255, 51, 51, 0.5);
+}
+
+@keyframes focus-pulse {
+  0%, 100% { opacity: 0.9; box-shadow: 0 0 12px rgba(255, 51, 51, 0.5); }
+  50% { opacity: 0.5; box-shadow: 0 0 24px rgba(255, 51, 51, 0.8); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .viewer-focus-highlight {
+    animation: none;
+    opacity: 0.8;
+  }
+}
+
+.revision-op-item--highlighting {
+  border-left: 3px solid #ff3333;
+}
+
 /* Compact wizard step (after upload) */
 .wizard-step-compact {
   display: flex;

@@ -2433,6 +2433,35 @@ async def revision_align(body: RevisionAlignRequest, user: dict = Depends(get_us
             raise HTTPException(status_code=500, detail="Alignment failed") from None
 
 
+def _change_spatial(changes: list, change_index: int) -> dict:
+    """Extract centroid and bbox from a comparison change for the diff response."""
+    if change_index < 0 or change_index >= len(changes):
+        return {"from_point": None, "to_point": None, "bbox": None}
+    change = changes[change_index]
+
+    def _snap_centroid(snap):
+        if snap is None:
+            return None
+        c = snap.centroid
+        return {"x": round(c.x, 4), "y": round(c.y, 4)}
+
+    bbox = change.bbox
+    return {
+        "from_point": _snap_centroid(change.master_snapshot),
+        "to_point": _snap_centroid(change.revision_snapshot),
+        "bbox": (
+            {
+                "min_x": round(bbox[0], 4),
+                "min_y": round(bbox[1], 4),
+                "max_x": round(bbox[2], 4),
+                "max_y": round(bbox[3], 4),
+            }
+            if bbox
+            else None
+        ),
+    }
+
+
 @app.post("/api/revision/diff")
 async def revision_diff(body: RevisionDiffRequest, user: dict = Depends(get_user)):
     """Run comparison and generate revision ops."""
@@ -2505,6 +2534,7 @@ async def revision_diff(body: RevisionDiffRequest, user: dict = Depends(get_user
                         "status": approval_set.get_decision(op.op_id).status.value
                         if approval_set.get_decision(op.op_id)
                         else "unknown",
+                        **_change_spatial(result.changes, op.change_index),
                     }
                     for op in ops
                 ],

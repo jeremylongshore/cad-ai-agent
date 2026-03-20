@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHandle } from 'react';
 import { DxfViewer } from 'dxf-viewer';
 import { Color } from 'three';
 
@@ -10,15 +10,107 @@ import { Color } from 'three';
  *   onPointClick — optional callback ({x, y}) for control point picking
  *   className   — optional container class
  *   pickingMode — when true, show crosshair cursor and emit onPointClick
+ *
+ * Ref API:
+ *   focusOnBounds({ minX, minY, maxX, maxY }) — pan/zoom to bounds with highlight ring
  */
-export default function DxfViewerComponent({ dxfUrl, onPointClick, className, pickingMode }) {
+const DxfViewerComponent = forwardRef(function DxfViewerComponent(
+  { dxfUrl, onPointClick, className, pickingMode },
+  ref,
+) {
   const containerRef = useRef(null);
   const viewerRef = useRef(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  // Highlight overlay state
+  const [highlightRect, setHighlightRect] = useState(null);
+  const highlightTimerRef = useRef(null);
+
   // Detect dark mode
   const isDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches;
+
+  /** Convert model-space bounds to pixel rect relative to the canvas container. */
+  const computeScreenRect = useCallback((bounds) => {
+    const viewer = viewerRef.current;
+    const container = containerRef.current;
+    if (!viewer || !container) return null;
+
+    const cam = viewer.GetCamera?.();
+    if (!cam) return null;
+
+    const origin = viewer.GetOrigin();
+    const canvas = container.querySelector('canvas');
+    if (!canvas) return null;
+    const cw = canvas.clientWidth;
+    const ch = canvas.clientHeight;
+
+    // Project world corner to NDC then to pixels
+    const toPixel = (wx, wy) => {
+      // dxf-viewer scene coords = model coords minus origin
+      const sx = wx - origin.x;
+      const sy = wy - origin.y;
+      // Three.js orthographic: project manually
+      const ndcX = (sx - cam.position.x) * cam.zoom / ((cam.right - cam.left) / 2);
+      const ndcY = (sy - cam.position.y) * cam.zoom / ((cam.top - cam.bottom) / 2);
+      return {
+        px: (ndcX + 1) / 2 * cw,
+        py: (1 - ndcY) / 2 * ch, // Y is flipped in screen space
+      };
+    };
+
+    const topLeft = toPixel(bounds.minX, bounds.maxY);
+    const bottomRight = toPixel(bounds.maxX, bounds.minY);
+
+    const left = Math.min(topLeft.px, bottomRight.px);
+    const top = Math.min(topLeft.py, bottomRight.py);
+    const width = Math.abs(bottomRight.px - topLeft.px);
+    const height = Math.abs(bottomRight.py - topLeft.py);
+
+    // Enforce minimum visible size (at least 20px)
+    const minSize = 20;
+    const adjWidth = Math.max(width, minSize);
+    const adjHeight = Math.max(height, minSize);
+    const adjLeft = left - (adjWidth - width) / 2;
+    const adjTop = top - (adjHeight - height) / 2;
+
+    return { left: adjLeft, top: adjTop, width: adjWidth, height: adjHeight };
+  }, []);
+
+  /** Clear any active highlight. */
+  const clearHighlight = useCallback(() => {
+    clearTimeout(highlightTimerRef.current);
+    setHighlightRect(null);
+  }, []);
+
+  useImperativeHandle(ref, () => ({
+    focusOnBounds({ minX, minY, maxX, maxY }) {
+      const viewer = viewerRef.current;
+      if (!viewer) return;
+
+      const origin = viewer.GetOrigin();
+      const padX = Math.max((maxX - minX) * 0.2, 50);
+      const padY = Math.max((maxY - minY) * 0.2, 50);
+
+      viewer.FitView(
+        minX - origin.x - padX,
+        maxX - origin.x + padX,
+        minY - origin.y - padY,
+        maxY - origin.y + padY,
+        0.05,
+      );
+
+      // Compute screen rect for the highlight overlay after FitView settles
+      requestAnimationFrame(() => {
+        const rect = computeScreenRect({ minX, minY, maxX, maxY });
+        if (rect) {
+          clearHighlight();
+          setHighlightRect(rect);
+          highlightTimerRef.current = setTimeout(() => setHighlightRect(null), 3000);
+        }
+      });
+    },
+  }), [computeScreenRect, clearHighlight]);
 
   const handleFitView = useCallback(() => {
     const viewer = viewerRef.current;
@@ -99,6 +191,10 @@ export default function DxfViewerComponent({ dxfUrl, onPointClick, className, pi
     };
     viewer.Subscribe('pointerdown', handlePointerDown);
 
+    // Dismiss highlight on user pan/zoom interaction
+    const dismissHighlight = () => clearHighlight();
+    viewer.Subscribe('viewChanged', dismissHighlight);
+
     viewer
       .Load({ url: dxfUrl, fonts: ['/fonts/NotoSans-Regular.ttf'], progressCbk: null })
       .then(() => {
@@ -124,10 +220,16 @@ export default function DxfViewerComponent({ dxfUrl, onPointClick, className, pi
 
     return () => {
       viewer.Unsubscribe('pointerdown', handlePointerDown);
+      viewer.Unsubscribe('viewChanged', dismissHighlight);
       viewer.Destroy();
       viewerRef.current = null;
     };
   }, [dxfUrl]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Clean up timer on unmount
+  useEffect(() => {
+    return () => clearTimeout(highlightTimerRef.current);
+  }, []);
 
   return (
     <div className={`dxf-viewer ${className || ''} ${pickingMode ? 'dxf-viewer--picking' : ''}`}>
@@ -144,6 +246,18 @@ export default function DxfViewerComponent({ dxfUrl, onPointClick, className, pi
         <div className="dxf-viewer__overlay dxf-viewer__overlay--error">
           <span className="dxf-viewer__overlay-text">{error}</span>
         </div>
+      )}
+
+      {highlightRect && (
+        <div
+          className="viewer-focus-highlight"
+          style={{
+            left: highlightRect.left,
+            top: highlightRect.top,
+            width: highlightRect.width,
+            height: highlightRect.height,
+          }}
+        />
       )}
 
       <div className="viewer-toolbar">
@@ -184,4 +298,6 @@ export default function DxfViewerComponent({ dxfUrl, onPointClick, className, pi
       <span className="viewer-toolbar__hint">Scroll to zoom · Drag to pan</span>
     </div>
   );
-}
+});
+
+export default DxfViewerComponent;
