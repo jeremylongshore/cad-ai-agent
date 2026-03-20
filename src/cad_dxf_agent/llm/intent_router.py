@@ -167,7 +167,7 @@ _RULES: list[HeuristicRule] = [
             r"\bwhere\s+is\b",
             r"\bshow\s+me\b",
             r"\bhow\s+many\b",
-            r"\blist\s+all\b",
+            r"\blist\b",
             r"\btell\s+me\b",
             r"\bwhat\s+are\b",
             r"\bwhat\s+text\b",

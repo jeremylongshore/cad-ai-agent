@@ -1668,3 +1668,51 @@
     background: var(--bg-tertiary);
   }
 }
+
+/* --- Entity selection tags (above chat input) --- */
+
+.chat-selection-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: var(--space-1) var(--space-4);
+  border-bottom: 1px solid var(--border-default);
+}
+
+.entity-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  background: rgba(37, 99, 235, 0.15);
+  border: 1px solid rgba(37, 99, 235, 0.3);
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  color: var(--accent-primary);
+}
+
+.entity-tag button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: inherit;
+  padding: 0 2px;
+  font-size: 13px;
+  font-family: var(--font-body);
+  line-height: 1;
+}
+
+.btn--xs {
+  padding: 1px 6px;
+  font-size: var(--text-xs);
+}
+
+/* Entity highlight overlay — appears on click-selected entities */
+.viewer-entity-highlight {
+  position: absolute;
+  border: 2px solid #3b82f6;
+  border-radius: 4px;
+  pointer-events: none;
+  z-index: 11;
+  background: rgba(59, 130, 246, 0.08);
+}
