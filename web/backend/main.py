@@ -373,9 +373,7 @@ async def entities_near(
                 "entity_type": e.entity_type.value,
                 "layer": e.layer,
                 "insert_point": (
-                    {"x": e.insert_point.x, "y": e.insert_point.y}
-                    if e.insert_point
-                    else None
+                    {"x": e.insert_point.x, "y": e.insert_point.y} if e.insert_point else None
                 ),
                 "label": _entity_label(e),
             }
@@ -562,8 +560,7 @@ async def _save_work_progress(session: Session, user_id: str) -> None:
             last_prompt=session.conversation_history[-1].get("content", "")
             if session.conversation_history
             else "",
-            has_working_dxf=session.edited_path is not None
-            and session.edited_path.exists(),
+            has_working_dxf=session.edited_path is not None and session.edited_path.exists(),
             audit_events=session.audit_events[-50:],  # Cap at 50 events
         )
         working_path = session.edited_path if progress.has_working_dxf else None
