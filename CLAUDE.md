@@ -156,7 +156,7 @@ Tool definitions in `llm/tool_definitions.py` — 20+ tools split into query (re
 
 ```
 src/cad_dxf_agent/
-  models/              # 27 Pydantic schemas
+  models/              # 30 Pydantic schemas
     cad_schema         #   DrawingContext, EntityRef, LayerInfo, BlockInfo
     ops_schema         #   EditOperation, OpType enum, ChangeSet
     objective_schema   #   RequestClass, ObjectiveTag, ObjectiveClassification
@@ -270,7 +270,7 @@ Optional tracing via `otel.py` bootstrap module. Off by default, CI-safe (no net
 | Property | `tests/property/` | ~7 | Fuzz/property tests (randomized, bounded runtime) |
 | Smoke | `tests/smoke/` + `scripts/smoke_test.py` | ~7 | End-to-end pipeline via mock planner |
 
-Total: ~4194 tests collected.
+Total: ~4494 tests collected.
 
 ### LLM Testing Patterns
 
