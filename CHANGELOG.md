@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-03-20
+
+### Added
+- **Production E2E Test Suite**: 58 new Playwright tests covering every user action against production Firebase + Cloud Run (#124)
+  - Auth flow (login, sign-out, re-login, unauthenticated redirect)
+  - File uploads (DXF, PDF, DWG, replace, reset, error handling, drag-drop)
+  - Document library (upload, load, delete, storage, reconnect, compare)
+  - Chat interactions (prompts, chips, keyboard shortcuts, loading indicators)
+  - Edit workflow (plan preview, checkboxes, apply, download, validation)
+  - Error handling (corrupt files, network errors, session expiry)
+- **Entity Selection Hardening**: Click-to-select with `data-testid` attributes, Ctrl+click multi-select, selection persistence (#123)
+- **Click-to-Focus Viewer**: Op card click triggers viewer focus highlight with auto-dismiss (#121)
+- **PDF-to-DXF Conversion Fidelity**: Tighter geometry conversion with improved path handling (#116)
+- **PNG Render in Planning Flow**: Preview image pipeline wired into planning workflow (#115)
+
+### Fixed
+- PDF focus test: accept any response type from mock provider
+- E2E: use `data-testid` for file input to avoid strict mode violation
+- Entity selection state cleanup on session change (#122)
+
+### Changed
+- Test count: 4036 → 4494 tests (315 E2E tests in 22 files)
+- Model count: 27 → 30 Pydantic schemas
+- GitHub Actions: bump checkout v4→v6, setup-node v4→v6, upload-artifact v4→v7, auth v2→v3
+
 ## [0.9.0] - 2026-03-09
 
 ### Added
