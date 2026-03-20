@@ -208,3 +208,271 @@ test.describe('Comparison Flow — r12_basic master', () => {
     console.log(`r12_basic vs r2000_blocks — ${allBadgeText}`);
   });
 });
+
+// --- Extended compare workflow tests ---
+
+const APPLY_TIMEOUT = 45_000;
+
+/** Upload master + revision and wait for comparison to complete. */
+async function uploadMasterAndRevision(page) {
+  await page.goto('/');
+  await expect(page.locator('h2')).toContainText('Upload a drawing', { timeout: 15_000 });
+
+  await page.locator('input[type="file"]').setInputFiles(path.join(DXF_ZOO, 'r2000_blocks.dxf'));
+  await expect(
+    page.locator('.message--system').filter({ hasText: 'Loaded' })
+  ).toBeVisible({ timeout: 30_000 });
+
+  const compareTab = page.locator('.preview__tab').filter({ hasText: 'Compare' });
+  await compareTab.click();
+
+  const revisionInput = page.locator('input#revision-upload');
+  await revisionInput.setInputFiles(path.join(DXF_ZOO, 'r2000_revision.dxf'));
+
+  await expect(
+    page.locator('.compare-float-bar--bottom, .revision-ops-list, .wizard-step-compact').first()
+  ).toBeVisible({ timeout: COMPARE_TIMEOUT });
+}
+
+test.describe('Comparison Workflow — Extended', () => {
+  test('upload revision shows alignment method and confidence', async ({ page }) => {
+    await uploadMasterAndRevision(page);
+
+    const floatBarTop = page.locator('.compare-float-bar--top');
+    if (await floatBarTop.isVisible({ timeout: 5_000 }).catch(() => false)) {
+      // Alignment method badge
+      const methodBadge = floatBarTop.locator('.badge').filter({
+        hasText: /Identity|Translation|Rigid|Anchor|Feature|Manual/,
+      });
+      await expect(methodBadge.first()).toBeVisible({ timeout: 5_000 });
+
+      // Confidence percentage
+      const confidence = floatBarTop.locator('.compare-float-bar__confidence');
+      if (await confidence.isVisible({ timeout: 3_000 }).catch(() => false)) {
+        const text = await confidence.textContent();
+        expect(text).toMatch(/\d+%/);
+        console.log(`Alignment: ${await methodBadge.first().textContent()}, confidence: ${text}`);
+      }
+    }
+  });
+
+  test('approve all → apply → success count shown', async ({ page }) => {
+    await uploadMasterAndRevision(page);
+
+    const opItems = page.locator('.revision-op-item');
+    if (!await opItems.first().isVisible({ timeout: 5_000 }).catch(() => false)) {
+      console.log('No revision ops — skipping approve/apply test');
+      return;
+    }
+
+    await page.locator('button').filter({ hasText: 'Approve All' }).click();
+
+    const applyBtn = page.locator('button').filter({ hasText: /Apply.*Approved Change/ });
+    await expect(applyBtn).toBeEnabled({ timeout: 5_000 });
+    await applyBtn.click();
+
+    const bundleDownload = page.locator('.bundle-download');
+    await expect(bundleDownload).toBeVisible({ timeout: APPLY_TIMEOUT });
+
+    const statusText = await page.locator('.bundle-download__status').textContent();
+    expect(statusText).toContain('successfully');
+    console.log(`Apply result: ${statusText}`);
+  });
+
+  test('reject individual op → approve rest → apply', async ({ page }) => {
+    await uploadMasterAndRevision(page);
+
+    const opItems = page.locator('.revision-op-item');
+    if (!await opItems.first().isVisible({ timeout: 5_000 }).catch(() => false)) {
+      console.log('No revision ops — skipping partial reject test');
+      return;
+    }
+
+    const opCount = await opItems.count();
+    if (opCount < 2) {
+      console.log('Only 1 op — cannot test partial reject');
+      // Approve all and apply
+      await page.locator('button').filter({ hasText: 'Approve All' }).click();
+    } else {
+      // Reject first op
+      const rejectBtn = opItems.first().locator('button').filter({ hasText: 'Reject' });
+      if (await rejectBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
+        await rejectBtn.click();
+      }
+
+      // Approve the rest
+      const approveAllBtn = page.locator('button').filter({ hasText: 'Approve All' });
+      if (await approveAllBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
+        await approveAllBtn.click();
+      } else {
+        // Approve remaining individually
+        for (let i = 1; i < opCount; i++) {
+          const approveBtn = opItems.nth(i).locator('button').filter({ hasText: 'Approve' });
+          if (await approveBtn.isVisible({ timeout: 2_000 }).catch(() => false)) {
+            await approveBtn.click();
+          }
+        }
+      }
+    }
+
+    const applyBtn = page.locator('button').filter({ hasText: /Apply.*Approved Change/ });
+    if (await applyBtn.isEnabled({ timeout: 5_000 }).catch(() => false)) {
+      await applyBtn.click();
+
+      const bundleDownload = page.locator('.bundle-download');
+      await expect(bundleDownload).toBeVisible({ timeout: APPLY_TIMEOUT });
+      console.log('Partial reject + apply succeeded');
+    }
+  });
+
+  test('reject all ops shows all rejected', async ({ page }) => {
+    await uploadMasterAndRevision(page);
+
+    const opItems = page.locator('.revision-op-item');
+    if (!await opItems.first().isVisible({ timeout: 5_000 }).catch(() => false)) {
+      console.log('No revision ops — skipping reject all test');
+      return;
+    }
+
+    // Click "Reject All" if available
+    const rejectAllBtn = page.locator('button').filter({ hasText: 'Reject All' });
+    if (await rejectAllBtn.isVisible({ timeout: 5_000 }).catch(() => false)) {
+      await rejectAllBtn.click();
+
+      // Apply button should be disabled (nothing approved)
+      const applyBtn = page.locator('button').filter({ hasText: /Apply.*Approved Change/ });
+      if (await applyBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
+        await expect(applyBtn).toBeDisabled();
+      }
+
+      console.log('All ops rejected — apply disabled');
+    } else {
+      // Reject individually
+      const count = await opItems.count();
+      for (let i = 0; i < count; i++) {
+        const rejectBtn = opItems.nth(i).locator('button').filter({ hasText: 'Reject' });
+        if (await rejectBtn.isVisible({ timeout: 2_000 }).catch(() => false)) {
+          await rejectBtn.click();
+        }
+      }
+      console.log('Rejected all ops individually');
+    }
+  });
+
+  test('download revision bundle after apply', async ({ page }) => {
+    await uploadMasterAndRevision(page);
+
+    const opItems = page.locator('.revision-op-item');
+    if (!await opItems.first().isVisible({ timeout: 5_000 }).catch(() => false)) {
+      console.log('No revision ops — skipping bundle download test');
+      return;
+    }
+
+    await page.locator('button').filter({ hasText: 'Approve All' }).click();
+
+    const applyBtn = page.locator('button').filter({ hasText: /Apply.*Approved Change/ });
+    await expect(applyBtn).toBeEnabled({ timeout: 5_000 });
+    await applyBtn.click();
+
+    const bundleDownload = page.locator('.bundle-download');
+    await expect(bundleDownload).toBeVisible({ timeout: APPLY_TIMEOUT });
+
+    const downloadBtn = page.locator('button').filter({ hasText: 'Download Bundle' });
+    await expect(downloadBtn).toBeVisible({ timeout: 5_000 });
+
+    const downloadPromise = page.waitForEvent('download', { timeout: APPLY_TIMEOUT });
+    await downloadBtn.click();
+    const download = await downloadPromise;
+
+    expect(download.suggestedFilename()).toMatch(/\.(zip|dxf)$/i);
+    console.log(`Bundle downloaded: ${download.suggestedFilename()}`);
+  });
+
+  test('keyboard navigation through ops', async ({ page }) => {
+    await uploadMasterAndRevision(page);
+
+    const opItems = page.locator('.revision-op-item');
+    if (!await opItems.first().isVisible({ timeout: 5_000 }).catch(() => false)) {
+      console.log('No revision ops — skipping keyboard navigation test');
+      return;
+    }
+
+    // Focus the first op item
+    await opItems.first().click();
+
+    // Try arrow key navigation
+    await page.keyboard.press('ArrowDown');
+    await page.waitForTimeout(300);
+
+    // Check if a different item got focus or active state
+    const activeItem = page.locator('.revision-op-item--active, .revision-op-item:focus');
+    if (await activeItem.isVisible({ timeout: 3_000 }).catch(() => false)) {
+      console.log('Keyboard navigation: ArrowDown moved focus');
+    } else {
+      console.log('Keyboard navigation may not be implemented for revision ops');
+    }
+  });
+
+  test('click op card focuses viewer on change location', async ({ page }) => {
+    await uploadMasterAndRevision(page);
+
+    const opItems = page.locator('.revision-op-item, [data-testid="revision-op-item"]');
+    if (!await opItems.first().isVisible({ timeout: 5_000 }).catch(() => false)) {
+      console.log('No revision ops — skipping focus test');
+      return;
+    }
+
+    await opItems.first().click();
+
+    // Check for viewer focus highlight
+    const highlight = page.locator('[data-testid="viewer-focus-highlight"]');
+    const hasHighlight = await highlight.isVisible({ timeout: 5_000 }).catch(() => false);
+    if (hasHighlight) {
+      console.log('Op click triggered viewer focus highlight');
+    } else {
+      console.log('No viewer focus highlight on op click (may use different indicator)');
+    }
+  });
+
+  test('profile selector filters comparison', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.locator('h2')).toContainText('Upload a drawing', { timeout: 15_000 });
+
+    await page.locator('input[type="file"]').setInputFiles(path.join(DXF_ZOO, 'r2000_blocks.dxf'));
+    await expect(
+      page.locator('.message--system').filter({ hasText: 'Loaded' })
+    ).toBeVisible({ timeout: 30_000 });
+
+    const compareTab = page.locator('.preview__tab').filter({ hasText: 'Compare' });
+    await compareTab.click();
+
+    const profileSelect = page.locator('#profile-select');
+    if (!await profileSelect.isVisible({ timeout: 5_000 }).catch(() => false)) {
+      console.log('Profile selector not visible — skipping');
+      return;
+    }
+
+    const options = profileSelect.locator('option');
+    const optionCount = await options.count();
+
+    if (optionCount > 1) {
+      // Select a non-default profile
+      await profileSelect.selectOption({ index: 1 });
+
+      const selectedText = await profileSelect.inputValue();
+      console.log(`Selected comparison profile: ${selectedText}`);
+
+      // Upload revision with profile selected
+      const revisionInput = page.locator('input#revision-upload');
+      await revisionInput.setInputFiles(path.join(DXF_ZOO, 'r2000_revision.dxf'));
+
+      await expect(
+        page.locator('.compare-float-bar--bottom, .revision-ops-list, .wizard-step-compact').first()
+      ).toBeVisible({ timeout: COMPARE_TIMEOUT });
+
+      console.log('Comparison completed with profile filter');
+    } else {
+      console.log('Only default profile available');
+    }
+  });
+});

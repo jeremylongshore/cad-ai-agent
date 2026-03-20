@@ -1,6 +1,22 @@
 // @ts-check
 import { defineConfig } from '@playwright/test';
 import path from 'path';
+import fs from 'fs';
+
+// Load .env.test for E2E credentials (gitignored) — simple parser, no dep needed
+const envTestPath = path.join(import.meta.dirname, '.env.test');
+if (fs.existsSync(envTestPath)) {
+  for (const line of fs.readFileSync(envTestPath, 'utf-8').split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const eqIdx = trimmed.indexOf('=');
+    if (eqIdx > 0) {
+      const key = trimmed.slice(0, eqIdx).trim();
+      const val = trimmed.slice(eqIdx + 1).trim();
+      if (!process.env[key]) process.env[key] = val;
+    }
+  }
+}
 
 const PROJECT_ROOT = path.resolve(import.meta.dirname, '..', '..');
 

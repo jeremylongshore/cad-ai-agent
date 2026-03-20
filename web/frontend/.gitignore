@@ -3,6 +3,7 @@ dist/
 .env
 .env.local
 .env.production
+.env.test
 
 # Playwright
 test-results/
