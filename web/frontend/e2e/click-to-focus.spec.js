@@ -46,18 +46,13 @@ test.describe('Click to Focus — DXF', () => {
       // Focus highlight should appear (red pulsing border)
       const highlight = page.locator('[data-testid="viewer-focus-highlight"]');
       const highlightVisible = await highlight.isVisible({ timeout: 5_000 }).catch(() => false);
-      console.log(`Edit op click → focus highlight visible: ${highlightVisible}`);
 
       if (highlightVisible) {
         // Should auto-dismiss after ~3 seconds
         await expect(highlight).not.toBeVisible({ timeout: 5_000 });
-        console.log('Focus highlight auto-dismissed');
       }
     } else {
-      // Check for legacy op items (non-structured preview path)
-      const legacyOp = page.locator('.op-item').first();
-      const hasLegacy = await legacyOp.isVisible({ timeout: 5_000 }).catch(() => false);
-      console.log(`Edit ops: structured=${hasEditOps}, legacy=${hasLegacy} — focus test requires structured preview`);
+      // No structured edit ops — focus test requires structured preview; legacy path skipped
     }
   });
 
@@ -71,7 +66,7 @@ test.describe('Click to Focus — DXF', () => {
 
     const opItem = page.locator('[data-testid="edit-op-item"]').first();
     if (!await opItem.isVisible({ timeout: LLM_TIMEOUT }).catch(() => false)) {
-      console.log('No structured edit ops — skipping dismiss-on-interaction test');
+      // No structured edit ops — skipping dismiss-on-interaction test
       return;
     }
 
@@ -79,7 +74,7 @@ test.describe('Click to Focus — DXF', () => {
 
     const highlight = page.locator('[data-testid="viewer-focus-highlight"]');
     if (!await highlight.isVisible({ timeout: 5_000 }).catch(() => false)) {
-      console.log('No highlight appeared — entity may lack position data');
+      // No highlight appeared — entity may lack position data
       return;
     }
 
@@ -90,7 +85,6 @@ test.describe('Click to Focus — DXF', () => {
       await page.mouse.wheel(0, 100);
       // Highlight should dismiss on view change
       await expect(highlight).not.toBeVisible({ timeout: 3_000 });
-      console.log('Focus highlight dismissed on viewer scroll');
     }
   });
 });
@@ -103,7 +97,7 @@ test.describe('Click to Focus — PDF', () => {
 
     const viewer = page.locator('[data-testid="dxf-viewer"]');
     if (!await viewer.isVisible({ timeout: VIEWER_TIMEOUT }).catch(() => false)) {
-      console.log('PDF rendered as image — click-to-focus not available for image preview');
+      // PDF rendered as image — click-to-focus not available for image preview
       return;
     }
 
@@ -114,8 +108,6 @@ test.describe('Click to Focus — PDF', () => {
     // Wait for AI response
     const aiMsg = page.locator('.message--ai');
     await expect(aiMsg.last()).toBeVisible({ timeout: LLM_TIMEOUT });
-
-    console.log('PDF: prompt sent and AI responded — viewer focus available');
   });
 });
 
@@ -144,10 +136,9 @@ test.describe('Click to Focus — Revision Comparison', () => {
 
       // Should trigger focus highlight on one of the compare viewers
       const highlight = page.locator('[data-testid="viewer-focus-highlight"]');
-      const highlightVisible = await highlight.isVisible({ timeout: 5_000 }).catch(() => false);
-      console.log(`Revision op click → focus highlight visible: ${highlightVisible}`);
+      await highlight.isVisible({ timeout: 5_000 }).catch(() => false);
     } else {
-      console.log('No revision ops to click — comparison may have had no changes');
+      // No revision ops to click — comparison may have had no changes
     }
   });
 });

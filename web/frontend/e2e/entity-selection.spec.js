@@ -71,7 +71,7 @@ test.describe('Entity Selection — DXF', () => {
       await expect(page.locator('[data-testid="entity-tag"]').first()).toBeVisible();
       await expect(page.locator('[data-testid="entity-tag-count"]')).toContainText('selected');
     } else {
-      console.log('No entity at canvas center — selection tags not shown (expected for sparse drawings)');
+      // No entity at canvas center — selection tags not shown (expected for sparse drawings)
     }
   });
 
@@ -96,7 +96,6 @@ test.describe('Entity Selection — DXF', () => {
     const tags = page.locator('[data-testid="entity-tag"]');
     const count = await tags.count();
     // Multi-select may have 0, 1, or 2 depending on drawing content at those coordinates
-    console.log(`Multi-select: ${count} entity tag(s) after two clicks`);
   });
 
   test('plain click replaces selection', async ({ page }) => {
@@ -118,7 +117,6 @@ test.describe('Entity Selection — DXF', () => {
     const count = await tags.count();
     // Should be 0 or 1 (plain click replaces, doesn't accumulate)
     expect(count).toBeLessThanOrEqual(1);
-    console.log(`Plain click replacement: ${count} tag(s)`);
   });
 
   test('remove individual entity tag', async ({ page }) => {
@@ -132,7 +130,7 @@ test.describe('Entity Selection — DXF', () => {
       // After removing the only tag, selection tags area should disappear
       await expect(page.locator('[data-testid="chat-selection-tags"]')).not.toBeVisible({ timeout: 3_000 });
     } else {
-      console.log('No entity tag to remove (no entity at center)');
+      // No entity tag to remove — no entity at center
     }
   });
 
@@ -146,7 +144,7 @@ test.describe('Entity Selection — DXF', () => {
       await clearBtn.click();
       await expect(page.locator('[data-testid="chat-selection-tags"]')).not.toBeVisible({ timeout: 3_000 });
     } else {
-      console.log('No selection to clear');
+      // No selection to clear — no entity at center
     }
   });
 
@@ -185,7 +183,7 @@ test.describe('Entity Selection — DXF', () => {
       // Selection should be cleared after send
       await expect(page.locator('[data-testid="chat-selection-tags"]')).not.toBeVisible({ timeout: 3_000 });
     } else {
-      console.log('No entity selected — skipping prompt-with-handles test');
+      // No entity selected — skipping prompt-with-handles test (no entity at center)
     }
   });
 
@@ -216,8 +214,6 @@ test.describe('Entity Selection — PDF', () => {
     const hasViewer = await viewer.isVisible({ timeout: VIEWER_TIMEOUT }).catch(() => false);
     const hasImg = await previewImg.isVisible({ timeout: 5_000 }).catch(() => false);
     expect(hasViewer || hasImg).toBe(true);
-
-    console.log(`PDF upload: viewer=${hasViewer}, img=${hasImg}`);
   });
 
   test('click entity shows selection tag (if viewer present)', async ({ page }) => {
@@ -225,7 +221,7 @@ test.describe('Entity Selection — PDF', () => {
 
     const viewer = page.locator('[data-testid="dxf-viewer"]');
     if (!await viewer.isVisible({ timeout: VIEWER_TIMEOUT }).catch(() => false)) {
-      console.log('PDF rendered as image — entity click not available');
+      // PDF rendered as image — entity click not available
       return;
     }
 
@@ -233,8 +229,7 @@ test.describe('Entity Selection — PDF', () => {
     await page.waitForTimeout(2000);
 
     const tags = page.locator('[data-testid="chat-selection-tags"]');
-    const visible = await tags.isVisible({ timeout: 5_000 }).catch(() => false);
-    console.log(`PDF entity click: selection tags visible=${visible}`);
+    await tags.isVisible({ timeout: 5_000 }).catch(() => false);
   });
 });
 
@@ -273,7 +268,6 @@ test.describe('Entity Selection — DWG', () => {
         page.locator('[style*="accent-danger"]').first().waitFor({ timeout: UPLOAD_TIMEOUT }).then(() => 'error-banner'),
       ]).catch(() => 'timeout');
 
-      console.log(`DWG upload result (no ODA): ${result}`);
       // Either outcome is acceptable — we just confirm no crash
       expect(['success', 'error', 'error-banner', 'timeout']).toContain(result);
 
@@ -283,7 +277,6 @@ test.describe('Entity Selection — DWG', () => {
       // Real DWG fixture available — test full upload
       await uploadAndWait(page, dwgFixturePath);
       await expect(page.locator('[data-testid="dxf-viewer"]')).toBeVisible({ timeout: VIEWER_TIMEOUT });
-      console.log('DWG upload with real fixture: success');
     }
   });
 });
