@@ -15,7 +15,7 @@ async function uploadAndWait(page, filePath) {
   await page.goto('/');
   await expect(page.locator('h2')).toContainText('Upload a drawing', { timeout: 15_000 });
 
-  await page.locator('input[type="file"]').setInputFiles(filePath);
+  await page.locator('[data-testid="file-upload-input"]').setInputFiles(filePath);
 
   await expect(
     page.locator('.message--system').filter({ hasText: 'Loaded' })
@@ -259,7 +259,7 @@ test.describe('Entity Selection — DWG', () => {
       await page.goto('/');
       await expect(page.locator('h2')).toContainText('Upload a drawing', { timeout: 15_000 });
 
-      await page.locator('input[type="file"]').setInputFiles(tmpDwg);
+      await page.locator('[data-testid="file-upload-input"]').setInputFiles(tmpDwg);
 
       // Wait for either success (if ODA available) or error message
       const result = await Promise.race([
