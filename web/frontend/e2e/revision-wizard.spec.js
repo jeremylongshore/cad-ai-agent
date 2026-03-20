@@ -19,7 +19,7 @@ async function uploadMasterAndRevision(page, masterFile, revisionFile) {
   await expect(page.locator('h2')).toContainText('Upload a drawing', { timeout: 15_000 });
 
   // Upload master
-  await page.locator('input[type="file"]').setInputFiles(path.join(DXF_ZOO, masterFile));
+  await page.locator('[data-testid="file-upload-input"]').setInputFiles(path.join(DXF_ZOO, masterFile));
   await expect(
     page.locator('.message--system').filter({ hasText: 'Loaded' })
   ).toBeVisible({ timeout: 30_000 });
@@ -186,7 +186,7 @@ test.describe('Revision Wizard', () => {
     await expect(page.locator('h2')).toContainText('Upload a drawing', { timeout: 15_000 });
 
     // Upload master
-    await page.locator('input[type="file"]').setInputFiles(path.join(DXF_ZOO, 'r2000_blocks.dxf'));
+    await page.locator('[data-testid="file-upload-input"]').setInputFiles(path.join(DXF_ZOO, 'r2000_blocks.dxf'));
     await expect(
       page.locator('.message--system').filter({ hasText: 'Loaded' })
     ).toBeVisible({ timeout: 30_000 });

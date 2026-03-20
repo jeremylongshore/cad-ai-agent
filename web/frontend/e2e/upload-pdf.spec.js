@@ -11,7 +11,7 @@ test.describe('PDF Upload', () => {
     await page.goto('/');
     await expect(page.locator('h2')).toContainText('Upload a drawing', { timeout: 15_000 });
 
-    await page.locator('input[type="file"]').setInputFiles(path.join(PDF_DIR, 'simple_geometry.pdf'));
+    await page.locator('[data-testid="file-upload-input"]').setInputFiles(path.join(PDF_DIR, 'simple_geometry.pdf'));
 
     // Wait for either success or error (PDF conversion can be slow)
     const result = await Promise.race([
@@ -34,7 +34,7 @@ test.describe('PDF Upload', () => {
     await page.goto('/');
     await expect(page.locator('h2')).toContainText('Upload a drawing', { timeout: 15_000 });
 
-    await page.locator('input[type="file"]').setInputFiles(path.join(PDF_DIR, 'structural_plan.pdf'));
+    await page.locator('[data-testid="file-upload-input"]').setInputFiles(path.join(PDF_DIR, 'structural_plan.pdf'));
 
     const result = await Promise.race([
       page.locator('.message--system').filter({ hasText: 'Loaded' }).waitFor({ timeout: 30_000 }).then(() => 'success'),

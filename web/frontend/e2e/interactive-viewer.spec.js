@@ -19,7 +19,7 @@ async function uploadAndWait(page, filename) {
   await page.goto('/');
   await expect(page.locator('h2')).toContainText('Upload a drawing', { timeout: 15_000 });
 
-  await page.locator('input[type="file"]').setInputFiles(path.join(DXF_ZOO, filename));
+  await page.locator('[data-testid="file-upload-input"]').setInputFiles(path.join(DXF_ZOO, filename));
 
   await expect(
     page.locator('.message--system').filter({ hasText: 'Loaded' })

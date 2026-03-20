@@ -16,7 +16,7 @@ test.describe('Chat Features', () => {
     await expect(page.locator('h2')).toContainText('Upload a drawing', { timeout: 15_000 });
 
     // Upload a DXF so the chat becomes active
-    await page.locator('input[type="file"]').setInputFiles(path.join(DXF_ZOO, 'r2000_blocks.dxf'));
+    await page.locator('[data-testid="file-upload-input"]').setInputFiles(path.join(DXF_ZOO, 'r2000_blocks.dxf'));
     await expect(
       page.locator('.message--system').filter({ hasText: 'Loaded' })
     ).toBeVisible({ timeout: 30_000 });
@@ -55,7 +55,7 @@ test.describe('Chat Features', () => {
     await expect(page.locator('h2')).toContainText('Upload a drawing', { timeout: 15_000 });
 
     // Upload DXF — this generates a system message
-    await page.locator('input[type="file"]').setInputFiles(path.join(DXF_ZOO, 'r2000_blocks.dxf'));
+    await page.locator('[data-testid="file-upload-input"]').setInputFiles(path.join(DXF_ZOO, 'r2000_blocks.dxf'));
     await expect(
       page.locator('.message--system').filter({ hasText: 'Loaded' })
     ).toBeVisible({ timeout: 30_000 });
@@ -88,7 +88,7 @@ test.describe('Chat Features', () => {
     await expect(page.locator('h2')).toContainText('Upload a drawing', { timeout: 15_000 });
 
     // Upload DXF
-    await page.locator('input[type="file"]').setInputFiles(path.join(DXF_ZOO, 'r2000_blocks.dxf'));
+    await page.locator('[data-testid="file-upload-input"]').setInputFiles(path.join(DXF_ZOO, 'r2000_blocks.dxf'));
     await expect(
       page.locator('.message--system').filter({ hasText: 'Loaded' })
     ).toBeVisible({ timeout: 30_000 });
@@ -118,7 +118,7 @@ test.describe('Chat Features', () => {
     const corruptPath = path.join(tmpDir, 'corrupt.dxf');
     writeFileSync(corruptPath, 'THIS IS NOT A DXF FILE');
 
-    await page.locator('input[type="file"]').setInputFiles(corruptPath);
+    await page.locator('[data-testid="file-upload-input"]').setInputFiles(corruptPath);
 
     // Wait for error to appear
     const errorBanner = page.locator('[role="alert"], [style*="--accent-danger"]');
@@ -147,7 +147,7 @@ test.describe('Chat Features', () => {
     await expect(page.locator('h2')).toContainText('Upload a drawing', { timeout: 15_000 });
 
     // Upload DXF
-    await page.locator('input[type="file"]').setInputFiles(path.join(DXF_ZOO, 'r2000_blocks.dxf'));
+    await page.locator('[data-testid="file-upload-input"]').setInputFiles(path.join(DXF_ZOO, 'r2000_blocks.dxf'));
     await expect(
       page.locator('.message--system').filter({ hasText: 'Loaded' })
     ).toBeVisible({ timeout: 30_000 });

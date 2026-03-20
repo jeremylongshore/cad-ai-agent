@@ -86,24 +86,31 @@ test.describe('Error Handling — Upload Errors', () => {
 });
 
 test.describe('Error Handling — Session Errors', () => {
-  test('session expired shows reconnect option or upload prompt', async ({ page, context }) => {
+  test('session expired shows error or reconnect option', async ({ page, context }) => {
     await uploadAndWait(page);
 
-    // Simulate session expiry by blocking session API
-    await context.route('**/api/session**', route => {
+    // Simulate backend failure by intercepting the prompt endpoint
+    await context.route('**/api/v2/prompt', route => {
       route.fulfill({
         status: 404,
         contentType: 'application/json',
-        body: JSON.stringify({ detail: 'Session not found' }),
+        body: JSON.stringify({ detail: 'Session not found or expired' }),
+      });
+    });
+    await context.route('**/api/plan', route => {
+      route.fulfill({
+        status: 404,
+        contentType: 'application/json',
+        body: JSON.stringify({ detail: 'Session not found or expired' }),
       });
     });
 
-    // Send a prompt that requires an active session
+    // Send a prompt — should hit our mocked 404
     const textarea = page.locator('[data-testid="chat-textarea"], .chat__textarea');
     await textarea.fill('How many entities?');
     await page.locator('[data-testid="chat-send"], button[aria-label="Send"]').click();
 
-    // Should show error or reconnect prompt
+    // Should show error message or reconnect prompt
     const errorOrBanner = page.locator(
       '[role="alert"], [style*="--accent-danger"], .message--error, .connection-banner'
     );
@@ -122,10 +129,13 @@ test.describe('Error Handling — Protected Layers', () => {
     await textarea.fill('Delete everything on the title block layer');
     await page.locator('[data-testid="chat-send"], button[aria-label="Send"]').click();
 
+    // Any AI response (plain, QnA, or design-ops panel)
+    const AI_RESPONSE = '.message--ai, .qna-panel, .design-ops-panel';
+
     // Wait for any response
     const result = await Promise.race([
       page.locator('.op-item, [data-testid="edit-op-item"]').first().waitFor({ timeout: PLAN_TIMEOUT }).then(() => 'ops'),
-      page.locator('.message--ai').last().waitFor({ timeout: PLAN_TIMEOUT }).then(() => 'message'),
+      page.locator(AI_RESPONSE).last().waitFor({ timeout: PLAN_TIMEOUT }).then(() => 'message'),
       page.locator('.message--error').last().waitFor({ timeout: PLAN_TIMEOUT }).then(() => 'error'),
     ]).catch(() => 'timeout');
 
@@ -140,7 +150,7 @@ test.describe('Error Handling — Protected Layers', () => {
       }
     } else if (result === 'message') {
       // LLM may refuse in its response text
-      const text = await page.locator('.message--ai').last().textContent();
+      const text = await page.locator(AI_RESPONSE).last().textContent();
       const mentionsProtected = /protect|title.?block|cannot|restricted/i.test(text || '');
       if (mentionsProtected) {
         console.log('LLM refused protected layer edit in response');

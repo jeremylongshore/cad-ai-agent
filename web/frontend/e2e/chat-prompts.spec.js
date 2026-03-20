@@ -35,11 +35,14 @@ async function sendPrompt(page, text) {
   await page.locator('[data-testid="chat-send"], button[aria-label="Send"]').click();
 }
 
+/** Any AI response element — plain message, QnA panel, or design-ops panel. */
+const AI_RESPONSE = '.message--ai, .qna-panel, .design-ops-panel';
+
 /** Wait for ops or error after sending a prompt. Returns 'ops' | 'message' | 'error'. */
 async function waitForResponse(page) {
   return await Promise.race([
     page.locator('.op-list__title, .op-item').first().waitFor({ timeout: PLAN_TIMEOUT }).then(() => 'ops'),
-    page.locator('.message--ai').last().waitFor({ timeout: PLAN_TIMEOUT }).then(() => 'message'),
+    page.locator(AI_RESPONSE).last().waitFor({ timeout: PLAN_TIMEOUT }).then(() => 'message'),
     page.locator('.message--error').last().waitFor({ timeout: PLAN_TIMEOUT }).then(() => 'error'),
   ]).catch(() => 'timeout');
 }
@@ -84,11 +87,11 @@ test.describe('Chat — Query Prompts', () => {
       }
     }
 
-    // Query should return a message, not operations
-    const aiMessage = page.locator('.message--ai').last();
-    await expect(aiMessage).toBeVisible({ timeout: PLAN_TIMEOUT });
+    // Query should return a message (plain, QnA, or design-ops — not edit operations)
+    const aiResponse = page.locator(AI_RESPONSE).last();
+    await expect(aiResponse).toBeVisible({ timeout: PLAN_TIMEOUT });
 
-    const text = await aiMessage.textContent();
+    const text = await aiResponse.textContent();
     expect(text?.length).toBeGreaterThan(10);
 
     console.log(`Query response (first 100 chars): ${text?.substring(0, 100)}`);
@@ -215,19 +218,17 @@ test.describe('Chat — Message Management', () => {
     // Wait for any response
     await waitForResponse(page);
 
-    // Verify we have messages
-    const msgCount = await page.locator('.message--user, .message--ai, .message--system').count();
+    // Verify we have messages (including QnA/design-ops panels)
+    const msgCount = await page.locator(`.message--user, ${AI_RESPONSE}, .message--system`).count();
     expect(msgCount).toBeGreaterThanOrEqual(1);
 
     // Clear chat
     const clearBtn = page.locator('button').filter({ hasText: 'Clear chat' });
     await clearBtn.click();
 
-    // All messages gone
-    const afterCount = await page.locator('.message--user').count();
-    expect(afterCount).toBe(0);
-    const aiAfterCount = await page.locator('.message--ai').count();
-    expect(aiAfterCount).toBe(0);
+    // All messages gone (user messages AND AI panels)
+    await expect(page.locator('.message--user')).toHaveCount(0, { timeout: 5_000 });
+    await expect(page.locator(AI_RESPONSE)).toHaveCount(0, { timeout: 5_000 });
   });
 
   test('export chat copies to clipboard', async ({ page, context }) => {
@@ -256,15 +257,16 @@ test.describe('Chat — Message Management', () => {
     await sendPrompt(page, 'How many entities?');
     await waitForResponse(page);
 
+    // The "Retry this message" button appears in the message actions
     const retryBtn = page.locator('button').filter({ hasText: /Retry|Regenerate/ });
-    if (await retryBtn.isVisible({ timeout: 5_000 }).catch(() => false)) {
-      const firstResponse = await page.locator('.message--ai').last().textContent();
-      await retryBtn.click();
+    if (await retryBtn.first().isVisible({ timeout: 5_000 }).catch(() => false)) {
+      const firstResponse = await page.locator(AI_RESPONSE).last().textContent();
+      await retryBtn.first().click();
 
       // Wait for new response
       await waitForResponse(page);
 
-      const secondResponse = await page.locator('.message--ai').last().textContent();
+      const secondResponse = await page.locator(AI_RESPONSE).last().textContent();
       // New response should exist (may or may not differ from first)
       expect(secondResponse?.length).toBeGreaterThan(0);
       console.log('Retry generated new response');

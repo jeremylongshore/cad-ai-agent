@@ -21,7 +21,7 @@ test.describe('Upload Errors', () => {
     // Create a file that has .dxf extension but is not a real DXF
     const garbageDxf = writeTmpFile('corrupt.dxf', 'THIS IS NOT A DXF FILE — JUST GARBAGE BYTES');
 
-    await page.locator('input[type="file"]').setInputFiles(garbageDxf);
+    await page.locator('[data-testid="file-upload-input"]').setInputFiles(garbageDxf);
 
     // Should show error
     const errorLocator = page.locator('[role="alert"], [style*="--accent-danger"]');
@@ -41,7 +41,7 @@ test.describe('Upload Errors', () => {
 
     const garbagePdf = writeTmpFile('corrupt.pdf', '%PDF-1.4 this is garbage not a real pdf at all');
 
-    await page.locator('input[type="file"]').setInputFiles(garbagePdf);
+    await page.locator('[data-testid="file-upload-input"]').setInputFiles(garbagePdf);
 
     const errorLocator = page.locator('[role="alert"], [style*="--accent-danger"]');
     await expect(errorLocator.first()).toBeVisible({ timeout: 20_000 });

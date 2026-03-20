@@ -21,8 +21,8 @@ test.describe('Comparison Flow — r2000_blocks master', () => {
     await page.goto('/');
     await expect(page.locator('h2')).toContainText('Upload a drawing', { timeout: 15_000 });
 
-    // Upload master DXF
-    await page.locator('input[type="file"]').setInputFiles(path.join(DXF_ZOO, 'r2000_blocks.dxf'));
+    // Upload master DXF (use data-testid to avoid matching the library upload input)
+    await page.locator('[data-testid="file-upload-input"]').setInputFiles(path.join(DXF_ZOO, 'r2000_blocks.dxf'));
     await expect(
       page.locator('.message--system').filter({ hasText: 'Loaded' })
     ).toBeVisible({ timeout: 30_000 });
@@ -150,7 +150,7 @@ test.describe('Comparison Flow — r2018_polylines master', () => {
     await page.goto('/');
     await expect(page.locator('h2')).toContainText('Upload a drawing', { timeout: 15_000 });
 
-    await page.locator('input[type="file"]').setInputFiles(path.join(DXF_ZOO, 'r2018_polylines.dxf'));
+    await page.locator('[data-testid="file-upload-input"]').setInputFiles(path.join(DXF_ZOO, 'r2018_polylines.dxf'));
     await expect(
       page.locator('.message--system').filter({ hasText: 'Loaded' })
     ).toBeVisible({ timeout: 30_000 });
@@ -190,7 +190,7 @@ test.describe('Comparison Flow — r12_basic master', () => {
     await page.goto('/');
     await expect(page.locator('h2')).toContainText('Upload a drawing', { timeout: 15_000 });
 
-    await page.locator('input[type="file"]').setInputFiles(path.join(DXF_ZOO, 'r12_basic.dxf'));
+    await page.locator('[data-testid="file-upload-input"]').setInputFiles(path.join(DXF_ZOO, 'r12_basic.dxf'));
     await expect(
       page.locator('.message--system').filter({ hasText: 'Loaded' })
     ).toBeVisible({ timeout: 30_000 });
@@ -218,7 +218,7 @@ async function uploadMasterAndRevision(page) {
   await page.goto('/');
   await expect(page.locator('h2')).toContainText('Upload a drawing', { timeout: 15_000 });
 
-  await page.locator('input[type="file"]').setInputFiles(path.join(DXF_ZOO, 'r2000_blocks.dxf'));
+  await page.locator('[data-testid="file-upload-input"]').setInputFiles(path.join(DXF_ZOO, 'r2000_blocks.dxf'));
   await expect(
     page.locator('.message--system').filter({ hasText: 'Loaded' })
   ).toBeVisible({ timeout: 30_000 });
@@ -438,7 +438,7 @@ test.describe('Comparison Workflow — Extended', () => {
     await page.goto('/');
     await expect(page.locator('h2')).toContainText('Upload a drawing', { timeout: 15_000 });
 
-    await page.locator('input[type="file"]').setInputFiles(path.join(DXF_ZOO, 'r2000_blocks.dxf'));
+    await page.locator('[data-testid="file-upload-input"]').setInputFiles(path.join(DXF_ZOO, 'r2000_blocks.dxf'));
     await expect(
       page.locator('.message--system').filter({ hasText: 'Loaded' })
     ).toBeVisible({ timeout: 30_000 });

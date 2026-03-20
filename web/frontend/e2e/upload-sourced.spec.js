@@ -37,7 +37,7 @@ test.describe('Upload Sourced DXF Files', () => {
           await page.goto('/');
           await expect(page.locator('h2')).toContainText('Upload a drawing', { timeout: 15_000 });
 
-          const fileInput = page.locator('input[type="file"]');
+          const fileInput = page.locator('[data-testid="file-upload-input"]');
           await fileInput.setInputFiles(path.join(SOURCED, file));
 
           // Wait for either successful load OR a graceful error

@@ -11,7 +11,7 @@ test.describe('DXF Upload', () => {
     await page.goto('/');
     await expect(page.locator('h2')).toContainText('Upload a drawing', { timeout: 15_000 });
 
-    const fileInput = page.locator('input[type="file"]');
+    const fileInput = page.locator('[data-testid="file-upload-input"]');
     await fileInput.setInputFiles(path.join(DXF_ZOO, 'r2000_blocks.dxf'));
 
     // System message confirms load
@@ -39,7 +39,7 @@ test.describe('DXF Upload', () => {
     await page.goto('/');
     await expect(page.locator('h2')).toContainText('Upload a drawing', { timeout: 15_000 });
 
-    await page.locator('input[type="file"]').setInputFiles(path.join(DXF_ZOO, 'r12_basic.dxf'));
+    await page.locator('[data-testid="file-upload-input"]').setInputFiles(path.join(DXF_ZOO, 'r12_basic.dxf'));
 
     await expect(page.locator('.message--system')).toContainText('Loaded r12_basic.dxf', { timeout: 20_000 });
     await expect(page.locator('.upload-bar-compact__filename')).toContainText('r12_basic.dxf');
@@ -49,7 +49,7 @@ test.describe('DXF Upload', () => {
     await page.goto('/');
     await expect(page.locator('h2')).toContainText('Upload a drawing', { timeout: 15_000 });
 
-    await page.locator('input[type="file"]').setInputFiles(path.join(DXF_ZOO, 'r2018_polylines.dxf'));
+    await page.locator('[data-testid="file-upload-input"]').setInputFiles(path.join(DXF_ZOO, 'r2018_polylines.dxf'));
 
     await expect(page.locator('.message--system')).toContainText('Loaded r2018_polylines.dxf', { timeout: 20_000 });
     await expect(page.locator('.upload-bar-compact__filename')).toContainText('r2018_polylines.dxf');

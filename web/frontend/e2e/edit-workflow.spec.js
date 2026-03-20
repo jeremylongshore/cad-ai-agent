@@ -28,6 +28,9 @@ async function uploadAndWait(page) {
   ).toBeVisible({ timeout: UPLOAD_TIMEOUT });
 }
 
+/** Any AI response element — plain message, QnA panel, or design-ops panel. */
+const AI_RESPONSE = '.message--ai, .qna-panel, .design-ops-panel';
+
 /** Send a prompt and wait for ops or error. Returns 'ops' | 'message' | 'error'. */
 async function sendPromptAndWait(page, text) {
   const textarea = page.locator('[data-testid="chat-textarea"], .chat__textarea');
@@ -37,7 +40,7 @@ async function sendPromptAndWait(page, text) {
 
   const result = await Promise.race([
     page.locator('.op-list__title, .op-item, [data-testid="edit-op-item"]').first().waitFor({ timeout: PLAN_TIMEOUT }).then(() => 'ops'),
-    page.locator('.message--ai').last().waitFor({ timeout: PLAN_TIMEOUT }).then(() => 'message'),
+    page.locator(AI_RESPONSE).last().waitFor({ timeout: PLAN_TIMEOUT }).then(() => 'message'),
     page.locator('.message--error').last().waitFor({ timeout: PLAN_TIMEOUT }).then(() => 'error'),
   ]).catch(() => 'timeout');
 
@@ -143,8 +146,9 @@ test.describe('Edit Workflow — Apply & Download', () => {
       page.locator('.preview__tab--active')
     ).toHaveText('Edited', { timeout: APPLY_TIMEOUT });
 
-    // Download the edited DXF
-    const downloadBtn = page.locator('button').filter({ hasText: 'Download Edited DXF' });
+    // Download the edited DXF — target the preview panel button (not chat follow-up)
+    const downloadBtn = page.locator('.preview__controls button, .bundle-download button')
+      .filter({ hasText: /Download.*DXF/i }).first();
     await expect(downloadBtn).toBeVisible({ timeout: 10_000 });
 
     const downloadPromise = page.waitForEvent('download', { timeout: APPLY_TIMEOUT });

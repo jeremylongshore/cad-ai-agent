@@ -33,7 +33,7 @@ test.describe('Revision Comparison — Sourced Documents', () => {
       await expect(page.locator('h2')).toContainText('Upload a drawing', { timeout: 15_000 });
 
       // Upload master
-      await page.locator('input[type="file"]').setInputFiles(path.join(SOURCED, master));
+      await page.locator('[data-testid="file-upload-input"]').setInputFiles(path.join(SOURCED, master));
       await expect(
         page.locator('.message--system').filter({ hasText: 'Loaded' })
       ).toBeVisible({ timeout: 30_000 });

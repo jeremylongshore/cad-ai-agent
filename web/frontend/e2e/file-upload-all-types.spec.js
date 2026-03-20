@@ -123,19 +123,15 @@ test.describe('File Upload — Replace & Reset', () => {
     await uploadAndWait(page, path.join(DXF_ZOO, 'r2000_blocks.dxf'));
     await expect(page.locator('.upload-bar-compact__filename')).toContainText('r2000_blocks.dxf');
 
-    // Find the replace file input
-    const replaceInput = page.locator('.upload-bar-compact input[type="file"], [data-testid="file-upload-input"]');
+    // The compact bar has a hidden file input for replacing — set files on it directly
+    const replaceInput = page.locator('.upload-bar-compact').locator('..').locator('input[type="file"]');
     await replaceInput.setInputFiles(path.join(DXF_ZOO, 'r12_basic.dxf'));
 
-    // New file should load
+    // Wait for the new file to load (compact bar updates + system message)
+    await expect(page.locator('.upload-bar-compact__filename')).toContainText('r12_basic.dxf', { timeout: UPLOAD_TIMEOUT });
     await expect(
-      page.locator('.message--system').filter({ hasText: 'Loaded' }).last()
+      page.locator('.message--system').filter({ hasText: 'r12_basic.dxf' })
     ).toBeVisible({ timeout: UPLOAD_TIMEOUT });
-
-    // Compact bar should update to new filename
-    const filename = page.locator('.upload-bar-compact__filename');
-    const text = await filename.textContent();
-    expect(text).toContain('r12_basic.dxf');
   });
 
   test('New File button resets to upload screen', async ({ page }) => {
