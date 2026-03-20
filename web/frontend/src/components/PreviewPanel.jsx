@@ -70,6 +70,11 @@ export default function PreviewPanel({
   const [focusedOpIndex, setFocusedOpIndex] = useState(-1);
   const opsListRef = useRef(null);
 
+  // Viewer refs for click-to-focus
+  const activeViewerRef = useRef(null);
+  const compareOriginalRef = useRef(null);
+  const compareChangesRef = useRef(null);
+
   // Resize handle state for controls height
   const [controlsHeight, setControlsHeight] = useState(240);
   const dragStartRef = useRef(null);
@@ -219,6 +224,53 @@ export default function PreviewPanel({
     activeTab === 'comparison' ? { maxHeight: controlsHeight, minHeight: controlsHeight } : undefined
   ), [activeTab, controlsHeight]);
 
+  // Estimate a fallback radius from the viewer's current viewport (25% of camera height),
+  // so the focus region scales with the drawing rather than being a fixed 100 units.
+  const _viewportRadius = useCallback((viewerRef) => {
+    const cam = viewerRef?.GetCamera?.();
+    return cam ? cam.top / 4 : 100;
+  }, []);
+
+  // Click-to-focus: pan/zoom viewer to a revision op's location
+  const handleFocusRevisionOp = useCallback((op) => {
+    const bbox = op.bbox;
+    let bounds = null;
+    if (bbox) {
+      bounds = { minX: bbox.min_x, minY: bbox.min_y, maxX: bbox.max_x, maxY: bbox.max_y };
+    } else if (op.to_point || op.from_point) {
+      const pt = op.to_point || op.from_point;
+      const targetViewer = activeTab === 'comparison'
+        ? (op.op_type === 'delete' ? compareOriginalRef.current : compareChangesRef.current)
+        : activeViewerRef.current;
+      const r = _viewportRadius(targetViewer);
+      bounds = { minX: pt.x - r, minY: pt.y - r, maxX: pt.x + r, maxY: pt.y + r };
+    }
+    if (!bounds) return;
+
+    if (activeTab === 'comparison') {
+      const isMoveOrModify = ['move', 'modify_geometry', 'modify_text'].includes(op.op_type);
+
+      if (op.op_type === 'delete' || isMoveOrModify) {
+        compareOriginalRef.current?.focusOnBounds(bounds);
+      }
+      if (op.op_type !== 'delete') {
+        compareChangesRef.current?.focusOnBounds(bounds);
+      }
+    } else {
+      activeViewerRef.current?.focusOnBounds(bounds);
+    }
+  }, [activeTab, _viewportRadius]);
+
+  // Click-to-focus: pan/zoom viewer to an edit preview op's location
+  const handleFocusEditOp = useCallback((op) => {
+    const pos = op.after_state?.position || op.after_state?.insert_point
+              || op.before_state?.position || op.before_state?.insert_point;
+    if (!pos) return;
+    const r = _viewportRadius(activeViewerRef.current);
+    const bounds = { minX: pos.x - r, minY: pos.y - r, maxX: pos.x + r, maxY: pos.y + r };
+    activeViewerRef.current?.focusOnBounds(bounds);
+  }, [_viewportRadius]);
+
   const completePairs = controlPoints.filter((p) => p.master && p.revision).length;
 
   // Use wizard upload if available, else fallback to simple compare
@@ -308,6 +360,7 @@ export default function PreviewPanel({
                     Original{pickingMode && currentPairSide === 'master' ? ' — click a point' : ''}
                   </span>
                   <DxfViewerComponent
+                    ref={compareOriginalRef}
                     dxfUrl={dxfUrls.original}
                     pickingMode={pickingMode && currentPairSide === 'master'}
                     onPointClick={handleMasterPointClick}
@@ -323,6 +376,7 @@ export default function PreviewPanel({
                     Changes{pickingMode && currentPairSide === 'revision' ? ' — click corresponding point' : ''}
                   </span>
                   <DxfViewerComponent
+                    ref={compareChangesRef}
                     dxfUrl={dxfUrls.comparison}
                     pickingMode={pickingMode && currentPairSide === 'revision'}
                     onPointClick={handleRevisionPointClick}
@@ -366,7 +420,7 @@ export default function PreviewPanel({
           </div>
         ) : dxfUrls?.[activeTab] ? (
           <div style={{ transform: `rotate(${rotation}deg)`, transition: 'transform 0.3s', width: '100%', height: '100%' }}>
-            <DxfViewerComponent dxfUrl={dxfUrls[activeTab]} />
+            <DxfViewerComponent ref={activeViewerRef} dxfUrl={dxfUrls[activeTab]} />
           </div>
         ) : previewUrls[activeTab] ? (
           <img
@@ -539,7 +593,7 @@ export default function PreviewPanel({
                       tabIndex={isFocused ? 0 : -1}
                       className={`revision-op-item${isFocused ? ' revision-op-item--focused' : ''}`}
                       aria-label={`${op.op_type} ${op.description}: ${op.status}`}
-                      onClick={() => setFocusedOpIndex(i)}
+                      onClick={() => { setFocusedOpIndex(i); handleFocusRevisionOp(op); }}
                     >
                       <div className="revision-op-item__header">
                         <span className={`op-item__type op-item__type--${opTypeClass(op.op_type)}`}>
@@ -633,7 +687,7 @@ export default function PreviewPanel({
               )}
             </h4>
             {editPreview.operations?.map((op, i) => (
-              <div key={op.action_id || i} className="revision-op-item">
+              <div key={op.action_id || i} className="revision-op-item" style={{ cursor: 'pointer' }} onClick={() => handleFocusEditOp(op)}>
                 <div className="revision-op-item__header">
                   <span className={`op-item__type op-item__type--${opTypeClass(op.action_type)}`}>
                     {op.action_type}

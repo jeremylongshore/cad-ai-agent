@@ -206,6 +206,41 @@ class TestRevisionDiff:
             assert "confidence" in op
             assert "status" in op
 
+    def test_revision_diff_includes_spatial_data(self, client, session_with_moved_revision):
+        """Diff ops include from_point, to_point, and bbox for click-to-focus."""
+        session_id = session_with_moved_revision
+        resp = client.post(
+            "/api/revision/diff",
+            json={"session_id": session_id},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data["ops"]) > 0
+
+        for op in data["ops"]:
+            # All ops must include the spatial keys (may be null for add/delete)
+            assert "from_point" in op
+            assert "to_point" in op
+            assert "bbox" in op
+
+            # At least one of from_point/to_point should be non-null
+            has_spatial = op["from_point"] is not None or op["to_point"] is not None
+            assert has_spatial, f"Op {op['op_id']} has no spatial data"
+
+            # If bbox present, validate structure
+            if op["bbox"] is not None:
+                bbox = op["bbox"]
+                assert bbox["min_x"] <= bbox["max_x"]
+                assert bbox["min_y"] <= bbox["max_y"]
+
+            # Centroids should be dicts with x/y
+            for pt_key in ("from_point", "to_point"):
+                pt = op[pt_key]
+                if pt is not None:
+                    assert "x" in pt and "y" in pt
+                    assert isinstance(pt["x"], (int, float))
+                    assert isinstance(pt["y"], (int, float))
+
     def test_revision_diff_no_revision(self, client, upload_dxf):
         """Diff without a revision file should return 400."""
         session_id, _ = upload_dxf
