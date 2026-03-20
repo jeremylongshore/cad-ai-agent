@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.1] - 2026-03-20
+
+### Fixed
+- **E2E Production Auth**: Firebase REST API authentication with IndexedDB injection for production test runs
+- **E2E Test Stability**: File input selector disambiguation, QnA/design-ops panel detection, session error endpoint interception, replace file test logic
+
 ## [0.10.0] - 2026-03-20
 
 ### Added
