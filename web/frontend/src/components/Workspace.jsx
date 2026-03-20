@@ -41,6 +41,11 @@ export default function Workspace({ user, onSignOut }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated]);
 
+  // Clear entity selection when session changes (new file, reset, library load)
+  useEffect(() => {
+    setSelectedEntities([]);
+  }, [sessionId]);
+
   // Auto-collapse sidebar when file is uploaded (compact bar already shows info)
   useEffect(() => {
     if (fileInfo) setSidebarCollapsed(true);

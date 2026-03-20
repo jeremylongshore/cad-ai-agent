@@ -239,7 +239,10 @@ const DxfViewerComponent = forwardRef(function DxfViewerComponent(
   }, []);
 
   return (
-    <div className={`dxf-viewer ${className || ''} ${pickingMode ? 'dxf-viewer--picking' : ''}`}>
+    <div
+      className={`dxf-viewer ${className || ''} ${pickingMode ? 'dxf-viewer--picking' : ''}${onEntityClick ? ' dxf-viewer--selectable' : ''}`}
+      data-testid="dxf-viewer"
+    >
       <div className="dxf-viewer__canvas" ref={containerRef} />
 
       {loading && (
@@ -258,6 +261,7 @@ const DxfViewerComponent = forwardRef(function DxfViewerComponent(
       {highlightRect && (
         <div
           className="viewer-focus-highlight"
+          data-testid="viewer-focus-highlight"
           style={{
             left: highlightRect.left,
             top: highlightRect.top,
@@ -280,6 +284,7 @@ const DxfViewerComponent = forwardRef(function DxfViewerComponent(
           <div
             key={entity.handle}
             className="viewer-entity-highlight"
+            data-testid="viewer-entity-highlight"
             style={{
               left: rect.left,
               top: rect.top,

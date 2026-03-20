@@ -312,14 +312,15 @@ export default function ChatPanel({
       )}
 
       {selectedEntities?.length > 0 && (
-        <div className="chat-selection-tags">
+        <div className="chat-selection-tags" data-testid="chat-selection-tags">
+          <span className="entity-tag-count" data-testid="entity-tag-count">{selectedEntities.length} selected</span>
           {selectedEntities.map(ent => (
-            <span key={ent.handle} className="entity-tag">
+            <span key={ent.handle} className="entity-tag" data-testid="entity-tag">
               {ent.label}
-              <button type="button" onClick={() => onRemoveEntity?.(ent.handle)} aria-label={`Remove ${ent.label}`}>&times;</button>
+              <button type="button" data-testid="entity-tag-remove" onClick={() => onRemoveEntity?.(ent.handle)} aria-label={`Remove ${ent.label}`}>&times;</button>
             </span>
           ))}
-          <button type="button" className="btn btn--ghost btn--xs" onClick={onClearSelection}>Clear</button>
+          <button type="button" className="btn btn--ghost btn--xs" data-testid="clear-selection" onClick={onClearSelection}>Clear</button>
         </div>
       )}
 
@@ -328,6 +329,7 @@ export default function ChatPanel({
           <textarea
             ref={textareaRef}
             className="chat__textarea"
+            data-testid="chat-textarea"
             value={input}
             onChange={handleInput}
             onKeyDown={handleKeyDown}
@@ -339,6 +341,7 @@ export default function ChatPanel({
           <button
             type="submit"
             className="btn btn--primary"
+            data-testid="chat-send"
             disabled={!input.trim() || loading || disabled}
             aria-label="Send"
           >

@@ -1707,6 +1707,11 @@
   font-size: var(--text-xs);
 }
 
+/* Cursor affordance — interactive entity viewer shows pointer */
+.dxf-viewer--selectable canvas { cursor: pointer; }
+/* Picking mode (crosshair) takes precedence over selectable (pointer) */
+.dxf-viewer--picking canvas { cursor: crosshair; }
+
 /* Entity highlight overlay — appears on click-selected entities */
 .viewer-entity-highlight {
   position: absolute;
@@ -1715,4 +1720,16 @@
   pointer-events: none;
   z-index: 11;
   background: rgba(59, 130, 246, 0.08);
+}
+
+/* Selection count badge (shown in entity tags area) */
+.entity-tag-count {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  background: rgba(37, 99, 235, 0.1);
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-weight: 500;
 }
