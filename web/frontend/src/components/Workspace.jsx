@@ -81,8 +81,8 @@ export default function Workspace({ user, onSignOut }) {
       } else {
         setSelectedEntities([entity]);
       }
-    } catch {
-      // Silently ignore entity pick failures
+    } catch (err) {
+      console.error('Entity pick failed:', err);
     }
   }, [sessionId]);
 

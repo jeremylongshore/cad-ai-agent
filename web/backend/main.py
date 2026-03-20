@@ -54,6 +54,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from cad_dxf_agent.core.edit_history import EditHistory  # noqa: E402
+from cad_dxf_agent.core.entity_index import EntityIndex  # noqa: E402
 from cad_dxf_agent.otel import span as otel_span  # noqa: E402
 from cad_dxf_agent.settings import settings as cad_settings  # noqa: E402
 
@@ -357,8 +358,6 @@ async def entities_near(
 
     if not session.context:
         raise HTTPException(400, "No drawing loaded")
-
-    from cad_dxf_agent.core.entity_index import EntityIndex
 
     idx = EntityIndex(session.context)
     nearby = idx.find_in_radius(req.x, req.y, req.radius)
