@@ -80,6 +80,10 @@ const DxfViewerComponent = forwardRef(function DxfViewerComponent(
   }, []);
 
   useImperativeHandle(ref, () => ({
+    /** Expose the underlying camera for viewport-based calculations. */
+    GetCamera() {
+      return viewerRef.current?.GetCamera?.() ?? null;
+    },
     focusOnBounds({ minX, minY, maxX, maxY }) {
       const viewer = viewerRef.current;
       if (!viewer) return;

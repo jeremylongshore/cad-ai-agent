@@ -224,6 +224,13 @@ export default function PreviewPanel({
     activeTab === 'comparison' ? { maxHeight: controlsHeight, minHeight: controlsHeight } : undefined
   ), [activeTab, controlsHeight]);
 
+  // Estimate a fallback radius from the viewer's current viewport (25% of camera height),
+  // so the focus region scales with the drawing rather than being a fixed 100 units.
+  const _viewportRadius = useCallback((viewerRef) => {
+    const cam = viewerRef?.GetCamera?.();
+    return cam ? cam.top / 4 : 100;
+  }, []);
+
   // Click-to-focus: pan/zoom viewer to a revision op's location
   const handleFocusRevisionOp = useCallback((op) => {
     const bbox = op.bbox;
@@ -232,7 +239,10 @@ export default function PreviewPanel({
       bounds = { minX: bbox.min_x, minY: bbox.min_y, maxX: bbox.max_x, maxY: bbox.max_y };
     } else if (op.to_point || op.from_point) {
       const pt = op.to_point || op.from_point;
-      const r = 100;
+      const targetViewer = activeTab === 'comparison'
+        ? (op.op_type === 'delete' ? compareOriginalRef.current : compareChangesRef.current)
+        : activeViewerRef.current;
+      const r = _viewportRadius(targetViewer);
       bounds = { minX: pt.x - r, minY: pt.y - r, maxX: pt.x + r, maxY: pt.y + r };
     }
     if (!bounds) return;
@@ -249,17 +259,17 @@ export default function PreviewPanel({
     } else {
       activeViewerRef.current?.focusOnBounds(bounds);
     }
-  }, [activeTab]);
+  }, [activeTab, _viewportRadius]);
 
   // Click-to-focus: pan/zoom viewer to an edit preview op's location
   const handleFocusEditOp = useCallback((op) => {
     const pos = op.after_state?.position || op.after_state?.insert_point
               || op.before_state?.position || op.before_state?.insert_point;
     if (!pos) return;
-    const r = 100;
+    const r = _viewportRadius(activeViewerRef.current);
     const bounds = { minX: pos.x - r, minY: pos.y - r, maxX: pos.x + r, maxY: pos.y + r };
     activeViewerRef.current?.focusOnBounds(bounds);
-  }, []);
+  }, [_viewportRadius]);
 
   const completePairs = controlPoints.filter((p) => p.master && p.revision).length;
 
