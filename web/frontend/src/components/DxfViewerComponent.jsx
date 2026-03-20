@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHandle } from 'react';
 import { DxfViewer } from 'dxf-viewer';
-import { Color } from 'three';
+import { Color, Vector3 } from 'three';
 
 /**
  * Interactive WebGL DXF viewer powered by dxf-viewer + Three.js.
@@ -45,17 +45,13 @@ const DxfViewerComponent = forwardRef(function DxfViewerComponent(
     const cw = canvas.clientWidth;
     const ch = canvas.clientHeight;
 
-    // Project world corner to NDC then to pixels
+    // Project world corner to NDC via Three.js, then to pixels
     const toPixel = (wx, wy) => {
-      // dxf-viewer scene coords = model coords minus origin
-      const sx = wx - origin.x;
-      const sy = wy - origin.y;
-      // Three.js orthographic: project manually
-      const ndcX = (sx - cam.position.x) * cam.zoom / ((cam.right - cam.left) / 2);
-      const ndcY = (sy - cam.position.y) * cam.zoom / ((cam.top - cam.bottom) / 2);
+      const point = new Vector3(wx - origin.x, wy - origin.y, 0);
+      point.project(cam);
       return {
-        px: (ndcX + 1) / 2 * cw,
-        py: (1 - ndcY) / 2 * ch, // Y is flipped in screen space
+        px: ((point.x + 1) / 2) * cw,
+        py: ((-point.y + 1) / 2) * ch,
       };
     };
 

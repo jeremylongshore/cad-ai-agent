@@ -238,14 +238,12 @@ export default function PreviewPanel({
     if (!bounds) return;
 
     if (activeTab === 'comparison') {
-      if (op.op_type === 'delete') {
+      const isMoveOrModify = ['move', 'modify_geometry', 'modify_text'].includes(op.op_type);
+
+      if (op.op_type === 'delete' || isMoveOrModify) {
         compareOriginalRef.current?.focusOnBounds(bounds);
-      } else {
-        compareChangesRef.current?.focusOnBounds(bounds);
       }
-      // In split view, focus both panes for move/modify
-      if (op.op_type === 'move' || op.op_type === 'modify_geometry' || op.op_type === 'modify_text') {
-        compareOriginalRef.current?.focusOnBounds(bounds);
+      if (op.op_type !== 'delete') {
         compareChangesRef.current?.focusOnBounds(bounds);
       }
     } else {
