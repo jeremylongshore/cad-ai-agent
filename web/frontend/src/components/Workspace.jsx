@@ -1,6 +1,7 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
 import { useSession } from '../hooks/useSession';
 import { useDocumentLibrary } from '../hooks/useDocumentLibrary';
+import { entitiesNear } from '../lib/api';
 import FileUpload from './FileUpload';
 import ChatPanel from './ChatPanel';
 import PreviewPanel from './PreviewPanel';
@@ -14,6 +15,7 @@ export default function Workspace({ user, onSignOut }) {
   const replaceInputRef = useRef(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [compareLibraryOpen, setCompareLibraryOpen] = useState(false);
+  const [selectedEntities, setSelectedEntities] = useState([]);
 
   const isAuthenticated = !!user;
   const library = useDocumentLibrary(isAuthenticated);
@@ -61,6 +63,36 @@ export default function Workspace({ user, onSignOut }) {
     session.compareRevision && console.info('[cad] Library compare result:', data);
     return data;
   }, [library, session]);
+
+  // Entity selection via viewer click
+  const handleEntityClick = useCallback(async (position, ctrlKey) => {
+    if (!sessionId) return;
+    try {
+      const res = await entitiesNear(sessionId, position.x, position.y);
+      if (!res.entities?.length) return;
+      const entity = res.entities[0];
+
+      if (ctrlKey) {
+        setSelectedEntities(prev => {
+          const exists = prev.find(e => e.handle === entity.handle);
+          if (exists) return prev.filter(e => e.handle !== entity.handle);
+          return [...prev, entity];
+        });
+      } else {
+        setSelectedEntities([entity]);
+      }
+    } catch (err) {
+      console.error('Entity pick failed:', err);
+    }
+  }, [sessionId]);
+
+  const handleRemoveEntity = useCallback((handle) => {
+    setSelectedEntities(prev => prev.filter(e => e.handle !== handle));
+  }, []);
+
+  const handleClearSelection = useCallback(() => {
+    setSelectedEntities([]);
+  }, []);
 
   return (
     <div className="page" style={{ height: '100vh', overflow: 'hidden' }}>
@@ -299,6 +331,8 @@ export default function Workspace({ user, onSignOut }) {
               onApprovePlan={session.approvePlan}
               onApproveAndApplyPlan={session.approveAndApplyPlan}
               onApplyPlan={session.applyPlan}
+              onEntityClick={handleEntityClick}
+              selectedEntities={selectedEntities}
             />
           </section>
 
@@ -313,6 +347,9 @@ export default function Workspace({ user, onSignOut }) {
               disabled={!sessionId}
               hasOperations={operations.length > 0}
               hasEdited={!!previewUrls.edited}
+              selectedEntities={selectedEntities}
+              onRemoveEntity={handleRemoveEntity}
+              onClearSelection={handleClearSelection}
             />
           </aside>
         </div>

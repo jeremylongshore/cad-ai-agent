@@ -54,6 +54,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from cad_dxf_agent.core.edit_history import EditHistory  # noqa: E402
+from cad_dxf_agent.core.entity_index import EntityIndex  # noqa: E402
 from cad_dxf_agent.otel import span as otel_span  # noqa: E402
 from cad_dxf_agent.settings import settings as cad_settings  # noqa: E402
 
@@ -327,6 +328,59 @@ async def health():
     return {"status": "ok", "service": "cad-dxf-web"}
 
 
+class EntitiesNearRequest(BaseModel):
+    session_id: str
+    x: float
+    y: float
+    radius: float = 50.0
+    limit: int = 5
+
+
+def _entity_label(entity) -> str:
+    """Human-readable label for an entity."""
+    if entity.text_content:
+        return f'{entity.entity_type.value}: "{entity.text_content[:40]}"'
+    if entity.block_name:
+        return f"INSERT: {entity.block_name}"
+    return f"{entity.entity_type.value} on {entity.layer}"
+
+
+@app.post("/api/entities/near")
+async def entities_near(
+    req: EntitiesNearRequest,
+    user=Depends(get_user),
+):
+    """Find entities near a click point for viewer selection."""
+    try:
+        session = session_mgr.get(req.session_id, user["uid"])
+    except (KeyError, PermissionError) as e:
+        raise HTTPException(404, str(e)) from None
+
+    if not session.context:
+        raise HTTPException(400, "No drawing loaded")
+
+    idx = EntityIndex(session.context)
+    nearby = idx.find_in_radius(req.x, req.y, req.radius)
+
+    # Apply limit
+    entities = nearby[: req.limit]
+
+    return {
+        "entities": [
+            {
+                "handle": e.handle,
+                "entity_type": e.entity_type.value,
+                "layer": e.layer,
+                "insert_point": (
+                    {"x": e.insert_point.x, "y": e.insert_point.y} if e.insert_point else None
+                ),
+                "label": _entity_label(e),
+            }
+            for e in entities
+        ]
+    }
+
+
 class DrawingHealthRequest(BaseModel):
     session_id: str
 
@@ -505,8 +559,7 @@ async def _save_work_progress(session: Session, user_id: str) -> None:
             last_prompt=session.conversation_history[-1].get("content", "")
             if session.conversation_history
             else "",
-            has_working_dxf=session.edited_path is not None
-            and session.edited_path.exists(),
+            has_working_dxf=session.edited_path is not None and session.edited_path.exists(),
             audit_events=session.audit_events[-50:],  # Cap at 50 events
         )
         working_path = session.edited_path if progress.has_working_dxf else None

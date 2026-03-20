@@ -332,6 +332,17 @@ export async function clearDocumentProgress(docId) {
   return res.json();
 }
 
+// --- Entity picking (viewer click → nearest entities) ---
+
+export async function entitiesNear(sessionId, x, y, radius = 50, limit = 5) {
+  const res = await request('/api/entities/near', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ session_id: sessionId, x, y, radius, limit }),
+  });
+  return res.json();
+}
+
 // --- v2 Preview / Approve / Apply (EPIC-CAD-08) ---
 
 export async function v2Preview(sessionId) {

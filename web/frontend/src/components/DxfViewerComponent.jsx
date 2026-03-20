@@ -15,7 +15,7 @@ import { Color, Vector3 } from 'three';
  *   focusOnBounds({ minX, minY, maxX, maxY }) — pan/zoom to bounds with highlight ring
  */
 const DxfViewerComponent = forwardRef(function DxfViewerComponent(
-  { dxfUrl, onPointClick, className, pickingMode },
+  { dxfUrl, onPointClick, onEntityClick, className, pickingMode, selectedEntities },
   ref,
 ) {
   const containerRef = useRef(null);
@@ -183,10 +183,17 @@ const DxfViewerComponent = forwardRef(function DxfViewerComponent(
 
     viewerRef.current = viewer;
 
-    // Pointer down for control point picking
+    // Pointer down for control point picking + entity selection
     const handlePointerDown = (e) => {
       if (onPointClick && e.detail?.position) {
         onPointClick({ x: e.detail.position.x, y: e.detail.position.y });
+      }
+      if (onEntityClick && e.detail?.position) {
+        const domEvent = e.detail.domEvent;
+        onEntityClick(
+          { x: e.detail.position.x, y: e.detail.position.y },
+          domEvent?.ctrlKey || domEvent?.metaKey || false,
+        );
       }
     };
     viewer.Subscribe('pointerdown', handlePointerDown);
@@ -259,6 +266,29 @@ const DxfViewerComponent = forwardRef(function DxfViewerComponent(
           }}
         />
       )}
+
+      {selectedEntities?.map(entity => {
+        if (!entity.insert_point) return null;
+        const rect = computeScreenRect({
+          minX: entity.insert_point.x - 10,
+          minY: entity.insert_point.y - 10,
+          maxX: entity.insert_point.x + 10,
+          maxY: entity.insert_point.y + 10,
+        });
+        if (!rect) return null;
+        return (
+          <div
+            key={entity.handle}
+            className="viewer-entity-highlight"
+            style={{
+              left: rect.left,
+              top: rect.top,
+              width: rect.width,
+              height: rect.height,
+            }}
+          />
+        );
+      })}
 
       <div className="viewer-toolbar">
         <button

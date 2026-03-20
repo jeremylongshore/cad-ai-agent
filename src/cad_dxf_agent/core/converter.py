@@ -373,7 +373,6 @@ _DXF_LW_MIN = 13
 _DXF_LW_MAX = 211
 
 
-
 def _parse_pdf_dashes(dashes) -> list[float]:
     """Parse PDF dash pattern into a list of numeric dash/gap lengths.
 

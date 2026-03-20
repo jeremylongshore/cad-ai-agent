@@ -60,6 +60,8 @@ export default function PreviewPanel({
   onApprovePlan,
   onApproveAndApplyPlan,
   onApplyPlan,
+  onEntityClick,
+  selectedEntities,
 }) {
   const [activeTab, setActiveTab] = useState('original');
   const hasEdited = !!previewUrls.edited;
@@ -420,7 +422,7 @@ export default function PreviewPanel({
           </div>
         ) : dxfUrls?.[activeTab] ? (
           <div style={{ transform: `rotate(${rotation}deg)`, transition: 'transform 0.3s', width: '100%', height: '100%' }}>
-            <DxfViewerComponent ref={activeViewerRef} dxfUrl={dxfUrls[activeTab]} />
+            <DxfViewerComponent ref={activeViewerRef} dxfUrl={dxfUrls[activeTab]} onEntityClick={onEntityClick} selectedEntities={selectedEntities} />
           </div>
         ) : previewUrls[activeTab] ? (
           <img

@@ -111,6 +111,9 @@ export default function ChatPanel({
   disabled,
   hasOperations,
   hasEdited,
+  selectedEntities,
+  onRemoveEntity,
+  onClearSelection,
 }) {
   const [input, setInput] = useState('');
   const messagesEndRef = useRef(null);
@@ -139,7 +142,14 @@ export default function ChatPanel({
     e.preventDefault();
     const trimmed = input.trim();
     if (!trimmed || loading || disabled) return;
-    onSend(trimmed);
+
+    if (selectedEntities?.length > 0) {
+      const regions = [{ handles: selectedEntities.map(ent => ent.handle) }];
+      onSend(trimmed, regions);
+      onClearSelection?.();
+    } else {
+      onSend(trimmed);
+    }
     setInput('');
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
   };
@@ -298,6 +308,18 @@ export default function ChatPanel({
               {text}
             </button>
           ))}
+        </div>
+      )}
+
+      {selectedEntities?.length > 0 && (
+        <div className="chat-selection-tags">
+          {selectedEntities.map(ent => (
+            <span key={ent.handle} className="entity-tag">
+              {ent.label}
+              <button type="button" onClick={() => onRemoveEntity?.(ent.handle)} aria-label={`Remove ${ent.label}`}>&times;</button>
+            </span>
+          ))}
+          <button type="button" className="btn btn--ghost btn--xs" onClick={onClearSelection}>Clear</button>
         </div>
       )}
 
