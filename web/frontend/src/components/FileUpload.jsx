@@ -54,6 +54,7 @@ export default function FileUpload({ onUpload, loading }) {
     <div>
       <div
         className={`upload-zone${dragActive ? ' upload-zone--active' : ''}`}
+        data-testid="file-upload-dropzone"
         onDrop={handleDrop}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
@@ -81,6 +82,7 @@ export default function FileUpload({ onUpload, loading }) {
           ref={inputRef}
           type="file"
           accept=".dxf,.dwg,.pdf"
+          data-testid="file-upload-input"
           onChange={handleInputChange}
           style={{ display: 'none' }}
           aria-hidden="true"

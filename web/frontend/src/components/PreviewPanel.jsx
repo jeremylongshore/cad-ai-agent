@@ -594,6 +594,7 @@ export default function PreviewPanel({
                       role="listitem"
                       tabIndex={isFocused ? 0 : -1}
                       className={`revision-op-item${isFocused ? ' revision-op-item--focused' : ''}`}
+                      data-testid="revision-op-item"
                       aria-label={`${op.op_type} ${op.description}: ${op.status}`}
                       onClick={() => { setFocusedOpIndex(i); handleFocusRevisionOp(op); }}
                     >
@@ -689,7 +690,7 @@ export default function PreviewPanel({
               )}
             </h4>
             {editPreview.operations?.map((op, i) => (
-              <div key={op.action_id || i} className="revision-op-item" style={{ cursor: 'pointer' }} onClick={() => handleFocusEditOp(op)}>
+              <div key={op.action_id || i} className="revision-op-item" data-testid="edit-op-item" style={{ cursor: 'pointer' }} onClick={() => handleFocusEditOp(op)}>
                 <div className="revision-op-item__header">
                   <span className={`op-item__type op-item__type--${opTypeClass(op.action_type)}`}>
                     {op.action_type}
