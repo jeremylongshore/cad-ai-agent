@@ -69,9 +69,7 @@ class TestAugmentNoSelection:
 class TestAugmentSingleEntity:
     def test_single_line(self):
         ctx = _make_context([_line_entity("A1")])
-        result = _augment_prompt_with_selection(
-            "move it right", [{"handles": ["A1"]}], ctx
-        )
+        result = _augment_prompt_with_selection("move it right", [{"handles": ["A1"]}], ctx)
         assert "[ACTIVE SELECTION]" in result
         assert "[/ACTIVE SELECTION]" in result
         assert 'Handle "A1"' in result
@@ -82,19 +80,19 @@ class TestAugmentSingleEntity:
 
     def test_includes_coordinates(self):
         ctx = _make_context([_line_entity("A1")])
-        result = _augment_prompt_with_selection(
-            "move it", [{"handles": ["A1"]}], ctx
-        )
+        result = _augment_prompt_with_selection("move it", [{"handles": ["A1"]}], ctx)
         assert "at (10.0, 20.0)" in result
 
 
 class TestAugmentMultiEntity:
     def test_three_entities(self):
-        ctx = _make_context([
-            _line_entity("A1"),
-            _line_entity("A2", layer="DOORS"),
-            _line_entity("A3", layer="WINDOWS"),
-        ])
+        ctx = _make_context(
+            [
+                _line_entity("A1"),
+                _line_entity("A2", layer="DOORS"),
+                _line_entity("A3", layer="WINDOWS"),
+            ]
+        )
         result = _augment_prompt_with_selection(
             "delete these", [{"handles": ["A1", "A2", "A3"]}], ctx
         )
@@ -109,9 +107,7 @@ class TestAugmentMultiEntity:
 class TestAugmentUnknownHandles:
     def test_unknown_handle_skipped(self):
         ctx = _make_context([_line_entity("A1")])
-        result = _augment_prompt_with_selection(
-            "move it", [{"handles": ["A1", "GONE"]}], ctx
-        )
+        result = _augment_prompt_with_selection("move it", [{"handles": ["A1", "GONE"]}], ctx)
         assert "[ACTIVE SELECTION]" in result
         assert 'Handle "A1"' in result
         assert "GONE" not in result
@@ -119,36 +115,28 @@ class TestAugmentUnknownHandles:
 
     def test_all_unknown_returns_original(self):
         ctx = _make_context([_line_entity("A1")])
-        result = _augment_prompt_with_selection(
-            "move it", [{"handles": ["GONE1", "GONE2"]}], ctx
-        )
+        result = _augment_prompt_with_selection("move it", [{"handles": ["GONE1", "GONE2"]}], ctx)
         assert result == "move it"
 
 
 class TestAugmentEntityTypes:
     def test_text_entity_includes_content(self):
         ctx = _make_context([_text_entity("T1", "ROOM 101")])
-        result = _augment_prompt_with_selection(
-            "change text", [{"handles": ["T1"]}], ctx
-        )
+        result = _augment_prompt_with_selection("change text", [{"handles": ["T1"]}], ctx)
         assert '"ROOM 101"' in result
         assert "TEXT" in result
 
     def test_text_truncated_at_60(self):
         long_text = "A" * 100
         ctx = _make_context([_text_entity("T1", long_text)])
-        result = _augment_prompt_with_selection(
-            "change text", [{"handles": ["T1"]}], ctx
-        )
+        result = _augment_prompt_with_selection("change text", [{"handles": ["T1"]}], ctx)
         # Should contain the truncated version (60 chars)
         assert f'"{long_text[:60]}"' in result
         assert long_text not in result
 
     def test_insert_entity_includes_block_name(self):
         ctx = _make_context([_insert_entity("B1", "DOOR_36")])
-        result = _augment_prompt_with_selection(
-            "move it", [{"handles": ["B1"]}], ctx
-        )
+        result = _augment_prompt_with_selection("move it", [{"handles": ["B1"]}], ctx)
         assert "(DOOR_36)" in result
         assert "INSERT" in result
 
@@ -157,9 +145,7 @@ class TestAugmentPreservesPrompt:
     def test_original_prompt_at_end(self):
         ctx = _make_context([_line_entity("A1")])
         original = "move the selected item 10 feet to the right"
-        result = _augment_prompt_with_selection(
-            original, [{"handles": ["A1"]}], ctx
-        )
+        result = _augment_prompt_with_selection(original, [{"handles": ["A1"]}], ctx)
         assert result.endswith(original)
         # The selection block is prepended, not appended
         assert result.index("[ACTIVE SELECTION]") < result.index(original)
@@ -212,13 +198,13 @@ class TestAugmentProtectedLayers:
 
     def test_augment_mixed_protected_and_editable(self):
         """One protected + one editable → only the protected one flagged."""
-        ctx = _make_context([
-            _line_entity("T1", layer="TITLE"),
-            _line_entity("W1", layer="WALLS"),
-        ])
-        result = _augment_prompt_with_selection(
-            "move them", [{"handles": ["T1", "W1"]}], ctx
+        ctx = _make_context(
+            [
+                _line_entity("T1", layer="TITLE"),
+                _line_entity("W1", layer="WALLS"),
+            ]
         )
+        result = _augment_prompt_with_selection("move them", [{"handles": ["T1", "W1"]}], ctx)
         # Protected entity should have the flag
         assert "[PROTECTED" in result
         # Check that WALLS entity line does NOT have the protected flag
