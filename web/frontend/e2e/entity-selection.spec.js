@@ -78,9 +78,9 @@ test.describe('Entity Selection — DXF', () => {
   test('Ctrl+click multi-selects entities', async ({ page }) => {
     await uploadAndWait(page, dxfFile);
 
-    // First click
+    // First click — wait for the selection API call to complete
     await clickViewerCenter(page);
-    await page.waitForTimeout(1000);
+    await page.waitForResponse(resp => resp.url().includes('/api/') && resp.status() === 200).catch(() => {});
 
     // Ctrl+click slightly offset
     const canvas = page.locator('[data-testid="dxf-viewer"] canvas').first();
@@ -91,7 +91,7 @@ test.describe('Entity Selection — DXF', () => {
     await page.mouse.click(box.x + box.width * 0.3, box.y + box.height * 0.3);
     await page.keyboard.up('Control');
 
-    await page.waitForTimeout(1000);
+    await page.waitForResponse(resp => resp.url().includes('/api/') && resp.status() === 200).catch(() => {});
 
     const tags = page.locator('[data-testid="entity-tag"]');
     const count = await tags.count();
@@ -101,9 +101,9 @@ test.describe('Entity Selection — DXF', () => {
   test('plain click replaces selection', async ({ page }) => {
     await uploadAndWait(page, dxfFile);
 
-    // Click once
+    // Click once — wait for API response
     await clickViewerCenter(page);
-    await page.waitForTimeout(1000);
+    await page.waitForResponse(resp => resp.url().includes('/api/') && resp.status() === 200).catch(() => {});
 
     // Click again without Ctrl — should replace, not add
     const canvas = page.locator('[data-testid="dxf-viewer"] canvas').first();
@@ -111,7 +111,7 @@ test.describe('Entity Selection — DXF', () => {
     if (!box) return;
 
     await page.mouse.click(box.x + box.width * 0.4, box.y + box.height * 0.4);
-    await page.waitForTimeout(1000);
+    await page.waitForResponse(resp => resp.url().includes('/api/') && resp.status() === 200).catch(() => {});
 
     const tags = page.locator('[data-testid="entity-tag"]');
     const count = await tags.count();
@@ -122,7 +122,7 @@ test.describe('Entity Selection — DXF', () => {
   test('remove individual entity tag', async ({ page }) => {
     await uploadAndWait(page, dxfFile);
     await clickViewerCenter(page);
-    await page.waitForTimeout(1000);
+    await page.waitForResponse(resp => resp.url().includes('/api/') && resp.status() === 200).catch(() => {});
 
     const removeBtn = page.locator('[data-testid="entity-tag-remove"]').first();
     if (await removeBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
@@ -137,7 +137,7 @@ test.describe('Entity Selection — DXF', () => {
   test('clear all selection', async ({ page }) => {
     await uploadAndWait(page, dxfFile);
     await clickViewerCenter(page);
-    await page.waitForTimeout(1000);
+    await page.waitForResponse(resp => resp.url().includes('/api/') && resp.status() === 200).catch(() => {});
 
     const clearBtn = page.locator('[data-testid="clear-selection"]');
     if (await clearBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
@@ -151,7 +151,7 @@ test.describe('Entity Selection — DXF', () => {
   test('selection cleared on new file upload', async ({ page }) => {
     await uploadAndWait(page, dxfFile);
     await clickViewerCenter(page);
-    await page.waitForTimeout(1000);
+    await page.waitForResponse(resp => resp.url().includes('/api/') && resp.status() === 200).catch(() => {});
 
     // Reset by clicking "New File"
     const newFileBtn = page.locator('button').filter({ hasText: 'New File' });
@@ -165,7 +165,7 @@ test.describe('Entity Selection — DXF', () => {
   test('send prompt with selected entities includes handles', async ({ page }) => {
     await uploadAndWait(page, dxfFile);
     await clickViewerCenter(page);
-    await page.waitForTimeout(1000);
+    await page.waitForResponse(resp => resp.url().includes('/api/') && resp.status() === 200).catch(() => {});
 
     const textarea = page.locator('[data-testid="chat-textarea"]');
     const sendBtn = page.locator('[data-testid="chat-send"]');
@@ -201,7 +201,7 @@ test.describe('Entity Selection — DXF', () => {
   test('entity highlight overlay appears on selection', async ({ page }) => {
     await uploadAndWait(page, dxfFile);
     await clickViewerCenter(page);
-    await page.waitForTimeout(1_000);
+    await page.waitForResponse(resp => resp.url().includes('/api/') && resp.status() === 200).catch(() => {});
 
     const tagsVisible = await page.locator('[data-testid="chat-selection-tags"]').isVisible({ timeout: 5_000 }).catch(() => false);
     if (tagsVisible) {
@@ -209,27 +209,21 @@ test.describe('Entity Selection — DXF', () => {
       const highlight = page.locator(
         '[data-testid="viewer-focus-highlight"], .dxf-viewer--highlight, [class*="selection-highlight"]'
       );
-      const hasHighlight = await highlight.isVisible({ timeout: 5_000 }).catch(() => false);
-      if (hasHighlight) {
-        console.log('Entity highlight overlay visible on selection');
-      } else {
-        // Highlight may be rendered via WebGL (not DOM) — can't assert
-        console.log('Entity selected but highlight is rendered via WebGL (not DOM-testable)');
-      }
+      await highlight.isVisible({ timeout: 5_000 }).catch(() => false);
+      // Highlight may be rendered via WebGL (not DOM) — either outcome is acceptable
     } else {
-      // No entity at center
-      console.log('No entity at canvas center — skipping highlight test');
+      // No entity at canvas center — skipping highlight test
     }
   });
 
   test('selected entities persist across tab switches', async ({ page }) => {
     await uploadAndWait(page, dxfFile);
     await clickViewerCenter(page);
-    await page.waitForTimeout(1_000);
+    await page.waitForResponse(resp => resp.url().includes('/api/') && resp.status() === 200).catch(() => {});
 
     const tagsVisible = await page.locator('[data-testid="chat-selection-tags"]').isVisible({ timeout: 5_000 }).catch(() => false);
     if (!tagsVisible) {
-      console.log('No entity at center — skipping persistence test');
+      // No entity at center — skipping persistence test
       return;
     }
 
@@ -239,32 +233,30 @@ test.describe('Entity Selection — DXF', () => {
     const compareTab = page.locator('.preview__tab').filter({ hasText: 'Compare' });
     if (await compareTab.isVisible({ timeout: 3_000 }).catch(() => false)) {
       await compareTab.click();
-      await page.waitForTimeout(500);
+
+      // Wait for tab content to render
+      await page.locator('.preview__tab--active').waitFor({ timeout: 3_000 }).catch(() => {});
 
       // Switch back to Original tab
       const originalTab = page.locator('.preview__tab').filter({ hasText: 'Original' });
       if (await originalTab.isVisible({ timeout: 3_000 }).catch(() => false)) {
         await originalTab.click();
       } else {
-        // May need to click a different tab name
         const previewTab = page.locator('.preview__tab').first();
         await previewTab.click();
       }
 
-      await page.waitForTimeout(500);
+      await page.locator('.preview__tab--active').waitFor({ timeout: 3_000 }).catch(() => {});
 
       // Tags should still be visible
       const tagsStillVisible = await page.locator('[data-testid="chat-selection-tags"]').isVisible({ timeout: 5_000 }).catch(() => false);
       if (tagsStillVisible) {
         const tagCountAfter = await page.locator('[data-testid="entity-tag"]').count();
         expect(tagCountAfter).toBe(tagCountBefore);
-        console.log('Entity selection persisted across tab switch');
-      } else {
-        console.log('Selection cleared on tab switch (may be expected behavior)');
       }
-    } else {
-      console.log('Compare tab not visible — skipping tab switch test');
+      // Selection may clear on tab switch — either outcome acceptable
     }
+    // Compare tab not visible — skipping tab switch test
   });
 });
 
@@ -295,7 +287,7 @@ test.describe('Entity Selection — PDF', () => {
     }
 
     await clickViewerCenter(page);
-    await page.waitForTimeout(2000);
+    await page.waitForResponse(resp => resp.url().includes('/api/') && resp.status() === 200).catch(() => {});
 
     const tags = page.locator('[data-testid="chat-selection-tags"]');
     await tags.isVisible({ timeout: 5_000 }).catch(() => false);

@@ -27,6 +27,9 @@ const DxfViewerComponent = forwardRef(function DxfViewerComponent(
   const [highlightRect, setHighlightRect] = useState(null);
   const highlightTimerRef = useRef(null);
 
+  // Bump this counter on every viewChanged so selection overlays recompute screen positions
+  const [viewVersion, setViewVersion] = useState(0);
+
   // Detect dark mode
   const isDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches;
 
@@ -198,9 +201,12 @@ const DxfViewerComponent = forwardRef(function DxfViewerComponent(
     };
     viewer.Subscribe('pointerdown', handlePointerDown);
 
-    // Dismiss highlight on user pan/zoom interaction
-    const dismissHighlight = () => clearHighlight();
-    viewer.Subscribe('viewChanged', dismissHighlight);
+    // Dismiss focus-highlight and bump view version so selection overlays recompute
+    const handleViewChanged = () => {
+      clearHighlight();
+      setViewVersion(v => v + 1);
+    };
+    viewer.Subscribe('viewChanged', handleViewChanged);
 
     viewer
       .Load({ url: dxfUrl, fonts: ['/fonts/NotoSans-Regular.ttf'], progressCbk: null })
@@ -227,7 +233,7 @@ const DxfViewerComponent = forwardRef(function DxfViewerComponent(
 
     return () => {
       viewer.Unsubscribe('pointerdown', handlePointerDown);
-      viewer.Unsubscribe('viewChanged', dismissHighlight);
+      viewer.Unsubscribe('viewChanged', handleViewChanged);
       viewer.Destroy();
       viewerRef.current = null;
     };
@@ -271,6 +277,8 @@ const DxfViewerComponent = forwardRef(function DxfViewerComponent(
         />
       )}
 
+      {/* viewVersion state changes on pan/zoom force a re-render so
+          computeScreenRect recalculates overlay positions with the updated camera. */}
       {selectedEntities?.map(entity => {
         if (!entity.insert_point) return null;
         const rect = computeScreenRect({

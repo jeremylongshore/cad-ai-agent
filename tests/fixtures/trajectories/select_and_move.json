@@ -1,0 +1,10 @@
+{
+  "prompt": "[ACTIVE SELECTION]\nThe user has selected 1 entity in the viewer:\n- Handle \"__FIRST_MATCH__\" — INSERT on layer STRUCTURAL (COLUMN) at (120.0, 96.0)\nWhen the user says \"selected\", \"this\", \"these\", or \"the selected entity\", target this entity by the handle(s) listed above.\n[/ACTIVE SELECTION]\n\nmove the selected column 2 feet east",
+  "description": "Agent uses pre-selected handle directly instead of searching",
+  "expected_turns": [
+    {"tool_calls": [{"name": "move_entity", "args": {"handle": "__FIRST_MATCH__", "dx": 24.0, "dy": 0.0}}]}
+  ],
+  "expected_op_types": ["move_entity"],
+  "expected_op_count": 1,
+  "must_not_touch_layers": ["TITLE", "TITLEBLOCK", "SEAL", "REVISION"]
+}

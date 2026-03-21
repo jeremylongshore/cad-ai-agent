@@ -314,12 +314,15 @@ export default function ChatPanel({
       {selectedEntities?.length > 0 && (
         <div className="chat-selection-tags" data-testid="chat-selection-tags">
           <span className="entity-tag-count" data-testid="entity-tag-count">{selectedEntities.length} selected</span>
-          {selectedEntities.map(ent => (
+          {selectedEntities.slice(0, 8).map(ent => (
             <span key={ent.handle} className="entity-tag" data-testid="entity-tag">
               {ent.label}
               <button type="button" data-testid="entity-tag-remove" onClick={() => onRemoveEntity?.(ent.handle)} aria-label={`Remove ${ent.label}`}>&times;</button>
             </span>
           ))}
+          {selectedEntities.length > 8 && (
+            <span className="entity-tag entity-tag--overflow" data-testid="entity-tag-overflow">+{selectedEntities.length - 8} more</span>
+          )}
           <button type="button" className="btn btn--ghost btn--xs" data-testid="clear-selection" onClick={onClearSelection}>Clear</button>
         </div>
       )}

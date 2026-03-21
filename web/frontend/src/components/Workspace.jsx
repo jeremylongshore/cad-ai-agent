@@ -13,6 +13,7 @@ export default function Workspace({ user, onSignOut }) {
   const session = useSession();
   const { fileInfo, sessionId, messages, operations, selectedOps, previewUrls, dxfUrls, comparisonResult, loading, loadingStartTime, error } = session;
   const replaceInputRef = useRef(null);
+  const entityClickTimerRef = useRef(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [compareLibraryOpen, setCompareLibraryOpen] = useState(false);
   const [selectedEntities, setSelectedEntities] = useState([]);
@@ -71,25 +72,30 @@ export default function Workspace({ user, onSignOut }) {
 
   // Entity selection via viewer click
   const handleEntityClick = useCallback(async (position, ctrlKey) => {
-    if (!sessionId) return;
-    try {
-      const res = await entitiesNear(sessionId, position.x, position.y);
-      if (!res.entities?.length) return;
-      const entity = res.entities[0];
+    if (!sessionId || loading) return;
 
-      if (ctrlKey) {
-        setSelectedEntities(prev => {
-          const exists = prev.find(e => e.handle === entity.handle);
-          if (exists) return prev.filter(e => e.handle !== entity.handle);
-          return [...prev, entity];
-        });
-      } else {
-        setSelectedEntities([entity]);
+    // Debounce rapid clicks (150ms) to avoid hammering the API on quick multi-clicks
+    clearTimeout(entityClickTimerRef.current);
+    entityClickTimerRef.current = setTimeout(async () => {
+      try {
+        const res = await entitiesNear(sessionId, position.x, position.y);
+        if (!res.entities?.length) return;
+        const entity = res.entities[0];
+
+        if (ctrlKey) {
+          setSelectedEntities(prev => {
+            const exists = prev.find(e => e.handle === entity.handle);
+            if (exists) return prev.filter(e => e.handle !== entity.handle);
+            return [...prev, entity];
+          });
+        } else {
+          setSelectedEntities([entity]);
+        }
+      } catch (err) {
+        console.error('Entity pick failed:', err);
       }
-    } catch (err) {
-      console.error('Entity pick failed:', err);
-    }
-  }, [sessionId]);
+    }, 150);
+  }, [sessionId, loading]);
 
   const handleRemoveEntity = useCallback((handle) => {
     setSelectedEntities(prev => prev.filter(e => e.handle !== handle));
