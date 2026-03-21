@@ -277,9 +277,9 @@ const DxfViewerComponent = forwardRef(function DxfViewerComponent(
         />
       )}
 
-      {/* viewVersion is read here so any pan/zoom triggers a re-render,
-          causing computeScreenRect to recalculate positions with the current camera. */}
-      {viewVersion >= 0 && selectedEntities?.map(entity => {
+      {/* viewVersion state changes on pan/zoom force a re-render so
+          computeScreenRect recalculates overlay positions with the updated camera. */}
+      {selectedEntities?.map(entity => {
         if (!entity.insert_point) return null;
         const rect = computeScreenRect({
           minX: entity.insert_point.x - 10,
