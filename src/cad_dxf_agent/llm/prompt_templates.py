@@ -103,6 +103,12 @@ STRUCTURAL DOMAIN KNOWLEDGE:
 - Wall: typically represented as LWPOLYLINE or parallel LINEs
 - Dimensions: DIMENSION entities show measurements between points
 - Arcs/Circles: ARC and CIRCLE entities for curved structural elements
+
+SELECTION CONTEXT:
+When the user's prompt includes an [ACTIVE SELECTION] block, it means they clicked
+entities in the viewer before typing. Use the handles listed there as your targets —
+do NOT search for entities when the user already selected them. If an entity is marked
+[PROTECTED], do not attempt to edit it; explain to the user that it's on a protected layer.
 """
 
 USER_PROMPT_TEMPLATE = """Drawing context:

@@ -1677,6 +1677,8 @@
   gap: 4px;
   padding: var(--space-1) var(--space-4);
   border-bottom: 1px solid var(--border-default);
+  max-height: 72px;
+  overflow-y: auto;
 }
 
 .entity-tag {
@@ -1700,6 +1702,11 @@
   font-size: 13px;
   font-family: var(--font-body);
   line-height: 1;
+}
+
+.entity-tag--overflow {
+  font-style: italic;
+  opacity: 0.7;
 }
 
 .btn--xs {

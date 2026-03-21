@@ -858,5 +858,53 @@
       "No ops target protected layers"
     ],
     "tags": ["tier3", "batch", "rotate"]
+  },
+  {
+    "entry_id": "edit-move-selection-001",
+    "task_family": "edit_plan",
+    "prompt": "move the selected item 10 feet right",
+    "drawing_fixture": "structural",
+    "expected_response_type": "changeset",
+    "expected_data_keys": ["operations"],
+    "must_not_produce_ops": false,
+    "must_have_evidence": false,
+    "expected_risk_level": "low",
+    "pass_criteria": [
+      "Intent classified as edit_plan",
+      "ChangeSet contains move_entity op"
+    ],
+    "tags": ["tier3", "selection"]
+  },
+  {
+    "entry_id": "edit-delete-selection-001",
+    "task_family": "edit_plan",
+    "prompt": "delete these selected elements",
+    "drawing_fixture": "structural",
+    "expected_response_type": "changeset",
+    "expected_data_keys": ["operations"],
+    "must_not_produce_ops": false,
+    "must_have_evidence": false,
+    "expected_risk_level": "medium",
+    "pass_criteria": [
+      "Intent classified as edit_plan",
+      "ChangeSet contains delete_entity op"
+    ],
+    "tags": ["tier3", "selection"]
+  },
+  {
+    "entry_id": "edit-selection-protected-001",
+    "task_family": "edit_plan",
+    "prompt": "move the selected title block",
+    "drawing_fixture": "structural",
+    "expected_response_type": "changeset",
+    "expected_data_keys": ["operations"],
+    "must_not_produce_ops": false,
+    "must_have_evidence": false,
+    "expected_risk_level": "low",
+    "pass_criteria": [
+      "Intent classified as edit_plan",
+      "Validator rejects ops targeting protected layers"
+    ],
+    "tags": ["tier3", "selection", "protected"]
   }
 ]

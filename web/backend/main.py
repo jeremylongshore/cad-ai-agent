@@ -1598,128 +1598,141 @@ async def v2_prompt(body: PromptRequest, user: dict = Depends(get_user)):
 
         # Handle edit_plan — dispatch to existing planner
         if intent.family == TaskFamily.EDIT_PLAN:
-            try:
-                from cad_dxf_agent.core.semantic_model import build_planner_context
-                from cad_dxf_agent.core.validators import validate_changeset
-                from cad_dxf_agent.llm.planner import run_planner
-                from cad_dxf_agent.models.config_schema import RuleConfig
-
-                ctx_start = _time.monotonic()
-                planner_context = build_planner_context(session.context)
-                rule_config = RuleConfig()
-                audit.context_build_time_ms = (_time.monotonic() - ctx_start) * 1000
-                image_path = session.original_render if cad_settings.vision_enabled else None
-
-                llm_start = _time.monotonic()
-                changeset = run_planner(
-                    prompt=body.prompt,
-                    drawing_context=planner_context,
-                    image_path=image_path,
-                    context=session.context,
-                    rule_config=rule_config,
-                    conversation_history=session.conversation_history or None,
-                )
-                session.changeset = changeset
-                audit.llm_time_ms = (_time.monotonic() - llm_start) * 1000
-
-                # Build structured EditPlan for preview/apply workflow (EPIC-CAD-08)
+            async with session_mgr.session_lock(body.session_id):
                 try:
-                    from cad_dxf_agent.llm.plan_builder import EditPlanBuilder
-                    from cad_dxf_agent.llm.plan_builder import PlanRequest as PlanReq
+                    from cad_dxf_agent.core.semantic_model import build_planner_context
+                    from cad_dxf_agent.core.validators import validate_changeset
+                    from cad_dxf_agent.llm.planner import run_planner
+                    from cad_dxf_agent.models.config_schema import RuleConfig
 
-                    plan_req = PlanReq(
-                        prompt=body.prompt,
-                        drawing_context=session.context,
-                        request_id=getattr(body, "request_id", ""),
-                        target_handles=[
-                            op.target_handle for op in changeset.operations if op.target_handle
+                    ctx_start = _time.monotonic()
+                    planner_context = build_planner_context(session.context)
+                    rule_config = RuleConfig()
+                    audit.context_build_time_ms = (_time.monotonic() - ctx_start) * 1000
+                    image_path = session.original_render if cad_settings.vision_enabled else None
+
+                    effective_prompt = _augment_prompt_with_selection(
+                        body.prompt, body.selected_regions, session.context
+                    )
+
+                    llm_start = _time.monotonic()
+                    changeset = run_planner(
+                        prompt=effective_prompt,
+                        drawing_context=planner_context,
+                        image_path=image_path,
+                        context=session.context,
+                        rule_config=rule_config,
+                        conversation_history=session.conversation_history or None,
+                    )
+                    session.changeset = changeset
+                    audit.llm_time_ms = (_time.monotonic() - llm_start) * 1000
+
+                    # Build structured EditPlan for preview/apply workflow (EPIC-CAD-08)
+                    try:
+                        from cad_dxf_agent.llm.plan_builder import EditPlanBuilder
+                        from cad_dxf_agent.llm.plan_builder import PlanRequest as PlanReq
+
+                        plan_req = PlanReq(
+                            prompt=body.prompt,
+                            drawing_context=session.context,
+                            request_id=getattr(body, "request_id", ""),
+                            target_handles=[
+                                op.target_handle
+                                for op in changeset.operations
+                                if op.target_handle
+                            ]
+                            or None,
+                        )
+                        edit_plan = EditPlanBuilder().build(plan_req)
+                        session.edit_plan = edit_plan
+                    except Exception as plan_err:
+                        logger.warning("EditPlan build failed (non-fatal): %s", plan_err)
+
+                    val_start = _time.monotonic()
+                    validation = validate_changeset(changeset, session.context, rule_config)
+                    audit.validation_time_ms = (_time.monotonic() - val_start) * 1000
+
+                    operations = []
+                    for op in changeset.operations:
+                        operations.append(
+                            {
+                                "op_type": op.op_type.value
+                                if hasattr(op.op_type, "value")
+                                else str(op.op_type),
+                                "target_handle": op.target_handle,
+                                "target_layer": op.target_layer,
+                                "description": _describe_op(op),
+                                "params": op.params,
+                            }
+                        )
+
+                    summary_parts = [o["description"] for o in operations]
+                    summary = (
+                        "; ".join(summary_parts) if summary_parts else "No operations planned."
+                    )
+                    llm_message = getattr(changeset, "message", None)
+
+                    # Track conversation history
+                    history_text = llm_message if llm_message else summary
+                    session.conversation_history.append({"role": "user", "text": body.prompt})
+                    session.conversation_history.append({"role": "model", "text": history_text})
+                    if len(session.conversation_history) > MAX_CONVERSATION_HISTORY:
+                        session.conversation_history = session.conversation_history[
+                            -MAX_CONVERSATION_HISTORY:
                         ]
-                        or None,
+
+                    # Apply precision controls (EPIC-CAD-14)
+                    precision_candidates = None
+                    precision_action_details = None
+                    try:
+                        precision_candidates, precision_action_details = _enrich_with_precision(
+                            changeset,
+                            session.context,
+                            validation,
+                            body.client_metadata,
+                        )
+                        if precision_action_details is not None:
+                            # Re-serialize operations from potentially modified changeset
+                            operations = []
+                            for op in changeset.operations:
+                                operations.append(
+                                    {
+                                        "op_type": op.op_type.value
+                                        if hasattr(op.op_type, "value")
+                                        else str(op.op_type),
+                                        "target_handle": op.target_handle,
+                                        "target_layer": op.target_layer,
+                                        "description": _describe_op(op),
+                                        "params": op.params,
+                                    }
+                                )
+                    except (ValueError, KeyError, TypeError) as prec_err:
+                        logger.warning("Precision enrichment failed (non-fatal): %s", prec_err)
+
+                    audit.total_request_time_ms = (_time.monotonic() - total_start) * 1000
+
+                    return _enrich(
+                        ResponseBuilder.plan_only(
+                            operations=operations,
+                            message=llm_message or summary,
+                            validation={
+                                "blockers": [
+                                    {"message": b.message} for b in validation.blockers
+                                ],
+                                "warnings": [
+                                    {"message": w.message} for w in validation.warnings
+                                ],
+                                "is_valid": len(validation.blockers) == 0,
+                            },
+                            audit=audit,
+                            ambiguity_candidates=precision_candidates,
+                            precision_actions=precision_action_details,
+                        ).model_dump()
                     )
-                    edit_plan = EditPlanBuilder().build(plan_req)
-                    session.edit_plan = edit_plan
-                except Exception as plan_err:
-                    logger.warning("EditPlan build failed (non-fatal): %s", plan_err)
 
-                val_start = _time.monotonic()
-                validation = validate_changeset(changeset, session.context, rule_config)
-                audit.validation_time_ms = (_time.monotonic() - val_start) * 1000
-
-                operations = []
-                for op in changeset.operations:
-                    operations.append(
-                        {
-                            "op_type": op.op_type.value
-                            if hasattr(op.op_type, "value")
-                            else str(op.op_type),
-                            "target_handle": op.target_handle,
-                            "target_layer": op.target_layer,
-                            "description": _describe_op(op),
-                            "params": op.params,
-                        }
-                    )
-
-                summary_parts = [o["description"] for o in operations]
-                summary = "; ".join(summary_parts) if summary_parts else "No operations planned."
-                llm_message = getattr(changeset, "message", None)
-
-                # Track conversation history
-                history_text = llm_message if llm_message else summary
-                session.conversation_history.append({"role": "user", "text": body.prompt})
-                session.conversation_history.append({"role": "model", "text": history_text})
-                if len(session.conversation_history) > MAX_CONVERSATION_HISTORY:
-                    session.conversation_history = session.conversation_history[
-                        -MAX_CONVERSATION_HISTORY:
-                    ]
-
-                # Apply precision controls (EPIC-CAD-14)
-                precision_candidates = None
-                precision_action_details = None
-                try:
-                    precision_candidates, precision_action_details = _enrich_with_precision(
-                        changeset,
-                        session.context,
-                        validation,
-                        body.client_metadata,
-                    )
-                    if precision_action_details is not None:
-                        # Re-serialize operations from potentially modified changeset
-                        operations = []
-                        for op in changeset.operations:
-                            operations.append(
-                                {
-                                    "op_type": op.op_type.value
-                                    if hasattr(op.op_type, "value")
-                                    else str(op.op_type),
-                                    "target_handle": op.target_handle,
-                                    "target_layer": op.target_layer,
-                                    "description": _describe_op(op),
-                                    "params": op.params,
-                                }
-                            )
-                except (ValueError, KeyError, TypeError) as prec_err:
-                    logger.warning("Precision enrichment failed (non-fatal): %s", prec_err)
-
-                audit.total_request_time_ms = (_time.monotonic() - total_start) * 1000
-
-                return _enrich(
-                    ResponseBuilder.plan_only(
-                        operations=operations,
-                        message=llm_message or summary,
-                        validation={
-                            "blockers": [{"message": b.message} for b in validation.blockers],
-                            "warnings": [{"message": w.message} for w in validation.warnings],
-                            "is_valid": len(validation.blockers) == 0,
-                        },
-                        audit=audit,
-                        ambiguity_candidates=precision_candidates,
-                        precision_actions=precision_action_details,
-                    ).model_dump()
-                )
-
-            except Exception as e:
-                logger.error("v2 plan failed: %s", e, exc_info=True)
-                raise HTTPException(status_code=500, detail="Planning failed") from None
+                except Exception as e:
+                    logger.error("v2 plan failed: %s", e, exc_info=True)
+                    raise HTTPException(status_code=500, detail="Planning failed") from None
 
         # Catch-all for families that are "implemented" but not yet wired
         audit.total_request_time_ms = (_time.monotonic() - total_start) * 1000
@@ -2890,6 +2903,90 @@ def _enrich_with_precision(
     details_dicts = [d.model_dump() for d in details] if details else None
 
     return candidates_dicts, details_dicts
+
+
+MAX_SELECTION_ENTITIES = 50
+
+
+def _augment_prompt_with_selection(
+    prompt: str,
+    selected_regions: list[dict] | None,
+    context: "DrawingContext",
+) -> str:
+    """Prepend active selection context to the user prompt.
+
+    When the user has selected entities in the viewer, this injects their
+    handles and metadata into the prompt so the LLM can resolve references
+    like "selected item", "this", "the thing I clicked" to specific entities.
+    """
+    if not selected_regions:
+        return prompt
+
+    handles = selected_regions[0].get("handles", []) if selected_regions else []
+    if not handles:
+        return prompt
+
+    total_selected = len(handles)
+    truncated = total_selected > MAX_SELECTION_ENTITIES
+    if truncated:
+        handles = handles[:MAX_SELECTION_ENTITIES]
+
+    entity_map = {e.handle: e for e in context.entities}
+    from cad_dxf_agent.settings import Settings as CadSettings
+
+    _settings = CadSettings()
+    protected = {layer.upper() for layer in _settings.protected_layers}
+
+    has_protected = any(
+        entity_map.get(h) and entity_map[h].layer.upper() in protected for h in handles
+    )
+
+    lines: list[str] = []
+    for h in handles:
+        ent = entity_map.get(h)
+        if ent is None:
+            continue
+        desc = f'Handle "{h}" — {ent.entity_type.value} on layer {ent.layer}'
+        if ent.text_content:
+            desc += f': "{ent.text_content[:60]}"'
+        if ent.block_name:
+            desc += f" ({ent.block_name})"
+        if ent.insert_point:
+            desc += f" at ({ent.insert_point.x:.1f}, {ent.insert_point.y:.1f})"
+        if ent.layer.upper() in protected:
+            desc += " [PROTECTED — cannot be edited]"
+        lines.append(f"- {desc}")
+
+    if truncated:
+        lines.append(
+            f"- ... and {total_selected - MAX_SELECTION_ENTITIES} more"
+            f" (showing first {MAX_SELECTION_ENTITIES})"
+        )
+
+    if not lines:
+        return prompt
+
+    count = total_selected if truncated else len(lines)
+    entity_word = "entity" if count == 1 else "entities"
+    protected_instruction = (
+        "Entities marked [PROTECTED] are on protected layers and MUST NOT be targeted"
+        " by edit operations.\n"
+        if has_protected
+        else ""
+    )
+    selection_block = (
+        f"[ACTIVE SELECTION]\n"
+        f"The user has selected {count} {entity_word} in the viewer:\n"
+        + "\n".join(lines)
+        + "\n"
+        f'When the user says "selected", "this", "these", or "the selected '
+        f'{entity_word}", target {"this entity" if count == 1 else "these entities"} '
+        f"by the handle(s) listed above.\n"
+        + protected_instruction
+        + "[/ACTIVE SELECTION]\n\n"
+    )
+
+    return selection_block + prompt
 
 
 def _parse_selected_region(selected_regions: list[dict] | None):

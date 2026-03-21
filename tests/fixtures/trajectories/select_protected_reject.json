@@ -1,0 +1,8 @@
+{
+  "prompt": "[ACTIVE SELECTION]\nThe user has selected 1 entity in the viewer:\n- Handle \"T1\" — TEXT on layer TITLE: \"DRAWING TITLE\" at (0.0, 0.0) [PROTECTED — cannot be edited]\nEntities marked [PROTECTED] are on protected layers and MUST NOT be targeted by edit operations.\nWhen the user says \"selected\", \"this\", \"these\", or \"the selected entity\", target this entity by the handle(s) listed above.\n[/ACTIVE SELECTION]\n\ndelete the selected item",
+  "description": "Agent refuses to edit protected-layer entity from selection",
+  "expected_turns": [],
+  "expected_op_types": [],
+  "expected_op_count": 0,
+  "must_not_touch_layers": ["TITLE", "TITLEBLOCK", "SEAL", "REVISION"]
+}
