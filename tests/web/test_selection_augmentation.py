@@ -4,15 +4,11 @@ from __future__ import annotations
 
 import pytest
 
+from cad_dxf_agent.models.cad_schema import DrawingContext, EntityRef, EntityType, Point2D
+
 starlette = pytest.importorskip("starlette", reason="web backend tests require fastapi/starlette")
 
-from cad_dxf_agent.models.cad_schema import (
-    DrawingContext,
-    EntityRef,
-    EntityType,
-    Point2D,
-)
-from web.backend.main import _augment_prompt_with_selection
+from web.backend.main import _augment_prompt_with_selection  # noqa: E402
 
 
 def _make_context(entities: list[EntityRef]) -> DrawingContext:

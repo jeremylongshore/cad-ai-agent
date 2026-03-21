@@ -2911,7 +2911,7 @@ MAX_SELECTION_ENTITIES = 50
 def _augment_prompt_with_selection(
     prompt: str,
     selected_regions: list[dict] | None,
-    context: "DrawingContext",
+    context: DrawingContext,
 ) -> str:
     """Prepend active selection context to the user prompt.
 
