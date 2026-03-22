@@ -92,6 +92,8 @@
 | 024 | AADR | [024-AA-AADR-perf-plan-audit.md](024-AA-AADR-perf-plan-audit.md) |
 | 026 | AUDT | [026-AA-AUDT-appaudit-devops-playbook.md](026-AA-AUDT-appaudit-devops-playbook.md) |
 | 033 | AACR | [033-AA-AACR-release-v0.5.0.md](033-AA-AACR-release-v0.5.0.md) |
+| 059 | AUDT | [059-AA-AUDT-appaudit-devops-playbook.md](059-AA-AUDT-appaudit-devops-playbook.md) |
+| 073 | AUDT | [073-AA-AUDT-appaudit-devops-playbook.md](073-AA-AUDT-appaudit-devops-playbook.md) |
 
 ## Chronological Listing
 
@@ -156,6 +158,12 @@
 | 056 | AT | SPEC | EPIC-CAD-14: Professional Precision Controls spec |
 | 057 | AT | SPEC | EPIC-CAD-15: Document Persistence spec |
 | 058 | AT | ARCH | IntentCAD v0.8.0 UI/UX design strategy |
+| 059 | AA | AUDT | DevOps operator playbook (appaudit v0.9.0) |
+| 060 | TQ | GUID | Mutation testing practices guide |
+| 070 | AN | TEST | Real-world prompt matrix |
+| 071 | TQ | TEST | Production quality proof system |
+| 072 | TQ | TEST | Real-world user profiles |
+| 073 | AA | AUDT | DevOps operator playbook (appaudit v0.10.1) |
 
 ## Quick Reference
 
