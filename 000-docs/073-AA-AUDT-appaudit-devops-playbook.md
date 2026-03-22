@@ -56,7 +56,7 @@ Key risks: (1) single-region deployment creates a SPOF, (2) ODA File Converter i
 | Tracing | OpenTelemetry → Cloud Trace | >=1.21 | Pipeline span instrumentation |
 | Desktop UI | PySide6 | >=6.6 | Qt-based desktop shell |
 | CI/CD | GitHub Actions | — | Lint, test, deploy (WIF auth) |
-| Linting | Ruff | >=0.5 | Lint + format |
+| Linting | Ruff | >=0.5.0 | Lint + format |
 | Type Check | Mypy | >=1.10 | Static type analysis |
 | Security | Bandit + pip-audit | — | SAST + dependency audit |
 | Build | Hatchling + PyInstaller | — | Package + desktop executable |
