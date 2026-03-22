@@ -1,6 +1,10 @@
-# cad-dxf-agent
+# cad-dxf-agent v0.10.1
 
 Drawing Intelligence Platform for AEC professionals — edit, analyze, and validate 2D DXF drawings using natural-language prompts. The LLM returns structured JSON operations (never raw DXF), which are validated and applied deterministically. Original files are never modified (save-as workflow).
+
+[![CI](https://github.com/jeremylongshore/cad-dxf-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/jeremylongshore/cad-dxf-agent/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/jeremylongshore/cad-dxf-agent/blob/main/LICENSE)
+
+**Links:** [Full Audit (Gist)](https://gist.github.com/jeremylongshore/0303189683f9547c79e1fc1fc68be711) · [Docs](000-docs/000-INDEX.md)
 
 ## What Is This?
 
