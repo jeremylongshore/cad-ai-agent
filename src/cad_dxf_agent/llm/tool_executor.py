@@ -12,7 +12,6 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from ..core.entity_index import EntityIndex
 from ..models.cad_schema import DrawingContext, EntityRef
 from ..models.ops_schema import EditOperation, OpType
 
@@ -32,7 +31,7 @@ class ToolExecutor:
         protected_layers: list[str] | None = None,
     ) -> None:
         self._context = context
-        self._index = EntityIndex(context)
+        self._index = context.index
         self._protected = [p.upper() for p in (protected_layers or [])]
         self._operations: list[EditOperation] = []
 

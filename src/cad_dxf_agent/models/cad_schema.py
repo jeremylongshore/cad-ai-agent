@@ -3,9 +3,13 @@
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import Any
+from functools import cached_property
+from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, Field, field_validator
+
+if TYPE_CHECKING:
+    from ..core.entity_index import EntityIndex
 
 
 class EntityType(StrEnum):
@@ -214,6 +218,18 @@ class DrawingContext(BaseModel):
     unsupported_entity_types: list[str] = Field(default_factory=list)
     load_warnings: list[LoadWarning] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @cached_property
+    def index(self) -> EntityIndex:
+        """Lazily build and cache an EntityIndex for this context.
+
+        Avoids redundant O(n) R-tree rebuilds when multiple consumers
+        (validators, compliance, health checker, etc.) need spatial queries
+        on the same DrawingContext within a single request.
+        """
+        from ..core.entity_index import EntityIndex as _EntityIndex
+
+        return _EntityIndex(self)
 
     @property
     def entity_count(self) -> int:

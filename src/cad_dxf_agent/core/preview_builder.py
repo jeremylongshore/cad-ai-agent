@@ -12,7 +12,6 @@ from ..models.cad_schema import DrawingContext
 from ..models.plan_schema import EditAction, EditActionType, EditPlan
 from ..models.preview_schema import ActionPreview, EditPreview, PreviewStatus
 from ..models.response_schema import RiskLevel
-from .entity_index import EntityIndex
 
 
 class EditPreviewBuilder:
@@ -20,7 +19,7 @@ class EditPreviewBuilder:
 
     def __init__(self, context: DrawingContext) -> None:
         self._context = context
-        self._index = EntityIndex(context)
+        self._index = context.index
 
     def build(self, plan: EditPlan) -> EditPreview:
         """Build a preview of what the plan will do."""

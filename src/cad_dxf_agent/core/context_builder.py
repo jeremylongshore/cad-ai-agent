@@ -16,7 +16,6 @@ from typing import Any
 
 from ..models.cad_schema import DrawingContext, EntityRef, EntityType, Point2D
 from ..models.stats_schema import DrawingStats
-from .entity_index import EntityIndex
 
 
 def full_context(context: DrawingContext) -> dict[str, Any]:
@@ -55,7 +54,7 @@ def subset_context(
 
     When multiple filters are provided, they are intersected.
     """
-    index = EntityIndex(context)
+    index = context.index
     candidates = set(e.handle for e in context.entities)
 
     if entity_ids is not None:

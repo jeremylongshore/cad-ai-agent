@@ -427,6 +427,7 @@ class TestAgentProviderGetModel:
         provider = AgentProvider(project="p", location="l")
         mock_model = MagicMock()
         provider._model = mock_model
+        provider._model_tool_set = "modify"  # match default request_class
 
         result = provider._get_model()
         assert result is mock_model

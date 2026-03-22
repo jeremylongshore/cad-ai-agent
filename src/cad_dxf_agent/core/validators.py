@@ -40,7 +40,7 @@ def validate_changeset(
         span.set_attribute("cad.ops.count", changeset.op_count)
 
         result = ValidationResult()
-        index = EntityIndex(context)
+        index = context.index
         protected_upper = [layer.upper() for layer in rules.protected_layers]
 
         for i, op in enumerate(changeset.operations):

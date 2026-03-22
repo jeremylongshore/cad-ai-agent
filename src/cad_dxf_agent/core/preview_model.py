@@ -5,7 +5,6 @@ from __future__ import annotations
 from ..models.cad_schema import DrawingContext
 from ..models.changes_schema import ValidationResult
 from ..models.ops_schema import ChangeSet, OpType
-from .entity_index import EntityIndex
 
 
 class PreviewItem:
@@ -36,7 +35,7 @@ class PreviewModel:
         self._build()
 
     def _build(self) -> None:
-        entity_index = EntityIndex(self.context)
+        entity_index = self.context.index
 
         for i, op in enumerate(self.changeset.operations):
             entity = entity_index.get_by_handle(op.target_handle) if op.target_handle else None

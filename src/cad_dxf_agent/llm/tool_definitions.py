@@ -742,3 +742,16 @@ def get_tool_by_name(name: str) -> dict[str, Any] | None:
 def is_edit_tool(name: str) -> bool:
     """Return True if the tool name is an edit (mutating) tool."""
     return any(t["name"] == name for t in EDIT_TOOLS)
+
+
+def get_tools_for_request_class(request_class: str) -> list[dict[str, Any]]:
+    """Return the tool subset appropriate for a given RequestClass.
+
+    Only MODIFY requests get the full tool set (query + edit).
+    All other request classes (understand, estimate, recommend, optimize,
+    summarize, compare, validate) get query-only tools — sending edit
+    tools for read-only requests wastes tokens and risks LLM confusion.
+    """
+    if request_class == "modify":
+        return ALL_TOOLS
+    return QUERY_TOOLS
