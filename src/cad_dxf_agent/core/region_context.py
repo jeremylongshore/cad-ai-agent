@@ -37,7 +37,7 @@ class RegionContextBuilder:
         in/near the region. Otherwise builds whole-drawing context.
         """
         if index is None:
-            index = EntityIndex(context)
+            index = context.index
 
         if region is not None:
             return self._build_from_region(context, region, index)

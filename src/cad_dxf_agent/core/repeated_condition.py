@@ -26,7 +26,6 @@ from ..models.repeated_condition_schema import (
     SimilaritySignalType,
 )
 from ..models.response_schema import EvidenceRef
-from .entity_index import EntityIndex
 from .text_utils import levenshtein_similarity as _levenshtein_similarity
 
 logger = logging.getLogger(__name__)
@@ -96,7 +95,7 @@ class ConditionDetector:
         config: SimilarityConfig | None = None,
     ) -> None:
         self._context = context
-        self._index = EntityIndex(context)
+        self._index = context.index
         self._config = config or SimilarityConfig()
 
     def find_repeated(

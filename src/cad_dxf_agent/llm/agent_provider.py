@@ -24,7 +24,7 @@ from ..otel import get_tracer
 from ..settings import settings
 from .prompt_templates import AGENT_SYSTEM_PROMPT
 from .providers import PlannerProvider
-from .tool_definitions import ALL_TOOLS
+from .tool_definitions import get_tools_for_request_class
 from .tool_executor import ToolExecutor
 from .vision_describer import describe_drawing
 
@@ -49,12 +49,16 @@ class AgentProvider(PlannerProvider):
         location: str | None = None,
         model_name: str | None = None,
         image_path: str | Path | None = None,
+        request_class: str = "modify",
     ) -> None:
         self._project = project or settings.gcp_project
         self._location = location or settings.gcp_location
         self._model_name = model_name or settings.gemini_model
         self._image_path = image_path
+        self._request_class = request_class
         self._model: Any = None  # lazy init
+        self._model_tool_set: str = ""  # tracks which tool set is cached
+        self._vertexai_initialized = False
 
     @property
     def name(self) -> str:
@@ -201,52 +205,72 @@ class AgentProvider(PlannerProvider):
             return changeset
 
     def _get_model(self):
-        """Lazy-initialize the Gemini model with tool declarations and GenerationConfig."""
-        if self._model is None:
-            try:
-                import vertexai
-                from vertexai.generative_models import (
-                    FunctionDeclaration,
-                    GenerationConfig,
-                    GenerativeModel,
-                    Tool,
-                )
+        """Lazy-initialize the Gemini model with tool declarations and GenerationConfig.
 
+        Tool set is narrowed by request_class: non-MODIFY requests get
+        query-only tools to avoid wasting tokens and prevent the LLM
+        from attempting edits on read-only requests.
+        """
+        tool_defs = get_tools_for_request_class(self._request_class)
+        tool_set_key = self._request_class
+
+        # Rebuild model if tool set changed (e.g., reuse across request classes)
+        if self._model is not None and self._model_tool_set == tool_set_key:
+            return self._model
+
+        try:
+            import vertexai
+            from vertexai.generative_models import (
+                FunctionDeclaration,
+                GenerationConfig,
+                GenerativeModel,
+                Tool,
+            )
+
+            if not self._vertexai_initialized:
                 vertexai.init(
                     project=self._project,
                     location=self._location,
                 )
+                self._vertexai_initialized = True
 
-                # Convert tool dicts to FunctionDeclaration objects
-                declarations = []
-                for tool_def in ALL_TOOLS:
-                    declarations.append(
-                        FunctionDeclaration(
-                            name=str(tool_def["name"]),
-                            description=str(tool_def["description"]),
-                            parameters=dict(tool_def["parameters"]),  # type: ignore[arg-type]
-                        )
+            # Convert tool dicts to FunctionDeclaration objects
+            declarations = []
+            for td in tool_defs:
+                declarations.append(
+                    FunctionDeclaration(
+                        name=str(td["name"]),
+                        description=str(td["description"]),
+                        parameters=dict(td["parameters"]),  # type: ignore[arg-type]
                     )
-                tools = [Tool(function_declarations=declarations)]
-
-                gen_config = GenerationConfig(
-                    temperature=settings.llm_temperature,
-                    top_p=settings.llm_top_p,
-                    top_k=settings.llm_top_k,
-                    max_output_tokens=settings.llm_max_output_tokens,
                 )
+            tools = [Tool(function_declarations=declarations)]
 
-                self._model = GenerativeModel(
-                    self._model_name,
-                    system_instruction=AGENT_SYSTEM_PROMPT,
-                    tools=tools,
-                    generation_config=gen_config,
-                )
-            except ImportError as err:
-                raise ImportError(
-                    "google-cloud-aiplatform not installed. "
-                    "Install with: pip install google-cloud-aiplatform"
-                ) from err
+            gen_config = GenerationConfig(
+                temperature=settings.llm_temperature,
+                top_p=settings.llm_top_p,
+                top_k=settings.llm_top_k,
+                max_output_tokens=settings.llm_max_output_tokens,
+            )
+
+            self._model = GenerativeModel(
+                self._model_name,
+                system_instruction=AGENT_SYSTEM_PROMPT,
+                tools=tools,
+                generation_config=gen_config,
+            )
+            self._model_tool_set = tool_set_key
+
+            logger.info(
+                "Agent model initialized with %d tools (request_class=%s)",
+                len(tool_defs),
+                self._request_class,
+            )
+        except ImportError as err:
+            raise ImportError(
+                "google-cloud-aiplatform not installed. "
+                "Install with: pip install google-cloud-aiplatform"
+            ) from err
 
         return self._model
 

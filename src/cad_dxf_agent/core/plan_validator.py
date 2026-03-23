@@ -25,7 +25,6 @@ from ..models.plan_schema import (
     EditPlan,
     PlanValidationStatus,
 )
-from .entity_index import EntityIndex
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +54,7 @@ class PlanValidator:
     ) -> None:
         self._context = context
         self._rules = rules or RuleConfig()
-        self._index = EntityIndex(context)
+        self._index = context.index
         self._protected_upper = [layer.upper() for layer in self._rules.protected_layers]
 
     def validate(self, plan: EditPlan) -> EditPlan:

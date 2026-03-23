@@ -52,7 +52,7 @@ def check_drawing_health(
 
         issues: list[HealthIssue] = []
         checks_run: list[str] = []
-        index = EntityIndex(context)
+        index = context.index
 
         # Run each check
         for check_fn in _ALL_CHECKS:

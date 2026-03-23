@@ -92,7 +92,7 @@ class RegionAssociator:
         Returns ranked candidates with association types and confidence.
         """
         if index is None:
-            index = EntityIndex(context)
+            index = context.index
 
         candidates: list[AssociatedEntity] = []
         flags: list[str] = []

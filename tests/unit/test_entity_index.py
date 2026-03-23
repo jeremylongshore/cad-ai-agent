@@ -234,3 +234,42 @@ def test_get_by_layer_unknown(entity_index):
     result = entity_index.get_by_layer("NONEXISTENT")
     assert result == []
     assert isinstance(result, list)
+
+
+# --- DrawingContext.index cached property ---
+
+
+class TestDrawingContextIndex:
+    """Verify that DrawingContext.index returns a cached EntityIndex."""
+
+    def test_index_returns_entity_index(self, sample_context):
+        """context.index returns an EntityIndex instance."""
+        idx = sample_context.index
+        assert isinstance(idx, EntityIndex)
+        assert idx.count == sample_context.entity_count
+
+    def test_index_is_cached(self, sample_context):
+        """Repeated access returns the same object (no rebuild)."""
+        idx1 = sample_context.index
+        idx2 = sample_context.index
+        assert idx1 is idx2
+
+    def test_index_matches_direct_construction(self, sample_context):
+        """Cached index produces same results as manually constructed one."""
+        cached = sample_context.index
+        direct = EntityIndex(sample_context)
+        assert cached.count == direct.count
+        assert set(cached.handles()) == set(direct.handles())
+
+    def test_index_on_empty_context(self):
+        """Empty context produces an index with count 0."""
+        ctx = DrawingContext(file_path="empty.dxf", entities=[], layers=[])
+        assert ctx.index.count == 0
+
+    def test_index_spatial_queries_work(self, sample_context):
+        """Spatial queries via cached index work correctly."""
+        idx = sample_context.index
+        # Should be able to call nearest without error
+        result = idx.nearest(0.0, 0.0)
+        # Result depends on fixture data, just verify no crash
+        assert result is None or result.handle

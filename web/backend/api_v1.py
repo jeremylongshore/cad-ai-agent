@@ -27,7 +27,6 @@ from cad_dxf_agent.core.compliance_rules import check_compliance
 from cad_dxf_agent.core.design_ops import TakeoffGenerator
 from cad_dxf_agent.core.drawing_summarizer import summarize_drawing
 from cad_dxf_agent.core.dxf_reader import load_dxf
-from cad_dxf_agent.core.entity_index import EntityIndex
 from cad_dxf_agent.core.rfi_generator import generate_rfi
 from cad_dxf_agent.core.zone_detector import detect_zones as run_zones
 from cad_dxf_agent.models.compliance_schema import BUILTIN_PROFILES
@@ -79,7 +78,7 @@ async def analyze(file: UploadFile = File(...)):
     """
     with otel_span("api.v1.analyze"):
         context = _load_context(file)
-        index = EntityIndex(context)
+        index = context.index
 
         # Layer breakdown
         layers = []
@@ -200,7 +199,7 @@ async def search_entities(
     """
     with otel_span("api.v1.entities"):
         context = _load_context(file)
-        index = EntityIndex(context)
+        index = context.index
 
         candidates = index.filter(layer=layer, entity_type=entity_type)
 

@@ -7,6 +7,7 @@ from cad_dxf_agent.llm.tool_definitions import (
     EDIT_TOOLS,
     QUERY_TOOLS,
     get_tool_by_name,
+    get_tools_for_request_class,
     is_edit_tool,
 )
 
@@ -98,3 +99,35 @@ class TestToolDefinitions:
         tool = get_tool_by_name("find_entities")
         assert tool is not None
         assert tool["parameters"]["required"] == []
+
+
+class TestToolNarrowing:
+    """Verify request_class → tool subset mapping."""
+
+    def test_modify_gets_all_tools(self):
+        tools = get_tools_for_request_class("modify")
+        assert tools == ALL_TOOLS
+
+    def test_non_modify_gets_query_only(self):
+        for rc in ("understand", "estimate", "recommend", "optimize",
+                    "summarize", "compare", "validate"):
+            tools = get_tools_for_request_class(rc)
+            assert tools == QUERY_TOOLS, f"{rc} should get QUERY_TOOLS only"
+            # Verify no edit tools leak through
+            tool_names = {t["name"] for t in tools}
+            edit_names = {t["name"] for t in EDIT_TOOLS}
+            assert tool_names & edit_names == set(), f"Edit tools in {rc}"
+
+    def test_query_tools_always_present(self):
+        """Every request class gets at least the query tools."""
+        for rc in ("modify", "understand", "estimate", "recommend",
+                    "optimize", "summarize", "compare", "validate"):
+            tools = get_tools_for_request_class(rc)
+            tool_names = {t["name"] for t in tools}
+            query_names = {t["name"] for t in QUERY_TOOLS}
+            assert query_names.issubset(tool_names), f"Missing query tools in {rc}"
+
+    def test_unknown_request_class_gets_query_only(self):
+        """Unknown/future request classes default to query-only (safe)."""
+        tools = get_tools_for_request_class("unknown_future_class")
+        assert tools == QUERY_TOOLS

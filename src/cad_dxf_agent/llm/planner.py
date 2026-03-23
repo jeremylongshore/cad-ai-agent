@@ -26,6 +26,7 @@ tracer = get_tracer(__name__)
 def get_provider(
     provider_name: str | None = None,
     image_path: Path | None = None,
+    request_class: str = "modify",
 ) -> PlannerProvider:
     """Get the configured planner provider.
 
@@ -34,6 +35,7 @@ def get_provider(
     Args:
         provider_name: Override for the provider name.
         image_path: Optional path to a rendered PNG for vision-augmented planning.
+        request_class: RequestClass value for tool narrowing (default "modify").
     """
     name = (provider_name or settings.llm_provider).lower()
 
@@ -56,7 +58,7 @@ def get_provider(
         try:
             from .agent_provider import AgentProvider
 
-            return AgentProvider(image_path=image_path)
+            return AgentProvider(image_path=image_path, request_class=request_class)
         except ImportError:
             logger.warning(
                 "google-cloud-aiplatform not installed, falling back to mock-agent. "
@@ -140,6 +142,7 @@ def run_planner(
     context: DrawingContext | None = None,
     rule_config: RuleConfig | None = None,
     conversation_history: list[dict] | None = None,
+    request_class: str = "modify",
 ) -> ChangeSet:
     """Run the planner to generate a changeset from a user prompt.
 
@@ -168,7 +171,7 @@ def run_planner(
     """
     with tracer.start_as_current_span("cad.run_planner") as span:
         if provider is None:
-            provider = get_provider(image_path=image_path)
+            provider = get_provider(image_path=image_path, request_class=request_class)
 
         # Try deterministic planner first (no LLM call needed)
         from .deterministic_planner import deterministic_plan

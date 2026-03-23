@@ -76,7 +76,7 @@ def check_compliance(
     if zones is None:
         zones = detect_zones(context)
 
-    index = EntityIndex(context)
+    index = context.index
     findings: list[ComplianceFinding] = []
     checks_run: list[str] = []
 
