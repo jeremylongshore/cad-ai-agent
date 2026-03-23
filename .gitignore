@@ -80,3 +80,6 @@ mutants/
 
 # Large test fixtures (not for version control)
 000-docs/*.pdf
+
+# Beads / Dolt files (added by bd init)
+.beads-credential-key
