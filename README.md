@@ -1,4 +1,4 @@
-# cad-dxf-agent v0.10.1
+# cad-dxf-agent v0.11.0
 
 Drawing Intelligence Platform for AEC professionals — edit, analyze, and validate 2D DXF drawings using natural-language prompts. The LLM returns structured JSON operations (never raw DXF), which are validated and applied deterministically. Original files are never modified (save-as workflow).
 

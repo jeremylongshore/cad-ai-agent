@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-03-22
+
+### Added
+- **EPIC-CAD-31: System Design Pattern Adoption**: ADK-compatible tool function signatures, Shapely geometry integration, architectural drift detection CI gate (#128)
+- **Cached EntityIndex**: R-tree index now cached on DrawingContext for O(1) repeated lookups (#127)
+- **Contextual Tool Narrowing**: `get_tools_for_request_class()` returns only relevant tools per request type (#127)
+- **Architectural Drift Detection**: New CI gate (`scripts/ci/check_nodrift.sh`) validates tool schema sync, OTel baseline, and code patterns
+
+### Fixed
+- **Rate Limiter Hardening**: Periodic stale-IP cleanup prevents memory growth under sustained load
+- **Schema Parser**: Handle multi-line docstring descriptions in tool function signatures
+- **Selection Binding**: Harden selection-to-edit binding edge cases (#124)
+- **Documentation**: Sync version to v0.10.1, rename gist link to "Gist One-Pager" (#125, #126)
+
+### Changed
+- All 23 agent tools now have typed Python function stubs with schema sync tests
+- OTel metrics baseline: `cad.request.count`, `cad.request.latency_ms`, `cad.agent.turns`, `cad.tool.success/failure`
+- Dependencies: added `shapely>=2.0` for geometry operations
+- Test count: 4494 → 4556+ tests
+
 ## [0.10.1] - 2026-03-20
 
 ### Fixed
