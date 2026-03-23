@@ -58,6 +58,7 @@ class AgentProvider(PlannerProvider):
         self._request_class = request_class
         self._model: Any = None  # lazy init
         self._model_tool_set: str = ""  # tracks which tool set is cached
+        self._vertexai_initialized = False
 
     @property
     def name(self) -> str:
@@ -226,10 +227,12 @@ class AgentProvider(PlannerProvider):
                 Tool,
             )
 
-            vertexai.init(
-                project=self._project,
-                location=self._location,
-            )
+            if not self._vertexai_initialized:
+                vertexai.init(
+                    project=self._project,
+                    location=self._location,
+                )
+                self._vertexai_initialized = True
 
             # Convert tool dicts to FunctionDeclaration objects
             declarations = []
