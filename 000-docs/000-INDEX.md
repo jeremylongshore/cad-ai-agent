@@ -26,7 +26,9 @@
 | 055 | SPEC | [055-AT-SPEC-epic-cad-13-objective-intelligence.md](055-AT-SPEC-epic-cad-13-objective-intelligence.md) |
 | 056 | SPEC | [056-AT-SPEC-epic-cad-14-precision-controls.md](056-AT-SPEC-epic-cad-14-precision-controls.md) |
 | 057 | SPEC | [057-AT-SPEC-epic-cad-15-document-persistence.md](057-AT-SPEC-epic-cad-15-document-persistence.md) |
+| 045 | SPEC | [045-AT-SPEC-repeated-condition-scoring.md](045-AT-SPEC-repeated-condition-scoring.md) |
 | 058 | ARCH | [058-AT-ARCH-v080-ui-ux-design-strategy.md](058-AT-ARCH-v080-ui-ux-design-strategy.md) |
+| 074 | ARCH | [074-AT-ARCH-adk-agent-engine-architecture.md](074-AT-ARCH-adk-agent-engine-architecture.md) |
 
 ### PP — Product & Planning
 | # | Type | File |
@@ -66,6 +68,10 @@
 | 032 | TEST | [032-TQ-TEST-sawcuts-sample-drawing.pdf](032-TQ-TEST-sawcuts-sample-drawing.pdf) |
 | 037 | SPEC | [037-TQ-SPEC-evaluation-plan.md](037-TQ-SPEC-evaluation-plan.md) |
 | 055 | AUDT | [055-TQ-AUDT-test-audit-report.md](055-TQ-AUDT-test-audit-report.md) |
+| 060 | GUID | [060-TQ-GUID-mutation-testing-practices.md](060-TQ-GUID-mutation-testing-practices.md) |
+| 070 | TEST | [070-AN-TEST-realworld-prompt-matrix.md](070-AN-TEST-realworld-prompt-matrix.md) |
+| 071 | TEST | [071-TQ-TEST-production-quality-proof-system.md](071-TQ-TEST-production-quality-proof-system.md) |
+| 072 | TEST | [072-TQ-TEST-realworld-user-profiles.md](072-TQ-TEST-realworld-user-profiles.md) |
 
 ### RL — Reports & Releases
 | # | Type | File |
@@ -75,6 +81,7 @@
 | 029 | REFC | [029-RM-REFC-appauditmini-quick-reference.md](029-RM-REFC-appauditmini-quick-reference.md) |
 | 047 | REPT | [047-RL-REPT-release-v0.6.0.md](047-RL-REPT-release-v0.6.0.md) |
 | 054 | REPT | [054-RL-REPT-release-v0.7.0.md](054-RL-REPT-release-v0.7.0.md) |
+| 075 | REPT | [075-RL-REPT-release-v0.11.0.md](075-RL-REPT-release-v0.11.0.md) |
 
 ### BL — Business & Legal
 | # | Type | File |
@@ -164,6 +171,8 @@
 | 071 | TQ | TEST | Production quality proof system |
 | 072 | TQ | TEST | Real-world user profiles |
 | 073 | AA | AUDT | DevOps operator playbook (appaudit v0.10.1) |
+| 074 | AT | ARCH | ADK Agent Engine architecture (EPIC-CAD-31) |
+| 075 | RL | REPT | Release v0.11.0 report |
 
 ## Quick Reference
 
