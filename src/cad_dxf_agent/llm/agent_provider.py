@@ -204,6 +204,48 @@ class AgentProvider(PlannerProvider):
             changeset.planner_trace = trace
             return changeset
 
+    def _ensure_vertexai(self) -> None:
+        """Initialize Vertex AI SDK on first use (lazy, idempotent).
+
+        Separates SDK initialization from model construction so that
+        the two concerns can evolve independently and be tested in
+        isolation.
+        """
+        if self._vertexai_initialized:
+            return
+        try:
+            import vertexai
+
+            vertexai.init(project=self._project, location=self._location)
+            self._vertexai_initialized = True
+            logger.info(
+                "Vertex AI initialized (project=%s, location=%s)",
+                self._project,
+                self._location,
+            )
+        except ImportError as err:
+            raise ImportError(
+                "google-cloud-aiplatform not installed. "
+                "Install with: pip install google-cloud-aiplatform"
+            ) from err
+
+    @property
+    def _generation_config(self):
+        """Lazily create GenerationConfig from current settings.
+
+        Called from _get_model() after _ensure_vertexai() has already
+        confirmed the SDK is available, so the import is guaranteed to
+        succeed at this point.
+        """
+        from vertexai.generative_models import GenerationConfig
+
+        return GenerationConfig(
+            temperature=settings.llm_temperature,
+            top_p=settings.llm_top_p,
+            top_k=settings.llm_top_k,
+            max_output_tokens=settings.llm_max_output_tokens,
+        )
+
     def _get_model(self):
         """Lazy-initialize the Gemini model with tool declarations and GenerationConfig.
 
@@ -219,45 +261,30 @@ class AgentProvider(PlannerProvider):
             return self._model
 
         try:
-            import vertexai
+            self._ensure_vertexai()
+
             from vertexai.generative_models import (
                 FunctionDeclaration,
-                GenerationConfig,
                 GenerativeModel,
                 Tool,
             )
 
-            if not self._vertexai_initialized:
-                vertexai.init(
-                    project=self._project,
-                    location=self._location,
-                )
-                self._vertexai_initialized = True
-
             # Convert tool dicts to FunctionDeclaration objects
-            declarations = []
-            for td in tool_defs:
-                declarations.append(
-                    FunctionDeclaration(
-                        name=str(td["name"]),
-                        description=str(td["description"]),
-                        parameters=dict(td["parameters"]),  # type: ignore[arg-type]
-                    )
+            declarations = [
+                FunctionDeclaration(
+                    name=str(td["name"]),
+                    description=str(td["description"]),
+                    parameters=dict(td["parameters"]),  # type: ignore[arg-type]
                 )
+                for td in tool_defs
+            ]
             tools = [Tool(function_declarations=declarations)]
-
-            gen_config = GenerationConfig(
-                temperature=settings.llm_temperature,
-                top_p=settings.llm_top_p,
-                top_k=settings.llm_top_k,
-                max_output_tokens=settings.llm_max_output_tokens,
-            )
 
             self._model = GenerativeModel(
                 self._model_name,
                 system_instruction=AGENT_SYSTEM_PROMPT,
                 tools=tools,
-                generation_config=gen_config,
+                generation_config=self._generation_config,
             )
             self._model_tool_set = tool_set_key
 
@@ -266,11 +293,8 @@ class AgentProvider(PlannerProvider):
                 len(tool_defs),
                 self._request_class,
             )
-        except ImportError as err:
-            raise ImportError(
-                "google-cloud-aiplatform not installed. "
-                "Install with: pip install google-cloud-aiplatform"
-            ) from err
+        except ImportError:
+            raise
 
         return self._model
 

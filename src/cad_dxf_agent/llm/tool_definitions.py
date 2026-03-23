@@ -8,6 +8,11 @@ and the host code executes them against the validated pipeline.
 
 from __future__ import annotations
 
+import inspect
+import types
+import typing
+from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Any
 
 # ---------------------------------------------------------------------------
@@ -755,3 +760,201 @@ def get_tools_for_request_class(request_class: str) -> list[dict[str, Any]]:
     if request_class == "modify":
         return ALL_TOOLS
     return QUERY_TOOLS
+
+
+# ---------------------------------------------------------------------------
+# ADK-pattern typed tool functions
+# ---------------------------------------------------------------------------
+# Plain Python functions with type hints and docstrings.
+# ADK auto-generates JSON Schema from these. These coexist with the
+# dict-based definitions above — the dicts remain canonical for now.
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class Point2D:
+    """A 2D point in drawing units."""
+
+    x: float
+    y: float
+
+
+def find_entities_fn(
+    layer: str | None = None,
+    entity_type: str | None = None,
+    text_contains: str | None = None,
+    limit: int = 50,
+) -> dict:
+    """Search for entities in the drawing by layer, type, and/or text content.
+
+    Returns a list of matching entities with handle, type, layer, position, and text.
+    Results are limited to the first `limit` matches.
+
+    Args:
+        layer: Filter by layer name (case-insensitive). Example: 'STRUCTURAL'
+        entity_type: Filter by entity type. Supported: LINE, LWPOLYLINE, TEXT, MTEXT, INSERT,
+            CIRCLE, ARC, DIMENSION, HATCH, SPLINE, POLYLINE, ELLIPSE, MLEADER, SOLID, LEADER
+        text_contains: Search for entities whose text contains this string (case-insensitive)
+        limit: Maximum number of entities to return (default 50)
+    """
+    raise NotImplementedError("Dispatch via ToolExecutor")
+
+
+def get_entity_fn(handle: str) -> dict:
+    """Get full details of a single entity by its handle (unique ID).
+
+    Returns handle, type, layer, position, text content, and block name.
+
+    Args:
+        handle: The DXF entity handle (unique identifier)
+    """
+    raise NotImplementedError("Dispatch via ToolExecutor")
+
+
+def find_nearest_fn(
+    x: float,
+    y: float,
+    entity_type: str | None = None,
+    layer: str | None = None,
+    radius: float | None = None,
+) -> dict:
+    """Find the nearest entity to a given point.
+
+    Useful for locating entities at grid intersections or near specific coordinates.
+    Use `radius` to limit the search to a spatial window.
+
+    Args:
+        x: X coordinate in drawing units
+        y: Y coordinate in drawing units
+        entity_type: Optional type filter
+        layer: Optional layer filter (case-insensitive)
+        radius: Optional search radius in drawing units. Only entities within this distance
+            are considered.
+    """
+    raise NotImplementedError("Dispatch via ToolExecutor")
+
+
+def list_layers_fn() -> dict:
+    """List all layers in the drawing with their protection status and entity counts."""
+    raise NotImplementedError("Dispatch via ToolExecutor")
+
+
+def is_protected_fn(layer: str) -> dict:
+    """Check whether a layer is protected from editing.
+
+    Args:
+        layer: The layer name to check
+    """
+    raise NotImplementedError("Dispatch via ToolExecutor")
+
+
+QUERY_TOOL_FUNCTIONS: list[Callable] = [
+    find_entities_fn,
+    get_entity_fn,
+    find_nearest_fn,
+    list_layers_fn,
+    is_protected_fn,
+]
+
+
+# ---------------------------------------------------------------------------
+# Schema generation from typed functions
+# ---------------------------------------------------------------------------
+
+
+def _hint_to_json_schema(hint: Any) -> dict[str, Any]:
+    """Convert a Python type hint to a JSON Schema type dict.
+
+    Handles Optional (``X | None``), primitives (str, int, float, bool),
+    and falls back to ``{"type": "string"}`` for anything unrecognised.
+    """
+    origin = getattr(hint, "__origin__", None)
+
+    # PEP 604 union: ``str | None`` → types.UnionType (Python 3.10+)
+    if isinstance(hint, types.UnionType):
+        non_none = [a for a in hint.__args__ if a is not type(None)]
+        if len(non_none) == 1:
+            return _hint_to_json_schema(non_none[0])
+
+    # typing.Union / typing.Optional (older style)
+    if origin is typing.Union:
+        non_none = [a for a in hint.__args__ if a is not type(None)]
+        if len(non_none) == 1:
+            return _hint_to_json_schema(non_none[0])
+
+    if hint is str:
+        return {"type": "string"}
+    if hint is int:
+        return {"type": "integer"}
+    if hint is float:
+        return {"type": "number"}
+    if hint is bool:
+        return {"type": "boolean"}
+    if hint is dict:
+        return {"type": "object"}
+    if hint is list:
+        return {"type": "array"}
+
+    return {"type": "string"}  # safe fallback
+
+
+def _fn_to_tool_schema(fn: Callable) -> dict[str, Any]:
+    """Convert a typed Python function to a Gemini FunctionDeclaration-compatible dict.
+
+    Extracts name, description (from docstring body before ``Args:``), and
+    parameters (from type hints + docstring ``Args:`` section) to produce
+    the same format as the hand-written dicts above.
+
+    The function name must end with ``_fn``; that suffix is stripped to
+    derive the tool name (e.g. ``find_entities_fn`` → ``find_entities``).
+    """
+    hints = typing.get_type_hints(fn)
+    sig = inspect.signature(fn)
+    doc = inspect.getdoc(fn) or ""
+
+    # Description = everything before "Args:"
+    desc_parts = doc.split("Args:")
+    description = desc_parts[0].strip()
+
+    # Parse the "Args:" section for per-parameter descriptions.
+    # Format expected: "    param_name: description text"
+    param_descs: dict[str, str] = {}
+    if len(desc_parts) > 1:
+        for line in desc_parts[1].strip().splitlines():
+            line = line.strip()
+            if ":" in line:
+                pname, pdesc = line.split(":", 1)
+                param_descs[pname.strip()] = pdesc.strip()
+
+    # Build JSON Schema properties and required list.
+    properties: dict[str, Any] = {}
+    required: list[str] = []
+    for pname, param in sig.parameters.items():
+        if pname == "return":
+            continue
+        hint = hints.get(pname)
+        prop = _hint_to_json_schema(hint)
+        if pname in param_descs:
+            prop["description"] = param_descs[pname]
+        properties[pname] = prop
+        if param.default is inspect.Parameter.empty:
+            required.append(pname)
+
+    return {
+        "name": fn.__name__.removesuffix("_fn"),
+        "description": description,
+        "parameters": {
+            "type": "object",
+            "properties": properties,
+            "required": required,
+        },
+    }
+
+
+def _tools_as_schemas() -> list[dict[str, Any]]:
+    """Generate tool schemas from the typed function definitions.
+
+    Used for validation and future ADK migration. The dict-based
+    definitions above remain canonical for now.
+    """
+    return [_fn_to_tool_schema(fn) for fn in QUERY_TOOL_FUNCTIONS]

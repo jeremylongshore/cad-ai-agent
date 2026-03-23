@@ -13,6 +13,8 @@ from __future__ import annotations
 import math
 from collections import defaultdict
 
+from shapely.geometry import Polygon as ShapelyPolygon
+
 from cad_dxf_agent.core.primitive_extractors import LayerClassification, classify_layers
 from cad_dxf_agent.models.cad_schema import DrawingContext, EntityType, Point2D
 from cad_dxf_agent.models.zone_schema import DetectedZone, ZoneDetectionResult
@@ -417,70 +419,59 @@ def _snap_point(x: float, y: float, tolerance: float) -> tuple[float, float]:
 
 
 def _shoelace_area(vertices: list[Point2D]) -> float:
-    """Compute polygon area using the shoelace formula. Returns absolute area."""
-    n = len(vertices)
-    if n < 3:
+    """Compute polygon area using Shapely. Returns absolute area."""
+    if len(vertices) < 3:
         return 0.0
-    area = 0.0
-    for i in range(n):
-        j = (i + 1) % n
-        area += vertices[i].x * vertices[j].y
-        area -= vertices[j].x * vertices[i].y
-    return abs(area) / 2.0
+    coords = [(v.x, v.y) for v in vertices]
+    return float(ShapelyPolygon(coords).area)
 
 
 def _polygon_perimeter(vertices: list[Point2D]) -> float:
-    """Compute polygon perimeter."""
-    n = len(vertices)
-    perimeter = 0.0
-    for i in range(n):
-        j = (i + 1) % n
-        perimeter += _point_distance(vertices[i], vertices[j])
-    return perimeter
+    """Compute polygon perimeter using Shapely."""
+    if len(vertices) < 3:
+        return 0.0
+    coords = [(v.x, v.y) for v in vertices]
+    return float(ShapelyPolygon(coords).length)
 
 
 def _polygon_centroid(vertices: list[Point2D]) -> Point2D:
-    """Compute polygon centroid using the signed-area formula.
+    """Compute polygon centroid using Shapely.
 
-    This gives the true geometric centroid (center of mass) of the polygon,
-    not just the average of vertices. Falls back to vertex average for
-    degenerate cases where signed area is zero.
+    Falls back to vertex average for degenerate cases (zero-area or < 3 vertices).
     """
     n = len(vertices)
     if n == 0:
         return Point2D(x=0, y=0)
-
-    # Signed area (2x) for centroid weighting
-    signed_area_2x = 0.0
-    cx = 0.0
-    cy = 0.0
-    for i in range(n):
-        j = (i + 1) % n
-        cross = vertices[i].x * vertices[j].y - vertices[j].x * vertices[i].y
-        signed_area_2x += cross
-        cx += (vertices[i].x + vertices[j].x) * cross
-        cy += (vertices[i].y + vertices[j].y) * cross
-
-    if abs(signed_area_2x) < 1e-12:
+    coords = [(v.x, v.y) for v in vertices]
+    if n < 3:
+        return Point2D(
+            x=sum(v.x for v in vertices) / n,
+            y=sum(v.y for v in vertices) / n,
+        )
+    poly = ShapelyPolygon(coords)
+    if poly.area < 1e-12:
         # Degenerate polygon — fall back to vertex average
         return Point2D(
             x=sum(v.x for v in vertices) / n,
             y=sum(v.y for v in vertices) / n,
         )
-
-    factor = 1.0 / (3.0 * signed_area_2x)
-    return Point2D(x=cx * factor, y=cy * factor)
+    c = poly.centroid
+    return Point2D(x=c.x, y=c.y)
 
 
 def _aspect_ratio(vertices: list[Point2D]) -> float:
-    """Compute bounding-box aspect ratio (max/min dimension)."""
+    """Compute bounding-box aspect ratio using Shapely bounds."""
     if len(vertices) < 2:
         return 1.0
-    xs = [v.x for v in vertices]
-    ys = [v.y for v in vertices]
-    width = max(xs) - min(xs)
-    height = max(ys) - min(ys)
+    coords = [(v.x, v.y) for v in vertices]
+    if len(coords) >= 3:
+        minx, miny, maxx, maxy = ShapelyPolygon(coords).bounds
+    else:
+        xs = [v.x for v in vertices]
+        ys = [v.y for v in vertices]
+        minx, miny, maxx, maxy = min(xs), min(ys), max(xs), max(ys)
+    width = maxx - minx
+    height = maxy - miny
     if width == 0 or height == 0:
         return 1.0
-    ratio = max(width, height) / min(width, height)
-    return ratio
+    return float(max(width, height) / min(width, height))
