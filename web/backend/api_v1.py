@@ -54,6 +54,8 @@ class _RateLimiter:
         self.window_seconds = window_seconds
         self._store: dict[str, list[float]] = {}
         self._lock = threading.Lock()
+        self._call_count = 0
+        self._cleanup_interval = 500  # prune stale IPs every N calls
 
     def is_allowed(self, ip: str) -> bool:
         """Return True if the request should be allowed; False if rate-limited."""
@@ -71,6 +73,15 @@ class _RateLimiter:
 
             timestamps.append(now)
             self._store[ip] = timestamps
+
+            # Periodically prune stale IPs to prevent unbounded memory growth
+            self._call_count += 1
+            if self._call_count >= self._cleanup_interval:
+                self._call_count = 0
+                stale = [k for k, v in self._store.items() if not v or v[-1] <= cutoff]
+                for k in stale:
+                    del self._store[k]
+
             return True
 
 
