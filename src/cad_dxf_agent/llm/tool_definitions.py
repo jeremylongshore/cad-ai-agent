@@ -917,14 +917,24 @@ def _fn_to_tool_schema(fn: Callable) -> dict[str, Any]:
     description = desc_parts[0].strip()
 
     # Parse the "Args:" section for per-parameter descriptions.
-    # Format expected: "    param_name: description text"
+    # Handles multi-line descriptions: continuation lines (indented without
+    # a leading "name:") are appended to the current parameter.
     param_descs: dict[str, str] = {}
     if len(desc_parts) > 1:
+        current_pname: str | None = None
         for line in desc_parts[1].strip().splitlines():
-            line = line.strip()
-            if ":" in line:
-                pname, pdesc = line.split(":", 1)
-                param_descs[pname.strip()] = pdesc.strip()
+            stripped = line.strip()
+            if not stripped:
+                continue
+            # Continuation line: indented and no new param name
+            if line.startswith("    ") and current_pname and ":" not in stripped.split()[0]:
+                param_descs[current_pname] += " " + stripped
+            elif ":" in stripped:
+                pname, pdesc = stripped.split(":", 1)
+                current_pname = pname.strip()
+                param_descs[current_pname] = pdesc.strip()
+            else:
+                current_pname = None
 
     # Build JSON Schema properties and required list.
     properties: dict[str, Any] = {}

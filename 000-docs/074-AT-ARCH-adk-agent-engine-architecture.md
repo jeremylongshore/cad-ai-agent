@@ -99,7 +99,7 @@ Client → Cloud Run (FastAPI gateway)  → Agent Engine (ADK runtime)
 | ADK version churn | Low | Pin version like bobs-brain (`>=1.18.0,<1.19.0`) |
 | Dual tool definition maintenance burden | Low | Schema-match tests enforce sync; sunset dicts after validation |
 | Session migration data loss | Medium | Migration script + parallel run period |
-| Shapely dependency size | Low | Optional install group `[geometry]` |
+| Shapely dependency size | Low | Core dep (~3MB wheel); zone detection is a core feature, conditional imports not worth the complexity |
 
 ## Verification
 
