@@ -49,7 +49,7 @@ cd web/frontend && npm run build && firebase deploy --only hosting --project cad
 gcloud run deploy cad-dxf-web \
   --source . --dockerfile web/backend/Dockerfile \
   --region us-central1 --project cad-dxf-agent \
-  --allow-unauthenticated --memory 1Gi --cpu 1 --timeout 300 \
+  --allow-unauthenticated --memory 8Gi --cpu 4 --timeout 600 \
   --service-account cad-dxf-web-run@cad-dxf-agent.iam.gserviceaccount.com \
   --set-env-vars CAD_LLM_PROVIDER=gemini,CAD_GCP_PROJECT=cad-dxf-agent,OTEL_ENABLED=1,OTEL_EXPORTER=gcp-trace
 ```
@@ -93,7 +93,7 @@ CAD_GCP_PROJECT=cad-dxf-agent pytest tests/live/ -v -m live_api -s
 
 ## Architecture
 
-### Request Flow (v0.8.0)
+### Request Flow (v0.10.1)
 
 ```
 User Prompt
@@ -169,7 +169,7 @@ src/cad_dxf_agent/
     config_schema      #   RuleConfig, ValidationResult
     ...                #   + comparison, region, qna, precision, rfi, stats, etc.
 
-  core/                # 41 modules — DXF I/O, validation, editing, platform services
+  core/                # 43 modules — DXF I/O, validation, editing, platform services
     dxf_reader         #   Load DXF → DrawingContext
     dxf_writer         #   Save working copy to new path
     edit_engine        #   Apply validated ops to DXF
@@ -191,7 +191,7 @@ src/cad_dxf_agent/
     edit_history       #   Undo/redo + named snapshots
     comparison/        #   Revision diff engine (alignment, matching, changelog, bundle, overlay)
 
-  llm/                 # 22 modules — intent classification, planning, agent loop
+  llm/                 # 24 modules — intent classification, planning, agent loop
     planner            #   Orchestrator: prompt → ChangeSet
     providers          #   PlannerProvider ABC
     gemini_provider    #   Vertex AI tool-use with vision
@@ -223,6 +223,16 @@ web/
   frontend/            # React + Vite SPA on Firebase Hosting
 ```
 
+### Tool Function Architecture (EPIC-CAD-31)
+
+Tool schemas exist in two coexisting representations in `llm/tool_definitions.py`:
+1. **Dict-based schemas** — hand-written Gemini FunctionDeclaration dicts (canonical, used at runtime)
+2. **Typed Python functions** — `_fn` stub functions with type hints and docstrings for ADK-pattern schema generation
+
+Both are kept in sync via CI tests (`test_all_tools_typed`, schema-matching assertions). The typed functions `raise NotImplementedError` — dispatch stays in `ToolExecutor`. When ADK migration happens (Phase 2+), the typed functions become the canonical source and the dicts are deleted.
+
+`_hint_to_json_schema()` handles: primitives, `Optional`, `Literal` (→ `enum`), dataclasses (→ nested `object`), `list[X]` (→ `array`).
+
 ### Provider Pattern
 
 `PlannerProvider` ABC in `llm/providers.py` → implement `plan(prompt, drawing_context) → ChangeSet`. Three providers:
@@ -248,10 +258,12 @@ All settings via environment variables (`.env` file, `.gitignore`d):
 | `OTEL_ENABLED` | _(unset)_ | Enable OpenTelemetry tracing (`1`, `true`, `yes`) |
 | `OTEL_EXPORTER` | `console` | Span exporter: `console`, `otlp`, or `gcp-trace` |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | _(unset)_ | OTLP collector endpoint (e.g., `http://localhost:4317`) |
+| `CAD_AGENT_BACKEND` | `cloud_run` | Agent backend: `cloud_run` (local pipeline) or `agent_engine` (future Vertex AI Agent Engine) |
+| `CAD_AGENT_ENGINE_URL` | _(unset)_ | Vertex AI Agent Engine endpoint (future use, requires `CAD_AGENT_BACKEND=agent_engine`) |
 
 ### Observability (OpenTelemetry)
 
-Optional tracing via `otel.py` bootstrap module. Off by default, CI-safe (no network). Each pipeline stage emits a span (e.g., `cad.load_dxf`, `cad.run_planner`, `cad.validate`). No full file paths or drawing text in span attributes. Install extras: `pip install -e ".[otel]"`.
+Optional tracing + metrics via `otel.py` bootstrap module. Off by default, CI-safe (no network). Each pipeline stage emits a span (e.g., `cad.load_dxf`, `cad.run_planner`, `cad.validate`). Core metrics: `cad.request.count`, `cad.request.latency_ms`, `cad.agent.turns`, `cad.tool.success`, `cad.tool.failure`. No full file paths or drawing text in span attributes. Install extras: `pip install -e ".[otel]"`.
 
 ## Testing
 
@@ -259,10 +271,10 @@ Optional tracing via `otel.py` bootstrap module. Off by default, CI-safe (no net
 
 | Tier | Location | Count | What |
 |------|----------|-------|------|
-| Unit | `tests/unit/` | ~3570 | Schemas, validators, reader, writer, engine, preview, semantic model, snapshots, comparison, compliance, takeoff, zones, families |
-| Integration | `tests/integration/` | ~102 | Full pipeline, undo/redo, agent loop with ScriptedAgentProvider |
-| Web | `tests/web/` | ~362 | FastAPI backend endpoints (TestClient), document library, session management |
-| Eval | `tests/eval/` | ~42 | Intent classification accuracy scorecard |
+| Unit | `tests/unit/` | ~3600 | Schemas, validators, reader, writer, engine, preview, semantic model, snapshots, comparison, compliance, takeoff, zones, families |
+| Integration | `tests/integration/` | ~100 | Full pipeline, undo/redo, agent loop with ScriptedAgentProvider |
+| Web | `tests/web/` | ~420 | FastAPI backend endpoints (TestClient), document library, session management |
+| Eval | `tests/eval/` | ~40 | Intent classification accuracy scorecard |
 | Live | `tests/live/` | ~42 | Real Gemini API tests (require ADC + `cad-dxf-agent` GCP project) |
 | E2E | `tests/e2e/` | ~33 | End-to-end tests with real DXF files |
 | Benchmark | `tests/benchmark/` | ~19 | Performance micro-benchmarks (pytest-benchmark) |
@@ -270,7 +282,7 @@ Optional tracing via `otel.py` bootstrap module. Off by default, CI-safe (no net
 | Property | `tests/property/` | ~7 | Fuzz/property tests (randomized, bounded runtime) |
 | Smoke | `tests/smoke/` + `scripts/smoke_test.py` | ~7 | End-to-end pipeline via mock planner |
 
-Total: ~4494 tests collected.
+Total: ~4556 tests collected.
 
 ### LLM Testing Patterns
 
@@ -303,7 +315,7 @@ make scorecard-live    # Eval scorecard (real Gemini)
 
 ## CI
 
-GitHub Actions on push/PR to main: lint, format check, mypy, tests (matrix: ubuntu+windows, Python 3.11+3.12). Pre-commit hooks enforce ruff, trailing whitespace, no `.env` commits, no direct commits to main.
+GitHub Actions on push/PR to main: lint, format check, mypy, tests (matrix: ubuntu, Python 3.11+3.12), benchmarks + live API tests on main only. Security: bandit + pip-audit. Pre-commit hooks enforce ruff, trailing whitespace, no `.env` commits, no direct commits to main.
 
 ## Commit & PR Conventions
 
@@ -396,3 +408,16 @@ This project uses `bd` (beads) for issue tracking. Run `bd ready` to find availa
 | EPIC-CAD-27 | cad-dxf-agent-xvs | Session Undo/Redo + Snapshots | 8 | Done |
 | EPIC-CAD-29 | cad-dxf-agent-9cd | Agent-Mode API v1 | 8 | Done |
 | EPIC-CAD-30 | cad-dxf-agent-qvf | User Accounts, Workspaces & Persistent Work Progress | 9 | Done |
+| EPIC-CAD-31 | cad-dxf-agent-ees | System Design Pattern Adoption | — | Phase 0+1 Done, Phase 2+ Deferred |
+
+### EPIC-CAD-31 Review Outcome
+
+A 12-specialist engineer review (ADK, security, database, performance, backend architecture, Python, cloud, DevOps, testing, architecture review, DX, observability) evaluated the EPIC-CAD-31 rollout plan. Key findings:
+
+- **Decision:** Phase 0+1 shipped, Phase 2+ deferred until user growth demands it.
+- **Critical finding:** Tools cannot run inside Agent Engine (ezdxf C library, R-tree, local file I/O). When ready, adopt the HTTP-Client FunctionTool pattern (tools as Cloud Run endpoints).
+- **Pre-existing bugs fixed:** V1 API had zero rate limiting (now 60 req/min per IP), `CAD_WEB_DEV_MODE` parsing was inconsistent across auth/lifespan (now `is_dev_mode()` helper), `SessionManager.get_by_id()` bypassed ownership (now private `_get_by_id_internal()`).
+- **Dead code removed:** `from __future__ import annotations` in tool_definitions (latent `get_type_hints()` bug), dead `Point2D` dataclass (name collision), dead `pname == "return"` guard, loop-body imports in agent_provider.
+- **Foundation completed:** All 23 tools have typed function stubs with schema sync tests, `_hint_to_json_schema()` handles Literal/dataclass/list types, drift detection extended (6 checks), OTel metrics baseline added.
+- **`CAD_AGENT_BACKEND` feature flag** exists (`cloud_run` default) but Agent Engine routing is not wired — just the config plumbing for future use.
+- **Reference materials** for Phase 2 resumption preserved in `memory/reference_*.md`.

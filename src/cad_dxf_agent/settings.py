@@ -93,6 +93,15 @@ class Settings:
         # Edit history
         self.max_undo_snapshots: int = int(os.getenv("CAD_MAX_UNDO_SNAPSHOTS", "50"))
 
+        # Agent backend (EPIC-CAD-31: Phase 0+1 only, Phase 2+ deferred)
+        agent_backend = os.getenv("CAD_AGENT_BACKEND", "cloud_run")
+        if agent_backend not in ("cloud_run", "agent_engine"):
+            raise ValueError(
+                f"CAD_AGENT_BACKEND must be 'cloud_run' or 'agent_engine', got '{agent_backend}'"
+            )
+        self.agent_backend: str = agent_backend
+        self.agent_engine_url: str | None = os.getenv("CAD_AGENT_ENGINE_URL") or None
+
     def get_api_key(self, provider: str) -> str | None:
         """Retrieve API key for a provider. Never logs the key."""
         key_map = {

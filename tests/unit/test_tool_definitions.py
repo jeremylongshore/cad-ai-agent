@@ -109,8 +109,15 @@ class TestToolNarrowing:
         assert tools == ALL_TOOLS
 
     def test_non_modify_gets_query_only(self):
-        for rc in ("understand", "estimate", "recommend", "optimize",
-                    "summarize", "compare", "validate"):
+        for rc in (
+            "understand",
+            "estimate",
+            "recommend",
+            "optimize",
+            "summarize",
+            "compare",
+            "validate",
+        ):
             tools = get_tools_for_request_class(rc)
             assert tools == QUERY_TOOLS, f"{rc} should get QUERY_TOOLS only"
             # Verify no edit tools leak through
@@ -120,8 +127,16 @@ class TestToolNarrowing:
 
     def test_query_tools_always_present(self):
         """Every request class gets at least the query tools."""
-        for rc in ("modify", "understand", "estimate", "recommend",
-                    "optimize", "summarize", "compare", "validate"):
+        for rc in (
+            "modify",
+            "understand",
+            "estimate",
+            "recommend",
+            "optimize",
+            "summarize",
+            "compare",
+            "validate",
+        ):
             tools = get_tools_for_request_class(rc)
             tool_names = {t["name"] for t in tools}
             query_names = {t["name"] for t in QUERY_TOOLS}

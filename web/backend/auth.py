@@ -12,6 +12,15 @@ from fastapi import HTTPException, Request
 
 logger = logging.getLogger(__name__)
 
+
+def is_dev_mode() -> bool:
+    """Check if the backend is running in development mode.
+
+    Consolidates the CAD_WEB_DEV_MODE check into a single function
+    so all callers agree on which values are truthy.
+    """
+    return os.getenv("CAD_WEB_DEV_MODE", "").strip().lower() in ("1", "true", "yes")
+
 # License cache: {uid: (active: bool, timestamp: float)}
 _license_cache: dict[str, tuple[bool, float]] = {}
 _LICENSE_CACHE_TTL = 300  # 5 minutes
@@ -56,7 +65,7 @@ async def verify_token(request: Request) -> dict:
     Raises HTTPException 401 if missing or invalid.
     """
     # Skip auth in development mode
-    if os.getenv("CAD_WEB_DEV_MODE", "").lower() in ("1", "true"):
+    if is_dev_mode():
         return {"uid": "dev-user", "email": "dev@localhost"}
 
     auth_header = request.headers.get("Authorization", "")
@@ -88,7 +97,7 @@ async def check_license(user: dict) -> None:
     Raises HTTPException 403 if the license is missing or inactive.
     """
     # Skip in dev mode (same as auth skip)
-    if os.getenv("CAD_WEB_DEV_MODE", "").lower() in ("1", "true"):
+    if is_dev_mode():
         return
 
     # Reject anonymous users — Google sign-in required
@@ -237,7 +246,7 @@ async def ensure_user_profile(user: dict) -> dict:
     Subsequent calls hit the in-process cache (5 min TTL).
     In dev mode, returns a synthetic profile without touching Firestore.
     """
-    if os.getenv("CAD_WEB_DEV_MODE", "").lower() in ("1", "true"):
+    if is_dev_mode():
         user["tenant_id"] = "dev-tenant"
         user["display_name"] = user.get("name", user.get("email", "dev"))
         return user

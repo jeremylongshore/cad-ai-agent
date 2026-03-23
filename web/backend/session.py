@@ -191,8 +191,8 @@ class SessionManager:
 
         return session
 
-    def get_by_id(self, session_id: str) -> Session:
-        """Get a session by ID without ownership check."""
+    def _get_by_id_internal(self, session_id: str) -> Session:
+        """Get a session by ID without ownership check (internal use only)."""
         with self._lock:
             session = self._sessions.get(session_id)
 

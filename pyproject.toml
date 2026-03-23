@@ -28,7 +28,9 @@ dependencies = [
     "numpy>=1.26",
     "httpx>=0.27",
     "python-dotenv>=1.0",
+    "pyyaml>=6.0",
     "rtree>=1.0",
+    "shapely>=2.0",
 ]
 
 [project.optional-dependencies]
@@ -64,6 +66,9 @@ gemini = [
 ]
 gemini-key = [
     "google-generativeai>=0.8",
+]
+adk = [
+    "google-adk>=1.18.0,<1.19.0",
 ]
 build = [
     "pyinstaller>=6.0",
@@ -112,7 +117,7 @@ select = ["E", "F", "W", "I", "N", "UP", "S", "B", "A", "SIM"]
 ignore = ["S101"]  # Allow assert in tests
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**/*.py" = ["S101", "S106", "S108", "N806"]
+"tests/**/*.py" = ["S101", "S106", "S108", "S603", "S607", "N806"]
 "scripts/**/*.py" = ["S603", "S607", "E402"]  # subprocess + sys.path before imports
 "src/**/alignment.py" = ["N803", "N806"]  # R, U, Vt, H are standard linear algebra names
 "web/backend/**/*.py" = ["B008", "S108", "E402"]  # FastAPI Depends/File, /tmp sessions, sys.path
@@ -125,7 +130,7 @@ disallow_untyped_defs = false
 check_untyped_defs = true
 
 [[tool.mypy.overrides]]
-module = ["ezdxf.*", "PySide6.*", "opentelemetry.*", "pdfplumber.*", "fitz.*", "matplotlib.*", "fpdf.*", "google.*", "vertexai.*", "rtree.*"]
+module = ["ezdxf.*", "PySide6.*", "opentelemetry.*", "pdfplumber.*", "fitz.*", "matplotlib.*", "fpdf.*", "google.*", "vertexai.*", "rtree.*", "shapely.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
