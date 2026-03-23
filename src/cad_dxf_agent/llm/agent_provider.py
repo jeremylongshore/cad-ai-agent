@@ -15,6 +15,8 @@ from __future__ import annotations
 
 import logging
 import time
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FuturesTimeoutError
 from pathlib import Path
 from typing import Any
 
@@ -22,6 +24,7 @@ from ..models.ops_schema import ChangeSet
 from ..models.trace_schema import AgentTurn, PlannerTrace, ToolCall
 from ..otel import get_tracer
 from ..settings import settings
+from .errors import PlannerTimeoutError
 from .prompt_templates import AGENT_SYSTEM_PROMPT
 from .providers import PlannerProvider
 from .tool_definitions import get_tools_for_request_class
@@ -154,11 +157,6 @@ class AgentProvider(PlannerProvider):
                     )
 
                 # Send results back to Gemini with per-turn timeout
-                from concurrent.futures import ThreadPoolExecutor
-                from concurrent.futures import TimeoutError as FuturesTimeoutError
-
-                from .errors import PlannerTimeoutError
-
                 with ThreadPoolExecutor(max_workers=1) as pool:
                     future = pool.submit(self._send_tool_results, chat, tool_results)
                     try:

@@ -6,8 +6,7 @@ methods. The LLM never touches DXF directly — it calls these tools,
 and the host code executes them against the validated pipeline.
 """
 
-from __future__ import annotations
-
+import dataclasses
 import inspect
 import types
 import typing
@@ -772,8 +771,8 @@ def get_tools_for_request_class(request_class: str) -> list[dict[str, Any]]:
 
 
 @dataclass
-class Point2D:
-    """A 2D point in drawing units."""
+class ToolPoint2D:
+    """A 2D point in drawing units (used for schema generation only)."""
 
     x: float
     y: float
@@ -856,6 +855,397 @@ QUERY_TOOL_FUNCTIONS: list[Callable] = [
     is_protected_fn,
 ]
 
+# ---------------------------------------------------------------------------
+# Typed stubs for edit tools
+# ---------------------------------------------------------------------------
+
+
+def move_entity_fn(handle: str, dx: float, dy: float) -> dict:
+    """Move an entity by a displacement vector (dx, dy) in drawing units.
+
+    Cannot target entities on protected layers.
+
+    Args:
+        handle: Handle of the entity to move
+        dx: Displacement in X direction (drawing units)
+        dy: Displacement in Y direction (drawing units)
+    """
+    raise NotImplementedError("Dispatch via ToolExecutor")
+
+
+def edit_text_fn(handle: str, new_text: str) -> dict:
+    """Change the text content of a TEXT or MTEXT entity.
+
+    Cannot target entities on protected layers.
+
+    Args:
+        handle: Handle of the TEXT/MTEXT entity to edit
+        new_text: The new text content
+    """
+    raise NotImplementedError("Dispatch via ToolExecutor")
+
+
+def delete_entity_fn(handle: str) -> dict:
+    """Delete an entity from the drawing.
+
+    Cannot target entities on protected layers.
+
+    Args:
+        handle: Handle of the entity to delete
+    """
+    raise NotImplementedError("Dispatch via ToolExecutor")
+
+
+def add_block_fn(
+    block_name: str,
+    x: float,
+    y: float,
+    layer: str | None = None,
+    scale: float | None = None,
+    rotation: float | None = None,
+) -> dict:
+    """Insert a block reference at a specified point.
+
+    The block must exist in the drawing's block definitions.
+
+    Args:
+        block_name: Name of the block definition to insert
+        x: X coordinate for insertion point
+        y: Y coordinate for insertion point
+        layer: Optional target layer for the block reference
+        scale: Uniform scale factor (default 1.0)
+        rotation: Rotation angle in degrees (default 0)
+    """
+    raise NotImplementedError("Dispatch via ToolExecutor")
+
+
+def rotate_entity_fn(
+    handle: str,
+    angle: float,
+    cx: float | None = None,
+    cy: float | None = None,
+) -> dict:
+    """Rotate an entity by a given angle in degrees.
+
+    Rotation center defaults to origin (0,0) unless cx, cy are specified.
+    Cannot target entities on protected layers.
+
+    Args:
+        handle: Handle of the entity to rotate
+        angle: Rotation angle in degrees (positive = counter-clockwise)
+        cx: X coordinate of rotation center (default 0)
+        cy: Y coordinate of rotation center (default 0)
+    """
+    raise NotImplementedError("Dispatch via ToolExecutor")
+
+
+def copy_entity_fn(handle: str, dx: float, dy: float) -> dict:
+    """Create a copy of an entity at an offset position.
+
+    The original entity is preserved. The copy gets a new handle.
+    Cannot target entities on protected layers.
+
+    Args:
+        handle: Handle of the entity to copy
+        dx: X offset for the copy from original position
+        dy: Y offset for the copy from original position
+    """
+    raise NotImplementedError("Dispatch via ToolExecutor")
+
+
+def scale_entity_fn(
+    handle: str,
+    factor: float,
+    cx: float | None = None,
+    cy: float | None = None,
+) -> dict:
+    """Scale an entity by a uniform factor relative to a center point.
+
+    Center defaults to origin (0,0) unless cx, cy are specified.
+    Cannot target entities on protected layers.
+
+    Args:
+        handle: Handle of the entity to scale
+        factor: Scale factor (>1 enlarges, <1 shrinks, must be non-zero)
+        cx: X coordinate of scale center (default 0)
+        cy: Y coordinate of scale center (default 0)
+    """
+    raise NotImplementedError("Dispatch via ToolExecutor")
+
+
+def mirror_entity_fn(
+    handle: str,
+    axis: typing.Literal["x", "y"],
+    value: float | None = None,
+) -> dict:
+    """Mirror an entity across an axis line.
+
+    axis='x' mirrors across horizontal line y=value.
+    axis='y' mirrors across vertical line x=value.
+    Cannot target entities on protected layers.
+
+    Args:
+        handle: Handle of the entity to mirror
+        axis: Mirror axis: 'x' for horizontal, 'y' for vertical
+        value: Position of the mirror line (default 0)
+    """
+    raise NotImplementedError("Dispatch via ToolExecutor")
+
+
+def add_line_fn(
+    start: ToolPoint2D,
+    end: ToolPoint2D,
+    layer: str | None = None,
+) -> dict:
+    """Draw a new line between two points.
+
+    Cannot create on protected layers.
+
+    Args:
+        start: Start point {x, y}
+        end: End point {x, y}
+        layer: Target layer name (optional)
+    """
+    raise NotImplementedError("Dispatch via ToolExecutor")
+
+
+def add_polyline_fn(
+    points: list[ToolPoint2D],
+    closed: bool = False,
+    layer: str | None = None,
+) -> dict:
+    """Draw a new polyline through a series of points.
+
+    Set closed=true to close the shape.
+    Cannot create on protected layers.
+
+    Args:
+        points: List of {x, y} points defining the polyline (minimum 2)
+        closed: Whether to close the polyline (default false)
+        layer: Target layer name (optional)
+    """
+    raise NotImplementedError("Dispatch via ToolExecutor")
+
+
+def add_circle_fn(
+    center: ToolPoint2D,
+    radius: float,
+    layer: str | None = None,
+) -> dict:
+    """Draw a new circle at a center point with a given radius.
+
+    Cannot create on protected layers.
+
+    Args:
+        center: Center point {x, y}
+        radius: Circle radius in drawing units
+        layer: Target layer name (optional)
+    """
+    raise NotImplementedError("Dispatch via ToolExecutor")
+
+
+def add_arc_fn(
+    center: ToolPoint2D,
+    radius: float,
+    start_angle: float,
+    end_angle: float,
+    layer: str | None = None,
+) -> dict:
+    """Draw a new arc (portion of a circle) defined by center, radius, start angle, and end angle.
+
+    Angles are in degrees. Cannot create on protected layers.
+
+    Args:
+        center: Center point {x, y}
+        radius: Arc radius in drawing units
+        start_angle: Start angle in degrees (0 = east/right)
+        end_angle: End angle in degrees (counter-clockwise from start)
+        layer: Target layer name (optional)
+    """
+    raise NotImplementedError("Dispatch via ToolExecutor")
+
+
+def add_text_fn(
+    text: str,
+    insert: ToolPoint2D,
+    height: float | None = None,
+    rotation: float | None = None,
+    layer: str | None = None,
+    text_type: typing.Literal["TEXT", "MTEXT"] | None = None,
+) -> dict:
+    """Add a new text annotation at a specified point.
+
+    Use text_type='MTEXT' for multi-line text. Cannot create on protected layers.
+
+    Args:
+        text: The text content to add
+        insert: Insertion point {x, y}
+        height: Text height in drawing units (default 2.5)
+        rotation: Text rotation in degrees (default 0)
+        layer: Target layer name (optional)
+        text_type: TEXT (single line) or MTEXT (multi-line). Default TEXT.
+    """
+    raise NotImplementedError("Dispatch via ToolExecutor")
+
+
+def batch_move_fn(
+    dx: float,
+    dy: float,
+    layer: str | None = None,
+    entity_type: str | None = None,
+    text_contains: str | None = None,
+    center_x: float | None = None,
+    center_y: float | None = None,
+    radius: float | None = None,
+) -> dict:
+    """Move all entities matching the filter criteria by a displacement vector (dx, dy).
+
+    At least one filter (layer, entity_type, text_contains, or radius) is required.
+
+    Args:
+        dx: Displacement in X direction (drawing units)
+        dy: Displacement in Y direction (drawing units)
+        layer: Filter: only entities on this layer
+        entity_type: Filter: only entities of this type (LINE, LWPOLYLINE, TEXT, MTEXT,
+            INSERT, CIRCLE, ARC)
+        text_contains: Filter: only TEXT/MTEXT containing this substring
+        center_x: Filter: center X for radius search
+        center_y: Filter: center Y for radius search
+        radius: Filter: search radius from (center_x, center_y)
+    """
+    raise NotImplementedError("Dispatch via ToolExecutor")
+
+
+def batch_rotate_fn(
+    angle: float,
+    layer: str | None = None,
+    entity_type: str | None = None,
+    text_contains: str | None = None,
+    center_x: float | None = None,
+    center_y: float | None = None,
+    radius: float | None = None,
+    cx: float | None = None,
+    cy: float | None = None,
+) -> dict:
+    """Rotate all entities matching the filter criteria by a given angle.
+
+    At least one filter is required.
+
+    Args:
+        angle: Rotation angle in degrees (counter-clockwise)
+        layer: Filter: only entities on this layer
+        entity_type: Filter: only entities of this type (LINE, LWPOLYLINE, TEXT, MTEXT,
+            INSERT, CIRCLE, ARC)
+        text_contains: Filter: only TEXT/MTEXT containing this substring
+        center_x: Filter: center X for radius search
+        center_y: Filter: center Y for radius search
+        radius: Filter: search radius from (center_x, center_y)
+        cx: Rotation center X (default: each entity's own center)
+        cy: Rotation center Y (default: each entity's own center)
+    """
+    raise NotImplementedError("Dispatch via ToolExecutor")
+
+
+def batch_scale_fn(
+    factor: float,
+    layer: str | None = None,
+    entity_type: str | None = None,
+    text_contains: str | None = None,
+    center_x: float | None = None,
+    center_y: float | None = None,
+    radius: float | None = None,
+    cx: float | None = None,
+    cy: float | None = None,
+) -> dict:
+    """Scale all entities matching the filter criteria by a uniform factor.
+
+    At least one filter is required.
+
+    Args:
+        factor: Scale factor (>1 enlarges, <1 shrinks)
+        layer: Filter: only entities on this layer
+        entity_type: Filter: only entities of this type (LINE, LWPOLYLINE, TEXT, MTEXT,
+            INSERT, CIRCLE, ARC)
+        text_contains: Filter: only TEXT/MTEXT containing this substring
+        center_x: Filter: center X for radius search
+        center_y: Filter: center Y for radius search
+        radius: Filter: search radius from (center_x, center_y)
+        cx: Scale center X (default: each entity's own center)
+        cy: Scale center Y (default: each entity's own center)
+    """
+    raise NotImplementedError("Dispatch via ToolExecutor")
+
+
+def batch_delete_fn(
+    layer: str | None = None,
+    entity_type: str | None = None,
+    text_contains: str | None = None,
+    center_x: float | None = None,
+    center_y: float | None = None,
+    radius: float | None = None,
+) -> dict:
+    """Delete all entities matching the filter criteria.
+
+    At least one filter is required. Use with caution.
+
+    Args:
+        layer: Filter: only entities on this layer
+        entity_type: Filter: only entities of this type (LINE, LWPOLYLINE, TEXT, MTEXT,
+            INSERT, CIRCLE, ARC)
+        text_contains: Filter: only TEXT/MTEXT containing this substring
+        center_x: Filter: center X for radius search
+        center_y: Filter: center Y for radius search
+        radius: Filter: search radius from (center_x, center_y)
+    """
+    raise NotImplementedError("Dispatch via ToolExecutor")
+
+
+def batch_edit_text_fn(
+    find: str,
+    replace: str,
+    layer: str | None = None,
+    entity_type: str | None = None,
+    text_contains: str | None = None,
+    center_x: float | None = None,
+    center_y: float | None = None,
+    radius: float | None = None,
+) -> dict:
+    """Find-and-replace text content across all TEXT/MTEXT entities matching the filter criteria.
+
+    Args:
+        find: Text substring to find
+        replace: Replacement text
+        layer: Filter: only entities on this layer
+        entity_type: Filter: only entities of this type (LINE, LWPOLYLINE, TEXT, MTEXT,
+            INSERT, CIRCLE, ARC)
+        text_contains: Filter: only TEXT/MTEXT containing this substring
+        center_x: Filter: center X for radius search
+        center_y: Filter: center Y for radius search
+        radius: Filter: search radius from (center_x, center_y)
+    """
+    raise NotImplementedError("Dispatch via ToolExecutor")
+
+
+EDIT_TOOL_FUNCTIONS: list[Callable] = [
+    move_entity_fn,
+    edit_text_fn,
+    delete_entity_fn,
+    add_block_fn,
+    rotate_entity_fn,
+    copy_entity_fn,
+    scale_entity_fn,
+    mirror_entity_fn,
+    add_line_fn,
+    add_polyline_fn,
+    add_circle_fn,
+    add_arc_fn,
+    add_text_fn,
+    batch_move_fn,
+    batch_rotate_fn,
+    batch_scale_fn,
+    batch_delete_fn,
+    batch_edit_text_fn,
+]
 
 # ---------------------------------------------------------------------------
 # Schema generation from typed functions
@@ -866,7 +1256,9 @@ def _hint_to_json_schema(hint: Any) -> dict[str, Any]:
     """Convert a Python type hint to a JSON Schema type dict.
 
     Handles Optional (``X | None``), primitives (str, int, float, bool),
-    and falls back to ``{"type": "string"}`` for anything unrecognised.
+    ``typing.Literal`` (→ enum), dataclasses (→ object with properties),
+    ``list[X]`` (→ array with items), and falls back to ``{"type": "string"}``
+    for anything unrecognised.
     """
     origin = getattr(hint, "__origin__", None)
 
@@ -881,6 +1273,41 @@ def _hint_to_json_schema(hint: Any) -> dict[str, Any]:
         non_none = [a for a in hint.__args__ if a is not type(None)]
         if len(non_none) == 1:
             return _hint_to_json_schema(non_none[0])
+
+    # typing.Literal["x", "y"] → {"type": "string", "enum": ["x", "y"]}
+    if origin is typing.Literal:
+        args = typing.get_args(hint)
+        if args:
+            # Infer JSON type from the first literal value
+            first = args[0]
+            if isinstance(first, bool):
+                json_type = "boolean"
+            elif isinstance(first, int):
+                json_type = "integer"
+            elif isinstance(first, float):
+                json_type = "number"
+            else:
+                json_type = "string"
+            return {"type": json_type, "enum": list(args)}
+
+    # list[X] → {"type": "array", "items": <schema for X>}
+    if origin is list:
+        args = typing.get_args(hint)
+        if args:
+            return {"type": "array", "items": _hint_to_json_schema(args[0])}
+        return {"type": "array"}
+
+    # dataclass → {"type": "object", "properties": {...}, "required": [...]}
+    if dataclasses.is_dataclass(hint) and isinstance(hint, type):
+        props: dict[str, Any] = {}
+        req: list[str] = []
+        for field in dataclasses.fields(hint):
+            props[field.name] = _hint_to_json_schema(field.type)
+            no_default = field.default is dataclasses.MISSING
+            no_factory = field.default_factory is dataclasses.MISSING  # type: ignore[misc]
+            if no_default and no_factory:
+                req.append(field.name)
+        return {"type": "object", "properties": props, "required": req}
 
     if hint is str:
         return {"type": "string"}
@@ -908,7 +1335,8 @@ def _fn_to_tool_schema(fn: Callable) -> dict[str, Any]:
     The function name must end with ``_fn``; that suffix is stripped to
     derive the tool name (e.g. ``find_entities_fn`` → ``find_entities``).
     """
-    hints = typing.get_type_hints(fn)
+    # Exclude "return" from hints before the loop to avoid processing it
+    hints = {k: v for k, v in typing.get_type_hints(fn).items() if k != "return"}
     sig = inspect.signature(fn)
     doc = inspect.getdoc(fn) or ""
 
@@ -917,31 +1345,36 @@ def _fn_to_tool_schema(fn: Callable) -> dict[str, Any]:
     description = desc_parts[0].strip()
 
     # Parse the "Args:" section for per-parameter descriptions.
-    # Handles multi-line descriptions: continuation lines (indented without
-    # a leading "name:") are appended to the current parameter.
+    # A line is treated as a new parameter only when the text before the first
+    # colon is a single valid Python identifier that matches a parameter name.
+    # Any other colon-containing line is treated as a continuation of the
+    # current parameter description (e.g. "Note: case-insensitive").
     param_descs: dict[str, str] = {}
+    param_names = set(sig.parameters.keys())
     if len(desc_parts) > 1:
         current_pname: str | None = None
         for line in desc_parts[1].strip().splitlines():
             stripped = line.strip()
             if not stripped:
                 continue
-            # Continuation line: indented and no new param name
-            if line.startswith("    ") and current_pname and ":" not in stripped.split()[0]:
+            # Check whether this line starts a new parameter entry:
+            # the token before the first colon must be a plain identifier
+            # that exists in the function's parameter list.
+            if ":" in stripped:
+                before_colon, after_colon = stripped.split(":", 1)
+                before_colon = before_colon.strip()
+                if before_colon.isidentifier() and before_colon in param_names:
+                    current_pname = before_colon
+                    param_descs[current_pname] = after_colon.strip()
+                    continue
+            # Continuation line (indented or no valid param name before colon)
+            if current_pname is not None:
                 param_descs[current_pname] += " " + stripped
-            elif ":" in stripped:
-                pname, pdesc = stripped.split(":", 1)
-                current_pname = pname.strip()
-                param_descs[current_pname] = pdesc.strip()
-            else:
-                current_pname = None
 
     # Build JSON Schema properties and required list.
     properties: dict[str, Any] = {}
     required: list[str] = []
     for pname, param in sig.parameters.items():
-        if pname == "return":
-            continue
         hint = hints.get(pname)
         prop = _hint_to_json_schema(hint)
         if pname in param_descs:
@@ -967,4 +1400,4 @@ def _tools_as_schemas() -> list[dict[str, Any]]:
     Used for validation and future ADK migration. The dict-based
     definitions above remain canonical for now.
     """
-    return [_fn_to_tool_schema(fn) for fn in QUERY_TOOL_FUNCTIONS]
+    return [_fn_to_tool_schema(fn) for fn in QUERY_TOOL_FUNCTIONS + EDIT_TOOL_FUNCTIONS]

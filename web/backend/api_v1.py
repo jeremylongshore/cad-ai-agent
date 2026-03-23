@@ -19,9 +19,11 @@ from __future__ import annotations
 
 import logging
 import tempfile
+import threading
+import time
 from pathlib import Path
 
-from fastapi import APIRouter, File, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
 
 from cad_dxf_agent.core.compliance_rules import check_compliance
 from cad_dxf_agent.core.design_ops import TakeoffGenerator
@@ -34,7 +36,66 @@ from cad_dxf_agent.otel import span as otel_span
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/v1", tags=["v1-agent"])
+
+# ---------------------------------------------------------------------------
+# Per-IP rate limiter
+# ---------------------------------------------------------------------------
+
+
+class _RateLimiter:
+    """Sliding-window per-IP rate limiter backed by an in-memory dict.
+
+    Not distributed — effective for single-instance Cloud Run deployments.
+    For multi-instance deployments, replace with Redis-backed counting.
+    """
+
+    def __init__(self, max_requests: int = 60, window_seconds: float = 60.0) -> None:
+        self.max_requests = max_requests
+        self.window_seconds = window_seconds
+        self._store: dict[str, list[float]] = {}
+        self._lock = threading.Lock()
+
+    def is_allowed(self, ip: str) -> bool:
+        """Return True if the request should be allowed; False if rate-limited."""
+        now = time.monotonic()
+        cutoff = now - self.window_seconds
+
+        with self._lock:
+            timestamps = self._store.get(ip, [])
+            # Prune timestamps outside the current window.
+            timestamps = [ts for ts in timestamps if ts > cutoff]
+
+            if len(timestamps) >= self.max_requests:
+                self._store[ip] = timestamps
+                return False
+
+            timestamps.append(now)
+            self._store[ip] = timestamps
+            return True
+
+
+_rate_limiter = _RateLimiter(max_requests=60, window_seconds=60.0)
+
+
+async def _check_rate_limit(request: Request) -> None:
+    """FastAPI dependency that enforces per-IP rate limiting.
+
+    Raises HTTP 429 with a Retry-After header when the limit is exceeded.
+    """
+    ip = request.client.host if request.client else "unknown"
+    if not _rate_limiter.is_allowed(ip):
+        raise HTTPException(
+            status_code=429,
+            detail="Rate limit exceeded. Max 60 requests per 60 seconds per IP.",
+            headers={"Retry-After": str(int(_rate_limiter.window_seconds))},
+        )
+
+
+router = APIRouter(
+    prefix="/api/v1",
+    tags=["v1-agent"],
+    dependencies=[Depends(_check_rate_limit)],
+)
 
 
 def _save_upload(file: UploadFile) -> Path:

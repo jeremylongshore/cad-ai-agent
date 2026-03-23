@@ -507,3 +507,80 @@ class TestAspectRatio:
 
     def test_single_point(self):
         assert _aspect_ratio([Point2D(x=0, y=0)]) == 1.0
+
+
+# ---------------------------------------------------------------------------
+# Geometry helper reference-value tests
+# ---------------------------------------------------------------------------
+
+
+class TestGeometryHelpers:
+    """Reference-value assertions for geometry functions.
+
+    These serve as regression tests with exact expected values,
+    and as Shapely-equivalent reference tests for future migration.
+    """
+
+    def test_square_10x10_area(self):
+        """10x10 square: area = 100.0"""
+        points = [Point2D(x=0, y=0), Point2D(x=10, y=0), Point2D(x=10, y=10), Point2D(x=0, y=10)]
+        assert _shoelace_area(points) == pytest.approx(100.0)
+
+    def test_square_10x10_perimeter(self):
+        """10x10 square: perimeter = 40.0"""
+        points = [Point2D(x=0, y=0), Point2D(x=10, y=0), Point2D(x=10, y=10), Point2D(x=0, y=10)]
+        assert _polygon_perimeter(points) == pytest.approx(40.0)
+
+    def test_square_10x10_centroid(self):
+        """10x10 square: centroid = (5.0, 5.0)"""
+        points = [Point2D(x=0, y=0), Point2D(x=10, y=0), Point2D(x=10, y=10), Point2D(x=0, y=10)]
+        c = _polygon_centroid(points)
+        assert c.x == pytest.approx(5.0)
+        assert c.y == pytest.approx(5.0)
+
+    def test_square_10x10_aspect_ratio(self):
+        """10x10 square: aspect_ratio = 1.0"""
+        points = [Point2D(x=0, y=0), Point2D(x=10, y=0), Point2D(x=10, y=10), Point2D(x=0, y=10)]
+        assert _aspect_ratio(points) == pytest.approx(1.0)
+
+    def test_rectangle_10x5_aspect_ratio(self):
+        """10x5 rectangle: aspect_ratio = 2.0"""
+        points = [Point2D(x=0, y=0), Point2D(x=10, y=0), Point2D(x=10, y=5), Point2D(x=0, y=5)]
+        assert _aspect_ratio(points) == pytest.approx(2.0)
+
+    def test_rectangle_10x5_area(self):
+        """10x5 rectangle: area = 50.0"""
+        points = [Point2D(x=0, y=0), Point2D(x=10, y=0), Point2D(x=10, y=5), Point2D(x=0, y=5)]
+        assert _shoelace_area(points) == pytest.approx(50.0)
+
+    def test_rectangle_20x15_area(self):
+        """20x15 rectangle: area = 300.0"""
+        points = [Point2D(x=0, y=0), Point2D(x=20, y=0), Point2D(x=20, y=15), Point2D(x=0, y=15)]
+        assert _shoelace_area(points) == pytest.approx(300.0)
+
+    def test_degenerate_polygon_two_vertices(self):
+        """Degenerate polygon (< 3 vertices): area = 0.0 without raising."""
+        points = [Point2D(x=0, y=0), Point2D(x=10, y=0)]
+        assert _shoelace_area(points) == pytest.approx(0.0)
+
+    def test_degenerate_polygon_single_vertex(self):
+        """Single vertex: area = 0.0 without raising."""
+        points = [Point2D(x=5, y=5)]
+        assert _shoelace_area(points) == pytest.approx(0.0)
+
+    def test_degenerate_polygon_empty(self):
+        """Empty polygon: area = 0.0 without raising."""
+        points: list[Point2D] = []
+        assert _shoelace_area(points) == pytest.approx(0.0)
+
+    def test_triangle_area(self):
+        """Right triangle (0,0)-(10,0)-(0,10): area = 50.0"""
+        points = [Point2D(x=0, y=0), Point2D(x=10, y=0), Point2D(x=0, y=10)]
+        assert _shoelace_area(points) == pytest.approx(50.0)
+
+    def test_offset_rectangle_centroid(self):
+        """Rectangle at (20,0)-(40,15): centroid = (30.0, 7.5)"""
+        points = [Point2D(x=20, y=0), Point2D(x=40, y=0), Point2D(x=40, y=15), Point2D(x=20, y=15)]
+        c = _polygon_centroid(points)
+        assert c.x == pytest.approx(30.0)
+        assert c.y == pytest.approx(7.5)

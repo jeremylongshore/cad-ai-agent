@@ -58,7 +58,13 @@ from cad_dxf_agent.otel import span as otel_span  # noqa: E402
 from cad_dxf_agent.settings import settings as cad_settings  # noqa: E402
 
 from .api_v1 import router as v1_router  # noqa: E402
-from .auth import _get_profile, _get_tenant, _update_profile, get_licensed_user  # noqa: E402
+from .auth import (  # noqa: E402
+    _get_profile,
+    _get_tenant,
+    _update_profile,
+    get_licensed_user,
+    is_dev_mode,
+)
 from .session import Session, SessionManager  # noqa: E402
 
 logger = logging.getLogger(__name__)
@@ -107,7 +113,7 @@ async def _session_cleanup_loop():
 async def lifespan(app: FastAPI):
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 
-    dev_mode = os.getenv("CAD_WEB_DEV_MODE", "").strip() in ("1", "true", "yes")
+    dev_mode = is_dev_mode()
     otel_enabled = os.getenv("OTEL_ENABLED", "").strip() in ("1", "true", "yes")
 
     if dev_mode and otel_enabled:
@@ -527,7 +533,7 @@ def _get_document_store():
             InMemoryDocumentStore,
         )
 
-        if os.getenv("CAD_WEB_DEV_MODE", "").lower() in ("1", "true"):
+        if is_dev_mode():
             _document_store = InMemoryDocumentStore()
             logger.info("Using InMemory document store (dev mode)")
         else:
@@ -604,7 +610,7 @@ class ProfileUpdateRequest(BaseModel):
 @app.get("/api/profile")
 async def get_profile(user: dict = Depends(get_user)):
     """Get the current user's profile."""
-    if os.getenv("CAD_WEB_DEV_MODE", "").lower() in ("1", "true"):
+    if is_dev_mode():
         return {
             "profile": {
                 "uid": user["uid"],
@@ -626,7 +632,7 @@ async def get_profile(user: dict = Depends(get_user)):
 @app.put("/api/profile")
 async def update_profile(body: ProfileUpdateRequest, user: dict = Depends(get_user)):
     """Update the current user's display name and/or company."""
-    if os.getenv("CAD_WEB_DEV_MODE", "").lower() in ("1", "true"):
+    if is_dev_mode():
         profile = {"uid": user["uid"], "display_name": body.display_name or ""}
         if body.company is not None:
             profile["company"] = body.company
@@ -652,7 +658,7 @@ async def update_profile(body: ProfileUpdateRequest, user: dict = Depends(get_us
 async def get_workspace(user: dict = Depends(get_user)):
     """Get the current user's workspace/tenant info."""
     tenant_id = user.get("tenant_id", "")
-    if os.getenv("CAD_WEB_DEV_MODE", "").lower() in ("1", "true"):
+    if is_dev_mode():
         return {
             "workspace": {"tenant_id": "dev-tenant", "name": "Dev Workspace", "plan": "personal"}
         }

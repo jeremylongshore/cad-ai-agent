@@ -161,6 +161,34 @@ else
 fi
 
 # --------------------------------------------------------------------------
+# 5. No google.adk imports outside approved ADK module
+# --------------------------------------------------------------------------
+header "Check 5: No google.adk imports outside approved module"
+
+ADK_IMPORT_HITS=$(grep -rn --include='*.py' -E '^(import |from )google\.adk' "$REPO_ROOT/src/" | grep -v 'src/cad_dxf_agent/adk/' || true)
+if [[ -n "$ADK_IMPORT_HITS" ]]; then
+    red "FAIL: google.adk imports found outside src/cad_dxf_agent/adk/:"
+    echo "$ADK_IMPORT_HITS"
+    red "      ADK imports must only appear in the adk/ module (when it exists)."
+    VIOLATIONS=$((VIOLATIONS + 1))
+else
+    green "PASS: No google.adk imports outside approved module."
+fi
+
+# --------------------------------------------------------------------------
+# 6. Gateway must not import google.adk (bobs-brain R3: gateway = pure proxy)
+# --------------------------------------------------------------------------
+header "Check 6: Gateway (web/backend/main.py) does not import google.adk"
+
+if grep -qn -E '^(import |from )google\.adk' "$REPO_ROOT/web/backend/main.py" 2>/dev/null; then
+    red "FAIL: web/backend/main.py imports google.adk."
+    red "      The gateway must be a pure proxy — no ADK dependency."
+    VIOLATIONS=$((VIOLATIONS + 1))
+else
+    green "PASS: Gateway does not import google.adk."
+fi
+
+# --------------------------------------------------------------------------
 # Summary
 # --------------------------------------------------------------------------
 echo ""

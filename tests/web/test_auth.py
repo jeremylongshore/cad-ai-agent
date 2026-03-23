@@ -398,3 +398,68 @@ class TestAllowlist:
         os.environ["CAD_WEB_DEV_MODE"] = "1"
         user = {"uid": "any-user"}
         await check_license(user)  # should not raise
+
+
+@pytest.mark.web
+class TestIsDevMode:
+    """Tests for the consolidated is_dev_mode() helper."""
+
+    def test_dev_mode_with_1(self, monkeypatch):
+        monkeypatch.setenv("CAD_WEB_DEV_MODE", "1")
+        from web.backend.auth import is_dev_mode
+
+        assert is_dev_mode() is True
+
+    def test_dev_mode_with_true(self, monkeypatch):
+        monkeypatch.setenv("CAD_WEB_DEV_MODE", "true")
+        from web.backend.auth import is_dev_mode
+
+        assert is_dev_mode() is True
+
+    def test_dev_mode_with_yes(self, monkeypatch):
+        monkeypatch.setenv("CAD_WEB_DEV_MODE", "yes")
+        from web.backend.auth import is_dev_mode
+
+        assert is_dev_mode() is True
+
+    def test_dev_mode_with_true_uppercase(self, monkeypatch):
+        monkeypatch.setenv("CAD_WEB_DEV_MODE", "TRUE")
+        from web.backend.auth import is_dev_mode
+
+        assert is_dev_mode() is True
+
+    def test_dev_mode_with_yes_uppercase(self, monkeypatch):
+        monkeypatch.setenv("CAD_WEB_DEV_MODE", "YES")
+        from web.backend.auth import is_dev_mode
+
+        assert is_dev_mode() is True
+
+    def test_dev_mode_with_true_mixed_case(self, monkeypatch):
+        monkeypatch.setenv("CAD_WEB_DEV_MODE", "True")
+        from web.backend.auth import is_dev_mode
+
+        assert is_dev_mode() is True
+
+    def test_dev_mode_disabled_empty(self, monkeypatch):
+        monkeypatch.delenv("CAD_WEB_DEV_MODE", raising=False)
+        from web.backend.auth import is_dev_mode
+
+        assert is_dev_mode() is False
+
+    def test_dev_mode_disabled_zero(self, monkeypatch):
+        monkeypatch.setenv("CAD_WEB_DEV_MODE", "0")
+        from web.backend.auth import is_dev_mode
+
+        assert is_dev_mode() is False
+
+    def test_dev_mode_disabled_false(self, monkeypatch):
+        monkeypatch.setenv("CAD_WEB_DEV_MODE", "false")
+        from web.backend.auth import is_dev_mode
+
+        assert is_dev_mode() is False
+
+    def test_dev_mode_with_whitespace(self, monkeypatch):
+        monkeypatch.setenv("CAD_WEB_DEV_MODE", "  true  ")
+        from web.backend.auth import is_dev_mode
+
+        assert is_dev_mode() is True
