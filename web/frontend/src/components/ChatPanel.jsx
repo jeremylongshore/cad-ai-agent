@@ -157,7 +157,7 @@ export default function ChatPanel({
         el.style.height = Math.min(el.scrollHeight, 120) + 'px';
       }
     });
-  }, [insertText]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [insertText, onInsertConsumed]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
