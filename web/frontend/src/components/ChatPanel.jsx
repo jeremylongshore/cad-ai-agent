@@ -114,6 +114,8 @@ export default function ChatPanel({
   selectedEntities,
   onRemoveEntity,
   onClearSelection,
+  insertText,
+  onInsertConsumed,
 }) {
   const [input, setInput] = useState('');
   const messagesEndRef = useRef(null);
@@ -137,6 +139,25 @@ export default function ChatPanel({
       });
     }
   }, [messages, loading]);
+
+  // Append entity label into textarea when an entity is selected
+  useEffect(() => {
+    if (!insertText?.text) return;
+    setInput(prev => {
+      const sep = prev && !prev.endsWith(' ') ? ' ' : '';
+      return prev + sep + insertText.text;
+    });
+    onInsertConsumed?.();
+    // Focus and auto-resize textarea after insertion
+    requestAnimationFrame(() => {
+      const el = textareaRef.current;
+      if (el) {
+        el.focus();
+        el.style.height = 'auto';
+        el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+      }
+    });
+  }, [insertText, onInsertConsumed]);
 
   const handleSubmit = (e) => {
     e.preventDefault();

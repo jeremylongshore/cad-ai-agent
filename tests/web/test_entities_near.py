@@ -59,6 +59,9 @@ class TestEntitiesNear:
             assert "entity_type" in entity
             assert "layer" in entity
             assert "label" in entity
+            assert "bounds" in entity
+            bounds = entity["bounds"]
+            assert all(k in bounds for k in ("minX", "minY", "maxX", "maxY"))
 
     def test_404_for_invalid_session(self, client):
         resp = client.post(

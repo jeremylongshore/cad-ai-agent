@@ -326,6 +326,20 @@ def _extract_one(
             attributes["insert_xscale"] = entity.dxf.get("xscale", 1.0)
             attributes["insert_yscale"] = entity.dxf.get("yscale", 1.0)
             attributes["insert_rotation"] = entity.dxf.get("rotation", 0.0) % 360.0
+            # Capture ATTRIB sub-entity text (door tags, room numbers, etc.)
+            try:
+                attribs = list(entity.attribs)  # type: ignore[attr-defined]
+                if attribs:
+                    attrib_dict = {}
+                    for attrib in attribs:
+                        tag = attrib.dxf.get("tag", "")
+                        val = attrib.dxf.get("text", "")
+                        if tag:
+                            attrib_dict[tag] = val
+                    if attrib_dict:
+                        attributes["attribs"] = attrib_dict
+            except Exception:
+                logger.debug("INSERT %s: attrib read failed", handle)
 
         elif dxf_type == "CIRCLE":
             center = entity.dxf.center

@@ -2,36 +2,68 @@
   "summary": {
     "added": 0,
     "removed": 0,
-    "modified": 0,
+    "modified": 3,
     "moved": 0,
-    "unchanged": 3
+    "unchanged": 0
   },
   "change_count": 3,
   "changes": [
     {
-      "category": "unchanged",
+      "category": "modified",
       "entity_type": "INSERT",
       "layer": "STRUCTURAL",
       "confidence": 1.0,
-      "match_method": "fingerprint",
+      "match_method": "spatial",
+      "modifications": {
+        "attribs": {
+          "FIRE_RATING": {
+            "from": null,
+            "to": ""
+          }
+        }
+      },
       "point_count": 1,
       "block_name": "DOOR"
     },
     {
-      "category": "unchanged",
+      "category": "modified",
       "entity_type": "INSERT",
       "layer": "STRUCTURAL",
       "confidence": 1.0,
-      "match_method": "fingerprint",
+      "match_method": "spatial",
+      "modifications": {
+        "attribs": {
+          "FIRE_RATING": {
+            "from": null,
+            "to": ""
+          },
+          "ROOM": {
+            "from": "102",
+            "to": "105"
+          },
+          "SIZE": {
+            "from": "36",
+            "to": "42"
+          }
+        }
+      },
       "point_count": 1,
       "block_name": "DOOR"
     },
     {
-      "category": "unchanged",
+      "category": "modified",
       "entity_type": "INSERT",
       "layer": "STRUCTURAL",
       "confidence": 1.0,
-      "match_method": "fingerprint",
+      "match_method": "spatial",
+      "modifications": {
+        "attribs": {
+          "FIRE_RATING": {
+            "from": null,
+            "to": "1HR"
+          }
+        }
+      },
       "point_count": 1,
       "block_name": "DOOR"
     }

@@ -1,31 +1,13 @@
 {
   "summary": {
-    "added": 4,
-    "removed": 3,
-    "modified": 0,
-    "moved": 0,
+    "added": 1,
+    "removed": 0,
+    "modified": 1,
+    "moved": 2,
     "unchanged": 19
   },
-  "change_count": 26,
+  "change_count": 23,
   "changes": [
-    {
-      "category": "added",
-      "entity_type": "TEXT",
-      "layer": "NOTES",
-      "confidence": 1.0,
-      "match_method": null,
-      "point_count": 1,
-      "text_content": "C-2"
-    },
-    {
-      "category": "added",
-      "entity_type": "INSERT",
-      "layer": "STRUCTURAL",
-      "confidence": 1.0,
-      "match_method": null,
-      "point_count": 1,
-      "block_name": "COLUMN_MARK"
-    },
     {
       "category": "added",
       "entity_type": "INSERT",
@@ -36,38 +18,44 @@
       "block_name": "OUTLET"
     },
     {
-      "category": "added",
+      "category": "modified",
       "entity_type": "LWPOLYLINE",
       "layer": "STRUCTURAL",
-      "confidence": 1.0,
-      "match_method": null,
-      "point_count": 6
+      "confidence": 0.65,
+      "match_method": "spatial",
+      "modifications": {
+        "point_count": {
+          "from": 2,
+          "to": 6
+        }
+      },
+      "point_count": 2
     },
     {
-      "category": "removed",
+      "category": "moved",
       "entity_type": "TEXT",
       "layer": "NOTES",
-      "confidence": 1.0,
-      "match_method": null,
+      "confidence": 0.95,
+      "match_method": "spatial",
+      "displacement": {
+        "x": 5.0,
+        "y": 0.0
+      },
       "point_count": 1,
       "text_content": "C-2"
     },
     {
-      "category": "removed",
+      "category": "moved",
       "entity_type": "INSERT",
       "layer": "STRUCTURAL",
-      "confidence": 1.0,
-      "match_method": null,
+      "confidence": 0.97,
+      "match_method": "spatial",
+      "displacement": {
+        "x": 5.0,
+        "y": 0.0
+      },
       "point_count": 1,
       "block_name": "COLUMN_MARK"
-    },
-    {
-      "category": "removed",
-      "entity_type": "LWPOLYLINE",
-      "layer": "STRUCTURAL",
-      "confidence": 1.0,
-      "match_method": null,
-      "point_count": 2
     },
     {
       "category": "unchanged",

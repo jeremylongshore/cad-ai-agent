@@ -1,21 +1,13 @@
 {
   "summary": {
-    "added": 1,
-    "removed": 1,
+    "added": 0,
+    "removed": 0,
     "modified": 3,
-    "moved": 0,
+    "moved": 1,
     "unchanged": 48
   },
-  "change_count": 53,
+  "change_count": 52,
   "changes": [
-    {
-      "category": "added",
-      "entity_type": "LWPOLYLINE",
-      "layer": "0",
-      "confidence": 1.0,
-      "match_method": null,
-      "point_count": 4
-    },
     {
       "category": "modified",
       "entity_type": "MTEXT",
@@ -62,11 +54,15 @@
       "text_content": "DEFAULT"
     },
     {
-      "category": "removed",
+      "category": "moved",
       "entity_type": "LWPOLYLINE",
       "layer": "0",
       "confidence": 1.0,
-      "match_method": null,
+      "match_method": "spatial",
+      "displacement": {
+        "x": 3.0,
+        "y": 3.0
+      },
       "point_count": 4
     },
     {

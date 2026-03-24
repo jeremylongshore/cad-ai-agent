@@ -1,38 +1,37 @@
 {
   "summary": {
-    "added": 2,
-    "removed": 6,
+    "added": 0,
+    "removed": 4,
     "modified": 0,
-    "moved": 0,
+    "moved": 2,
     "unchanged": 2
   },
-  "change_count": 10,
+  "change_count": 8,
   "changes": [
     {
-      "category": "added",
+      "category": "moved",
       "entity_type": "TEXT",
       "layer": "NOTES",
-      "confidence": 1.0,
-      "match_method": null,
+      "confidence": 0.95,
+      "match_method": "spatial",
+      "displacement": {
+        "x": 5.0,
+        "y": 0.0
+      },
       "point_count": 1,
       "text_content": "COL-2"
     },
     {
-      "category": "added",
+      "category": "moved",
       "entity_type": "LINE",
       "layer": "STRUCTURAL",
       "confidence": 1.0,
-      "match_method": null,
+      "match_method": "spatial",
+      "displacement": {
+        "x": 5.0,
+        "y": 0.0
+      },
       "point_count": 2
-    },
-    {
-      "category": "removed",
-      "entity_type": "TEXT",
-      "layer": "NOTES",
-      "confidence": 1.0,
-      "match_method": null,
-      "point_count": 1,
-      "text_content": "COL-2"
     },
     {
       "category": "removed",
@@ -51,14 +50,6 @@
       "match_method": null,
       "point_count": 1,
       "text_content": "COL-4"
-    },
-    {
-      "category": "removed",
-      "entity_type": "LINE",
-      "layer": "STRUCTURAL",
-      "confidence": 1.0,
-      "match_method": null,
-      "point_count": 2
     },
     {
       "category": "removed",

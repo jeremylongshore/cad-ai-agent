@@ -1,82 +1,69 @@
 {
   "summary": {
-    "added": 4,
-    "removed": 4,
-    "modified": 0,
-    "moved": 0,
+    "added": 0,
+    "removed": 0,
+    "modified": 1,
+    "moved": 3,
     "unchanged": 0
   },
-  "change_count": 8,
+  "change_count": 4,
   "changes": [
     {
-      "category": "added",
-      "entity_type": "INSERT",
-      "layer": "GRID",
-      "confidence": 1.0,
-      "match_method": null,
-      "point_count": 1,
-      "block_name": "COL"
-    },
-    {
-      "category": "added",
-      "entity_type": "INSERT",
-      "layer": "GRID",
-      "confidence": 1.0,
-      "match_method": null,
-      "point_count": 1,
-      "block_name": "COL"
-    },
-    {
-      "category": "added",
-      "entity_type": "INSERT",
-      "layer": "GRID",
-      "confidence": 1.0,
-      "match_method": null,
-      "point_count": 1,
-      "block_name": "COL"
-    },
-    {
-      "category": "added",
+      "category": "modified",
       "entity_type": "LWPOLYLINE",
       "layer": "STRUCTURAL",
       "confidence": 1.0,
-      "match_method": null,
+      "match_method": "spatial",
+      "modifications": {
+        "changed_point_indices": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ]
+      },
       "point_count": 6
     },
     {
-      "category": "removed",
+      "category": "moved",
       "entity_type": "INSERT",
       "layer": "GRID",
-      "confidence": 1.0,
-      "match_method": null,
+      "confidence": 0.9416,
+      "match_method": "spatial",
+      "displacement": {
+        "x": 9.6421,
+        "y": 1.3768
+      },
       "point_count": 1,
       "block_name": "COL"
     },
     {
-      "category": "removed",
+      "category": "moved",
       "entity_type": "INSERT",
       "layer": "GRID",
-      "confidence": 1.0,
-      "match_method": null,
+      "confidence": 0.9244,
+      "match_method": "spatial",
+      "displacement": {
+        "x": 10.5162,
+        "y": -6.9397
+      },
       "point_count": 1,
       "block_name": "COL"
     },
     {
-      "category": "removed",
+      "category": "moved",
       "entity_type": "INSERT",
       "layer": "GRID",
-      "confidence": 1.0,
-      "match_method": null,
+      "confidence": 0.9221,
+      "match_method": "spatial",
+      "displacement": {
+        "x": 8.1199,
+        "y": -10.1405
+      },
       "point_count": 1,
       "block_name": "COL"
-    },
-    {
-      "category": "removed",
-      "entity_type": "LWPOLYLINE",
-      "layer": "STRUCTURAL",
-      "confidence": 1.0,
-      "match_method": null,
-      "point_count": 6
     }
   ]
 }

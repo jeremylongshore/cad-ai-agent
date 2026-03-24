@@ -1,27 +1,23 @@
 {
   "summary": {
-    "added": 1,
-    "removed": 1,
+    "added": 0,
+    "removed": 0,
     "modified": 0,
-    "moved": 0,
+    "moved": 1,
     "unchanged": 63
   },
-  "change_count": 65,
+  "change_count": 64,
   "changes": [
     {
-      "category": "added",
+      "category": "moved",
       "entity_type": "LINE",
       "layer": "0",
       "confidence": 1.0,
-      "match_method": null,
-      "point_count": 2
-    },
-    {
-      "category": "removed",
-      "entity_type": "LINE",
-      "layer": "0",
-      "confidence": 1.0,
-      "match_method": null,
+      "match_method": "spatial",
+      "displacement": {
+        "x": 5.0,
+        "y": 5.0
+      },
       "point_count": 2
     },
     {

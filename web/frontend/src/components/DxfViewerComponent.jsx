@@ -280,13 +280,8 @@ const DxfViewerComponent = forwardRef(function DxfViewerComponent(
       {/* viewVersion state changes on pan/zoom force a re-render so
           computeScreenRect recalculates overlay positions with the updated camera. */}
       {selectedEntities?.map(entity => {
-        if (!entity.insert_point) return null;
-        const rect = computeScreenRect({
-          minX: entity.insert_point.x - 10,
-          minY: entity.insert_point.y - 10,
-          maxX: entity.insert_point.x + 10,
-          maxY: entity.insert_point.y + 10,
-        });
+        if (!entity.bounds) return null;
+        const rect = computeScreenRect(entity.bounds);
         if (!rect) return null;
         return (
           <div
