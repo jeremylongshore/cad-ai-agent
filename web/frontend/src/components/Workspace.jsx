@@ -17,6 +17,7 @@ export default function Workspace({ user, onSignOut }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [compareLibraryOpen, setCompareLibraryOpen] = useState(false);
   const [selectedEntities, setSelectedEntities] = useState([]);
+  const [textToInsert, setTextToInsert] = useState(null);
 
   const isAuthenticated = !!user;
   const library = useDocumentLibrary(isAuthenticated);
@@ -86,10 +87,13 @@ export default function Workspace({ user, onSignOut }) {
           setSelectedEntities(prev => {
             const exists = prev.find(e => e.handle === entity.handle);
             if (exists) return prev.filter(e => e.handle !== entity.handle);
+            // Entity added — insert label into prompt
+            setTextToInsert({ text: entity.label, ts: Date.now() });
             return [...prev, entity];
           });
         } else {
           setSelectedEntities([entity]);
+          setTextToInsert({ text: entity.label, ts: Date.now() });
         }
       } catch (err) {
         console.error('Entity pick failed:', err);
@@ -361,6 +365,8 @@ export default function Workspace({ user, onSignOut }) {
               selectedEntities={selectedEntities}
               onRemoveEntity={handleRemoveEntity}
               onClearSelection={handleClearSelection}
+              insertText={textToInsert}
+              onInsertConsumed={() => setTextToInsert(null)}
             />
           </aside>
         </div>

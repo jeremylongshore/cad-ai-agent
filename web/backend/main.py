@@ -341,6 +341,49 @@ class EntitiesNearRequest(BaseModel):
     limit: int = 5
 
 
+def _entity_bounds(entity) -> dict:
+    """Compute bounding box from entity geometry for frontend highlight overlay."""
+    ip = entity.insert_point
+    x, y = (ip.x, ip.y) if ip else (0.0, 0.0)
+    attrs = entity.attributes
+    etype = entity.entity_type.value
+
+    if etype == "LINE" and "end_point" in attrs:
+        ex, ey = attrs["end_point"]
+        return {
+            "minX": min(x, ex),
+            "minY": min(y, ey),
+            "maxX": max(x, ex),
+            "maxY": max(y, ey),
+        }
+    if etype == "LWPOLYLINE" and "vertices" in attrs:
+        verts = attrs["vertices"]
+        xs = [v[0] for v in verts]
+        ys = [v[1] for v in verts]
+        return {"minX": min(xs), "minY": min(ys), "maxX": max(xs), "maxY": max(ys)}
+    if etype in ("CIRCLE", "ARC") and "radius" in attrs:
+        r = attrs["radius"]
+        return {"minX": x - r, "minY": y - r, "maxX": x + r, "maxY": y + r}
+    if etype in ("TEXT", "MTEXT") and entity.text_geometry:
+        from cad_dxf_agent.models.cad_schema import compute_approx_text_bbox
+
+        bbox = compute_approx_text_bbox(
+            entity.text_content or "",
+            entity.text_geometry,
+            mtext_width=attrs.get("mtext_width"),
+        )
+        if bbox:
+            return {
+                "minX": x + bbox[0].x,
+                "minY": y + bbox[0].y,
+                "maxX": x + bbox[1].x,
+                "maxY": y + bbox[1].y,
+            }
+    # INSERT / fallback — pad around insert point
+    pad = 20
+    return {"minX": x - pad, "minY": y - pad, "maxX": x + pad, "maxY": y + pad}
+
+
 def _entity_label(entity) -> str:
     """Human-readable label for an entity."""
     if entity.text_content:
@@ -380,6 +423,7 @@ async def entities_near(
                     {"x": e.insert_point.x, "y": e.insert_point.y} if e.insert_point else None
                 ),
                 "label": _entity_label(e),
+                "bounds": _entity_bounds(e),
             }
             for e in entities
         ]
