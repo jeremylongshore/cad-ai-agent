@@ -217,10 +217,14 @@ class ComparisonConfig(BaseModel):
 
     tolerance: float = Field(
         default=0.25,
-        description="Match threshold in drawing units (1/4 inch default)",
+        description="Geometric precision threshold in drawing units (point matching)",
+    )
+    match_search_radius: float = Field(
+        default=50.0,
+        description="Max centroid distance for candidate pairing (drawing units)",
     )
     move_threshold: float = Field(
-        default=0.25,
+        default=0.5,
         description="Min displacement to classify as moved vs unchanged",
     )
     ignored_layers: list[str] = Field(default_factory=list)

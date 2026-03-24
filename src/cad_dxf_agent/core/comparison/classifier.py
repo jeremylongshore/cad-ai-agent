@@ -173,6 +173,9 @@ def _content_matches(a: GeometrySnapshot, b: GeometrySnapshot) -> bool:
                     return False
             else:
                 return False
+    # Check block ATTRIB text (door tags, room numbers, etc.)
+    if a.attributes.get("attribs") != b.attributes.get("attribs"):
+        return False
     return True
 
 
@@ -225,5 +228,19 @@ def _describe_modifications(
         vb = r_snap.attributes.get(key)
         if va != vb:
             mods[key] = {"from": va, "to": vb}
+
+    # Report block ATTRIB text changes
+    m_attribs = m_snap.attributes.get("attribs", {})
+    r_attribs = r_snap.attributes.get("attribs", {})
+    if m_attribs != r_attribs:
+        attrib_changes = {}
+        all_keys = set(m_attribs) | set(r_attribs)
+        for key in sorted(all_keys):
+            mv = m_attribs.get(key)
+            rv = r_attribs.get(key)
+            if mv != rv:
+                attrib_changes[key] = {"from": mv, "to": rv}
+        if attrib_changes:
+            mods["attribs"] = attrib_changes
 
     return mods

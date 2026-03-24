@@ -232,7 +232,8 @@ class TestComparisonConfig:
     def test_defaults(self):
         config = ComparisonConfig()
         assert config.tolerance == 0.25
-        assert config.move_threshold == 0.25
+        assert config.match_search_radius == 50.0
+        assert config.move_threshold == 0.5
         assert config.ignored_layers == []
         assert config.focus_entity_types is None
         assert config.profile is None

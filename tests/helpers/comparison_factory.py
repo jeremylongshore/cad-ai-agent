@@ -150,28 +150,32 @@ def make_moved_entity_pair(tmp_path: Path, dx: float = 10.0, dy: float = 5.0) ->
 
 
 def make_added_removed_pair(tmp_path: Path) -> tuple[Path, Path]:
-    """Revision has one extra entity; master has one entity that revision lacks."""
+    """Revision has one extra entity; master has one entity that revision lacks.
+
+    Uses different layers for the master-only and revision-only text so that
+    the matcher cannot pair them (find_candidates filters by layer).
+    """
     master = tmp_path / "master.dxf"
     revision = tmp_path / "revision.dxf"
 
     doc_m = ezdxf.new(dxfversion="R2018")
     msp_m = doc_m.modelspace()
     doc_m.layers.add("STRUCTURAL", color=1)
-    doc_m.layers.add("NOTES", color=3)
+    doc_m.layers.add("NOTES-OLD", color=3)
     # Shared: line at origin
     msp_m.add_line((0, 0), (10, 0), dxfattribs={"layer": "STRUCTURAL"})
-    # Master-only: text that gets removed
-    msp_m.add_text("Old Note", dxfattribs={"layer": "NOTES", "height": 2, "insert": (50, 50)})
+    # Master-only: text on NOTES-OLD layer (removed in revision)
+    msp_m.add_text("Old Note", dxfattribs={"layer": "NOTES-OLD", "height": 2, "insert": (50, 50)})
     doc_m.saveas(str(master))
 
     doc_r = ezdxf.new(dxfversion="R2018")
     msp_r = doc_r.modelspace()
     doc_r.layers.add("STRUCTURAL", color=1)
-    doc_r.layers.add("NOTES", color=3)
+    doc_r.layers.add("NOTES-NEW", color=3)
     # Shared: same line
     msp_r.add_line((0, 0), (10, 0), dxfattribs={"layer": "STRUCTURAL"})
-    # Revision-only: new text added
-    msp_r.add_text("New Note", dxfattribs={"layer": "NOTES", "height": 2, "insert": (80, 80)})
+    # Revision-only: new text on NOTES-NEW layer (added in revision)
+    msp_r.add_text("New Note", dxfattribs={"layer": "NOTES-NEW", "height": 2, "insert": (80, 80)})
     doc_r.saveas(str(revision))
 
     return master, revision

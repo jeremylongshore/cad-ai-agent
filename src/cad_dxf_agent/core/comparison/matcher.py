@@ -81,7 +81,7 @@ def match_entities(
         # --- Step 2: Confidence-scored matching on unmatched ---
         if unmatched_master and unmatched_revision:
             scored_pairs, still_master, still_revision = _scored_matching(
-                unmatched_master, unmatched_revision, config.tolerance
+                unmatched_master, unmatched_revision, config.match_search_radius
             )
             pairs.extend(scored_pairs)
             unmatched_master = still_master
@@ -113,12 +113,18 @@ def _fingerprint(snap: GeometrySnapshot) -> str:
     if snap.entity_type.value == "LINE":
         rounded_pts = sorted(rounded_pts)
 
+    # Include block ATTRIB text so attribute changes break the fingerprint
+    attrib_str = ""
+    if "attribs" in snap.attributes:
+        attrib_str = str(sorted(snap.attributes["attribs"].items()))
+
     parts = [
         snap.entity_type.value,
         snap.layer,
         str(rounded_pts),
         snap.text_content or "",
         snap.block_name or "",
+        attrib_str,
     ]
     raw = "|".join(parts)
     return hashlib.sha256(raw.encode()).hexdigest()
