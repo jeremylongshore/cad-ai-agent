@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHandle } from 'react';
 import { DxfViewer } from 'dxf-viewer';
 import { Color, Vector3 } from 'three';
+import { SELECTION_COLORS } from '../lib/selectionColors';
 
 /**
  * Interactive WebGL DXF viewer powered by dxf-viewer + Three.js.
@@ -279,10 +280,11 @@ const DxfViewerComponent = forwardRef(function DxfViewerComponent(
 
       {/* viewVersion state changes on pan/zoom force a re-render so
           computeScreenRect recalculates overlay positions with the updated camera. */}
-      {selectedEntities?.map(entity => {
+      {selectedEntities?.map((entity, index) => {
         if (!entity.bounds) return null;
         const rect = computeScreenRect(entity.bounds);
         if (!rect) return null;
+        const color = SELECTION_COLORS[index % SELECTION_COLORS.length];
         return (
           <div
             key={entity.handle}
@@ -293,6 +295,9 @@ const DxfViewerComponent = forwardRef(function DxfViewerComponent(
               top: rect.top,
               width: rect.width,
               height: rect.height,
+              borderColor: color.border,
+              backgroundColor: color.bg,
+              boxShadow: `0 0 8px ${color.shadow}`,
             }}
           />
         );
