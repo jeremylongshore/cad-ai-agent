@@ -174,9 +174,7 @@ def _content_matches(a: GeometrySnapshot, b: GeometrySnapshot) -> bool:
             else:
                 return False
     # Check block ATTRIB text (door tags, room numbers, etc.)
-    if a.attributes.get("attribs") != b.attributes.get("attribs"):
-        return False
-    return True
+    return a.attributes.get("attribs") == b.attributes.get("attribs")
 
 
 def _describe_modifications(
