@@ -403,7 +403,7 @@ def _op_bounds(op, context) -> dict | None:
     params = op.params or {}
     pt = params.get("insert_point") or params.get("center") or params.get("start")
     if pt and isinstance(pt, dict):
-        pad = params.get("radius", 20)
+        pad = params.get("radius", 20)  # default padding for reasonable visual buffer on focus
         return {
             "minX": pt["x"] - pad,
             "minY": pt["y"] - pad,

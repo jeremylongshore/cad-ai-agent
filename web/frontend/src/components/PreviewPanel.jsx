@@ -767,7 +767,7 @@ export default function PreviewPanel({
             <div className="op-list">
               <h4 className="op-list__title">Planned operations</h4>
               {operations.map((op, i) => (
-                <div
+                <label
                   key={i}
                   className="op-item op-item--clickable"
                   onClick={() => op.bounds && activeViewerRef.current?.focusOnBounds(op.bounds)}
@@ -784,7 +784,7 @@ export default function PreviewPanel({
                   <span className={`op-item__type op-item__type--${opTypeClass(op.op_type)}`}>
                     {op.op_type}
                   </span>
-                </div>
+                </label>
               ))}
             </div>
           )}
