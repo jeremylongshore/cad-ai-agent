@@ -134,23 +134,44 @@ const DxfViewerComponent = forwardRef(function DxfViewerComponent(
     }
   }, []);
 
+  const zoomAnimRef = useRef(null);
+
+  const animateZoom = useCallback((targetZoom) => {
+    const viewer = viewerRef.current;
+    const cam = viewer?.GetCamera?.();
+    if (!cam) return;
+
+    if (zoomAnimRef.current) cancelAnimationFrame(zoomAnimRef.current);
+
+    const startZoom = cam.zoom;
+    const startTime = performance.now();
+    const duration = 200; // ms
+
+    const step = (now) => {
+      const t = Math.min((now - startTime) / duration, 1);
+      // ease-out cubic
+      const ease = 1 - (1 - t) ** 3;
+      cam.zoom = startZoom + (targetZoom - startZoom) * ease;
+      cam.updateProjectionMatrix();
+      viewer.Render();
+      if (t < 1) {
+        zoomAnimRef.current = requestAnimationFrame(step);
+      } else {
+        zoomAnimRef.current = null;
+      }
+    };
+    zoomAnimRef.current = requestAnimationFrame(step);
+  }, []);
+
   const handleZoomIn = useCallback(() => {
     const cam = viewerRef.current?.GetCamera?.();
-    if (cam) {
-      cam.zoom *= 1.3;
-      cam.updateProjectionMatrix();
-      viewerRef.current.Render();
-    }
-  }, []);
+    if (cam) animateZoom(cam.zoom * 1.3);
+  }, [animateZoom]);
 
   const handleZoomOut = useCallback(() => {
     const cam = viewerRef.current?.GetCamera?.();
-    if (cam) {
-      cam.zoom /= 1.3;
-      cam.updateProjectionMatrix();
-      viewerRef.current.Render();
-    }
-  }, []);
+    if (cam) animateZoom(cam.zoom / 1.3);
+  }, [animateZoom]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -250,6 +271,7 @@ const DxfViewerComponent = forwardRef(function DxfViewerComponent(
       });
 
     return () => {
+      if (zoomAnimRef.current) cancelAnimationFrame(zoomAnimRef.current);
       viewer.Unsubscribe('pointerdown', handlePointerDown);
       viewer.Unsubscribe('viewChanged', handleViewChanged);
       viewer.Destroy();
