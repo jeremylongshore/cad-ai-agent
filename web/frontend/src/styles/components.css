@@ -1014,6 +1014,21 @@
   color: var(--text-secondary);
 }
 
+.dxf-viewer__progress {
+  width: 180px;
+  height: 4px;
+  background: var(--border-default, #e2e8f0);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.dxf-viewer__progress-bar {
+  height: 100%;
+  background: var(--accent-primary, #3b82f6);
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
 .dxf-viewer--picking {
   cursor: crosshair;
 }

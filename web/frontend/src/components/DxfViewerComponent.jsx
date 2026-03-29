@@ -22,6 +22,8 @@ const DxfViewerComponent = forwardRef(function DxfViewerComponent(
   const containerRef = useRef(null);
   const viewerRef = useRef(null);
   const [loading, setLoading] = useState(false);
+  const [loadPhase, setLoadPhase] = useState(null);
+  const [loadProgress, setLoadProgress] = useState(0);
   const [error, setError] = useState(null);
 
   // Highlight overlay state
@@ -161,6 +163,8 @@ const DxfViewerComponent = forwardRef(function DxfViewerComponent(
     }
 
     setLoading(true);
+    setLoadPhase(null);
+    setLoadProgress(0);
     setError(null);
 
     let viewer;
@@ -209,8 +213,21 @@ const DxfViewerComponent = forwardRef(function DxfViewerComponent(
     };
     viewer.Subscribe('viewChanged', handleViewChanged);
 
+    const progressCbk = (phase, processedSize, totalSize) => {
+      const labels = { font: 'Loading fonts', fetch: 'Downloading', parse: 'Parsing', prepare: 'Preparing' };
+      setLoadPhase(labels[phase] || phase);
+      if (phase === 'fetch' && totalSize > 0) {
+        setLoadProgress(Math.round((processedSize / totalSize) * 100));
+      } else if (phase === 'prepare') {
+        setLoadProgress(90);
+      }
+    };
+
+    const workerFactory = () =>
+      new Worker(new URL('../workers/dxf-viewer-worker.js', import.meta.url), { type: 'module' });
+
     viewer
-      .Load({ url: dxfUrl, fonts: ['/fonts/NotoSans-Regular.ttf'], progressCbk: null })
+      .Load({ url: dxfUrl, fonts: ['/fonts/NotoSans-Regular.ttf'], progressCbk, workerFactory })
       .then(() => {
         setLoading(false);
         // Auto fit after load
@@ -255,7 +272,21 @@ const DxfViewerComponent = forwardRef(function DxfViewerComponent(
       {loading && (
         <div className="dxf-viewer__overlay">
           <div className="spinner" aria-hidden="true" />
-          <span className="dxf-viewer__overlay-text">Loading drawing...</span>
+          <span className="dxf-viewer__overlay-text">
+            {loadPhase ? `${loadPhase}…` : 'Loading drawing…'}
+          </span>
+          {loadProgress > 0 && (
+            <div className="dxf-viewer__progress">
+              <div
+                className="dxf-viewer__progress-bar"
+                style={{ width: `${loadProgress}%` }}
+                role="progressbar"
+                aria-valuenow={loadProgress}
+                aria-valuemin={0}
+                aria-valuemax={100}
+              />
+            </div>
+          )}
         </div>
       )}
 
