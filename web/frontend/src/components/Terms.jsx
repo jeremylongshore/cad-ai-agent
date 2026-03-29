@@ -21,7 +21,7 @@ export default function Terms() {
           <div className="flex flex-col gap-5" style={{ lineHeight: 1.8, color: 'var(--text-secondary)' }}>
             <section>
               <h3 style={{ marginBottom: 'var(--space-2)' }}>Service Description</h3>
-              <p>CAD DXF Agent is an AI-powered CAD drawing editor operated by Intent Solutions. The service allows users to upload DXF and PDF files, describe edits in natural language, and download modified drawings.</p>
+              <p>CAD DXF Agent is an AI-powered CAD drawing editor operated by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)' }}>Intent Solutions</a>. The service allows users to upload DXF and PDF files, describe edits in natural language, and download modified drawings.</p>
             </section>
 
             <section>
@@ -52,17 +52,17 @@ export default function Terms() {
 
             <section>
               <h3 style={{ marginBottom: 'var(--space-2)' }}>Limitation of Liability</h3>
-              <p>Intent Solutions shall not be liable for any indirect, incidental, or consequential damages arising from use of the service. Our total liability shall not exceed the amount paid by you for the service in the preceding 12 months.</p>
+              <p><a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)' }}>Intent Solutions</a> shall not be liable for any indirect, incidental, or consequential damages arising from use of the service. Our total liability shall not exceed the amount paid by you for the service in the preceding 12 months.</p>
             </section>
 
             <section>
               <h3 style={{ marginBottom: 'var(--space-2)' }}>Termination</h3>
-              <p>We reserve the right to suspend or terminate your account for violations of these terms. You may request deletion of your account and data at any time by contacting <a href="mailto:legal@intentsolutions.io" style={{ color: 'var(--accent-primary)' }}>legal@intentsolutions.io</a>.</p>
+              <p>We reserve the right to suspend or terminate your account for violations of these terms. You may request deletion of your account and data at any time by contacting <a href="mailto:jeremy@intentsolutions.io" style={{ color: 'var(--accent-primary)' }}>jeremy@intentsolutions.io</a>.</p>
             </section>
 
             <section>
               <h3 style={{ marginBottom: 'var(--space-2)' }}>Governing Law</h3>
-              <p>These terms are governed by United States federal and state law where Intent Solutions operates.</p>
+              <p>These terms are governed by United States federal and state law where <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)' }}>Intent Solutions</a> operates.</p>
             </section>
 
             <section>
@@ -72,7 +72,7 @@ export default function Terms() {
 
             <section>
               <h3 style={{ marginBottom: 'var(--space-2)' }}>Contact</h3>
-              <p>For questions about these terms, contact <a href="mailto:legal@intentsolutions.io" style={{ color: 'var(--accent-primary)' }}>legal@intentsolutions.io</a>.</p>
+              <p>For questions about these terms, contact <a href="mailto:jeremy@intentsolutions.io" style={{ color: 'var(--accent-primary)' }}>jeremy@intentsolutions.io</a>.</p>
             </section>
           </div>
         </div>

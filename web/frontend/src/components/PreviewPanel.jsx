@@ -767,12 +767,18 @@ export default function PreviewPanel({
             <div className="op-list">
               <h4 className="op-list__title">Planned operations</h4>
               {operations.map((op, i) => (
-                <label key={i} className="op-item">
+                <label
+                  key={i}
+                  className="op-item op-item--clickable"
+                  onClick={() => op.bounds && activeViewerRef.current?.focusOnBounds(op.bounds)}
+                  style={{ cursor: op.bounds ? 'pointer' : 'default' }}
+                >
                   <input
                     type="checkbox"
                     className="op-item__checkbox"
                     checked={selectedOps.includes(i)}
                     onChange={() => onToggleOp(i)}
+                    onClick={e => e.stopPropagation()}
                   />
                   <span className="op-item__text">{op.description || op.summary || `Operation ${i + 1}`}</span>
                   <span className={`op-item__type op-item__type--${opTypeClass(op.op_type)}`}>
