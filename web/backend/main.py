@@ -393,6 +393,26 @@ def _entity_label(entity) -> str:
     return f"{entity.entity_type.value} on {entity.layer}"
 
 
+def _op_bounds(op, context) -> dict | None:
+    """Compute bounds for an operation's target entity."""
+    if op.target_handle and context:
+        for e in context.entities:
+            if e.handle == op.target_handle:
+                return _entity_bounds(e)
+    # For add_* ops, derive from params
+    params = op.params or {}
+    pt = params.get("insert_point") or params.get("center") or params.get("start")
+    if pt and isinstance(pt, dict):
+        pad = params.get("radius", 20)  # default padding for reasonable visual buffer on focus
+        return {
+            "minX": pt["x"] - pad,
+            "minY": pt["y"] - pad,
+            "maxX": pt["x"] + pad,
+            "maxY": pt["y"] + pad,
+        }
+    return None
+
+
 @app.post("/api/entities/near")
 async def entities_near(
     req: EntitiesNearRequest,
@@ -1234,6 +1254,7 @@ async def plan(body: PlanRequest, user: dict = Depends(get_user)):
                     "target_layer": op.target_layer,
                     "description": _describe_op(op),
                     "params": op.params,
+                    "bounds": _op_bounds(op, session.context),
                 }
             )
 
@@ -1712,6 +1733,7 @@ async def v2_prompt(body: PromptRequest, user: dict = Depends(get_user)):
                                 "target_layer": op.target_layer,
                                 "description": _describe_op(op),
                                 "params": op.params,
+                                "bounds": _op_bounds(op, session.context),
                             }
                         )
 
@@ -1753,6 +1775,7 @@ async def v2_prompt(body: PromptRequest, user: dict = Depends(get_user)):
                                         "target_layer": op.target_layer,
                                         "description": _describe_op(op),
                                         "params": op.params,
+                                        "bounds": _op_bounds(op, session.context),
                                     }
                                 )
                     except (ValueError, KeyError, TypeError) as prec_err:

@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import QnaPanel from './QnaPanel';
 import DesignOpsPanel from './DesignOpsPanel';
+import { SELECTION_COLORS } from '../lib/selectionColors';
 
 const SUGGESTIONS = [
   'Move column A1 24 feet east',
@@ -335,12 +336,15 @@ export default function ChatPanel({
       {selectedEntities?.length > 0 && (
         <div className="chat-selection-tags" data-testid="chat-selection-tags">
           <span className="entity-tag-count" data-testid="entity-tag-count">{selectedEntities.length} selected</span>
-          {selectedEntities.slice(0, 8).map(ent => (
-            <span key={ent.handle} className="entity-tag" data-testid="entity-tag">
-              {ent.label}
-              <button type="button" data-testid="entity-tag-remove" onClick={() => onRemoveEntity?.(ent.handle)} aria-label={`Remove ${ent.label}`}>&times;</button>
-            </span>
-          ))}
+          {selectedEntities.slice(0, 8).map((ent, index) => {
+            const color = SELECTION_COLORS[index % SELECTION_COLORS.length];
+            return (
+              <span key={ent.handle} className="entity-tag" data-testid="entity-tag" style={{ borderColor: color.border, backgroundColor: color.bg }}>
+                {ent.label}
+                <button type="button" data-testid="entity-tag-remove" onClick={() => onRemoveEntity?.(ent.handle)} aria-label={`Remove ${ent.label}`}>&times;</button>
+              </span>
+            );
+          })}
           {selectedEntities.length > 8 && (
             <span className="entity-tag entity-tag--overflow" data-testid="entity-tag-overflow">+{selectedEntities.length - 8} more</span>
           )}

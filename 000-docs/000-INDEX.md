@@ -72,6 +72,7 @@
 | 070 | TEST | [070-AN-TEST-realworld-prompt-matrix.md](070-AN-TEST-realworld-prompt-matrix.md) |
 | 071 | TEST | [071-TQ-TEST-production-quality-proof-system.md](071-TQ-TEST-production-quality-proof-system.md) |
 | 072 | TEST | [072-TQ-TEST-realworld-user-profiles.md](072-TQ-TEST-realworld-user-profiles.md) |
+| 077 | TEST | [077-TQ-TEST-manual-qa-comparison-workflow.md](077-TQ-TEST-manual-qa-comparison-workflow.md) |
 
 ### RL — Reports & Releases
 | # | Type | File |
@@ -171,6 +172,7 @@
 | 071 | TQ | TEST | Production quality proof system |
 | 072 | TQ | TEST | Real-world user profiles |
 | 073 | AA | AUDT | DevOps operator playbook (appaudit v0.10.1) |
+| 077 | TQ | TEST | Manual QA test plan for comparison workflow |
 | 074 | AT | ARCH | ADK Agent Engine architecture (EPIC-CAD-31) |
 | 075 | RL | REPT | Release v0.11.0 report |
 

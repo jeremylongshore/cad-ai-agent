@@ -21,7 +21,7 @@ export default function Privacy() {
           <div className="flex flex-col gap-5" style={{ lineHeight: 1.8, color: 'var(--text-secondary)' }}>
             <section>
               <h3 style={{ marginBottom: 'var(--space-2)' }}>Who We Are</h3>
-              <p>CAD DXF Agent is operated by Intent Solutions. Contact us at <a href="mailto:privacy@intentsolutions.io" style={{ color: 'var(--accent-primary)' }}>privacy@intentsolutions.io</a> for any privacy-related requests.</p>
+              <p>CAD DXF Agent is operated by <a href="https://intentsolutions.io" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)' }}>Intent Solutions</a>. Contact us at <a href="mailto:jeremy@intentsolutions.io" style={{ color: 'var(--accent-primary)' }}>jeremy@intentsolutions.io</a> for any privacy-related requests.</p>
             </section>
 
             <section>
@@ -60,7 +60,7 @@ export default function Privacy() {
 
             <section>
               <h3 style={{ marginBottom: 'var(--space-2)' }}>Your Rights</h3>
-              <p>You may request to review, delete, or modify your account data at any time by contacting <a href="mailto:privacy@intentsolutions.io" style={{ color: 'var(--accent-primary)' }}>privacy@intentsolutions.io</a>. Data will be deleted within 30 days of a valid request.</p>
+              <p>You may request to review, delete, or modify your account data at any time by contacting <a href="mailto:jeremy@intentsolutions.io" style={{ color: 'var(--accent-primary)' }}>jeremy@intentsolutions.io</a>. Data will be deleted within 30 days of a valid request.</p>
             </section>
 
             <section>
