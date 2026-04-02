@@ -427,11 +427,7 @@ export function useSession() {
     setError(null);
     try {
       const approvals = revisionOps
-        .filter((op) => {
-          if (action === 'approve') return op.status !== 'approved';
-          if (action === 'reject') return op.status !== 'rejected';
-          return true;
-        })
+        .filter((op) => op.status === 'pending' || op.status === 'auto_approved' || (action === 'reject' && op.status !== 'rejected'))
         .map((op) => ({ op_id: op.op_id, action }));
       if (approvals.length === 0) return;
       const data = await revisionApprove(sessionId, approvals);
