@@ -635,9 +635,9 @@ export default function PreviewPanel({
                 const approved = revisionOps.filter((o) => isOpApproved(o)).length;
                 const pending = revisionOps.filter((o) => o.status === 'pending').length;
                 const canApply = approved > 0 && pending === 0;
-                const disabledTitle = approved === 0
-                  ? 'Approve at least one change to apply'
-                  : 'Review all changes before applying';
+                const disabledTitle = pending > 0
+                  ? 'Review all changes before applying'
+                  : 'Approve at least one change to apply';
                 return (
                   <>
                     <button
