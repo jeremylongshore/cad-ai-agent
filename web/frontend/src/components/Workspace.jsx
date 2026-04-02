@@ -119,7 +119,11 @@ export default function Workspace({ user, onSignOut }) {
           </div>
           <div className="flex items-center gap-3">
             {sessionId && (
-              <button className="btn btn--ghost btn--sm" onClick={session.reset}>
+              <button className="btn btn--ghost btn--sm" onClick={() => {
+                if (window.confirm('Start a new file? Any unsaved work will be lost.')) {
+                  session.reset();
+                }
+              }}>
                 New File
               </button>
             )}
