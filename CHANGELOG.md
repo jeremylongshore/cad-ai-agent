@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-04-01
+
+### Added
+- **Email/Password Sign-In**: Admin-provisioned email/password login alongside Google OAuth (#151)
+- **Color-Cycle Selection Highlights**: Multi-entity selection with distinct color cycling and click-to-focus operations (#130)
+- **Entity Selection UX**: Click-to-select entities in viewer, diff detection for MODIFIED and MOVED entities (#129)
+- **QA Test Infrastructure**: First manual QA pass — 37 test cases covering comparison workflow, 13 issues filed (#141)
+
+### Fixed
+- **Apply Button Tooltip**: Contextual helper text explains why Apply is disabled; pending-ops message takes priority over zero-approved (#150)
+- **Keyboard Navigation Scroll**: Ops list scrolls to keep focused item visible with `prefers-reduced-motion` support (#148)
+- **Revision Replace Warning**: Confirmation dialog before replacing revision file mid-workflow prevents accidental progress loss (#148)
+- **Approve After Reject**: Bulk approve/reject filter correctly toggles ops between states; safe `return false` default for unknown actions (#147)
+- **New File Confirmation**: Browser confirm dialog prevents accidental workspace reset (#146)
+- **Disabled Title Priority**: `disabledTitle` logic prioritizes pending review message over approve-first message (#150)
+
+### Changed
+- Dependencies: bumped `google-adk` requirement (#131)
+- GitHub Sponsors + Buy Me a Coffee funding links added
+
 ## [0.11.0] - 2026-03-22
 
 ### Added
