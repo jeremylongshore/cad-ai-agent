@@ -118,6 +118,10 @@ export default function PreviewPanel({
   const handleRevisionUpload = (e) => {
     const file = e.target.files?.[0];
     if (file && onRevisionUpload) {
+      if (revisionOps?.length > 0 && !window.confirm('Replace current comparison? Your review progress will be lost.')) {
+        if (revisionInputRef.current) revisionInputRef.current.value = '';
+        return;
+      }
       onRevisionUpload(file, selectedProfile || null);
     }
     if (revisionInputRef.current) revisionInputRef.current.value = '';
@@ -157,6 +161,8 @@ export default function PreviewPanel({
     if (opsListRef.current && focusedOpIndex >= 0) {
       const items = opsListRef.current.querySelectorAll('[role="listitem"]');
       if (items[focusedOpIndex]) {
+        const prefersReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+        items[focusedOpIndex].scrollIntoView({ block: 'nearest', behavior: prefersReducedMotion ? 'instant' : 'smooth' });
         items[focusedOpIndex].focus();
       }
     }
