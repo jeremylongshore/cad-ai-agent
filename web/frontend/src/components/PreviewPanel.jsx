@@ -161,7 +161,8 @@ export default function PreviewPanel({
     if (opsListRef.current && focusedOpIndex >= 0) {
       const items = opsListRef.current.querySelectorAll('[role="listitem"]');
       if (items[focusedOpIndex]) {
-        items[focusedOpIndex].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        const prefersReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+        items[focusedOpIndex].scrollIntoView({ block: 'nearest', behavior: prefersReducedMotion ? 'instant' : 'smooth' });
         items[focusedOpIndex].focus();
       }
     }
