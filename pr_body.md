@@ -2,7 +2,7 @@
 
 Manual QA testing of the comparison workflow completed on 2026-04-01 against
 [cad-dxf-agent.web.app](https://cad-dxf-agent.web.app) per test plan
-**077-TQ-TEST-manual-qa-comparison-workflow.pdf**.
+**077-TQ-TEST-manual-qa-comparison-workflow.md**.
 
 **46 test cases executed · 135 individual checks · Tester: @opeyemiariyo**
 
@@ -56,7 +56,7 @@ The following areas passed all checks:
 - [x] All critical-path workflows verified
 - [x] Bugs filed with steps to reproduce, expected vs actual, and impact
 
-**Document:** 077-TQ-TEST-manual-qa-comparison-workflow.pdf
+**Document:** 077-TQ-TEST-manual-qa-comparison-workflow.md
 
 ---
 

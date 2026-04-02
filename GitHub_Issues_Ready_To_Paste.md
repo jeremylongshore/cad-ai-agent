@@ -47,7 +47,7 @@ The Document Library sidebar and all library-related functionality cannot be fou
 **Critical** - Blocks major workflow and multiple test cases
 
 ### Reference
-Test Plan: 077-TQ-TEST-manual-qa-comparison-workflow.pdf
+Test Plan: 077-TQ-TEST-manual-qa-comparison-workflow.md
 ```
 
 ---
@@ -97,7 +97,7 @@ The diff badges showing change summary (+N added, -N removed, ~N modified, ->N m
 **Major** - Core comparison feature missing critical UI elements
 
 ### Reference
-Test Plan: 077-TQ-TEST-manual-qa-comparison-workflow.pdf, Section 5 (TC-013)
+Test Plan: 077-TQ-TEST-manual-qa-comparison-workflow.md, Section 5 (TC-013)
 ```
 
 ---
@@ -146,7 +146,7 @@ Arrow key navigation in the operation list only works for the first 3 items. Use
 **Major** - Accessibility issue blocking keyboard-only users
 
 ### Reference
-Test Plan: 077-TQ-TEST-manual-qa-comparison-workflow.pdf, Section 7 (TC-040)
+Test Plan: 077-TQ-TEST-manual-qa-comparison-workflow.md, Section 7 (TC-040)
 ```
 
 ---
@@ -194,7 +194,7 @@ When using the "Refine" button to improve alignment via control point selection,
 **Major** - Critical feature for handling difficult alignments is non-functional
 
 ### Reference
-Test Plan: 077-TQ-TEST-manual-qa-comparison-workflow.pdf, Section 7 (TC-042)
+Test Plan: 077-TQ-TEST-manual-qa-comparison-workflow.md, Section 7 (TC-042)
 ```
 
 ---
@@ -243,7 +243,7 @@ Add confirmation dialog: *"Uploading a new revision will discard your current re
 **Minor** - Data loss risk, but recoverable by re-reviewing
 
 ### Reference
-Test Plan: 077-TQ-TEST-manual-qa-comparison-workflow.pdf, Section 7 (TC-043)
+Test Plan: 077-TQ-TEST-manual-qa-comparison-workflow.md, Section 7 (TC-043)
 ```
 
 ---
@@ -290,7 +290,7 @@ Add confirmation dialog: *"Starting a new file will clear your current work. Con
 **Minor** - UX improvement to prevent accidental data loss
 
 ### Reference
-Test Plan: 077-TQ-TEST-manual-qa-comparison-workflow.pdf, Section 8 (TC-054)
+Test Plan: 077-TQ-TEST-manual-qa-comparison-workflow.md, Section 8 (TC-054)
 ```
 
 ---
@@ -320,7 +320,7 @@ Add tooltip or inline message: *"No approved changes to apply. Please approve at
 **Low** - Enhancement, not a bug. Current functionality is correct.
 
 ### Reference
-Test Plan: 077-TQ-TEST-manual-qa-comparison-workflow.pdf, Section 7 (TC-041)
+Test Plan: 077-TQ-TEST-manual-qa-comparison-workflow.md, Section 7 (TC-041)
 ```
 
 ---
@@ -359,7 +359,7 @@ The operation list is not responsive when scrolling, particularly with larger co
 **Medium** - Needs investigation to determine severity and root cause
 
 ### Reference
-Test Plan: 077-TQ-TEST-manual-qa-comparison-workflow.pdf, Section 7 (TC-044)
+Test Plan: 077-TQ-TEST-manual-qa-comparison-workflow.md, Section 7 (TC-044)
 ```
 
 ---
