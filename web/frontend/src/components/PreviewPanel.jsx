@@ -635,19 +635,30 @@ export default function PreviewPanel({
                 const approved = revisionOps.filter((o) => isOpApproved(o)).length;
                 const pending = revisionOps.filter((o) => o.status === 'pending').length;
                 const canApply = approved > 0 && pending === 0;
+                const disabledTitle = approved === 0
+                  ? 'Approve at least one change to apply'
+                  : 'Review all changes before applying';
                 return (
-                  <button
-                    className="btn btn--primary btn--full"
-                    onClick={onRevisionApply}
-                    disabled={loading || !canApply}
-                    style={{ marginTop: 'var(--space-2)' }}
-                  >
-                    {loading
-                      ? <span className="spinner" aria-hidden="true" />
-                      : canApply
-                        ? `Apply ${approved} Approved Change${approved !== 1 ? 's' : ''}`
-                        : 'Review all changes before applying'}
-                  </button>
+                  <>
+                    <button
+                      className="btn btn--primary btn--full"
+                      onClick={onRevisionApply}
+                      disabled={loading || !canApply}
+                      title={!loading && !canApply ? disabledTitle : undefined}
+                      style={{ marginTop: 'var(--space-2)' }}
+                    >
+                      {loading
+                        ? <span className="spinner" aria-hidden="true" />
+                        : canApply
+                          ? `Apply ${approved} Approved Change${approved !== 1 ? 's' : ''}`
+                          : 'Apply Changes'}
+                    </button>
+                    {!loading && !canApply && (
+                      <p style={{ marginTop: 'var(--space-1)', fontSize: '0.75rem', color: 'var(--color-text-muted)', textAlign: 'center' }}>
+                        {disabledTitle}
+                      </p>
+                    )}
+                  </>
                 );
               })()}
             </div>
