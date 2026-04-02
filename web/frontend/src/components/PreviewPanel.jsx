@@ -157,6 +157,7 @@ export default function PreviewPanel({
     if (opsListRef.current && focusedOpIndex >= 0) {
       const items = opsListRef.current.querySelectorAll('[role="listitem"]');
       if (items[focusedOpIndex]) {
+        items[focusedOpIndex].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
         items[focusedOpIndex].focus();
       }
     }
