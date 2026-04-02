@@ -64,6 +64,7 @@ function AuthGate({ user, loading, authState }) {
     return (
       <LoginPage
         onSignInWithGoogle={authState.signInWithGoogle}
+        onSignInWithEmail={authState.signInWithEmail}
         error={authState.error}
         clearError={authState.clearError}
       />

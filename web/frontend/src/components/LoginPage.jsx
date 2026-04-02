@@ -1,8 +1,10 @@
 import { Link } from 'react-router-dom';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
-export default function LoginPage({ onSignInWithGoogle, error, clearError }) {
+export default function LoginPage({ onSignInWithGoogle, onSignInWithEmail, error, clearError }) {
   const gistRef = useRef(null);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
 
   useEffect(() => {
     if (!gistRef.current) return;
@@ -94,6 +96,37 @@ export default function LoginPage({ onSignInWithGoogle, error, clearError }) {
           </svg>
           Sign in with Google
         </button>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', margin: 'var(--space-4) 0' }}>
+          <hr style={{ flex: 1, border: 'none', borderTop: '1px solid var(--border-default)' }} />
+          <span className="text-sm text-muted">or</span>
+          <hr style={{ flex: 1, border: 'none', borderTop: '1px solid var(--border-default)' }} />
+        </div>
+
+        <form onSubmit={(e) => { e.preventDefault(); onSignInWithEmail(email, password); }}
+              style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+          <input
+            type="email"
+            placeholder="Email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            className="input"
+            style={{ width: '100%', padding: 'var(--space-2) var(--space-3)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-default)', fontSize: 'var(--text-sm)' }}
+          />
+          <input
+            type="password"
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            className="input"
+            style={{ width: '100%', padding: 'var(--space-2) var(--space-3)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-default)', fontSize: 'var(--text-sm)' }}
+          />
+          <button type="submit" className="btn btn--secondary btn--lg" style={{ width: '100%' }}>
+            Sign in with Email
+          </button>
+        </form>
 
         <details style={{ marginTop: 'var(--space-5)', textAlign: 'left' }}>
           <summary className="text-sm text-muted" style={{ cursor: 'pointer', textAlign: 'center' }}>
