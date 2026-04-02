@@ -430,7 +430,7 @@ export function useSession() {
         .filter((op) => {
           if (action === 'approve') return op.status !== 'approved';
           if (action === 'reject') return op.status !== 'rejected';
-          return true;
+          return false;
         })
         .map((op) => ({ op_id: op.op_id, action }));
       if (approvals.length === 0) return;
