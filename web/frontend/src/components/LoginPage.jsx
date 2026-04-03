@@ -1,10 +1,11 @@
 import { Link } from 'react-router-dom';
 import { useEffect, useRef, useState } from 'react';
 
-export default function LoginPage({ onSignInWithGoogle, onSignInWithEmail, error, clearError }) {
+export default function LoginPage({ onSignInWithGoogle, onSignInWithEmail, onSignUpWithEmail, error, clearError }) {
   const gistRef = useRef(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [isSignUp, setIsSignUp] = useState(false);
 
   useEffect(() => {
     if (!gistRef.current) return;
@@ -103,7 +104,11 @@ export default function LoginPage({ onSignInWithGoogle, onSignInWithEmail, error
           <hr style={{ flex: 1, border: 'none', borderTop: '1px solid var(--border-default)' }} />
         </div>
 
-        <form onSubmit={(e) => { e.preventDefault(); onSignInWithEmail(email, password); }}
+        <form onSubmit={(e) => {
+                e.preventDefault();
+                if (isSignUp) { onSignUpWithEmail(email, password); }
+                else { onSignInWithEmail(email, password); }
+              }}
               style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
           <input
             type="email"
@@ -116,17 +121,29 @@ export default function LoginPage({ onSignInWithGoogle, onSignInWithEmail, error
           />
           <input
             type="password"
-            placeholder="Password"
+            placeholder="Password (min 6 characters)"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
+            minLength={6}
             className="input"
             style={{ width: '100%', padding: 'var(--space-2) var(--space-3)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-default)', fontSize: 'var(--text-sm)' }}
           />
           <button type="submit" className="btn btn--secondary btn--lg" style={{ width: '100%' }}>
-            Sign in with Email
+            {isSignUp ? 'Create Account' : 'Sign in with Email'}
           </button>
         </form>
+
+        <p className="text-sm text-muted" style={{ marginTop: 'var(--space-3)' }}>
+          {isSignUp ? 'Already have an account? ' : "Don't have an account? "}
+          <button
+            type="button"
+            onClick={() => { setIsSignUp(!isSignUp); clearError(); }}
+            style={{ background: 'none', border: 'none', color: 'var(--accent-primary)', cursor: 'pointer', padding: 0, fontSize: 'inherit', textDecoration: 'underline' }}
+          >
+            {isSignUp ? 'Sign in' : 'Create one'}
+          </button>
+        </p>
 
         <details style={{ marginTop: 'var(--space-5)', textAlign: 'left' }}>
           <summary className="text-sm text-muted" style={{ cursor: 'pointer', textAlign: 'center' }}>

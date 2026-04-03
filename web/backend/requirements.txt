@@ -16,3 +16,4 @@ opentelemetry-exporter-gcp-trace>=1.6
 google-cloud-firestore>=2.16
 google-cloud-storage>=2.14
 rtree>=1.0
+shapely>=2.0
