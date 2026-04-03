@@ -79,7 +79,7 @@ jobs:
             CAD_LLM_PROVIDER=gemini
             CAD_GCP_PROJECT=${{ env.GCP_PROJECT }}
             CAD_WEB_CORS_ORIGIN=https://cad-dxf-agent.web.app
-            CAD_ALLOWED_EMAILS=michaelmcquaig@gmail.com;scott@heyflora.ai;jeremy@intentsolutions.io;hashimotokohei67@gmail.com
+            CAD_ALLOWED_EMAILS=michaelmcquaig@gmail.com;scott@heyflora.ai;jeremy@intentsolutions.io;hashimotokohei67@gmail.com;opeyemiariyo@intentsolutions.io;engineer@gmail.com
             OTEL_ENABLED=1
             OTEL_EXPORTER=gcp-trace
           flags: |
