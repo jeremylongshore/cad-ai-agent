@@ -125,17 +125,20 @@ async def check_license(user: dict) -> None:
     try:
         from starlette.concurrency import run_in_threadpool
 
-        active = await run_in_threadpool(_fetch_license, uid)
+        status = await run_in_threadpool(_fetch_license_status, uid)
 
-        if not active:
-            # Open self-registration: any authenticated user gets a trial
+        if status == "active":
+            _license_cache[uid] = (True, now)
+        elif status == "missing":
+            # Open self-registration: first-time user gets a trial
             email = user.get("email", "").lower()
             await run_in_threadpool(_provision_license, uid, email)
             _license_cache[uid] = (True, now)
             logger.info("Auto-provisioned 30-day trial for %s", email)
-            return
-
-        _license_cache[uid] = (active, now)
+        else:
+            # Expired or revoked — do not re-provision
+            _license_cache[uid] = (False, now)
+            raise HTTPException(status_code=403, detail="License inactive")
 
     except HTTPException:
         raise
@@ -145,8 +148,14 @@ async def check_license(user: dict) -> None:
         raise HTTPException(status_code=403, detail="License check unavailable") from e
 
 
-def _fetch_license(uid: str) -> bool:
-    """Synchronous Firestore lookup — called via run_in_threadpool."""
+def _fetch_license_status(uid: str) -> str:
+    """Synchronous Firestore lookup — called via run_in_threadpool.
+
+    Returns:
+        "active" — license exists and is valid
+        "missing" — no license document (first-time user)
+        "inactive" — license exists but expired or revoked
+    """
     import datetime
 
     from google.cloud import firestore
@@ -154,12 +163,14 @@ def _fetch_license(uid: str) -> bool:
     db = firestore.Client()
     doc = db.collection("licenses").document(uid).get()
     if not doc.exists:
-        return False
+        return "missing"
     data = doc.to_dict()
     if not data.get("active", False):
-        return False
+        return "inactive"
     expires_at = data.get("expires_at")
-    return not (expires_at and expires_at < datetime.datetime.now(datetime.UTC))
+    if expires_at and expires_at < datetime.datetime.now(datetime.UTC):
+        return "inactive"
+    return "active"
 
 
 def _provision_license(uid: str, email: str) -> None:

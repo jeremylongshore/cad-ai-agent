@@ -175,7 +175,7 @@ class TestCheckLicense:
             "email": "u@example.com",
             "firebase": {"sign_in_provider": "google.com"},
         }
-        with patch("web.backend.auth._fetch_license", return_value=True):
+        with patch("web.backend.auth._fetch_license_status", return_value="active"):
             await check_license(user)  # should not raise
 
     @pytest.mark.asyncio
@@ -192,7 +192,7 @@ class TestCheckLicense:
 
         mock_provision = MagicMock()
         with (
-            patch("web.backend.auth._fetch_license", return_value=False),
+            patch("web.backend.auth._fetch_license_status", return_value="missing"),
             patch("web.backend.auth._provision_license", mock_provision),
         ):
             await check_license(user)  # should not raise
@@ -210,13 +210,13 @@ class TestCheckLicense:
             "email": "u@example.com",
             "firebase": {"sign_in_provider": "google.com"},
         }
-        # _fetch_license returns False for expired licenses
         with (
-            patch("web.backend.auth._fetch_license", return_value=False),
-            patch("web.backend.auth._provision_license", side_effect=Exception("already exists")),
-            pytest.raises(HTTPException),
+            patch("web.backend.auth._fetch_license_status", return_value="inactive"),
+            pytest.raises(HTTPException) as exc_info,
         ):
             await check_license(user)
+        assert exc_info.value.status_code == 403
+        assert "License inactive" in exc_info.value.detail
 
     @pytest.mark.asyncio
     async def test_dev_mode_bypasses_license(self):
@@ -266,7 +266,7 @@ class TestAllowlist:
         }
         mock_provision = MagicMock()
         with (
-            patch("web.backend.auth._fetch_license", return_value=False),
+            patch("web.backend.auth._fetch_license_status", return_value="missing"),
             patch("web.backend.auth._provision_license", mock_provision),
         ):
             await check_license(user)  # should not raise
@@ -286,7 +286,7 @@ class TestAllowlist:
         }
         mock_provision = MagicMock()
         with (
-            patch("web.backend.auth._fetch_license", return_value=False),
+            patch("web.backend.auth._fetch_license_status", return_value="missing"),
             patch("web.backend.auth._provision_license", mock_provision),
         ):
             await check_license(user)
@@ -306,7 +306,7 @@ class TestAllowlist:
         }
         mock_provision = MagicMock()
         with (
-            patch("web.backend.auth._fetch_license", return_value=False),
+            patch("web.backend.auth._fetch_license_status", return_value="missing"),
             patch("web.backend.auth._provision_license", mock_provision),
         ):
             await check_license(user)
@@ -325,7 +325,7 @@ class TestAllowlist:
             "firebase": {"sign_in_provider": "google.com"},
         }
         with (
-            patch("web.backend.auth._fetch_license", return_value=True),
+            patch("web.backend.auth._fetch_license_status", return_value="active"),
             patch("web.backend.auth._provision_license") as mock_provision,
         ):
             await check_license(user)
