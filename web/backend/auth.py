@@ -103,7 +103,7 @@ async def check_license(user: dict) -> None:
     # Reject anonymous users — Google sign-in required
     provider = user.get("firebase", {}).get("sign_in_provider", "")
     if provider == "anonymous" or not user.get("email"):
-        raise HTTPException(status_code=403, detail="Google sign-in required")
+        raise HTTPException(status_code=403, detail="Sign-in required")
 
     uid = user.get("uid")
     if not uid:
@@ -128,16 +128,8 @@ async def check_license(user: dict) -> None:
         active = await run_in_threadpool(_fetch_license, uid)
 
         if not active:
-            # Only auto-provision if the email is on the allowlist
+            # Open self-registration: any authenticated user gets a trial
             email = user.get("email", "").lower()
-            allowed = await run_in_threadpool(_check_email_allowed, email)
-            if not allowed:
-                _license_cache[uid] = (False, now)
-                logger.info("Rejected unlisted email %s", email)
-                raise HTTPException(
-                    status_code=403,
-                    detail="Access restricted — contact admin for an invitation",
-                )
             await run_in_threadpool(_provision_license, uid, email)
             _license_cache[uid] = (True, now)
             logger.info("Auto-provisioned 30-day trial for %s", email)

@@ -152,7 +152,7 @@ class TestCheckLicense:
         with pytest.raises(HTTPException) as exc_info:
             await check_license(user)
         assert exc_info.value.status_code == 403
-        assert "Google sign-in required" in exc_info.value.detail
+        assert "Sign-in required" in exc_info.value.detail
 
     @pytest.mark.asyncio
     async def test_user_without_email_rejected(self):
@@ -162,7 +162,7 @@ class TestCheckLicense:
         with pytest.raises(HTTPException) as exc_info:
             await check_license(user)
         assert exc_info.value.status_code == 403
-        assert "Google sign-in required" in exc_info.value.detail
+        assert "Sign-in required" in exc_info.value.detail
 
     @pytest.mark.asyncio
     async def test_existing_active_license_passes(self):
@@ -179,7 +179,7 @@ class TestCheckLicense:
             await check_license(user)  # should not raise
 
     @pytest.mark.asyncio
-    async def test_new_user_auto_provisioned_when_on_allowlist(self):
+    async def test_new_user_auto_provisioned(self):
         from unittest.mock import MagicMock, patch
 
         from web.backend.auth import check_license
@@ -193,7 +193,6 @@ class TestCheckLicense:
         mock_provision = MagicMock()
         with (
             patch("web.backend.auth._fetch_license", return_value=False),
-            patch("web.backend.auth._check_email_allowed", return_value=True),
             patch("web.backend.auth._provision_license", mock_provision),
         ):
             await check_license(user)  # should not raise
@@ -254,9 +253,9 @@ class TestAllowlist:
             os.environ.pop("CAD_ALLOWED_EMAILS", None)
 
     @pytest.mark.asyncio
-    async def test_unlisted_email_rejected_with_403(self):
-        """A new user not on the allowlist gets 403, not auto-provisioned."""
-        from unittest.mock import patch
+    async def test_unlisted_email_auto_provisioned(self):
+        """Any new authenticated user is auto-provisioned (no allowlist gate)."""
+        from unittest.mock import MagicMock, patch
 
         from web.backend.auth import check_license
 
@@ -265,23 +264,21 @@ class TestAllowlist:
             "email": "stranger@gmail.com",
             "firebase": {"sign_in_provider": "google.com"},
         }
+        mock_provision = MagicMock()
         with (
             patch("web.backend.auth._fetch_license", return_value=False),
-            patch("web.backend.auth._check_email_allowed", return_value=False),
-            pytest.raises(HTTPException) as exc_info,
+            patch("web.backend.auth._provision_license", mock_provision),
         ):
-            await check_license(user)
-        assert exc_info.value.status_code == 403
-        assert "Access restricted" in exc_info.value.detail
+            await check_license(user)  # should not raise
+        mock_provision.assert_called_once_with("stranger", "stranger@gmail.com")
 
     @pytest.mark.asyncio
-    async def test_env_var_allows_email(self):
-        """Email listed in CAD_ALLOWED_EMAILS is auto-provisioned."""
+    async def test_any_email_auto_provisioned(self):
+        """Any authenticated user is auto-provisioned regardless of allowlist."""
         from unittest.mock import MagicMock, patch
 
         from web.backend.auth import check_license
 
-        os.environ["CAD_ALLOWED_EMAILS"] = "beta@test.com,vip@corp.com"
         user = {
             "uid": "beta-user",
             "email": "beta@test.com",
@@ -296,16 +293,15 @@ class TestAllowlist:
         mock_provision.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_env_var_semicolon_separator(self):
-        """Semicolons work as separators (avoids gcloud delimiter conflicts)."""
+    async def test_email_lowercased_before_provision(self):
+        """Email is lowercased before being passed to _provision_license."""
         from unittest.mock import MagicMock, patch
 
         from web.backend.auth import check_license
 
-        os.environ["CAD_ALLOWED_EMAILS"] = "alpha@test.com;beta@test.com"
         user = {
-            "uid": "beta-user",
-            "email": "beta@test.com",
+            "uid": "mixed-case-user",
+            "email": "BETA@Test.COM",
             "firebase": {"sign_in_provider": "google.com"},
         }
         mock_provision = MagicMock()
@@ -314,53 +310,11 @@ class TestAllowlist:
             patch("web.backend.auth._provision_license", mock_provision),
         ):
             await check_license(user)
-        mock_provision.assert_called_once()
+        mock_provision.assert_called_once_with("mixed-case-user", "beta@test.com")
 
     @pytest.mark.asyncio
-    async def test_env_var_case_insensitive(self):
-        """Allowlist matching is case-insensitive."""
-        from unittest.mock import MagicMock, patch
-
-        from web.backend.auth import check_license
-
-        os.environ["CAD_ALLOWED_EMAILS"] = "BETA@Test.COM"
-        user = {
-            "uid": "beta-user",
-            "email": "beta@test.com",
-            "firebase": {"sign_in_provider": "google.com"},
-        }
-        mock_provision = MagicMock()
-        with (
-            patch("web.backend.auth._fetch_license", return_value=False),
-            patch("web.backend.auth._provision_license", mock_provision),
-        ):
-            await check_license(user)
-        mock_provision.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_firestore_allowlist_allows_email(self):
-        """Email found in Firestore allowlist collection is auto-provisioned."""
-        from unittest.mock import MagicMock, patch
-
-        from web.backend.auth import check_license
-
-        user = {
-            "uid": "firestore-user",
-            "email": "approved@corp.com",
-            "firebase": {"sign_in_provider": "google.com"},
-        }
-        mock_provision = MagicMock()
-        with (
-            patch("web.backend.auth._fetch_license", return_value=False),
-            patch("web.backend.auth._check_email_allowed", return_value=True),
-            patch("web.backend.auth._provision_license", mock_provision),
-        ):
-            await check_license(user)
-        mock_provision.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_existing_license_skips_allowlist(self):
-        """A user with an active license is not checked against the allowlist."""
+    async def test_existing_license_skips_provisioning(self):
+        """A user with an active license is not re-provisioned."""
         from unittest.mock import patch
 
         from web.backend.auth import check_license
@@ -370,13 +324,12 @@ class TestAllowlist:
             "email": "old@example.com",
             "firebase": {"sign_in_provider": "google.com"},
         }
-        # _check_email_allowed should NOT be called
         with (
             patch("web.backend.auth._fetch_license", return_value=True),
-            patch("web.backend.auth._check_email_allowed") as mock_check,
+            patch("web.backend.auth._provision_license") as mock_provision,
         ):
             await check_license(user)
-        mock_check.assert_not_called()
+        mock_provision.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_allowlist_cached(self):
