@@ -578,6 +578,17 @@ def try_manual_alignment(
     diag = score_alignment(m_pts, r_pts, R, t, master_snaps, revision_snaps, config.max_residual)
     confidence = compute_confidence(diag, config.max_residual)
 
+    # Manual control points: trust the user's correspondence assertion.
+    # Confidence floor based on control-point fit quality, not full-drawing overlap.
+    if len(pairs) >= 2:
+        transformed = (R @ r_pts.T).T + t
+        cp_residuals = np.linalg.norm(m_pts - transformed, axis=1)
+        cp_rms = float(np.sqrt(np.mean(cp_residuals**2)))
+        cp_score = max(0.0, 1.0 - cp_rms / config.max_residual)
+        confidence = max(confidence, 0.5 * cp_score + 0.2)
+    elif len(pairs) == 1:
+        confidence = max(confidence, 0.7)
+
     return AlignmentResult(
         method=AlignmentMethod.manual,
         confidence=confidence,
