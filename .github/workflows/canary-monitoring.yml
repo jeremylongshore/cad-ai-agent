@@ -54,9 +54,14 @@ jobs:
       - name: Check for failures
         working-directory: web/frontend
         run: |
-          FAILED=$(find test-results/canary-results -name '*.json' -exec grep -l '"outcome":"error"\|"outcome":"timeout"' {} \; | wc -l)
+          RESULTS=$(find test-results/canary-results -name '*.json' 2>/dev/null | wc -l)
+          if [ "$RESULTS" -eq "0" ]; then
+            echo "::error::No canary result files found — tests may not have run"
+            exit 1
+          fi
+          FAILED=$(find test-results/canary-results -name '*.json' -exec grep -lE '"outcome"\s*:\s*"(error|timeout)"' {} \; | wc -l)
           if [ "$FAILED" -gt "0" ]; then
             echo "::error::$FAILED canary test(s) failed"
             exit 1
           fi
-          echo "All canary tests passed"
+          echo "All canary tests passed ($RESULTS result files checked)"

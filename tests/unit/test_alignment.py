@@ -759,8 +759,8 @@ class TestManualAlignment:
         )
         result = try_manual_alignment(m, r, cfg)
         assert result.method == AlignmentMethod.manual
-        # Single control point → confidence floor of 0.7
-        assert result.confidence >= 0.7
+        # Single control point → confidence floor of 0.5 (translation only)
+        assert result.confidence >= 0.5
         # Overlap is still zero (drawings don't actually match)
         assert result.diagnostics.overlap_ratio == 0.0
 

@@ -587,7 +587,8 @@ def try_manual_alignment(
         cp_score = max(0.0, 1.0 - cp_rms / config.max_residual)
         confidence = max(confidence, 0.5 * cp_score + 0.2)
     elif len(pairs) == 1:
-        confidence = max(confidence, 0.7)
+        # Single point = translation only, no rotation constraint
+        confidence = max(confidence, 0.5)
 
     return AlignmentResult(
         method=AlignmentMethod.manual,
