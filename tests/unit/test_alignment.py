@@ -748,7 +748,7 @@ class TestManualAlignment:
         assert result.diagnostics.attempts[0].method == "manual"
 
     def test_manual_bad_points_still_returns(self):
-        """Wrong control points → result still returned, low confidence."""
+        """Wrong control points → result still returned, confidence from floor."""
         m = [_make_snap(0, 0), _make_snap(10, 10)]
         r = [_make_snap(500, 500), _make_snap(600, 600)]
         cfg = AlignmentConfig(
@@ -759,5 +759,22 @@ class TestManualAlignment:
         )
         result = try_manual_alignment(m, r, cfg)
         assert result.method == AlignmentMethod.manual
-        # Result is returned (not None) but overlap should be zero
+        # Single control point → confidence floor of 0.5 (translation only)
+        assert result.confidence >= 0.5
+        # Overlap is still zero (drawings don't actually match)
         assert result.diagnostics.overlap_ratio == 0.0
+
+    def test_manual_correct_points_high_confidence(self):
+        """Correct control points → confidence > 0.5 from control-point fit."""
+        m = [_make_snap(0, 0), _make_snap(10, 0), _make_snap(10, 10)]
+        r = [_make_snap(5, 0), _make_snap(15, 0), _make_snap(15, 10)]
+        # Correct correspondence: revision is shifted +5 in x
+        cfg = AlignmentConfig(
+            enabled=True,
+            confidence_threshold=0.3,
+            max_residual=1.0,
+            control_points=[((0.0, 0.0), (5.0, 0.0)), ((10.0, 0.0), (15.0, 0.0))],
+        )
+        result = try_manual_alignment(m, r, cfg)
+        assert result.method == AlignmentMethod.manual
+        assert result.confidence > 0.5

@@ -8,7 +8,6 @@ on:
 
 permissions:
   contents: read
-  id-token: write  # WIF for GCP auth
 
 jobs:
   canary:
@@ -33,16 +32,12 @@ jobs:
         working-directory: web/frontend
         run: npx playwright install --with-deps chromium
 
-      - name: Authenticate to Google Cloud (WIF)
-        uses: google-github-actions/auth@v3
-        with:
-          workload_identity_provider: 'projects/604022301876/locations/global/workloadIdentityPools/github-actions/providers/github-provider'
-          service_account: 'github-actions-ci@cad-dxf-agent.iam.gserviceaccount.com'
-
       - name: Run canary tests against production
         working-directory: web/frontend
         env:
           TARGET: production
+          E2E_TEST_EMAIL: ${{ secrets.E2E_TEST_EMAIL }}
+          E2E_TEST_PASSWORD: ${{ secrets.E2E_TEST_PASSWORD }}
         run: npx playwright test -c playwright.config.js --grep "canary" --reporter=list
         continue-on-error: true
 
@@ -59,9 +54,14 @@ jobs:
       - name: Check for failures
         working-directory: web/frontend
         run: |
-          FAILED=$(find test-results/canary-results -name '*.json' -exec grep -l '"outcome":"error"\|"outcome":"timeout"' {} \; | wc -l)
+          RESULTS=$(find test-results/canary-results -name '*.json' 2>/dev/null | wc -l)
+          if [ "$RESULTS" -eq "0" ]; then
+            echo "::error::No canary result files found — tests may not have run"
+            exit 1
+          fi
+          FAILED=$(find test-results/canary-results -name '*.json' -exec grep -lE '"outcome"\s*:\s*"(error|timeout)"' {} \; | wc -l)
           if [ "$FAILED" -gt "0" ]; then
             echo "::error::$FAILED canary test(s) failed"
             exit 1
           fi
-          echo "All canary tests passed"
+          echo "All canary tests passed ($RESULTS result files checked)"
