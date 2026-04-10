@@ -5,13 +5,18 @@ build-backend = "hatchling.build"
 [project]
 name = "cad-dxf-agent"
 dynamic = ["version"]
-description = "Local-first DXF layout editor with LLM-assisted prompt-to-edit planning, validation, preview, and safe save-as DXF workflow."
+description = "Drawing Intelligence Platform for AEC professionals — edit, analyze, and validate 2D drawings using natural-language prompts."
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.11"
 authors = [
     { name = "cad-dxf-agent contributors" },
 ]
+
+[project.urls]
+Homepage = "https://cad-dxf-agent.web.app"
+Repository = "https://github.com/jeremylongshore/cad-dxf-agent"
+Documentation = "https://github.com/jeremylongshore/cad-dxf-agent/tree/main/000-docs"
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Manufacturing",

@@ -282,7 +282,7 @@ Optional tracing + metrics via `otel.py` bootstrap module. Off by default, CI-sa
 | Property | `tests/property/` | ~7 | Fuzz/property tests (randomized, bounded runtime) |
 | Smoke | `tests/smoke/` + `scripts/smoke_test.py` | ~7 | End-to-end pipeline via mock planner |
 
-Total: ~4556 tests collected.
+Total: ~4687 tests collected.
 
 ### LLM Testing Patterns
 

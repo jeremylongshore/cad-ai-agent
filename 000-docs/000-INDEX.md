@@ -175,6 +175,8 @@
 | 077 | TQ | TEST | Manual QA test plan for comparison workflow |
 | 074 | AT | ARCH | ADK Agent Engine architecture (EPIC-CAD-31) |
 | 075 | RL | REPT | Release v0.11.0 report |
+| 076 | AA | AUDT | DevOps operator playbook (appaudit v0.12.0) |
+| 078 | RL | REPT | Release v0.12.0 report |
 
 ## Quick Reference
 
