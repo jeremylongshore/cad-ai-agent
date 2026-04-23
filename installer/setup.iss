@@ -9,7 +9,7 @@
   #define AppVersion "0.1.0"
 #endif
 #define AppPublisher "Intent Solutions"
-#define AppURL "https://github.com/jeremylongshore/cad-dxf-agent"
+#define AppURL "https://github.com/jeremylongshore/cad-ai-agent"
 #define AppExeName "cad-dxf-agent.exe"
 
 [Setup]
