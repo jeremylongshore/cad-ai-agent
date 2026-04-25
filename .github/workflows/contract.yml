@@ -1,0 +1,67 @@
+name: API Contract (Schemathesis)
+
+# Schemathesis hits FastAPI's auto-generated OpenAPI schema and fuzzes
+# every endpoint. Catches SPA ↔ backend contract drift on every PR
+# touching web/backend/ or src/cad_dxf_agent/.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'web/backend/**'
+      - 'src/cad_dxf_agent/models/**'
+      - 'src/cad_dxf_agent/llm/response_builder.py'
+      - 'pyproject.toml'
+      - '.github/workflows/contract.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'web/backend/**'
+      - 'src/cad_dxf_agent/models/**'
+      - 'src/cad_dxf_agent/llm/response_builder.py'
+      - 'pyproject.toml'
+      - '.github/workflows/contract.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  schemathesis:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -e ".[dev]" schemathesis
+
+      - name: Boot FastAPI in dev mode
+        env:
+          CAD_WEB_DEV_MODE: '1'
+          CAD_LLM_PROVIDER: mock
+        run: |
+          uvicorn web.backend.main:app --host 127.0.0.1 --port 8322 &
+          echo $! > /tmp/uvicorn.pid
+          # Wait for the server to be ready
+          for i in {1..30}; do
+            curl -fsS http://127.0.0.1:8322/api/healthz >/dev/null 2>&1 && break
+            sleep 1
+          done
+
+      - name: Run schemathesis
+        run: |
+          schemathesis run \
+            --base-url=http://127.0.0.1:8322 \
+            --checks all \
+            --exclude-path-regex='^/api/v1/(plan|apply|compare|takeoff|compliance|health|rfi|summary)' \
+            --hypothesis-max-examples=20 \
+            --hypothesis-deadline=2000 \
+            http://127.0.0.1:8322/openapi.json
+
+      - name: Stop uvicorn
+        if: always()
+        run: kill $(cat /tmp/uvicorn.pid) || true

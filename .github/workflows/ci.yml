@@ -32,6 +32,25 @@ jobs:
         run: ruff check src/ tests/
       - name: Ruff format check
         run: ruff format --check src/ tests/
+      - name: import-linter (architecture boundaries)
+        run: lint-imports
+
+  frontend-lint:
+    runs-on: ubuntu-latest
+    needs: [drift-check]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: web/frontend/package-lock.json
+      - name: Install frontend dependencies
+        working-directory: web/frontend
+        run: npm ci
+      - name: ESLint
+        working-directory: web/frontend
+        run: npm run lint
 
   typecheck:
     runs-on: ubuntu-latest

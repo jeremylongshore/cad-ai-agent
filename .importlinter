@@ -1,0 +1,26 @@
+[importlinter]
+root_package = cad_dxf_agent
+
+# Layered architecture: lower layers cannot depend on higher layers.
+# Order: highest layer first → lowest layer last.
+#
+# cli + ui  ← user-facing entry points (depend on everything below)
+# llm       ← planner / agent loop (depends on core + models)
+# core      ← DXF I/O, edit engine, validators, takeoff, compliance, etc.
+# models    ← Pydantic schemas only (zero internal deps)
+#
+# A violation here means a leaf module imported a higher-layer module —
+# almost always indicates a mis-placed helper or a circular concern that
+# wants its own module.
+
+[importlinter:contract:layered-architecture]
+name = Layered architecture (cli/ui → llm → core → models)
+type = layers
+layers =
+    cad_dxf_agent.cli | cad_dxf_agent.ui
+    cad_dxf_agent.llm
+    cad_dxf_agent.core
+    cad_dxf_agent.models
+ignore_imports =
+    # Allow models to be imported by anyone — schemas are universally consumable.
+    # No ignores needed; layers config above already permits downward imports.
