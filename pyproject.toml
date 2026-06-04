@@ -12,11 +12,6 @@ requires-python = ">=3.11"
 authors = [
     { name = "cad-dxf-agent contributors" },
 ]
-
-[project.urls]
-Homepage = "https://cad-dxf-agent.web.app"
-Repository = "https://github.com/jeremylongshore/cad-dxf-agent"
-Documentation = "https://github.com/jeremylongshore/cad-dxf-agent/tree/main/000-docs"
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Manufacturing",
@@ -37,6 +32,11 @@ dependencies = [
     "rtree>=1.0",
     "shapely>=2.0",
 ]
+
+[project.urls]
+Homepage = "https://cad-dxf-agent.web.app"
+Repository = "https://github.com/jeremylongshore/cad-dxf-agent"
+Documentation = "https://github.com/jeremylongshore/cad-dxf-agent/tree/main/000-docs"
 
 [project.optional-dependencies]
 gui = [
