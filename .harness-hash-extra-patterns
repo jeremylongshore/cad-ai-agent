@@ -1,0 +1,14 @@
+# Extra hash-pin patterns for this repo (consumed by .audit-harness/scripts/harness-hash.sh).
+#
+# This repo has no BDD .feature files or import-linter/dependency-cruiser config yet,
+# so the harness's canonical pin set is empty. The most meaningful thing to pin here
+# is the enforcement surface itself — the vendored harness scripts and the wrapper.
+# With these pinned, `audit-harness verify` (and escape-scan's hash check) will REFUSE
+# any diff that alters the harness without a fresh `audit-harness init`, so the quality
+# gates can't be silently weakened.
+#
+# On a deliberate harness upgrade: review the new scripts, then re-run
+# `scripts/audit-harness init` and commit the updated .harness-hash in the same change.
+.audit-harness/scripts/*.sh
+.audit-harness/scripts/*.py
+scripts/audit-harness

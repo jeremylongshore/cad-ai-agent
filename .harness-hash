@@ -1,0 +1,8 @@
+f5bb89ef74bffa018a92df6abbfeb66b3d2264daf6b365bc8cafdbad00065f9d  .audit-harness/scripts/arch-check.sh
+93173d353a7820a6484519329a16ea8795b9658d79e682af0557158b18a6ebdf  .audit-harness/scripts/bias-count.sh
+83da2309e20151aeb14afe5625c14a67ebf8a6a5e78330861fcf3e1444bebc40  .audit-harness/scripts/crap-score.py
+add245f35fb0dbd63d5ab475020bb367b53be4c611eb509d614c8a1f5ca8ea32  .audit-harness/scripts/emit-evidence.sh
+0ffea346a8c310677f2176e9f367370c8b308f82633bf62ccd00a95985e09469  .audit-harness/scripts/escape-scan.sh
+d29a2e9b94f7fd94f4f8953314323f96ca424cbaa6a985f6783b48ee2feae0f8  .audit-harness/scripts/gherkin-lint.sh
+9c588a980e89dbc9ea2bcf0992daff51ec72b926ecb1644e21838b9fc5c2883d  .audit-harness/scripts/harness-hash.sh
+6342f5b91dca3736912c7a388527e388ed964676efd9ecb9dd8090845aa48970  scripts/audit-harness

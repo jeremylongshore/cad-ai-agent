@@ -1,4 +1,4 @@
-.PHONY: install lint format typecheck test test-unit test-integration test-live test-web test-web-live test-e2e test-cov smoke check run clean build build-clean scorecard scorecard-live
+.PHONY: install lint format typecheck test test-unit test-integration test-live test-web test-web-live test-e2e test-cov smoke check run clean build build-clean scorecard scorecard-live audit-harness
 
 install:
 	pip install -e ".[dev]"
@@ -49,6 +49,14 @@ scorecard-live:
 security:
 	bandit -r src/ -ll
 	pip-audit --local
+
+# Vendored audit-harness gates. `verify` is blocking (hash-pin tamper check);
+# escape-scan/bias/arch are advisory locally (leading `-` ignores their exit).
+audit-harness:
+	bash scripts/audit-harness verify
+	-bash scripts/audit-harness escape-scan --staged
+	-bash scripts/audit-harness bias
+	-bash scripts/audit-harness arch
 
 check: lint format typecheck test smoke
 	@echo "All checks passed."
