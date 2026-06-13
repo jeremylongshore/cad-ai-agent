@@ -1,12 +1,15 @@
 name: Deploy Web
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'web/**'
-      - 'src/**'
-      - '.github/workflows/deploy-web.yml'
+  # Manual-only. Auto-deploy on push was disabled when the hosted instance was
+  # retired, so merges no longer push to anyone's Cloud Run / Firebase project.
+  # Re-add the push trigger below to resume continuous deployment to your own GCP:
+  #   push:
+  #     branches: [main]
+  #     paths:
+  #       - 'web/**'
+  #       - 'src/**'
+  #       - '.github/workflows/deploy-web.yml'
   workflow_dispatch:
 
 permissions:
