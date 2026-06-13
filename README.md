@@ -4,7 +4,7 @@ Drawing Intelligence Platform for AEC professionals.
 
 Upload a DXF, PDF, or DWG — describe what you need in plain English, and get structured edits, compliance reports, quantity takeoffs, health assessments, RFIs, and drawing summaries — all without the AI ever touching your original file.
 
-[![CI](https://github.com/jeremylongshore/cad-dxf-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/jeremylongshore/cad-dxf-agent/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/jeremylongshore/cad-dxf-agent/blob/main/LICENSE)
+[![CI](https://github.com/jeremylongshore/cad-ai-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/jeremylongshore/cad-ai-agent/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/jeremylongshore/cad-ai-agent/blob/main/LICENSE)
 
 **Links:** [Gist One-Pager](https://gist.github.com/jeremylongshore/0303189683f9547c79e1fc1fc68be711) · [Docs](000-docs/000-INDEX.md)
 
@@ -53,7 +53,7 @@ Upload a DXF, PDF, or DWG — describe what you need in plain English, and get s
 | Revision comparison (CLI + web) | |
 | Web app (Firebase + Cloud Run, auto-deploy) | |
 | Desktop app (Windows + Linux) | |
-| Gemini vision pipeline (Vertex AI) | |
+| Gemini vision pipeline (free API key or Vertex AI) | |
 | OpenTelemetry tracing (console, OTLP, GCP Trace) | |
 
 For full details see:
@@ -72,8 +72,8 @@ For full details see:
 ### Install
 
 ```bash
-git clone https://github.com/jeremylongshore/cad-dxf-agent.git
-cd cad-dxf-agent
+git clone https://github.com/jeremylongshore/cad-ai-agent.git
+cd cad-ai-agent
 python -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install -e ".[dev]"
@@ -136,21 +136,19 @@ This opens the PySide6 desktop window. You can:
 3. Click **Plan & Preview** to see proposed changes
 4. Click **Apply & Save As** to save the edited DXF
 
-### Web App
+### Web App (self-hosted)
 
-The web app is deployed at [cad-dxf-agent.web.app](https://cad-dxf-agent.web.app).
-
-For local development:
+The repo ships a full web UI — React + Vite frontend, FastAPI backend — that you run locally or self-host. There is no public hosted instance.
 
 ```bash
 # Frontend (React + Vite)
 cd web/frontend && npm run dev    # http://localhost:3000
 
-# Backend (FastAPI)
+# Backend (FastAPI) — CAD_WEB_DEV_MODE=1 skips Firebase auth for local testing
 CAD_WEB_DEV_MODE=1 uvicorn web.backend.main:app --port 8322
 ```
 
-**Deploy:** Push to `main` → GitHub Actions auto-deploys both frontend (Firebase Hosting) and backend (Cloud Run) via Workload Identity Federation. No manual deploy steps needed. Check status: `gh run list --workflow=deploy-web.yml`
+The backend reuses the same pipeline as the CLI and desktop app, so configure `CAD_LLM_PROVIDER` / `CAD_GEMINI_API_KEY` the same way (see [Using Real AI](#using-real-ai-bring-your-own-key)). A `deploy-web.yml` workflow exists for deploying to Cloud Run + Firebase Hosting, but it is wired to its operator's GCP project — repoint it at your own project and Firebase app before using it.
 
 ## Testing Without an API Key (Mock Mode)
 
@@ -166,28 +164,40 @@ python scripts/smoke_test.py
 
 The mock provider responds to keywords like "move", "delete", "text", "rename" in your prompt.
 
-## Using Gemini (Vertex AI)
+## Using Real AI (bring your own key)
 
-The production planner uses Gemini via Vertex AI:
+The default `mock` provider only keyword-matches — it's for exercising the pipeline offline, not for real results. To get actual AI planning, bring your own Gemini API key. **No GCP project, billing setup, or `gcloud` required.**
+
+### Quickest path — free Gemini API key
 
 ```bash
-# Authenticate with GCP
-gcloud auth application-default login
+# 1. Get a free key at https://aistudio.google.com/apikey
+# 2. Install the lightweight Gemini client
+pip install -e ".[gemini-key]"
 
-# Set environment
-export CAD_LLM_PROVIDER=gemini
-export CAD_GCP_PROJECT=cad-dxf-agent
+# 3. Point the app at your key
+export CAD_LLM_PROVIDER=gemini-key
+export CAD_GEMINI_API_KEY=your-key-here
 
-# Run
+# 4. Run
 python -m cad_dxf_agent.app
 ```
 
-The planner uses tool-use with vision capabilities — it can analyze DXF renders and plan operations based on visual inspection. For complex multi-step requests, the agent mode runs an iterative tool-use loop (up to 10 turns) with 20+ query and edit tools.
+That's it — every capability (edit, compliance, takeoff, agent mode) runs on **your** key. Model defaults to `gemini-2.5-flash` (override with `CAD_GEMINI_MODEL`).
 
-**Notes:**
-- Requires `google-cloud-aiplatform` (included in `[gemini]` extras)
-- API credentials are handled via Application Default Credentials (ADC)
-- Mock provider (`CAD_LLM_PROVIDER=mock`) still works for offline testing
+### Advanced — Vertex AI (bring your own GCP project)
+
+If you already run on Google Cloud and prefer Vertex AI with Application Default Credentials:
+
+```bash
+gcloud auth application-default login
+pip install -e ".[gemini]"
+export CAD_LLM_PROVIDER=gemini
+export CAD_GCP_PROJECT=your-gcp-project-id   # your own project — not a shared one
+python -m cad_dxf_agent.app
+```
+
+Both paths use tool-use with vision — the planner analyzes DXF renders and, for complex multi-step requests, runs an iterative agent loop (up to 10 turns) over 20+ query/edit tools. The `mock` provider remains available for offline pipeline testing.
 
 ## AI Revision Notes
 

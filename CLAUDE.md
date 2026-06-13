@@ -71,25 +71,21 @@ make build
 
 ### Dev Environment
 
-Dev mirrors production. Use Gemini (Vertex AI) locally — not mock mode.
+Local dev uses a bring-your-own Gemini API key (free, no GCP project) — not mock mode. Get a key at https://aistudio.google.com/apikey.
 
 ```bash
-# One-time: authenticate with GCP
-gcloud auth application-default login
-
-# .env (gitignored) — production-like config:
-CAD_LLM_PROVIDER=gemini
-CAD_GCP_PROJECT=cad-dxf-agent
+# .env (gitignored):
+CAD_LLM_PROVIDER=gemini-key
+CAD_GEMINI_API_KEY=your-key-here
 ```
 
-CI tests use mock mode for determinism and speed, but local dev and `tests/live/` hit real Gemini:
+CI tests use mock mode for determinism and speed. The `tests/live/` suite hits the real Gemini API — run it locally with your key:
 
 ```bash
-# Live API tests
-CAD_GCP_PROJECT=cad-dxf-agent pytest tests/live/ -v -m live_api -s
-
-# CI: live tests run automatically on push to main via WIF (tokenless, no secrets)
+CAD_LLM_PROVIDER=gemini-key CAD_GEMINI_API_KEY=your-key pytest tests/live/ -v -m live_api -s
 ```
+
+> Vertex AI (`CAD_LLM_PROVIDER=gemini` + `CAD_GCP_PROJECT=<your-project>`) is still supported for BYO-GCP setups. The `deploy-web.yml` / WIF live-test plumbing targets a specific GCP project — repoint it at your own before relying on it.
 
 ## Architecture
 

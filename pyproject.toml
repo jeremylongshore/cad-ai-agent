@@ -34,9 +34,9 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://cad-dxf-agent.web.app"
-Repository = "https://github.com/jeremylongshore/cad-dxf-agent"
-Documentation = "https://github.com/jeremylongshore/cad-dxf-agent/tree/main/000-docs"
+Homepage = "https://github.com/jeremylongshore/cad-ai-agent"
+Repository = "https://github.com/jeremylongshore/cad-ai-agent"
+Documentation = "https://github.com/jeremylongshore/cad-ai-agent/tree/main/000-docs"
 
 [project.optional-dependencies]
 gui = [
