@@ -45,6 +45,33 @@ jobs:
       - name: Mypy
         run: mypy src/
 
+  audit-harness:
+    runs-on: ubuntu-latest
+    needs: [drift-check]
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Verify harness hash-pin (tamper check)
+        # Blocking: exit 2 = HARNESS_TAMPERED (a pinned harness script changed
+        # without a fresh `audit-harness init`). Keeps the quality gates honest.
+        run: bash scripts/audit-harness verify
+      - name: Escape-scan the PR diff for test-weakening
+        # Blocking on PRs: REFUSE (exit 2) = coverage floor lowered / tests
+        # deleted / pinned artifact touched; CHALLENGE (exit 1) = skip marker /
+        # mutation bypass / trivially-true assertion added. Floor read from
+        # tests/TESTING.md (coverage.line: 65).
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch --no-tags --prune origin \
+            "+refs/heads/${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }}"
+          git diff "origin/${{ github.base_ref }}...HEAD" > /tmp/scan.diff
+          bash scripts/audit-harness escape-scan /tmp/scan.diff
+      - name: Test-bias scan (advisory)
+        run: bash scripts/audit-harness bias || true
+      - name: Architecture rules (advisory — no rule config yet)
+        run: bash scripts/audit-harness arch || true
+
   test:
     runs-on: ${{ matrix.os }}
     needs: [drift-check]

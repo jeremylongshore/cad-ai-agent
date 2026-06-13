@@ -20,6 +20,12 @@ repos:
         entry: bash -c 'echo "Do not commit .env files!" && exit 1'
         language: system
         files: '^\.env$'
+      - id: audit-harness-verify
+        name: audit-harness verify (hash-pin tamper check)
+        entry: bash scripts/audit-harness verify
+        language: system
+        pass_filenames: false
+        always_run: true
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.5.0
