@@ -410,9 +410,21 @@ This project uses `bd` (beads) for issue tracking. Run `bd ready` to find availa
 | EPIC-CAD-27 | cad-dxf-agent-xvs | Session Undo/Redo + Snapshots | 8 | Done |
 | EPIC-CAD-29 | cad-dxf-agent-9cd | Agent-Mode API v1 | 8 | Done |
 | EPIC-CAD-30 | cad-dxf-agent-qvf | User Accounts, Workspaces & Persistent Work Progress | 9 | Done |
-| EPIC-CAD-31 | cad-dxf-agent-ees | System Design Pattern Adoption | — | Phase 0+1 Done, Phase 2+ Deferred |
+| EPIC-CAD-31 | cad-dxf-agent-ees | System Design Pattern Adoption | — | Phase 0+1 Done; Phase 2+ (Vertex Agent Engine) superseded by EPIC-CAD-32 |
+| EPIC-CAD-32 | cad-dxf-agent-jvc | Bring-Your-Own-Provider LLM Backend (provider-agnostic loader; bundled Gemini/Vertex providers removed) | — | Done |
+
+### EPIC-CAD-32 Bring-Your-Own-Provider LLM Backend
+
+Pivoted the planner off any bundled LLM vendor onto a bring-your-own model.
+
+- **`get_provider()` (`llm/planner.py`)** loads any `PlannerProvider` from a dotted import path — `CAD_LLM_PROVIDER=package.module:YourProvider` — imported and validated at startup; bad specs raise (no silent mock). Bare unknown names still fall back to mock. (#178, bead `cad-dxf-agent-jvc`)
+- **Bundled Gemini/Vertex providers removed** — `gemini_provider`, `gemini_key_provider`, `proxy_client`, `vision_describer`, the Vertex `AgentProvider`, their settings/extras/tests, the `tests/live/` suite, and the `live-test` CI job (−4,225 lines). (#179, bead `cad-dxf-agent-udo`)
+- **Kept (provider-agnostic):** `MockProvider`, `MockAgentProvider`, and the `ToolExecutor` + `tool_definitions` + `capability_registry` tool-use scaffolding — load-bearing for entity creation + the web backend, and reusable by a BYO provider for agent-style tool use.
+- Docs (`README.md`, `.env.example`, `CLAUDE.md`) rewritten vendor-neutral: `mock` to try, bring-your-own for real use, no vendor named.
 
 ### EPIC-CAD-31 Review Outcome
+
+> **Superseded (2026-06-14) by EPIC-CAD-32:** Phase 2+ targeted Vertex AI Agent Engine. The bundled Gemini/Vertex providers were removed (#179), so the Agent Engine path, the `CAD_AGENT_BACKEND=agent_engine` flag, and the "tools as Cloud Run endpoints" plan below no longer apply — real AI is now bring-your-own. Findings retained for historical reference.
 
 A 12-specialist engineer review (ADK, security, database, performance, backend architecture, Python, cloud, DevOps, testing, architecture review, DX, observability) evaluated the EPIC-CAD-31 rollout plan. Key findings:
 
