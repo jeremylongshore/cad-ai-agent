@@ -7,7 +7,7 @@ name = "cad-dxf-agent"
 dynamic = ["version"]
 description = "Drawing Intelligence Platform for AEC professionals — edit, analyze, and validate 2D drawings using natural-language prompts."
 readme = "README.md"
-license = "MIT"
+license = "Apache-2.0"
 requires-python = ">=3.11"
 authors = [
     { name = "cad-dxf-agent contributors" },
@@ -15,7 +15,7 @@ authors = [
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Manufacturing",
-    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: Apache Software License",
     "Operating System :: Microsoft :: Windows",
     "Operating System :: POSIX :: Linux",
     "Programming Language :: Python :: 3.11",
