@@ -53,7 +53,7 @@ Upload a DXF, PDF, or DWG — describe what you need in plain English, and get s
 | Revision comparison (CLI + web) | |
 | Web app (Firebase + Cloud Run, auto-deploy) | |
 | Desktop app (Windows + Linux) | |
-| Gemini vision pipeline (free API key or Vertex AI) | |
+| Pluggable LLM provider (bring your own) | |
 | OpenTelemetry tracing (console, OTLP, GCP Trace) | |
 
 For full details see:
@@ -148,7 +148,7 @@ cd web/frontend && npm run dev    # http://localhost:3000
 CAD_WEB_DEV_MODE=1 uvicorn web.backend.main:app --port 8322
 ```
 
-The backend reuses the same pipeline as the CLI and desktop app, so configure `CAD_LLM_PROVIDER` / `CAD_GEMINI_API_KEY` the same way (see [Using Real AI](#using-real-ai-bring-your-own-key)). A `deploy-web.yml` workflow exists for deploying to Cloud Run + Firebase Hosting, but it is wired to its operator's GCP project — repoint it at your own project and Firebase app before using it.
+The backend reuses the same pipeline as the CLI and desktop app, so configure `CAD_LLM_PROVIDER` the same way (see [Bring Your Own LLM Provider](#bring-your-own-llm-provider)). A `deploy-web.yml` workflow exists for deploying to Cloud Run + Firebase Hosting, but it is wired to its operator's cloud project — repoint it at your own before using it.
 
 ## Testing Without an API Key (Mock Mode)
 
@@ -164,38 +164,51 @@ python scripts/smoke_test.py
 
 The mock provider responds to keywords like "move", "delete", "text", "rename" in your prompt.
 
-## Using Real AI (bring your own key)
+## Bring Your Own LLM Provider
 
-The default `mock` provider only keyword-matches — it's for exercising the pipeline offline, not for real results. To get actual AI planning, bring your own Gemini API key. **No GCP project, billing setup, or `gcloud` required.**
+The default `mock` provider only keyword-matches — it's for exercising the pipeline offline, not for real results. The LLM is **fully pluggable**: the planner never sees raw DXF, it only returns a structured `ChangeSet`, so any model that can follow that contract works. Point `CAD_LLM_PROVIDER` at your own provider — no fork required.
 
-### Quickest path — free Gemini API key
+### 1. Implement the provider interface
+
+Subclass `PlannerProvider` (`src/cad_dxf_agent/llm/providers.py`):
+
+```python
+# my_providers.py
+from cad_dxf_agent.llm.providers import PlannerProvider
+from cad_dxf_agent.models.ops_schema import ChangeSet
+
+class MyProvider(PlannerProvider):
+    @property
+    def name(self) -> str:
+        return "my-provider"
+
+    def plan(
+        self,
+        prompt: str,
+        drawing_context: dict,
+        conversation_history: list[dict] | None = None,
+    ) -> ChangeSet:
+        # Call your model and return a validated ChangeSet of structured
+        # operations. The engine validates and applies them — the model never
+        # touches DXF. Read your own keys / endpoint / model from the
+        # environment in __init__.
+        ...
+```
+
+The contract is small (`plan()` + a `name`) and the provider must be constructible with no arguments.
+
+### 2. Point the app at it
+
+`CAD_LLM_PROVIDER` accepts a dotted import path — `package.module:ClassName`:
 
 ```bash
-# 1. Get a free key at https://aistudio.google.com/apikey
-# 2. Install the lightweight Gemini client
-pip install -e ".[gemini-key]"
-
-# 3. Point the app at your key
-export CAD_LLM_PROVIDER=gemini-key
-export CAD_GEMINI_API_KEY=your-key-here
-
-# 4. Run
+export CAD_LLM_PROVIDER=my_providers:MyProvider
 python -m cad_dxf_agent.app
 ```
 
-That's it — every capability (edit, compliance, takeoff, agent mode) runs on **your** key. Model defaults to `gemini-2.5-flash` (override with `CAD_GEMINI_MODEL`).
+The class is imported and validated as a `PlannerProvider` at startup. A bad path, or a class that isn't a `PlannerProvider`, **fails loudly** — it never silently degrades to mock and produces keyword-matched nonsense.
 
-### Advanced — Vertex AI (bring your own GCP project)
-
-If you already run on Google Cloud and prefer Vertex AI with Application Default Credentials:
-
-```bash
-gcloud auth application-default login
-pip install -e ".[gemini]"
-export CAD_LLM_PROVIDER=gemini
-export CAD_GCP_PROJECT=your-gcp-project-id   # your own project — not a shared one
-python -m cad_dxf_agent.app
-```
+> The `src/cad_dxf_agent/llm/` package contains existing provider implementations you can copy as a starting point.
 
 Both paths use tool-use with vision — the planner analyzes DXF renders and, for complex multi-step requests, runs an iterative agent loop (up to 10 turns) over 20+ query/edit tools. The `mock` provider remains available for offline pipeline testing.
 
@@ -361,10 +374,10 @@ The `StrategyRegistry` maps each (RequestClass, ObjectiveTag) pair to a `StagePi
 
 For complex requests, the `AgentProvider` runs an iterative tool-use loop:
 
-1. Sends prompt + drawing context + tool definitions to Gemini
-2. Gemini returns tool calls (query tools: list entities, find by layer; edit tools: move, delete, add)
+1. Sends prompt + drawing context + tool definitions to the LLM provider
+2. The provider returns tool calls (query tools: list entities, find by layer; edit tools: move, delete, add)
 3. `ToolExecutor` dispatches each call, enforcing protected-layer rules
-4. Results feed back to Gemini for next iteration (max 10 turns)
+4. Results feed back to the provider for the next iteration (max 10 turns)
 5. Final ChangeSet extracted from accumulated tool calls
 
 20+ tools split into query (read-only) and edit (state-changing) categories.

@@ -23,6 +23,80 @@ logger = logging.getLogger(__name__)
 tracer = get_tracer(__name__)
 
 
+def _is_import_path(spec: str) -> bool:
+    """True if ``spec`` looks like a dotted import path to a custom provider.
+
+    Accepts ``package.module:Attr`` (canonical) or ``package.module.Attr``.
+    Bare names like ``openai`` or ``totally-unknown-xyz`` are NOT import paths
+    and fall through to the mock fallback, preserving existing behaviour.
+    """
+    return ":" in spec or "." in spec
+
+
+def _load_custom_provider(spec: str) -> PlannerProvider:
+    """Dynamically load a user-supplied :class:`PlannerProvider` (bring-your-own).
+
+    ``spec`` is ``package.module:Attr`` (preferred) or ``package.module.Attr``.
+    ``Attr`` may be a ``PlannerProvider`` subclass (instantiated with no
+    arguments) or an already-constructed ``PlannerProvider`` instance. A custom
+    provider reads its own configuration (keys, endpoints, model) from the
+    environment in its constructor.
+
+    Misconfiguration is a hard error — a broken custom provider never silently
+    falls back to mock, so failures surface immediately instead of producing
+    keyword-matched nonsense.
+
+    Raises:
+        ValueError: spec malformed, module/attribute unimportable, the attribute
+            is not constructible with no arguments, or the loaded object is not a
+            ``PlannerProvider``.
+    """
+    import importlib
+
+    if ":" in spec:
+        module_path, _, attr = spec.partition(":")
+    else:
+        module_path, _, attr = spec.rpartition(".")
+    if not module_path or not attr:
+        raise ValueError(
+            f"CAD_LLM_PROVIDER='{spec}' is not a valid provider import path. "
+            "Use 'your_package.module:YourProvider'."
+        )
+
+    try:
+        module = importlib.import_module(module_path)
+    except ImportError as exc:
+        raise ValueError(
+            f"CAD_LLM_PROVIDER='{spec}': could not import module '{module_path}' ({exc})."
+        ) from exc
+    try:
+        obj = getattr(module, attr)
+    except AttributeError as exc:
+        raise ValueError(
+            f"CAD_LLM_PROVIDER='{spec}': module '{module_path}' has no attribute '{attr}'."
+        ) from exc
+
+    if isinstance(obj, type):
+        try:
+            provider: object = obj()
+        except Exception as exc:
+            raise ValueError(
+                f"CAD_LLM_PROVIDER='{spec}': could not instantiate {attr}() — a custom "
+                "provider must be constructible with no arguments and read its config "
+                f"from the environment ({exc})."
+            ) from exc
+    else:
+        provider = obj
+
+    if not isinstance(provider, PlannerProvider):
+        raise ValueError(
+            f"CAD_LLM_PROVIDER='{spec}': {attr} must be a PlannerProvider subclass or "
+            f"instance, got {type(provider).__name__}."
+        )
+    logger.info("Loaded custom planner provider: %s", provider.name)
+    return provider
+
+
 def get_provider(
     provider_name: str | None = None,
     image_path: Path | None = None,
@@ -37,7 +111,8 @@ def get_provider(
         image_path: Optional path to a rendered PNG for vision-augmented planning.
         request_class: RequestClass value for tool narrowing (default "modify").
     """
-    name = (provider_name or settings.llm_provider).lower()
+    raw = provider_name or settings.llm_provider
+    name = raw.lower()
 
     if name == "mock":
         return MockProvider()
@@ -96,6 +171,11 @@ def get_provider(
 
             return MockAgentProvider()
 
+    # Bring-your-own-provider: an unknown name shaped like a dotted import path
+    # ("your_pkg.module:YourProvider") is loaded dynamically and validated as a
+    # PlannerProvider. Bare unknown names fall back to mock.
+    if _is_import_path(raw):
+        return _load_custom_provider(raw)
     logger.warning("Unknown provider '%s', falling back to mock", name)
     return MockProvider()
 
