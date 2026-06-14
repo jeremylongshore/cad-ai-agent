@@ -5,6 +5,7 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:   # enables manual runs (e.g. the live-test job)
 
 permissions:
   contents: read
@@ -118,7 +119,12 @@ jobs:
   live-test:
     runs-on: ubuntu-latest
     needs: [drift-check, test]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # Manual-only. This job authenticates to GCP via WIF and runs tests/live/
+    # against Vertex AI, which is no longer in use — on a normal push it only
+    # fails. Trigger it by hand (Actions → CI → Run workflow) when a working
+    # GCP project is configured. Original auto-trigger:
+    #   if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'workflow_dispatch'
     permissions:
       contents: read
       id-token: write
