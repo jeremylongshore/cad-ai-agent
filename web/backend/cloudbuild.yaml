@@ -34,7 +34,7 @@ steps:
       - '--service-account'
       - 'cad-dxf-web-run@$PROJECT_ID.iam.gserviceaccount.com'
       - '--set-env-vars'
-      - 'CAD_LLM_PROVIDER=gemini,CAD_GCP_PROJECT=$PROJECT_ID,OTEL_ENABLED=1,OTEL_EXPORTER=gcp-trace'
+      - 'OTEL_ENABLED=1,OTEL_EXPORTER=gcp-trace'
 
 images:
   - 'us-central1-docker.pkg.dev/$PROJECT_ID/cad-dxf-agent/web-backend:$SHORT_SHA'

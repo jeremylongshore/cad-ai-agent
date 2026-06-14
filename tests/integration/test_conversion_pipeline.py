@@ -208,23 +208,6 @@ class TestPdfToPipelineFlow:
 class TestVisionRenderIntegration:
     """Render → vision mock → pipeline integration."""
 
-    def test_render_then_mock_vision(self, sample_dxf, tmp_path):
-        """Render DXF → PNG, feed to mock vision, verify description."""
-        try:
-            from cad_dxf_agent.core.renderer import render_dxf_to_png
-        except ImportError:
-            pytest.skip("matplotlib not installed (needed for rendering)")
-
-        render_result = render_dxf_to_png(sample_dxf, tmp_path / "preview.png")
-        assert render_result.success
-        assert render_result.output_path.exists()
-
-        from cad_dxf_agent.llm.vision_describer import describe_drawing_mock
-
-        desc = describe_drawing_mock(render_result.output_path)
-        assert len(desc) > 50
-        assert "foundation" in desc.lower()
-
     def test_render_structural_drawing(self, tmp_path):
         """Render a structural drawing and verify PNG creation."""
         try:

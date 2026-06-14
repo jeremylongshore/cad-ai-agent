@@ -1,4 +1,4 @@
-.PHONY: install lint format typecheck test test-unit test-integration test-live test-web test-web-live test-e2e test-cov smoke check run clean build build-clean scorecard scorecard-live audit-harness
+.PHONY: install lint format typecheck test test-unit test-integration test-web test-e2e test-cov smoke check run clean build build-clean scorecard audit-harness
 
 install:
 	pip install -e ".[dev]"
@@ -22,14 +22,8 @@ test-unit:
 test-integration:
 	pytest tests/integration/ -v -m integration
 
-test-live:
-	pytest tests/live/ -v -m live_api -s
-
 test-web:
 	pytest tests/web/ -v -m web
-
-test-web-live:
-	pytest tests/live/test_deployed_smoke.py -v -m web_live -s
 
 test-e2e:
 	pytest tests/e2e/ -v -m e2e
@@ -42,9 +36,6 @@ smoke:
 
 scorecard:
 	pytest tests/eval/ -v --tb=short
-
-scorecard-live:
-	CAD_LLM_PROVIDER=gemini pytest tests/eval/ -v --tb=short -m live_api
 
 security:
 	bandit -r src/ -ll

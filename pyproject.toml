@@ -65,13 +65,6 @@ draw = [
     "matplotlib>=3.8",
     "Pillow>=10.0",
 ]
-gemini = [
-    "google-cloud-aiplatform>=1.46",
-    "Pillow>=10.0",
-]
-gemini-key = [
-    "google-generativeai>=0.8",
-]
 adk = [
     "google-adk>=1.18.0,<1.30.0",
 ]
@@ -145,12 +138,10 @@ markers = [
     "smoke: end-to-end smoke tests",
     "slow: tests that take significant time",
     "integration: integration tests (full pipeline, multi-module)",
-    "live_api: tests that call real Gemini API (require ADC via gcloud auth)",
     "gui: GUI tests (require PySide6 and QT_QPA_PLATFORM=offscreen)",
     "property: property/fuzz tests (randomized, bounded runtime)",
     "benchmark: performance micro-benchmarks (pytest-benchmark)",
     "web: web backend API tests (FastAPI TestClient)",
-    "web_live: tests against deployed web backend (require CAD_WEB_URL)",
     "e2e: end-to-end tests using real DXF files (run scripts/download_e2e_fixtures.sh first)",
 ]
 
