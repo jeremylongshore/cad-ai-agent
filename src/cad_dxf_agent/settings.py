@@ -64,15 +64,9 @@ class Settings:
         self.llm_top_k: int | None = int(v) if (v := os.getenv("CAD_LLM_TOP_K")) else None
         self.llm_max_output_tokens: int = int(os.getenv("CAD_LLM_MAX_OUTPUT_TOKENS", "4096"))
 
-        # Gemini / Vertex AI (V2)
+        # Cloud / GCP (generic — e.g. OTel gcp-trace exporter; optional for BYO providers)
         self.gcp_project: str | None = os.getenv("CAD_GCP_PROJECT")
         self.gcp_location: str = os.getenv("CAD_GCP_LOCATION", "us-central1")
-        self.gemini_model: str = os.getenv("CAD_GEMINI_MODEL", "gemini-2.5-flash")
-        self.vision_model: str = os.getenv("CAD_VISION_MODEL", "gemini-2.5-flash")
-        self.gemini_max_retries: int = int(os.getenv("CAD_GEMINI_MAX_RETRIES", "1"))
-
-        # Cloud Run proxy (optional — lets users skip GCP credentials)
-        self.proxy_url: str | None = os.getenv("CAD_PROXY_URL")
         self.license_key: str | None = os.getenv("CAD_LICENSE_KEY")
 
         # Router

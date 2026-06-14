@@ -59,48 +59,20 @@ class TestGetProviderRouting:
         provider = get_provider("mock")
         assert provider.name == "mock"
 
-    def test_gemini_provider_or_fallback(self):
-        """'gemini' routes to GeminiProvider or falls back to mock gracefully."""
-        provider = get_provider("gemini")
-        assert provider is not None
-
-    def test_gemini_key_provider_or_fallback(self):
-        """'gemini-key' routes to GeminiKeyProvider or falls back to mock."""
-        provider = get_provider("gemini-key")
-        assert provider is not None
-        # Either GeminiKeyProvider or MockProvider — both are valid
-        assert hasattr(provider, "name")
-
-    def test_agent_provider_or_fallback(self):
-        """'agent' routes to AgentProvider or falls back to mock-agent."""
-        provider = get_provider("agent")
-        assert provider is not None
-        assert hasattr(provider, "name")
-
     def test_mock_agent_provider(self):
         """'mock-agent' always returns MockAgentProvider."""
         provider = get_provider("mock-agent")
         assert provider.name == "mock-agent"
-
-    def test_proxy_falls_back_to_mock_agent_without_url(self):
-        """'proxy' with no CAD_PROXY_URL set falls back to mock-agent."""
-        provider = get_provider("proxy")
-        assert "mock-agent" in provider.name
 
     def test_unknown_provider_falls_back_to_mock(self):
         """Unrecognised provider name falls back to mock with a warning."""
         provider = get_provider("totally-unknown-xyz")
         assert provider.name == "mock"
 
-    def test_vertex_alias_routes_same_as_gemini(self):
-        """'vertex' is an alias for gemini — returns a provider."""
-        provider = get_provider("vertex")
-        assert provider is not None
-
-    def test_google_alias_routes_same_as_gemini(self):
-        """'google' is an alias for gemini — returns a provider."""
-        provider = get_provider("google")
-        assert provider is not None
+    def test_retired_gemini_names_fall_back_to_mock(self):
+        """Former built-in Gemini/proxy names are gone — they fall back to mock."""
+        for retired in ("gemini", "google", "vertex", "gemini-key", "proxy", "agent"):
+            assert get_provider(retired).name == "mock"
 
 
 # ---------------------------------------------------------------------------

@@ -30,7 +30,6 @@ pytest tests/unit/test_validators.py::test_name -v
 
 # Eval scorecard (intent classification accuracy)
 make scorecard          # mock mode
-make scorecard-live     # real Gemini
 
 # Launch desktop app (requires PySide6: pip install -e ".[gui]")
 make run           # python -m cad_dxf_agent.app
@@ -51,7 +50,9 @@ gcloud run deploy cad-dxf-web \
   --region us-central1 --project cad-dxf-agent \
   --allow-unauthenticated --memory 8Gi --cpu 4 --timeout 600 \
   --service-account cad-dxf-web-run@cad-dxf-agent.iam.gserviceaccount.com \
-  --set-env-vars CAD_LLM_PROVIDER=gemini,CAD_GCP_PROJECT=cad-dxf-agent,OTEL_ENABLED=1,OTEL_EXPORTER=gcp-trace
+  --set-env-vars OTEL_ENABLED=1,OTEL_EXPORTER=gcp-trace
+  # The deployed backend runs `mock` unless you set CAD_LLM_PROVIDER to a
+  # bring-your-own provider (e.g. CAD_LLM_PROVIDER=my_providers:MyProvider).
 ```
 
 **Deploy notes:**
@@ -84,10 +85,12 @@ CAD_LLM_PROVIDER=my_providers:MyProvider   # package.module:ClassName
 A bad path or non-`PlannerProvider` class raises at startup (no silent mock
 fallback). Bare unknown names (no `:`/`.`) still fall back to mock.
 
-> The repo still ships Gemini/Vertex provider implementations under `llm/`
-> (`gemini`, `gemini-key`, `agent`, `proxy`), but they are **not** the
-> documented path and not maintained as the default. The `tests/live/` suite +
-> the `live-test` CI job target those and are gated to manual (`workflow_dispatch`).
+> The bundled Gemini/Vertex providers (`gemini_provider`, `gemini_key_provider`,
+> the Vertex `AgentProvider`, `proxy_client`), the `tests/live/` suite, and the
+> `live-test` CI job were **removed**. Real AI is now exclusively bring-your-own.
+> `mock` and `mock-agent` (offline) remain; the provider-agnostic `ToolExecutor`
+> + `tool_definitions` scaffolding stays so a BYO provider can do agent-style
+> tool use.
 
 ## Architecture
 
@@ -121,12 +124,15 @@ The `StrategyRegistry` maps each (RequestClass, ObjectiveTag) pair to a `StagePi
 
 ### Agent-Mode (Tool-Use Loop)
 
-For complex requests, the `AgentProvider` (`llm/agent_provider.py`) runs an iterative tool-use loop:
+Agent mode is a provider-agnostic tool-use loop. The bundled real backend
+(Vertex `AgentProvider`) was removed; `MockAgentProvider` (`llm/agent_provider.py`)
+exercises the loop offline, and a bring-your-own provider can drive it via the
+same `ToolExecutor` + tool definitions:
 
-1. Sends prompt + drawing context + tool definitions to Gemini
-2. Gemini returns tool calls (query tools: list entities, find by layer; edit tools: move, delete, add)
+1. Sends prompt + drawing context + tool definitions to the LLM provider
+2. The provider returns tool calls (query tools: list entities, find by layer; edit tools: move, delete, add)
 3. `ToolExecutor` (`llm/tool_executor.py`) dispatches each call, enforcing protected-layer rules at the executor level
-4. Results feed back to Gemini for next iteration (max 10 turns)
+4. Results feed back to the provider for the next iteration (max 10 turns)
 5. Final ChangeSet extracted from accumulated tool calls
 
 Tool definitions in `llm/tool_definitions.py` — 20+ tools split into query (read-only) and edit (state-changing) categories.
@@ -189,14 +195,13 @@ src/cad_dxf_agent/
     edit_history       #   Undo/redo + named snapshots
     comparison/        #   Revision diff engine (alignment, matching, changelog, bundle, overlay)
 
-  llm/                 # 24 modules — intent classification, planning, agent loop
-    planner            #   Orchestrator: prompt → ChangeSet
-    providers          #   PlannerProvider ABC
-    gemini_provider    #   Vertex AI tool-use with vision
-    mock_provider      #   Keyword-matching (CI/tests only)
-    agent_provider     #   Iterative tool-use loop (max 10 turns)
+  llm/                 # intent classification, planning, agent loop
+    planner            #   Orchestrator: prompt → ChangeSet; loads built-in + BYO providers
+    providers          #   PlannerProvider ABC (the bring-your-own seam)
+    mock_provider      #   Keyword-matching (offline / CI / default)
+    agent_provider     #   MockAgentProvider — offline tool-use loop
     tool_executor      #   Dispatches 20+ tools with safety enforcement
-    tool_definitions   #   Query + edit tool schemas for Gemini function calling
+    tool_definitions   #   Query + edit tool schemas (function-calling format)
     objective_classifier  # 2-axis intent classification
     strategy_registry  #   (RequestClass, ObjectiveTag) → StagePipelineDefinition
     stage_executor     #   Runs ordered stage handlers with gate checkpoints
@@ -224,7 +229,7 @@ web/
 ### Tool Function Architecture (EPIC-CAD-31)
 
 Tool schemas exist in two coexisting representations in `llm/tool_definitions.py`:
-1. **Dict-based schemas** — hand-written Gemini FunctionDeclaration dicts (canonical, used at runtime)
+1. **Dict-based schemas** — hand-written function-call schema dicts (canonical, used at runtime)
 2. **Typed Python functions** — `_fn` stub functions with type hints and docstrings for ADK-pattern schema generation
 
 Both are kept in sync via CI tests (`test_all_tools_typed`, schema-matching assertions). The typed functions `raise NotImplementedError` — dispatch stays in `ToolExecutor`. When ADK migration happens (Phase 2+), the typed functions become the canonical source and the dicts are deleted.
@@ -233,12 +238,14 @@ Both are kept in sync via CI tests (`test_all_tools_typed`, schema-matching asse
 
 ### Provider Pattern
 
-`PlannerProvider` ABC in `llm/providers.py` → implement `plan(prompt, drawing_context) → ChangeSet`. Three providers:
-- `GeminiProvider` — Vertex AI tool-use with vision (dev and prod)
-- `AgentProvider` — iterative tool-use loop for complex multi-step requests
-- `MockProvider` — keyword-matching (CI/tests only)
+`PlannerProvider` ABC in `llm/providers.py` → implement `plan(prompt, drawing_context) → ChangeSet` and a `name`. Built-in providers:
+- `MockProvider` — keyword-matching (offline / CI / default)
+- `MockAgentProvider` — offline mock of the tool-use loop
 
-Set via `CAD_LLM_PROVIDER=gemini|mock`.
+Real AI is **bring-your-own**: set `CAD_LLM_PROVIDER` to a dotted import path
+(`package.module:YourProvider`); `get_provider()` (`llm/planner.py`) imports and
+validates it as a `PlannerProvider`. Bad specs raise; bare unknown names fall
+back to mock.
 
 ## Configuration
 
@@ -246,8 +253,8 @@ All settings via environment variables (`.env` file, `.gitignore`d):
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `CAD_LLM_PROVIDER` | `mock` | Planner backend (`gemini` for dev/prod, `mock` for CI only) |
-| `CAD_GCP_PROJECT` | _(unset)_ | GCP project for Vertex AI (`cad-dxf-agent`) |
+| `CAD_LLM_PROVIDER` | `mock` | Planner backend: `mock`, `mock-agent`, or a bring-your-own dotted path `package.module:YourProvider` |
+| `CAD_GCP_PROJECT` | _(unset)_ | GCP project for generic cloud integrations (e.g. OTel `gcp-trace` exporter) |
 | `CAD_PROTECTED_LAYERS` | `TITLE,TITLEBLOCK,SEAL,REVISION` | Comma-separated protected layers |
 | `CAD_REVISION_NOTES_ENABLED` | `true` | Insert revision notes after edits |
 | `CAD_REVISION_NOTES_LAYER` | `AI_REV_NOTES` | Layer name for revision notes |
@@ -256,8 +263,8 @@ All settings via environment variables (`.env` file, `.gitignore`d):
 | `OTEL_ENABLED` | _(unset)_ | Enable OpenTelemetry tracing (`1`, `true`, `yes`) |
 | `OTEL_EXPORTER` | `console` | Span exporter: `console`, `otlp`, or `gcp-trace` |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | _(unset)_ | OTLP collector endpoint (e.g., `http://localhost:4317`) |
-| `CAD_AGENT_BACKEND` | `cloud_run` | Agent backend: `cloud_run` (local pipeline) or `agent_engine` (future Vertex AI Agent Engine) |
-| `CAD_AGENT_ENGINE_URL` | _(unset)_ | Vertex AI Agent Engine endpoint (future use, requires `CAD_AGENT_BACKEND=agent_engine`) |
+| `CAD_AGENT_BACKEND` | `cloud_run` | Agent backend selector (`cloud_run` local pipeline; `agent_engine` reserved/unwired) |
+| `CAD_AGENT_ENGINE_URL` | _(unset)_ | Remote agent-engine endpoint (reserved/unwired) |
 
 ### Observability (OpenTelemetry)
 
@@ -273,14 +280,13 @@ Optional tracing + metrics via `otel.py` bootstrap module. Off by default, CI-sa
 | Integration | `tests/integration/` | ~100 | Full pipeline, undo/redo, agent loop with ScriptedAgentProvider |
 | Web | `tests/web/` | ~420 | FastAPI backend endpoints (TestClient), document library, session management |
 | Eval | `tests/eval/` | ~40 | Intent classification accuracy scorecard |
-| Live | `tests/live/` | ~42 | Real Gemini API tests (require ADC + `cad-dxf-agent` GCP project) |
 | E2E | `tests/e2e/` | ~33 | End-to-end tests with real DXF files |
 | Benchmark | `tests/benchmark/` | ~19 | Performance micro-benchmarks (pytest-benchmark) |
 | GUI | `tests/gui/` | ~10 | PySide6 UI tests (require `QT_QPA_PLATFORM=offscreen`) |
 | Property | `tests/property/` | ~7 | Fuzz/property tests (randomized, bounded runtime) |
 | Smoke | `tests/smoke/` + `scripts/smoke_test.py` | ~7 | End-to-end pipeline via mock planner |
 
-Total: ~4687 tests collected.
+Total: ~4600 tests collected (the Gemini live tier was removed with the providers).
 
 ### LLM Testing Patterns
 
@@ -302,18 +308,16 @@ make test-unit         # Unit tests only
 make test-integration  # Integration tests only
 make test-web          # Web backend API tests only
 make test-e2e          # E2E tests (need scripts/download_e2e_fixtures.sh first)
-make test-live         # Live Gemini API tests (require ADC)
 make test-cov          # All tests with coverage report
 make scorecard         # Eval scorecard (mock mode)
-make scorecard-live    # Eval scorecard (real Gemini)
 ```
 
-- Pytest markers: `@pytest.mark.smoke`, `@pytest.mark.slow`, `@pytest.mark.integration`, `@pytest.mark.web`, `@pytest.mark.live_api`, `@pytest.mark.e2e`, `@pytest.mark.benchmark`, `@pytest.mark.property`, `@pytest.mark.gui`
+- Pytest markers: `@pytest.mark.smoke`, `@pytest.mark.slow`, `@pytest.mark.integration`, `@pytest.mark.web`, `@pytest.mark.e2e`, `@pytest.mark.benchmark`, `@pytest.mark.property`, `@pytest.mark.gui`
 - Coverage threshold: 65% (`fail_under` in pyproject.toml)
 
 ## CI
 
-GitHub Actions on push/PR to main: lint, format check, mypy, tests (matrix: ubuntu, Python 3.11+3.12), benchmarks + live API tests on main only. Security: bandit + pip-audit. Pre-commit hooks enforce ruff, trailing whitespace, no `.env` commits, no direct commits to main.
+GitHub Actions on push/PR to main: lint, format check, mypy, tests (matrix: ubuntu, Python 3.11+3.12), the vendored audit-harness gate (verify + escape-scan), and benchmarks on main only. Security: bandit + pip-audit. Pre-commit hooks enforce ruff, trailing whitespace, no `.env` commits, no direct commits to main.
 
 ## Commit & PR Conventions
 

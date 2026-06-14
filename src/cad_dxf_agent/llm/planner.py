@@ -117,59 +117,10 @@ def get_provider(
     if name == "mock":
         return MockProvider()
 
-    if name in ("gemini", "google", "vertex"):
-        try:
-            from .gemini_provider import GeminiProvider
-
-            return GeminiProvider()
-        except ImportError:
-            logger.warning(
-                "google-cloud-aiplatform not installed, falling back to mock. "
-                "Install with: pip install google-cloud-aiplatform"
-            )
-            return MockProvider()
-
-    if name == "agent":
-        try:
-            from .agent_provider import AgentProvider
-
-            return AgentProvider(image_path=image_path, request_class=request_class)
-        except ImportError:
-            logger.warning(
-                "google-cloud-aiplatform not installed, falling back to mock-agent. "
-                "Install with: pip install google-cloud-aiplatform"
-            )
-            from .agent_provider import MockAgentProvider
-
-            return MockAgentProvider()
-
     if name == "mock-agent":
         from .agent_provider import MockAgentProvider
 
         return MockAgentProvider()
-
-    if name == "gemini-key":
-        try:
-            from .gemini_key_provider import GeminiKeyProvider
-
-            return GeminiKeyProvider()
-        except ImportError:
-            logger.warning(
-                "google-generativeai not installed, falling back to mock. "
-                "Install with: pip install google-generativeai"
-            )
-            return MockProvider()
-
-    if name in ("proxy", "proxy-agent"):
-        try:
-            from .proxy_client import ProxyAgentProvider
-
-            return ProxyAgentProvider(image_path=image_path)
-        except ValueError as e:
-            logger.warning("Proxy provider misconfigured (%s), falling back to mock-agent", e)
-            from .agent_provider import MockAgentProvider
-
-            return MockAgentProvider()
 
     # Bring-your-own-provider: an unknown name shaped like a dotted import path
     # ("your_pkg.module:YourProvider") is loaded dynamically and validated as a

@@ -94,11 +94,9 @@ make test-unit         # ~3600 unit tests
 make test-integration  # ~100 integration tests
 make test-web          # ~420 web API tests
 make test-e2e          # ~33 end-to-end tests
-make test-live         # ~42 live Gemini API tests (requires ADC)
 
 # Eval scorecard (intent classification accuracy)
 make scorecard         # mock mode
-make scorecard-live    # real Gemini
 
 # Smoke test
 make smoke
@@ -403,7 +401,6 @@ cad-dxf-agent/
     integration/            # ~100 integration tests
     web/                    # ~420 web API tests
     eval/                   # ~240 eval scorecard tests
-    live/                   # ~42 live Gemini API tests
     e2e/                    # ~33 end-to-end tests
     benchmark/              # ~19 performance benchmarks
     gui/                    # ~10 PySide6 UI tests
