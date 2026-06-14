@@ -69,23 +69,25 @@ cad-revision bundle master.dxf revision.dxf --output-dir ./bundle --approve-all
 make build
 ```
 
-### Dev Environment
+### Dev Environment + LLM provider
 
-Local dev uses a bring-your-own Gemini API key (free, no GCP project) — not mock mode. Get a key at https://aistudio.google.com/apikey.
+Local dev and CI default to `CAD_LLM_PROVIDER=mock` (keyword matching, no key).
+The LLM is **pluggable** — `get_provider()` (`llm/planner.py`) loads any
+`PlannerProvider` (`llm/providers.py`) from a dotted import path. For real-AI
+dev, implement one and point the env var at it:
 
 ```bash
 # .env (gitignored):
-CAD_LLM_PROVIDER=gemini-key
-CAD_GEMINI_API_KEY=your-key-here
+CAD_LLM_PROVIDER=my_providers:MyProvider   # package.module:ClassName
 ```
 
-CI tests use mock mode for determinism and speed. The `tests/live/` suite hits the real Gemini API — run it locally with your key:
+A bad path or non-`PlannerProvider` class raises at startup (no silent mock
+fallback). Bare unknown names (no `:`/`.`) still fall back to mock.
 
-```bash
-CAD_LLM_PROVIDER=gemini-key CAD_GEMINI_API_KEY=your-key pytest tests/live/ -v -m live_api -s
-```
-
-> Vertex AI (`CAD_LLM_PROVIDER=gemini` + `CAD_GCP_PROJECT=<your-project>`) is still supported for BYO-GCP setups. The `deploy-web.yml` / WIF live-test plumbing targets a specific GCP project — repoint it at your own before relying on it.
+> The repo still ships Gemini/Vertex provider implementations under `llm/`
+> (`gemini`, `gemini-key`, `agent`, `proxy`), but they are **not** the
+> documented path and not maintained as the default. The `tests/live/` suite +
+> the `live-test` CI job target those and are gated to manual (`workflow_dispatch`).
 
 ## Architecture
 
