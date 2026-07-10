@@ -14,7 +14,7 @@ jobs:
   drift-check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Architectural drift detection
         run: bash scripts/ci/check_nodrift.sh
 
@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [drift-check]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
@@ -37,7 +37,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [drift-check]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
@@ -50,7 +50,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [drift-check]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: Verify harness hash-pin (tamper check)
@@ -82,7 +82,7 @@ jobs:
         os: [ubuntu-latest]
         python-version: ["3.11", "3.12"]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
@@ -102,7 +102,7 @@ jobs:
     needs: [drift-check, test]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
