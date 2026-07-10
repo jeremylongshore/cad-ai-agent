@@ -2,10 +2,7 @@ name: Production Canary Monitoring
 
 on:
   # Manual-only. The hosted demo instance this canary tested was retired, so the
-  # daily run only produced guaranteed failures. Re-add the schedule below if a
-  # public instance is ever restood:
-  #   schedule:
-  #     - cron: '0 8 * * *'   # daily at 8am UTC
+  # daily run only produced guaranteed failures.
   workflow_dispatch: {}
 
 permissions:
