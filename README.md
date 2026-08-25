@@ -8,6 +8,8 @@ Upload a DXF, PDF, or DWG — describe what you need in plain English, and get s
 
 **Links:** [Gist One-Pager](https://gist.github.com/jeremylongshore/0303189683f9547c79e1fc1fc68be711) · [Docs](000-docs/000-INDEX.md)
 
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/U5S225PTME)
+
 ## What Is This?
 
 **cad-dxf-agent** is a multi-capability platform that handles DXF drawings through natural language. Describe what you need — an edit, a compliance check, a quantity takeoff, a health report — and the platform classifies your intent, selects the right processing pipeline, and delivers structured results.
