@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "lint": "eslint . --quiet",
     "e2e": "playwright test",
     "e2e:prod": "TARGET=production playwright test",
     "e2e:prod:headed": "TARGET=production playwright test --headed",
@@ -17,7 +18,8 @@
     "e2e:realworld:report": "node e2e/realworld-report.js",
     "e2e:conversations": "REALWORLD=1 playwright test --grep 'Multi-Turn Conversations'",
     "e2e:canary": "REALWORLD=1 playwright test --grep 'Production Canary'",
-    "e2e:profiles": "REALWORLD=1 playwright test --grep 'Real-World Profile Journeys'"
+    "e2e:profiles": "REALWORLD=1 playwright test --grep 'Real-World Profile Journeys'",
+    "e2e:a11y": "playwright test --grep '@a11y'"
   },
   "dependencies": {
     "dxf-viewer": "^1.0.46",
@@ -28,10 +30,18 @@
     "three": "^0.183.2"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.10.0",
+    "@eslint/js": "^9.16.0",
     "@playwright/test": "^1.49.0",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.4",
+    "eslint": "^9.16.0",
+    "eslint-plugin-jsx-a11y": "^6.10.2",
+    "eslint-plugin-react": "^7.37.2",
+    "eslint-plugin-react-hooks": "^5.1.0",
+    "eslint-plugin-security": "^3.0.1",
+    "globals": "^15.13.0",
     "vite": "^6.0.0"
   }
 }

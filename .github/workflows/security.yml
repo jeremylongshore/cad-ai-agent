@@ -34,6 +34,31 @@ jobs:
       - name: Run pip-audit
         run: pip-audit --local --ignore-vuln CVE-2026-4539  # pygments 2.19.2, no fix released yet
 
+  trivy-dockerfile:
+    runs-on: ubuntu-latest
+    # Only run when Dockerfile or its build context changes
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Trivy filesystem + Dockerfile scan
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: config
+          scan-ref: web/backend/Dockerfile
+          exit-code: '1'
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+
+      - name: Trivy image-build vulnerability scan
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: '.'
+          exit-code: '1'
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          skip-dirs: '.venv,node_modules,web/frontend/node_modules,.audit-harness,dist,mutants,proxy'
+
   # dependency-review requires GitHub Advanced Security (paid for private repos).
   # Re-enable if repo goes public or plan is upgraded.
   # dependency-review:

@@ -46,6 +46,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -f /tmp/oda.deb \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
+# Run the application without root privileges.
+RUN groupadd --system app && useradd --system --gid app --create-home --home-dir /home/app app
+
 # ─── Python dependencies ─────────────────────────────────────────────
 # Single pip install layer for cacheability.
 COPY web/backend/requirements.txt ./
@@ -61,7 +64,11 @@ COPY web/backend/ ./web/backend/
 # ─── Runtime ──────────────────────────────────────────────────────────
 # Create XDG_RUNTIME_DIR so Qt6 doesn't emit stderr warnings
 # (ezdxf treats ANY stderr from ODA as failure on Linux).
-RUN mkdir -p /tmp/runtime-root && chmod 700 /tmp/runtime-root
+RUN mkdir -p /tmp/runtime-root \
+    && chown -R app:app /app /tmp/runtime-root \
+    && chmod 700 /tmp/runtime-root
+
+USER app
 
 ENV PORT=8080
 EXPOSE 8080
