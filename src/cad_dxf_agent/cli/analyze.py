@@ -21,6 +21,8 @@ import sys
 from argparse import Namespace
 from pathlib import Path
 
+from ezdxf.lldxf.const import DXFStructureError
+
 from .. import __version__
 from ..core.compliance_rules import check_compliance
 from ..core.drawing_summarizer import summarize_drawing
@@ -37,7 +39,11 @@ def _load_context(path: str):
     if not p.exists():
         print(f"cad-analyze: file not found: {path}", file=sys.stderr)
         raise SystemExit(2)
-    return load_dxf(p)
+    try:
+        return load_dxf(p)
+    except (OSError, DXFStructureError) as exc:
+        print(f"cad-analyze: unable to read DXF {path}: {exc}", file=sys.stderr)
+        raise SystemExit(2) from exc
 
 
 def _emit(report, *, title: str, as_json: bool) -> None:

@@ -69,6 +69,16 @@ class TestAnalyzeErrors:
             _run(["health", "/no/such/file.dxf", "--json"])
         assert exc.value.code == 2
 
+    def test_invalid_dxf_exits_2_without_a_traceback(self, tmp_path, capsys):
+        invalid_dxf = tmp_path / "invalid.dxf"
+        invalid_dxf.write_text("not a DXF", encoding="utf-8")
+
+        with pytest.raises(SystemExit) as exc:
+            _run(["health", str(invalid_dxf), "--json"])
+
+        assert exc.value.code == 2
+        assert "unable to read DXF" in capsys.readouterr().err
+
     def test_no_subcommand_errors(self):
         # argparse with required subparser exits 2 on no command
         with pytest.raises(SystemExit) as exc:
