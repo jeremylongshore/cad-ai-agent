@@ -37,14 +37,14 @@ jobs:
           python-version: "3.12"
 
       - name: Install dependencies
-        run: pip install -e ".[dev]" schemathesis
+        run: python -m pip install -e ".[dev]" -r web/backend/requirements.txt schemathesis
 
       - name: Boot FastAPI in dev mode
         env:
           CAD_WEB_DEV_MODE: '1'
           CAD_LLM_PROVIDER: mock
         run: |
-          uvicorn web.backend.main:app --host 127.0.0.1 --port 8322 &
+          python -m uvicorn web.backend.main:app --host 127.0.0.1 --port 8322 &
           echo $! > /tmp/uvicorn.pid
           # Wait for the server to be ready
           for i in {1..30}; do
