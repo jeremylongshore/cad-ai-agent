@@ -48,9 +48,10 @@ jobs:
           echo $! > /tmp/uvicorn.pid
           # Wait for the server to be ready
           for i in {1..30}; do
-            curl -fsS http://127.0.0.1:8322/api/healthz >/dev/null 2>&1 && break
+            curl -fsS http://127.0.0.1:8322/api/health >/dev/null 2>&1 && break
             sleep 1
           done
+          curl -fsS http://127.0.0.1:8322/api/health >/dev/null
 
       - name: Run schemathesis
         run: |
@@ -59,6 +60,7 @@ jobs:
             --checks all \
             --exclude-path-regex='^/api/v1/(plan|apply|compare|takeoff|compliance|health|rfi|summary)' \
             --max-examples=20 \
+            --wait-for-schema=30 \
             http://127.0.0.1:8322/openapi.json
 
       - name: Stop uvicorn
