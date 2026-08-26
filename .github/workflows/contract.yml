@@ -30,7 +30,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-python@v6
         with:
@@ -55,11 +55,10 @@ jobs:
       - name: Run schemathesis
         run: |
           schemathesis run \
-            --base-url=http://127.0.0.1:8322 \
+            --url=http://127.0.0.1:8322 \
             --checks all \
             --exclude-path-regex='^/api/v1/(plan|apply|compare|takeoff|compliance|health|rfi|summary)' \
-            --hypothesis-max-examples=20 \
-            --hypothesis-deadline=2000 \
+            --max-examples=20 \
             http://127.0.0.1:8322/openapi.json
 
       - name: Stop uvicorn
