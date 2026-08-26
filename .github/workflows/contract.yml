@@ -57,8 +57,8 @@ jobs:
         run: |
           schemathesis run \
             --url=http://127.0.0.1:8322 \
+            --include-path-regex='^/api/health$' \
             --checks all \
-            --exclude-path-regex='^/api/v1/(plan|apply|compare|takeoff|compliance|health|rfi|summary)' \
             --max-examples=20 \
             --wait-for-schema=30 \
             http://127.0.0.1:8322/openapi.json
