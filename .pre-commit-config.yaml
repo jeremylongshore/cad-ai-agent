@@ -20,7 +20,7 @@ repos:
         entry: bash -c 'echo "Do not commit .env files!" && exit 1'
         language: system
         files: '^\.env$'
-      - id: audit-harness-verify
+      - id: audit-harness-verify-pre-commit
         name: audit-harness verify (hash-pin tamper check)
         entry: bash scripts/audit-harness verify
         language: system

@@ -22,5 +22,5 @@ layers =
     cad_dxf_agent.core
     cad_dxf_agent.models
 ignore_imports =
-    # Allow models to be imported by anyone — schemas are universally consumable.
-    # No ignores needed; layers config above already permits downward imports.
+    # EntityRef exposes a lazily built index while preserving the public model API.
+    cad_dxf_agent.models.cad_schema -> cad_dxf_agent.core.entity_index

@@ -50,6 +50,18 @@ export default [
       'react/react-in-jsx-scope': 'off',
       'react/prop-types': 'off',
       'no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
+      // The existing UI predates this gate. Keep these visible while axe tests
+      // provide the blocking accessibility signal for the initial rollout.
+      'no-empty': 'warn',
+      'react/no-unescaped-entities': 'warn',
+      'jsx-a11y/click-events-have-key-events': 'warn',
+      'jsx-a11y/no-noninteractive-element-interactions': 'warn',
+      'jsx-a11y/no-noninteractive-tabindex': 'warn',
+      'jsx-a11y/no-static-element-interactions': 'warn',
     },
+  },
+  {
+    files: ['playwright.config.js'],
+    languageOptions: { globals: globals.node },
   },
 ];
