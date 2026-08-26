@@ -4,7 +4,7 @@ Drawing Intelligence Platform for AEC professionals.
 
 Upload a DXF, PDF, or DWG — describe what you need in plain English, and get structured edits, compliance reports, quantity takeoffs, health assessments, RFIs, and drawing summaries — all without the AI ever touching your original file.
 
-[![CI](https://github.com/jeremylongshore/cad-ai-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/jeremylongshore/cad-ai-agent/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/jeremylongshore/cad-ai-agent/blob/main/LICENSE)
+[![CI](https://github.com/jeremylongshore/cad-ai-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/jeremylongshore/cad-ai-agent/actions/workflows/ci.yml) [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://github.com/jeremylongshore/cad-ai-agent/blob/main/LICENSE)
 
 **Links:** [Gist One-Pager](https://gist.github.com/jeremylongshore/0303189683f9547c79e1fc1fc68be711) · [Docs](000-docs/000-INDEX.md)
 
@@ -425,4 +425,4 @@ Key references:
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+Apache-2.0 — see [LICENSE](LICENSE).
