@@ -12,7 +12,7 @@
 
 The existing E2E test suite uses the same `r2000_blocks.dxf` for all 15 conversations and 20 canary prompts. Real users upload wildly different drawings. This profile system simulates 25 different AEC professionals, each with their own documents, workflows, multi-turn conversations, and expected responses.
 
-**Document variety:** 17 unique DXF files + 5 unique PDFs = 22 distinct documents
+**Document variety:** 19 unique DXF files + 4 unique PDFs = 23 distinct documents. Profile 15 intentionally reuses the Profile 3 floor-plan fixture, and Profiles 12 and 18 intentionally reuse the sawcut plan, so the same drawings are exercised through distinct professional workflows.
 **Format coverage:** 20 DXF uploads + 5 PDF uploads = 25% PDF coverage (vs current: 0%)
 
 Each profile defines:
@@ -38,10 +38,10 @@ Each profile defines:
 | 9 | Fire Protection Eng. | Circle/arc layout | `tests/fixtures/dxf_zoo/sourced/jscad-2Dcircles.dxf` | DXF | add_circle, compliance, Q&A |
 | 10 | GC Superintendent | Structural plan (PDF) | `tests/fixtures/test_pdfs/structural_plan.pdf` | PDF | summary, Q&A, health |
 | 11 | Estimator | Foundation detail (PDF) | `tests/fixtures/test_pdfs/foundation_detail.pdf` | PDF | takeoff, Q&A, summary |
-| 12 | Code Compliance Officer | Stamped plan set (PDF) | `000-docs/aMULBERRYdsn01.1-STAMPED-SEALED.pdf` | PDF | compliance, RFI, health |
+| 12 | Code Compliance Officer | Site plan (PDF) | `000-docs/032-TQ-TEST-sawcuts-sample-drawing.pdf` | PDF | compliance, RFI, health |
 | 13 | Interior Designer | Text-heavy drawing | `tests/fixtures/dxf_zoo/sourced/jscad-texts.dxf` | DXF | edit_text, summary, zone, add_text |
 | 14 | Civil Engineer | Polyline site plan | `tests/fixtures/dxf_zoo/sourced/jscad-2Dpolylines.dxf` | DXF | add_polyline, move, scale, Q&A |
-| 15 | Landscape Designer | Landscape site plan | `tests/fixtures/dxf_zoo/sourced/jscad-floorplan.dxf` | DXF | compliance (MWELO), takeoff, summary, edit, Q&A, health |
+| 15 | Landscape Designer (HeyFlora.ai) | Landscape site plan | `tests/fixtures/dxf_zoo/sourced/jscad-floorplan.dxf` | DXF | compliance (MWELO), takeoff, summary, edit, Q&A, health |
 | 16 | Construction Manager | Revision pair | `tests/fixtures/revision/clean_realworld/master.dxf` + `revision.dxf` | DXF | compare, summary, Q&A |
 | 17 | Project Manager | Simple geometry (PDF) | `tests/fixtures/test_pdfs/simple_geometry.pdf` | PDF | summary, Q&A (non-technical) |
 | 18 | Plan Reviewer (City) | Sawcut drawing (PDF) | `000-docs/032-TQ-TEST-sawcuts-sample-drawing.pdf` | PDF | compliance, RFI, health |
@@ -51,7 +51,7 @@ Each profile defines:
 | 22 | Solar Installer | Rectangle layout | `tests/fixtures/dxf_zoo/sourced/jscad-2Drectangles.dxf` | DXF | add_block (panels), copy, batch, takeoff |
 | 23 | BIM Coordinator | Modern polylines | `tests/fixtures/dxf_zoo/r2018_polylines.dxf` | DXF | health, compare, Q&A, summary |
 | 24 | Junior Drafter/Intern | Layers + empty | `tests/fixtures/dxf_zoo/sourced/jscad-layers.dxf` | DXF | Q&A (learning), move, edit_text, summary |
-| 25 | Landscape Field Crew Lead | Arc/curve plan | `tests/fixtures/dxf_zoo/sourced/jscad-2Darcs.dxf` | DXF | Q&A, summary, health, takeoff |
+| 25 | Landscape Field Crew Lead (HeyFlora.ai) | Arc/curve plan | `tests/fixtures/dxf_zoo/sourced/jscad-2Darcs.dxf` | DXF | Q&A, summary, health, takeoff |
 
 ---
 
@@ -416,7 +416,7 @@ Verification that all platform capabilities appear in at least two profiles:
 ### Profile 12 — Code Compliance Officer
 
 **Who:** Officer Patricia Nelson, senior plan reviewer at the City of Mulberry Building Department. 18 years of plan review experience. Processes 15-20 permit applications per week across residential and commercial projects.
-**Document:** `000-docs/aMULBERRYdsn01.1-STAMPED-SEALED.pdf` (PDF)
+**Document:** `000-docs/032-TQ-TEST-sawcuts-sample-drawing.pdf` (PDF)
 **Business context:** The plan review queue is backed up. Patricia needs to quickly check submitted plans for code compliance, flag deficiencies, and generate RFIs (Requests for Information) for anything that doesn't meet code. Her department has a 10-business-day turnaround requirement.
 
 #### Capabilities exercised
@@ -502,7 +502,7 @@ Verification that all platform capabilities appear in at least two profiles:
 
 ---
 
-### Profile 15 — Landscape Designer
+### Profile 15 — Landscape Designer (HeyFlora.ai workflow)
 
 **Who:** Maya Greenfield, RLA (Registered Landscape Architect) at GreenEdge Design-Build, specializing in water-efficient landscape design. 9 years of experience in drought-tolerant commercial landscapes in Southern California. Currently designing a 2-acre water-efficient landscape for a new corporate campus in Irvine.
 **Document:** `tests/fixtures/dxf_zoo/sourced/jscad-floorplan.dxf` (DXF)
@@ -536,7 +536,7 @@ Verification that all platform capabilities appear in at least two profiles:
 
 #### Landscape management integration context
 
-This profile models the landscape management vertical — a $150B professional sector that relies on drawing analysis for compliance, bidding, and field operations. Landscape design firms need to:
+This profile models a HeyFlora.ai landscape-design workflow in the landscape management vertical — a $150B professional sector that relies on drawing analysis for compliance, bidding, and field operations. Landscape design firms need to:
 - Read DXF/PDF site plans and extract plant counts for bid pricing
 - Check spatial compliance against water-efficiency ordinances (MWELO, LEED)
 - Generate client-facing summaries for proposals and reports
@@ -814,7 +814,7 @@ This profile models the landscape management vertical — a $150B professional s
 
 ---
 
-### Profile 25 — Landscape Field Crew Lead
+### Profile 25 — Landscape Field Crew Lead (HeyFlora.ai workflow)
 
 **Who:** Marcus Thompson, landscape crew lead at Green Valley Landscapes. 8 years of hands-on landscape installation experience. Reviews plans on a ruggedized tablet at the job site. Prefers short, direct answers — voice-first interaction style.
 **Document:** `tests/fixtures/dxf_zoo/sourced/jscad-2Darcs.dxf` (DXF)
@@ -844,7 +844,7 @@ This profile models the landscape management vertical — a $150B professional s
 
 #### Landscape field operations context
 
-This profile models the field crew use case for landscape management — the person who reads plans on a tablet at the job site. Voice-first interaction style: short, direct questions about what's where and what to build. Field crews need:
+This profile models a HeyFlora.ai field-crew workflow for landscape management — the person who reads plans on a tablet at the job site. Voice-first interaction style: short, direct questions about what's where and what to build. Field crews need:
 - Spatial Q&A ("what's in the northeast corner?") routed through drawing analysis
 - Quick field briefs summarizing scope for crew huddles
 - Health checks that flag drawing issues before concrete pours or installations

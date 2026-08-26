@@ -356,7 +356,7 @@
   {
     "id": "profile-12",
     "title": "Profile 12 — Code Compliance Officer — plan check review",
-    "drawing_fixture": "000-docs/aMULBERRYdsn01.1-STAMPED-SEALED.pdf",
+    "drawing_fixture": "000-docs/032-TQ-TEST-sawcuts-sample-drawing.pdf",
     "profile": {
       "id": "12",
       "role": "Code Compliance Officer",
@@ -456,12 +456,12 @@
   },
   {
     "id": "profile-15",
-    "title": "Profile 15 — Landscape Designer — water-efficient landscape proposal",
+    "title": "Profile 15 — Landscape Designer (HeyFlora.ai) — water-efficient landscape proposal",
     "drawing_fixture": "tests/fixtures/dxf_zoo/sourced/jscad-floorplan.dxf",
     "profile": {
       "id": "15",
       "role": "Landscape Designer",
-      "context": "Water-efficient commercial landscape design, client proposal due next week"
+      "context": "HeyFlora.ai water-efficient commercial landscape design, client proposal due next week"
     },
     "turns": [
       {
@@ -784,12 +784,12 @@
   },
   {
     "id": "profile-25",
-    "title": "Profile 25 — Landscape Field Crew Lead — hardscape installation brief",
+    "title": "Profile 25 — Landscape Field Crew Lead (HeyFlora.ai) — hardscape installation brief",
     "drawing_fixture": "tests/fixtures/dxf_zoo/sourced/jscad-2Darcs.dxf",
     "profile": {
       "id": "25",
       "role": "Landscape Field Crew Lead",
-      "context": "On-site for hardscape installation, using tablet"
+      "context": "HeyFlora.ai on-site hardscape installation workflow, using tablet"
     },
     "turns": [
       {
