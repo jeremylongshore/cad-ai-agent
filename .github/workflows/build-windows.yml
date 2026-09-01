@@ -68,7 +68,7 @@ jobs:
 
       - name: Build Inno Setup installer
         if: hashFiles('installer/setup.iss') != ''
-        uses: Minionguyjpro/Inno-Setup-Action@v1.2.8
+        uses: Minionguyjpro/Inno-Setup-Action@v1.2.9
         with:
           path: installer/setup.iss
           options: /DAppVersion=${{ steps.version.outputs.version }}
