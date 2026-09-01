@@ -30,8 +30,7 @@ def test_realworld_profile_corpus_identifies_two_heyflora_workflows() -> None:
     heyflora = [
         profile
         for profile in profiles
-        if "HeyFlora.ai" in profile["title"]
-        and "HeyFlora.ai" in profile["profile"]["context"]
+        if "HeyFlora.ai" in profile["title"] and "HeyFlora.ai" in profile["profile"]["context"]
     ]
 
     assert [profile["id"] for profile in heyflora] == ["profile-15", "profile-25"]
