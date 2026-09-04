@@ -1,4 +1,4 @@
 fastapi>=0.115.0
 uvicorn[standard]>=0.52.4
-google-cloud-aiplatform>=1.165.1
+google-cloud-aiplatform>=2.0.1
 pydantic>=2.13.4
