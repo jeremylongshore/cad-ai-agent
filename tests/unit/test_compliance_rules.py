@@ -297,6 +297,47 @@ class TestCheckCompliance:
         for check_name in report.checks_run:
             assert "door" in check_name
 
+    @pytest.mark.parametrize(
+        ("layers", "family_label"),
+        [
+            (["SURVEY", "BOUNDARY"], "survey/boundary"),
+            (["CIVIL", "SITE"], "civil/site"),
+        ],
+    )
+    def test_unsupported_site_families_skip_interior_checks(
+        self,
+        layers: list[str],
+        family_label: str,
+    ):
+        from cad_dxf_agent.core.compliance_rules import check_compliance
+
+        # These architectural-looking inputs prove the gate runs before the
+        # interior rules and does not emit misleading door/room findings.
+        door = _make_entity(
+            "d1",
+            EntityType.INSERT,
+            "DOORS",
+            insert_point=Point2D(x=5, y=5),
+            block_name="DOOR_30",
+            attributes={"width": 30.0},
+        )
+        context = _make_context(entities=[door], layers=layers)
+        zones = _make_zones_result(
+            [_make_zone(zone_id="bedroom", area=5000.0, inferred_type="bedroom")]
+        )
+
+        report = check_compliance(context, "ibc-2021", zones=zones)
+
+        assert report.checks_run == []
+        assert report.violation_count == 1
+        assert report.passed is False
+        assert report.zone_count == 1
+        assert len(report.findings) == 1
+        finding = report.findings[0]
+        assert finding.rule_id == "FAMILY-SUPPORT-001"
+        assert finding.title == (f"Compliance checks unavailable for {family_label} drawing")
+        assert "Building-interior compliance checks were not run" in finding.description
+
 
 # ===================================================================
 # Door Width Checks

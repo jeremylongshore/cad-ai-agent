@@ -129,6 +129,21 @@ class TestComplianceHandler:
         assert "compliance_findings" in result
         assert isinstance(result["compliance_checks_run"], list)
 
+    def test_unsupported_family_is_explicitly_not_run(self):
+        ctx = _make_context(layers=["SURVEY", "BOUNDARY"])
+        handler = ComplianceHandler()
+
+        result = handler.execute(
+            classification=_make_classification(),
+            context={"drawing_context": ctx},
+            prompt="check compliance",
+        )
+
+        assert result["compliance_passed"] is False
+        assert result["compliance_checks_run"] == []
+        assert "NOT RUN" in result["summary"]
+        assert "survey/boundary" in result["summary"]
+
     def test_with_dict_drawing_context(self):
         ctx = _make_context()
         handler = ComplianceHandler()

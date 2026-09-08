@@ -54,7 +54,7 @@ class ObjectiveTag(StrEnum):
 
 
 class DocumentFamilyHint(StrEnum):
-    """Inferred document family — refines output phrasing, never gates capability.
+    """Inferred document family used for phrasing and capability selection.
 
     20 families detected from layer names, block names, and text content.
     """

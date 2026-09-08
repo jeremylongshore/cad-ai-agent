@@ -17,6 +17,7 @@ import re
 from collections.abc import Callable
 
 from cad_dxf_agent.core.entity_index import EntityIndex
+from cad_dxf_agent.core.family_detector import detect_document_family
 from cad_dxf_agent.core.zone_detector import detect_zones
 from cad_dxf_agent.models.cad_schema import DrawingContext, EntityType
 from cad_dxf_agent.models.compliance_schema import (
@@ -28,6 +29,7 @@ from cad_dxf_agent.models.compliance_schema import (
     ComplianceSeverity,
     ComplianceThresholds,
 )
+from cad_dxf_agent.models.objective_schema import DocumentFamilyHint
 from cad_dxf_agent.models.zone_schema import DetectedZone, ZoneDetectionResult
 
 logger = logging.getLogger(__name__)
@@ -46,6 +48,11 @@ _WINDOW_PATTERNS = re.compile(
     r"window|wndw|win[_\-\s]|glazing|glass",
     re.IGNORECASE,
 )
+
+_UNSUPPORTED_COMPLIANCE_FAMILIES = {
+    DocumentFamilyHint.CIVIL_SITE: "civil/site",
+    DocumentFamilyHint.SURVEY_BOUNDARY: "survey/boundary",
+}
 
 
 def check_compliance(
@@ -72,6 +79,16 @@ def check_compliance(
             )
     else:
         prof = profile
+
+    family = detect_document_family(context).family
+    family_label = _UNSUPPORTED_COMPLIANCE_FAMILIES.get(family)
+    if family_label is not None:
+        return _unsupported_family_report(
+            prof,
+            context,
+            family_label,
+            zones=zones,
+        )
 
     if zones is None:
         zones = detect_zones(context)
@@ -102,6 +119,36 @@ def check_compliance(
         warning_count=warning_count,
         pass_count=pass_count,
         zone_count=zones.zone_count,
+        entity_count=context.entity_count,
+    )
+
+
+def _unsupported_family_report(
+    profile: ComplianceProfile,
+    context: DrawingContext,
+    family_label: str,
+    *,
+    zones: ZoneDetectionResult | None,
+) -> ComplianceReport:
+    """Return an explicit failure instead of applying interior rules blindly."""
+    return ComplianceReport(
+        profile_name=profile.name,
+        findings=[
+            ComplianceFinding(
+                rule_id="FAMILY-SUPPORT-001",
+                category=ComplianceCategory.GENERAL,
+                severity=ComplianceSeverity.VIOLATION,
+                title=f"Compliance checks unavailable for {family_label} drawing",
+                description=(
+                    f"Detected a {family_label} document family. "
+                    "Building-interior compliance checks were not run because "
+                    "this drawing type is not supported by the current rule pack."
+                ),
+            )
+        ],
+        checks_run=[],
+        violation_count=1,
+        zone_count=zones.zone_count if zones is not None else 0,
         entity_count=context.entity_count,
     )
 
