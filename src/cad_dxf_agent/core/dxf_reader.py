@@ -24,6 +24,7 @@ from ..models.cad_schema import (
 )
 from ..otel import get_tracer
 from ..settings import settings
+from .crs import resolve_drawing_crs
 
 logger = logging.getLogger(__name__)
 tracer = get_tracer(__name__)
@@ -31,7 +32,7 @@ tracer = get_tracer(__name__)
 SUPPORTED_TYPES = {t.value for t in EntityType}
 
 
-def load_dxf(file_path: str | Path) -> DrawingContext:
+def load_dxf(file_path: str | Path, *, crs: Any | None = None) -> DrawingContext:
     """Load a DXF file and build a normalized DrawingContext.
 
     Loads model space and all named layouts (paper spaces).
@@ -46,6 +47,7 @@ def load_dxf(file_path: str | Path) -> DrawingContext:
         span.set_attribute("cad.file.name", file_path.name)
 
         doc = ezdxf.readfile(str(file_path))
+        resolved_crs = resolve_drawing_crs(doc, file_path, crs)
         raw_insunits = int(doc.header.get("$INSUNITS", 0) or 0)
         try:
             drawing_unit = DrawingUnit(raw_insunits)
@@ -107,6 +109,7 @@ def load_dxf(file_path: str | Path) -> DrawingContext:
         ctx = DrawingContext(
             file_path=str(file_path),
             drawing_unit=drawing_unit,
+            crs=resolved_crs,
             entities=entities,
             layers=layers,
             blocks=blocks,
@@ -118,6 +121,8 @@ def load_dxf(file_path: str | Path) -> DrawingContext:
                 "encoding": doc.encoding,
                 "insunits": int(drawing_unit),
                 "unit_name": drawing_unit.name.lower(),
+                "crs": resolved_crs.definition if resolved_crs is not None else None,
+                "crs_source": resolved_crs.source.value if resolved_crs is not None else None,
             },
         )
 
