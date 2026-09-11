@@ -1,0 +1,45 @@
+%% Canonical Mermaid source for the public CAD AI Agent architecture page.
+flowchart LR
+  subgraph SURFACES["User surfaces"]
+    DESKTOP["PySide6 desktop\napp.py · ui/"]
+    CLI["CLI tools\ncad-analyze · cad-revision"]
+    WEB["React + Vite SPA\nweb/frontend/"]
+    PLUGIN["Claude Code plugin\nplugin/skills/"]
+  end
+
+  subgraph ORCHESTRATION["Application and orchestration"]
+    API["FastAPI boundary\nweb/backend/main.py · api_v1.py"]
+    ROUTER["Objective + intent routing\nObjectiveClassifier · IntentRouter"]
+    PIPELINE["Typed stage execution\nStrategyRegistry · StagePipelineExecutor"]
+    GUARDS["Safety gates\nPydantic schemas · protected layers · preview/approval"]
+  end
+
+  subgraph ENGINE["Deterministic drawing engine"]
+    CONTEXT["Drawing context\nDXFReader · SemanticModel · EntityIndex"]
+    ANALYSIS["Analysis families\ncompliance · health · takeoff · Q&A · compare"]
+    EDIT["Edit and revision\nEditEngine · ApplyPipeline · RevisionNotes"]
+    FILES["Local artifacts\noriginal DXF · save-as DXF · previews · bundles"]
+  end
+
+  subgraph OPTIONAL["Optional boundaries"]
+    LLM["PlannerProvider\nmock or user-supplied model/key"]
+    ODA["ODA File Converter\nDWG conversion"]
+    CLOUD["Firebase / Cloud Run / GCS\nweb deployment and persistence"]
+    OTEL["OpenTelemetry exporter"]
+  end
+
+  DESKTOP --> ROUTER
+  CLI --> ROUTER
+  WEB --> API --> ROUTER
+  PLUGIN --> CLI
+  ROUTER --> PIPELINE
+  PIPELINE --> CONTEXT
+  CONTEXT --> ANALYSIS
+  CONTEXT --> LLM
+  LLM --> GUARDS
+  ANALYSIS --> GUARDS
+  GUARDS --> EDIT
+  EDIT --> FILES
+  ODA --> CONTEXT
+  API -. optional .-> CLOUD
+  PIPELINE -. telemetry .-> OTEL

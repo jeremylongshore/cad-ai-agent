@@ -29,6 +29,7 @@
 | 045 | SPEC | [045-AT-SPEC-repeated-condition-scoring.md](045-AT-SPEC-repeated-condition-scoring.md) |
 | 058 | ARCH | [058-AT-ARCH-v080-ui-ux-design-strategy.md](058-AT-ARCH-v080-ui-ux-design-strategy.md) |
 | 074 | ARCH | [074-AT-ARCH-adk-agent-engine-architecture.md](074-AT-ARCH-adk-agent-engine-architecture.md) |
+| 079 | ARCH | [079-AT-ARCH-cad-ai-agent-system-architecture.mmd](079-AT-ARCH-cad-ai-agent-system-architecture.mmd) |
 
 ### PP — Product & Planning
 | # | Type | File |

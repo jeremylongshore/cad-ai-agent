@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CAD AI Agent · System Architecture</title>
+  <meta name="description" content="A repo-grounded walkthrough of CAD AI Agent: model-agnostic drawing intelligence with deterministic DXF safety gates.">
+  <meta property="og:title" content="CAD AI Agent · System Architecture">
+  <meta property="og:description" content="See how desktop, CLI, web, and plugin surfaces share one guarded drawing-intelligence core.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://demos.intentsolutions.io/cad-ai-agent/">
+  <link rel="canonical" href="https://demos.intentsolutions.io/cad-ai-agent/">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #090d13; --surface: #111824; --raised: #172231; --line: #2b3a4e;
+      --text: #edf4fa; --muted: #9cabb9; --quiet: #708093;
+      --cyan: #46d9df; --blue: #64a8ff; --amber: #ffbf69; --green: #72d998;
+      --purple: #c49aff; --red: #ff7d87;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { margin: 0; background: var(--bg); color: var(--text); font-family: "DM Sans", system-ui, sans-serif; line-height: 1.55; }
+    a { color: var(--cyan); }
+    a:focus-visible { outline: 2px solid var(--amber); outline-offset: 4px; }
+    code, .mono { font-family: "JetBrains Mono", monospace; }
+    .estate { border-bottom: 1px solid var(--line); background: #070a0f; }
+    .estate nav { width: min(100% - 32px, 1460px); margin: auto; min-height: 40px; display: flex; align-items: center; gap: 24px; overflow-x: auto; }
+    .estate a { color: var(--quiet); text-decoration: none; font-size: 12px; white-space: nowrap; }
+    .estate a[aria-current="page"] { color: var(--cyan); }
+    .layout { display: grid; grid-template-columns: 270px minmax(0, 1fr); gap: 46px; width: min(100% - 64px, 1460px); margin: 0 auto; padding: 48px 0 64px; }
+    .rail { position: sticky; top: 28px; align-self: start; display: grid; gap: 30px; }
+    .brand { color: var(--text); text-decoration: none; font-weight: 700; letter-spacing: -.02em; }
+    .eyebrow { margin: 10px 0 0; color: var(--cyan); font: 500 11px/1.4 "JetBrains Mono", monospace; letter-spacing: .11em; text-transform: uppercase; }
+    .rail h2 { margin: 0 0 10px; color: var(--quiet); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; }
+    .rail nav, .rail ul { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+    .rail nav a { color: var(--muted); text-decoration: none; font-size: 13px; }
+    .rail nav a:hover { color: var(--text); }
+    .invariants li { padding-left: 12px; border-left: 2px solid var(--green); color: var(--muted); font-size: 12px; }
+    .invariants strong { color: var(--text); }
+    .main { min-width: 0; }
+    .hero { padding: 8px 0 42px; border-bottom: 1px solid var(--line); }
+    .status { display: inline-flex; align-items: center; gap: 8px; color: var(--green); font: 500 11px "JetBrains Mono", monospace; }
+    .status::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 5px rgba(114,217,152,.10); }
+    h1 { max-width: 900px; margin: 22px 0 16px; font-size: clamp(42px, 6vw, 78px); line-height: .98; letter-spacing: -.055em; }
+    .hero p { max-width: 800px; margin: 0; color: var(--muted); font-size: 18px; }
+    .hero strong { color: var(--text); }
+    .hero-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 26px; }
+    .button { display: inline-flex; min-height: 44px; align-items: center; padding: 0 16px; border: 1px solid var(--line); border-radius: 7px; color: var(--text); text-decoration: none; font-size: 13px; font-weight: 700; }
+    .button.primary { background: var(--cyan); border-color: var(--cyan); color: #071013; }
+    .section { padding-top: 46px; }
+    .section-head { display: flex; justify-content: space-between; gap: 24px; align-items: end; margin-bottom: 18px; }
+    .section h2 { margin: 0; font-size: 23px; letter-spacing: -.025em; }
+    .source-note { color: var(--quiet); font: 400 10px/1.5 "JetBrains Mono", monospace; text-align: right; }
+    .diagram-card { overflow: hidden; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+    .diagram-scroll { overflow-x: auto; padding: 26px; }
+    .scroll-hint { display: none; margin: 0 0 12px; color: var(--quiet); font: 11px "JetBrains Mono", monospace; }
+    .stage { position: relative; width: 1200px; height: 800px; }
+    .plane { position: absolute; top: 38px; height: 700px; border: 1px dashed; border-radius: 11px; }
+    .plane::before { content: attr(data-label); position: absolute; left: 14px; top: -9px; padding: 0 7px; background: var(--surface); font: 500 10px "JetBrains Mono", monospace; letter-spacing: .05em; text-transform: uppercase; }
+    .p-surface { left: 12px; width: 226px; border-color: rgba(100,168,255,.55); color: var(--blue); }
+    .p-orch { left: 262px; width: 400px; border-color: rgba(70,217,223,.55); color: var(--cyan); }
+    .p-core { left: 686px; width: 286px; border-color: rgba(114,217,152,.55); color: var(--green); }
+    .p-ext { left: 996px; width: 192px; border-color: rgba(255,191,105,.55); color: var(--amber); }
+    .node { position: absolute; z-index: 2; padding: 13px 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--raised); }
+    .node h3 { margin: 0; font: 600 12px "JetBrains Mono", monospace; }
+    .node p { margin: 5px 0 0; color: var(--muted); font-size: 11px; line-height: 1.4; }
+    .surface h3 { color: var(--blue); } .orch h3 { color: var(--cyan); } .core h3 { color: var(--green); } .external h3 { color: var(--amber); }
+    .surface { left: 28px; width: 194px; }
+    .orch { left: 280px; width: 364px; }
+    .core { left: 704px; width: 250px; }
+    .external { left: 1013px; width: 158px; }
+    .n1 { top: 72px; } .n2 { top: 221px; } .n3 { top: 370px; } .n4 { top: 519px; }
+    .orch.n1, .core.n1 { min-height: 105px; }
+    .orch.n2, .core.n2 { min-height: 112px; }
+    .orch.n3, .core.n3 { min-height: 124px; }
+    .orch.n4, .core.n4 { min-height: 118px; }
+    .external.e1 { top: 124px; } .external.e2 { top: 314px; } .external.e3 { top: 504px; }
+    .flow { position: absolute; inset: 0; z-index: 1; width: 1200px; height: 800px; pointer-events: none; }
+    .cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+    .card { min-height: 200px; padding: 22px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+    .card h3 { margin: 0 0 12px; font-size: 15px; }
+    .card ul { margin: 0; padding-left: 18px; color: var(--muted); font-size: 13px; }
+    .card li + li { margin-top: 7px; }
+    .card code { color: var(--cyan); font-size: 11px; }
+    .guardrail { border-left: 3px solid var(--green); }
+    .caveat { border-left: 3px solid var(--amber); }
+    .facts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; overflow: hidden; border: 1px solid var(--line); border-radius: 10px; background: var(--line); }
+    .fact { padding: 20px; background: var(--surface); }
+    .fact strong { display: block; color: var(--cyan); font: 600 20px "JetBrains Mono", monospace; }
+    .fact span { color: var(--muted); font-size: 12px; }
+    footer { margin-top: 52px; padding-top: 20px; border-top: 1px solid var(--line); color: var(--quiet); font: 11px "JetBrains Mono", monospace; }
+    @media (max-width: 980px) {
+      .layout { grid-template-columns: 1fr; width: min(100% - 32px, 900px); padding-top: 28px; }
+      .rail { position: static; grid-template-columns: repeat(2, minmax(0,1fr)); }
+      .rail > div:first-child { grid-column: 1 / -1; }
+      .scroll-hint { display: block; }
+      .cards { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 620px) {
+      .rail { grid-template-columns: 1fr; }
+      h1 { font-size: 44px; }
+      .facts { grid-template-columns: repeat(2, 1fr); }
+      .section-head { display: block; }
+      .source-note { margin-top: 10px; text-align: left; }
+    }
+    @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } *, *::before, *::after { animation: none !important; transition: none !important; } }
+  </style>
+</head>
+<body>
+  <div class="estate"><nav aria-label="Intent Solutions network"><a href="https://intentsolutions.io/">Intent Solutions</a><a href="https://labs.intentsolutions.io/">Labs</a><a href="https://evals.intentsolutions.io/">Evals</a><a href="https://demos.intentsolutions.io/" aria-current="page">Demos</a><a href="https://learn.intentsolutions.io/">Learn</a></nav></div>
+  <main class="layout">
+    <aside class="rail">
+      <div><a class="brand" href="https://demos.intentsolutions.io/">Intent Demos / CAD AI Agent</a><p class="eyebrow">Repository architecture</p></div>
+      <section><h2>On this page</h2><nav aria-label="Page contents"><a href="#topology">System topology</a><a href="#flows">Execution paths</a><a href="#boundaries">Trust boundaries</a><a href="#reality">Current reality</a></nav></section>
+      <section><h2>Architectural invariants</h2><ul class="invariants"><li><strong>The model proposes; code disposes.</strong></li><li><strong>The original drawing is never overwritten.</strong></li><li><strong>Mock mode keeps the core usable offline.</strong></li><li><strong>All surfaces reuse the same typed engine.</strong></li></ul></section>
+    </aside>
+
+    <div class="main">
+      <header class="hero">
+        <span class="status">REPO-GROUNDED · v0.12.0</span>
+        <h1>Drawing intelligence with a hard boundary around the model.</h1>
+        <p>CAD AI Agent accepts DXF, PDF, and conditionally DWG across desktop, command-line, web, and Claude Code surfaces. <strong>Models do not edit drawings.</strong> They return typed plans; deterministic Python validates, previews, applies, and saves the result as a new artifact.</p>
+        <div class="hero-actions"><a class="button primary" href="#topology">Inspect the architecture</a><a class="button" href="https://github.com/jeremylongshore/cad-ai-agent">Open the repository</a></div>
+      </header>
+
+      <section class="section" id="topology" aria-labelledby="topology-title">
+        <div class="section-head"><h2 id="topology-title">System topology</h2><span class="source-note">Grounded in README.md · pyproject.toml<br>src/cad_dxf_agent/ · web/ · plugin/</span></div>
+        <div class="diagram-card"><div class="diagram-scroll"><p class="scroll-hint">Swipe sideways to inspect the full system →</p><div class="stage">
+          <div class="plane p-surface" data-label="User surfaces"></div><div class="plane p-orch" data-label="Orchestration"></div><div class="plane p-core" data-label="Deterministic engine"></div><div class="plane p-ext" data-label="Optional boundaries"></div>
+          <div class="node surface n1"><h3>Desktop</h3><p>PySide6 main window and background pipeline worker</p></div>
+          <div class="node surface n2"><h3>CLI</h3><p><code>cad-analyze</code>, <code>cad-revision</code>, desktop launcher</p></div>
+          <div class="node surface n3"><h3>Web SPA</h3><p>React + Vite drawing viewer, prompts, approvals</p></div>
+          <div class="node surface n4"><h3>Claude plugin</h3><p>Skill surface invokes the packaged command workflow</p></div>
+
+          <div class="node orch n1"><h3>Ingress and sessions</h3><p>FastAPI upload/plan/apply/revision APIs; local desktop and CLI enter below HTTP.</p></div>
+          <div class="node orch n2"><h3>Objective + intent routing</h3><p>Classifies what the user wants and why, then selects an ordered strategy.</p></div>
+          <div class="node orch n3"><h3>Typed stage pipeline</h3><p>Registered handlers execute in order. Every stage emits a gate; rejection stops downstream work.</p></div>
+          <div class="node orch n4"><h3>Validation + approval gates</h3><p>Pydantic schemas, protected-layer rules, previews, explicit approvals, bounded agent turns.</p></div>
+
+          <div class="node core n1"><h3>Drawing context</h3><p><code>DXFReader</code>, semantic model, entity index, region and family detection.</p></div>
+          <div class="node core n2"><h3>Analysis families</h3><p>Compliance, health, takeoff, Q&amp;A, summaries, RFIs, zones, comparison.</p></div>
+          <div class="node core n3"><h3>Edit + revision engine</h3><p>Validated operations only; <code>ezdxf</code> performs mutation and revision notes.</p></div>
+          <div class="node core n4"><h3>Local artifacts</h3><p>Original input, preview renders, save-as DXF, changelog, overlays, bundles.</p></div>
+
+          <div class="node external e1"><h3>Model seam</h3><p>Mock or user-supplied <code>PlannerProvider</code></p></div>
+          <div class="node external e2"><h3>ODA converter</h3><p>Required for real DWG conversion</p></div>
+          <div class="node external e3"><h3>Cloud + OTel</h3><p>Optional web hosting, persistence, telemetry</p></div>
+
+          <svg class="flow" viewBox="0 0 1200 800" role="img" aria-labelledby="flow-title flow-desc">
+            <title id="flow-title">CAD AI Agent component and data-flow architecture</title>
+            <desc id="flow-desc">Desktop, command-line, web, and Claude Code plugin surfaces converge on objective routing and a typed stage pipeline. Drawing context feeds deterministic analysis or a model planning seam. Validation and approval gates control the edit engine, which writes new local artifacts without overwriting the original.</desc>
+            <rect x="1" y="1" width="1198" height="798" fill="none" aria-label="Architecture canvas"></rect>
+            <defs><marker id="arrow-blue" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#64a8ff"></path></marker><marker id="arrow-cyan" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#46d9df"></path></marker><marker id="arrow-green" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#72d998"></path></marker><marker id="arrow-amber" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#ffbf69"></path></marker></defs>
+            <g fill="none" stroke="#64a8ff" stroke-width="1.5" marker-end="url(#arrow-blue)"><path d="M222 120 H278"></path><path d="M222 266 H250 V190 H278"></path><path d="M222 415 H250 V152 H278"></path><path d="M222 564 H250 V266 H278"></path></g>
+            <g fill="none" stroke="#46d9df" stroke-width="1.5" marker-end="url(#arrow-cyan)"><path d="M462 177 V219"></path><path d="M462 333 V368"></path><path d="M462 494 V517"></path><path d="M644 432 H680 V125 H702"></path></g>
+            <g fill="none" stroke="#72d998" stroke-width="1.5" marker-end="url(#arrow-green)"><path d="M829 177 V219"></path><path d="M829 333 V368"></path><path d="M829 494 V517"></path><path d="M644 580 H680 V432 H702"></path></g>
+            <g fill="none" stroke="#ffbf69" stroke-width="1.4" marker-end="url(#arrow-amber)"><path d="M1011 170 H980 V565 H646"></path><path d="M1011 355 H980 V125 H956"></path><path d="M1011 545 H974"></path></g>
+            <g fill="#9cabb9" font-family="JetBrains Mono" font-size="9"><text x="232" y="111">direct</text><text x="663" y="421">context</text><text x="854" y="358">typed result</text><text x="982" y="160">plan()</text><text x="963" y="345">convert</text></g>
+          </svg>
+        </div></div></div>
+      </section>
+
+      <section class="section" id="flows" aria-labelledby="flows-title"><div class="section-head"><h2 id="flows-title">Execution paths</h2></div><div class="cards">
+        <article class="card"><h3>Analysis stays deterministic</h3><ul><li>Intent routing selects compliance, health, takeoff, summary, RFI, zone, Q&amp;A, or comparison handlers.</li><li>Extractors read the semantic drawing context and return typed response envelopes.</li><li>The mock provider allows the entire core and its tests to run without a network or key.</li></ul></article>
+        <article class="card guardrail"><h3>Edit requests cross explicit gates</h3><ul><li>A provider returns a structured <code>ChangeSet</code>, never raw DXF.</li><li>Validation rejects unsupported operations, invalid targets, and protected-layer edits.</li><li>The user previews and approves operations before <code>EditEngine</code> touches a copy.</li><li>Output is save-as DXF with optional deterministic revision notes.</li></ul></article>
+        <article class="card"><h3>Revision comparison is its own pipeline</h3><ul><li>Two drawings are canonicalized, aligned, matched, classified, and scored.</li><li>Reviewable revision operations can be approved individually.</li><li>Application produces a new DXF plus overlay, changelog, and downloadable bundle.</li></ul></article>
+        <article class="card"><h3>One core, four delivery surfaces</h3><ul><li>PySide6 provides the local desktop workflow.</li><li>Three console scripts expose analysis and revision automation.</li><li>FastAPI reuses the package for a React web application.</li><li>The Claude Code skill wraps the same command surface instead of duplicating the engine.</li></ul></article>
+      </div></section>
+
+      <section class="section" id="boundaries" aria-labelledby="boundaries-title"><div class="section-head"><h2 id="boundaries-title">Trust boundaries</h2></div><div class="facts"><div class="fact"><strong>0</strong><span>raw DXF edits performed by an LLM</span></div><div class="fact"><strong>10</strong><span>maximum agent turns for complex tool use</span></div><div class="fact"><strong>25 MB</strong><span>shared web upload limit</span></div><div class="fact"><strong>3</strong><span>Python console entry points</span></div></div></section>
+
+      <section class="section" id="reality" aria-labelledby="reality-title"><div class="section-head"><h2 id="reality-title">Current reality, including the edges</h2></div><div class="cards">
+        <article class="card guardrail"><h3>What is structurally strong</h3><ul><li>The provider interface is deliberately small and model-agnostic.</li><li>Typed schemas separate probabilistic planning from deterministic mutation.</li><li>Original-file preservation, protected layers, and approval are first-class safeguards.</li><li>Unit, integration, web, eval, E2E, GUI, property, smoke, and benchmark suites cover the system.</li></ul></article>
+        <article class="card caveat"><h3>Known product constraints</h3><ul><li>DWG input depends on a separately installed ODA File Converter; the fallback is not equivalent.</li><li>The geometric model is currently 2D and does not provide full elevation/terrain semantics.</li><li>Coordinate-reference-system and unit handling still need hardening for civil/survey drawings.</li><li>Cloud deployment is optional; the accepted core architecture remains local-first.</li></ul></article>
+      </div></section>
+
+      <footer>CAD AI Agent · <a href="architecture.mmd">Mermaid source</a> · repository at <a href="https://github.com/jeremylongshore/cad-ai-agent">github.com/jeremylongshore/cad-ai-agent</a> · architecture snapshot 2026-09-10</footer>
+    </div>
+  </main>
+</body>
+</html>
