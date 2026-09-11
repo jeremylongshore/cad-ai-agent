@@ -180,6 +180,16 @@ The mock provider responds to keywords like "move", "delete", "text", "rename" i
 
 The default `mock` provider only keyword-matches — it's for exercising the pipeline offline, not for real results. The LLM is **fully pluggable**: the planner never sees raw DXF, it only returns a structured `ChangeSet`, so any model that can follow that contract works. Point `CAD_LLM_PROVIDER` at your own provider — no fork required.
 
+The engine is model-agnostic. You bring the provider, model, endpoint, and credentials; the engine only accepts and validates the structured `ChangeSet`. For portability, providers may use these shared environment variables:
+
+| Variable | Meaning |
+|---|---|
+| `CAD_LLM_MODEL` | Model identifier (optional) |
+| `CAD_LLM_API_KEY` | Provider API key (optional; never logged) |
+| `CAD_LLM_BASE_URL` | OpenAI-compatible or provider API endpoint (optional) |
+
+Provider-specific variables are also supported. `CAD_GEMINI_API_KEY` takes precedence over the generic key when requested through `get_api_key("gemini-key")`.
+
 ### 1. Implement the provider interface
 
 Subclass `PlannerProvider` (`src/cad_dxf_agent/llm/providers.py`):

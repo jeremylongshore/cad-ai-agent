@@ -47,9 +47,36 @@ class TestSettings:
             s = Settings()
             assert s.get_api_key("gemini-key") == "test-key-123"
 
-    def test_get_api_key_unknown_provider(self):
-        """get_api_key returns None for unknown providers."""
+    def test_generic_key_falls_back_for_known_provider(self):
+        """The portable key works when a provider-specific key is absent."""
         from cad_dxf_agent.settings import Settings
 
-        s = Settings()
-        assert s.get_api_key("unknown_provider") is None
+        with patch.dict(os.environ, {"CAD_LLM_API_KEY": "portable-key"}, clear=True):
+            s = Settings()
+            assert s.get_api_key("gemini-key") == "portable-key"
+
+    def test_get_api_key_unknown_provider(self):
+        """Unknown providers use the generic BYOK key when configured."""
+        from cad_dxf_agent.settings import Settings
+
+        with patch.dict(os.environ, {"CAD_LLM_API_KEY": "portable-key"}, clear=True):
+            s = Settings()
+            assert s.get_api_key("unknown_provider") == "portable-key"
+
+    def test_provider_neutral_model_and_endpoint(self):
+        """Shared model and endpoint settings are available to custom providers."""
+        from cad_dxf_agent.settings import Settings
+
+        with patch.dict(
+            os.environ,
+            {
+                "CAD_LLM_MODEL": "local-model",
+                "CAD_LLM_API_KEY": "portable-key",
+                "CAD_LLM_BASE_URL": "http://localhost:8080/v1",
+            },
+            clear=True,
+        ):
+            s = Settings()
+            assert s.llm_model == "local-model"
+            assert s.llm_api_key == "portable-key"
+            assert s.llm_base_url == "http://localhost:8080/v1"
