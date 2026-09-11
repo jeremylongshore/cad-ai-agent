@@ -15,16 +15,16 @@ flowchart LR
   end
 
   subgraph ENGINE["Deterministic drawing engine"]
-    CONTEXT["Drawing context\nDXFReader · SemanticModel · EntityIndex"]
+    CONTEXT["Drawing context\nTyped geometry · units · elevation · CRS"]
     ANALYSIS["Analysis families\ncompliance · health · takeoff · Q&A · compare"]
     EDIT["Edit and revision\nEditEngine · ApplyPipeline · RevisionNotes"]
     FILES["Local artifacts\noriginal DXF · save-as DXF · previews · bundles"]
   end
 
   subgraph OPTIONAL["Optional boundaries"]
-    LLM["PlannerProvider\nmock or user-supplied model/key"]
+    LLM["PlannerProvider\nmock or BYOK model + endpoint"]
     ODA["ODA File Converter\nDWG conversion"]
-    CLOUD["Firebase / Cloud Run / GCS\nweb deployment and persistence"]
+    CLOUD["Operator-owned cloud\nweb hosting and persistence"]
     OTEL["OpenTelemetry exporter"]
   end
 
