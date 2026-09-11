@@ -305,9 +305,9 @@ def _find_anchor_pairs(
             for ri, r_snap in enumerate(r_list):
                 if ri in used_r:
                     continue
-                d = math.sqrt(
-                    (m_snap.centroid.x - r_snap.centroid.x) ** 2
-                    + (m_snap.centroid.y - r_snap.centroid.y) ** 2
+                d = math.hypot(
+                    m_snap.centroid.x - r_snap.centroid.x,
+                    m_snap.centroid.y - r_snap.centroid.y,
                 )
                 if d < best_d:
                     best_d = d

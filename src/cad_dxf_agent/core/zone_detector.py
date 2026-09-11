@@ -406,7 +406,7 @@ def _points_close(a: Point2D, b: Point2D, tolerance: float) -> bool:
 def _point_distance(a: Point2D, b: Point2D) -> float:
     dx = a.x - b.x
     dy = a.y - b.y
-    return math.sqrt(dx * dx + dy * dy)
+    return math.hypot(dx, dy)
 
 
 def _snap_point(x: float, y: float, tolerance: float) -> tuple[float, float]:

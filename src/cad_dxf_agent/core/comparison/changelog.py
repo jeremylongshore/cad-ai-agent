@@ -264,7 +264,7 @@ def generate_summary(result: ComparisonResult) -> DiffSummary:
     large_moves = 0
     for change in result.changes:
         if change.displacement is not None:
-            dist = math.sqrt(change.displacement.x**2 + change.displacement.y**2)
+            dist = math.hypot(change.displacement.x, change.displacement.y)
             if dist > _LARGE_MOVE_THRESHOLD:
                 large_moves += 1
     if large_moves > 0:

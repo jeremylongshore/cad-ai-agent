@@ -132,7 +132,7 @@ def _validate_move(
         return
 
     if rules.max_move_distance is not None:
-        distance = math.sqrt(dx**2 + dy**2)
+        distance = math.hypot(dx, dy)
         if distance > rules.max_move_distance:
             result.add_warning(
                 f"Move distance {distance:.2f} exceeds max {rules.max_move_distance}",

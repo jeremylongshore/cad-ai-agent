@@ -38,24 +38,24 @@ _allowlist_cache: dict[str, tuple[bool, float]] = {}
 _ALLOWLIST_CACHE_TTL = 300  # 5 minutes
 
 # Lazy-init firebase admin
-_firebase_app = None
-
-
 def _init_firebase():
-    global _firebase_app
-    if _firebase_app is not None:
-        return
-
     import firebase_admin
     from firebase_admin import credentials
+
+    try:
+        firebase_admin.get_app()
+        return
+    except ValueError:
+        # No default app exists yet; initialize it below.
+        pass
 
     cred_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
     if cred_path:
         cred = credentials.Certificate(cred_path)
-        _firebase_app = firebase_admin.initialize_app(cred)
+        firebase_admin.initialize_app(cred)
     else:
         # Uses ADC (Application Default Credentials) on Cloud Run
-        _firebase_app = firebase_admin.initialize_app()
+        firebase_admin.initialize_app()
 
 
 async def verify_token(request: Request) -> dict:

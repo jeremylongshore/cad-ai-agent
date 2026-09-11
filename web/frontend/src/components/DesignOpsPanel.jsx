@@ -229,7 +229,6 @@ function renderSection(section) {
 export default function DesignOpsPanel({ data }) {
   if (!data) return null;
 
-  const taskFamily = data.task_family;
   const payload = data.data || {};
 
   // Scope / field summary (has sections array)

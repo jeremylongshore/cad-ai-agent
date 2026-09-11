@@ -184,7 +184,7 @@ class PlanValidator:
             and isinstance(dx, (int, float))
             and isinstance(dy, (int, float))
         ):
-            dist = math.sqrt(dx**2 + dy**2)
+            dist = math.hypot(dx, dy)
             if dist > self._rules.max_move_distance:
                 warnings.append(
                     f"Move distance {dist:.1f} exceeds max {self._rules.max_move_distance}"

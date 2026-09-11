@@ -363,7 +363,7 @@ def _sig_text(
 
 def _distance(a: Point2D, b: Point2D) -> float:
     """Euclidean distance between two points."""
-    return math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2)
+    return math.hypot(a.x - b.x, a.y - b.y)
 
 
 def _angle_bucket(a: Point2D, b: Point2D) -> int:

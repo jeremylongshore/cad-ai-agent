@@ -200,7 +200,7 @@ def _format_distance(dx: float, dy: float) -> str:
     """Format distance as engineering-friendly string."""
     import math
 
-    dist = math.sqrt(dx**2 + dy**2)
+    dist = math.hypot(dx, dy)
     if dist < 12:
         return f'{dist:.1f}"'
     feet = int(dist // 12)

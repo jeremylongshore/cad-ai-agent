@@ -191,7 +191,7 @@ def _line_length(entity: EntityRef) -> float:
         return 0.0
     dx = points[1].x - points[0].x
     dy = points[1].y - points[0].y
-    return math.sqrt(dx * dx + dy * dy)
+    return math.hypot(dx, dy)
 
 
 def _polyline_length(entity: EntityRef) -> float:
@@ -203,12 +203,12 @@ def _polyline_length(entity: EntityRef) -> float:
     for i in range(len(vertices) - 1):
         dx = vertices[i + 1].x - vertices[i].x
         dy = vertices[i + 1].y - vertices[i].y
-        total += math.sqrt(dx * dx + dy * dy)
+        total += math.hypot(dx, dy)
 
     # Add closing segment if closed
     if entity_is_closed(entity) and len(vertices) >= 3:
         dx = vertices[0].x - vertices[-1].x
         dy = vertices[0].y - vertices[-1].y
-        total += math.sqrt(dx * dx + dy * dy)
+        total += math.hypot(dx, dy)
 
     return total

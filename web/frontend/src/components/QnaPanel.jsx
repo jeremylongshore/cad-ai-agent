@@ -5,7 +5,7 @@
  * Evidence list shows entity handles, layers, and locations.
  */
 
-import { useState, useCallback } from 'react';
+import { useState } from 'react';
 
 function ConfidenceBadge({ confidence }) {
   if (confidence == null) return null;

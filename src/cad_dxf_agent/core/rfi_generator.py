@@ -27,7 +27,6 @@ from .entity_geometry import entity_is_closed, entity_points
 
 # Block patterns for symbol detection
 _DOOR_PATTERN = re.compile(r"door|dr[_\-\s]|entry|exit|gate", re.IGNORECASE)
-_WINDOW_PATTERN = re.compile(r"window|wndw|win[_\-\s]|glazing", re.IGNORECASE)
 
 
 def generate_rfi(

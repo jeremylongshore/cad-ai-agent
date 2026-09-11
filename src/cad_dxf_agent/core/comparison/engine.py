@@ -30,8 +30,8 @@ class ComparisonOutputs:
     result: ComparisonResult
     changelog: ChangeLog
     diff_overlay_path: Path | None = None
-    master_path: Path = field(default_factory=lambda: Path())
-    revision_path: Path = field(default_factory=lambda: Path())
+    master_path: Path = field(default_factory=Path)
+    revision_path: Path = field(default_factory=Path)
 
 
 class ComparisonEngine:

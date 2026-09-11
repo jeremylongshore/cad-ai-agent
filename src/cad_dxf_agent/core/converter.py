@@ -204,7 +204,7 @@ def _convert_pdf(source_path: Path, output_dir: str | Path | None) -> Conversion
 
         has_fitz = True
     except ImportError:
-        pass
+        has_fitz = False
 
     if not has_fitz:
         try:
@@ -212,7 +212,7 @@ def _convert_pdf(source_path: Path, output_dir: str | Path | None) -> Conversion
 
             has_pdfplumber = True
         except ImportError:
-            pass
+            has_pdfplumber = False
 
     if not has_fitz and not has_pdfplumber:
         return ConversionResult(

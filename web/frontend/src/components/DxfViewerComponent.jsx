@@ -31,7 +31,7 @@ const DxfViewerComponent = forwardRef(function DxfViewerComponent(
   const highlightTimerRef = useRef(null);
 
   // Bump this counter on every viewChanged so selection overlays recompute screen positions
-  const [viewVersion, setViewVersion] = useState(0);
+  const [, setViewVersion] = useState(0);
 
   // Detect dark mode
   const isDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches;

@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
 import {
-  uploadFile, planEdit, v2Prompt, applyChanges, downloadFile, getRenderBlob, getDxfBlob,
+  uploadFile, v2Prompt, applyChanges, downloadFile, getRenderBlob, getDxfBlob,
   clearHistory, compareFiles, revisionUpload, revisionAlign, revisionDiff,
   revisionApprove, revisionApply, revisionDownloadBlob,
   v2Preview, v2Approve, v2Apply,
