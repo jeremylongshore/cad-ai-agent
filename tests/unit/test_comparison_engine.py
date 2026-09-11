@@ -113,6 +113,23 @@ class TestComparisonEngine:
         with pytest.raises(DrawingUnitMismatchError, match=r"set \$INSUNITS"):
             self.engine.compare(unitless, metric)
 
+    def test_warns_when_both_drawings_are_unitless(self, tmp_path):
+        first = ezdxf.new(dxfversion="R2018")
+        first.header["$INSUNITS"] = int(DrawingUnit.UNITLESS)
+        first.modelspace().add_line((0, 0), (10, 0))
+        master = tmp_path / "unitless_master.dxf"
+        first.saveas(master)
+
+        second = ezdxf.new(dxfversion="R2018")
+        second.header["$INSUNITS"] = int(DrawingUnit.UNITLESS)
+        second.modelspace().add_line((0, 0), (10, 0))
+        revision = tmp_path / "unitless_revision.dxf"
+        second.saveas(revision)
+
+        result = self.engine.compare(master, revision)
+
+        assert any("unitless $INSUNITS" in warning for warning in result.warnings)
+
 
 class TestComparisonEngineOutputs:
     def setup_method(self):

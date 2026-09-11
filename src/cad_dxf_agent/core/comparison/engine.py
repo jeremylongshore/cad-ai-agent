@@ -74,6 +74,12 @@ class ComparisonEngine:
             revision_unit = read_drawing_unit(revision_path)
             unit_scale = conversion_factor(revision_unit, master_unit)
 
+            if master_unit.value == 0 and revision_unit.value == 0:
+                profile_warnings.append(
+                    "Both drawings have unitless $INSUNITS; comparing raw coordinates and "
+                    "interpreting configured tolerances as drawing units."
+                )
+
             # Defaults are physical-inch tolerances. Express them in the master
             # drawing's native coordinates; explicitly supplied configs retain
             # their documented drawing-unit semantics.
