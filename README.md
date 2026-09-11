@@ -2,7 +2,7 @@
 
 Drawing Intelligence Platform for AEC professionals.
 
-Upload a DXF, PDF, or DWG — describe what you need in plain English, and get structured edits, compliance reports, quantity takeoffs, health assessments, RFIs, and drawing summaries — all without the AI ever touching your original file.
+Upload a DXF or vector PDF—or a DWG when the optional ODA File Converter is installed—describe what you need in plain English, and get structured edits, compliance reports, quantity takeoffs, health assessments, RFIs, and drawing summaries, all without the AI ever touching your original file.
 
 [![CI](https://github.com/jeremylongshore/cad-ai-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/jeremylongshore/cad-ai-agent/actions/workflows/ci.yml) [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://github.com/jeremylongshore/cad-ai-agent/blob/main/LICENSE)
 
@@ -40,7 +40,7 @@ Upload a DXF, PDF, or DWG — describe what you need in plain English, and get s
 
 | Supported | Not Yet |
 |-----------|---------|
-| DXF files (2D) | DWG native editing |
+| DXF files (2D) | DWG native editing; DWG import/export requires the separately installed ODA File Converter |
 | Model space + paper space layouts | 3D entities |
 | LINE, LWPOLYLINE, TEXT, MTEXT, INSERT, CIRCLE, ARC | Dimension regeneration |
 | 13 edit operations (move, edit_text, delete, add_block, rotate, copy, scale, mirror, add_line, add_polyline, add_circle, add_arc, add_text) | Xrefs |
@@ -81,6 +81,18 @@ source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install -e ".[dev]"
 pre-commit install
 ```
+
+### Optional DWG support
+
+DWG is not decoded natively by this package. Import and export require the separately installed [ODA File Converter](https://www.opendesign.com/guestfiles/oda_file_converter), which `ezdxf` detects at runtime. DXF and vector-PDF workflows do not require ODA.
+
+Run this preflight before accepting DWG files:
+
+```bash
+python -c "from ezdxf.addons import odafc; print('DWG ready' if odafc.is_installed() else 'DWG unavailable: install ODA File Converter or export the drawing as DXF')"
+```
+
+If the result is `DWG unavailable`, install ODA File Converter and make its executable discoverable to `ezdxf`, or set `CAD_ODA_PATH`. The planned cloud-conversion fallback is not implemented; the application will fail clearly instead of uploading the drawing elsewhere.
 
 ### Run Tests (Mock Mode — No API Key Needed)
 
