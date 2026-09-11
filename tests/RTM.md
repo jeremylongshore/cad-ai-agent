@@ -44,7 +44,7 @@ are flagged TODO in the "Retrofit queue" section at the end — engineer review.
 | REQ-010 | MUST   | EPIC-07 | Validators reject the entire changeset on any invalid/unsupported op                | tests/unit/test_validators.py                                                  |
 | REQ-011 | MUST   | EPIC-08 | Preview produces human-readable change descriptions before apply                    | tests/unit/test_preview_builder.py                                             |
 | REQ-012 | MUST   | EPIC-08 | EditEngine applies validated ops deterministically to a working copy                | tests/unit/test_edit_engine*.py, tests/integration/test_pipeline.py            |
-| REQ-013 | MUST   | EPIC-17 | Supported entity types (LINE/LWPOLYLINE/TEXT/MTEXT/INSERT/CIRCLE/ARC) enforced      | tests/unit/test_dxf_reader.py, tests/unit/test_entity_creation*.py             |
+| REQ-013 | MUST   | EPIC-17 | Supported entity types are defined by the 14-member `EntityType` enum and enforced | tests/unit/test_dxf_reader.py, tests/unit/test_entity_creation*.py             |
 
 ## Domain capabilities (EPIC-CAD-19..29)
 

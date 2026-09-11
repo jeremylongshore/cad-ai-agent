@@ -153,7 +153,7 @@ Tool definitions in `llm/tool_definitions.py` — 20+ tools split into query (re
 - **LLM never touches DXF directly** (see `000-docs/005-AT-ADEC-llm-plans-not-dxf.md`). It returns structured `EditOperation` objects with `OpType` enum: `move_entity`, `edit_text`, `delete_entity`, `add_block`, `rotate_entity`, `copy_entity`, `scale_entity`, `mirror_entity`, `add_line`, `add_polyline`, `add_circle`, `add_arc`, `add_text`. Invalid/unsupported ops reject the entire changeset.
 - **Protected layers** (TITLE, TITLEBLOCK, SEAL, REVISION) cannot be edited. Enforced at both validator and ToolExecutor levels.
 - **Revision notes are deterministic** — generated from operation metadata, never from freeform LLM output.
-- **Supported entity types**: LINE, LWPOLYLINE, TEXT, MTEXT, INSERT, CIRCLE, ARC. Other types are skipped during load.
+- **Supported entity types** are defined canonically by `EntityType` in `models/cad_schema.py`: LINE, LWPOLYLINE, TEXT, MTEXT, INSERT, CIRCLE, ARC, DIMENSION, HATCH, SPLINE, POLYLINE, ELLIPSE, SOLID, and LEADER. Types outside that enum are recorded and skipped during load; do not maintain a shorter hand-copied subset here.
 - **Response contracts** — every API response wraps in `PlatformResponse` with `TaskFamily` (11 categories), `ResponseType` (7 kinds), and `AuditMetadata` for traceability.
 
 ### Source Layout
