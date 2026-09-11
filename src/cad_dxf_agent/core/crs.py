@@ -9,7 +9,8 @@ from ezdxf.math import Matrix44
 from pyproj import CRS, Transformer
 from pyproj.exceptions import CRSError
 
-from ..models.cad_schema import CRSSource, DrawingCRS, Point2D
+from ..models.cad_schema import CRSSource, DrawingCRS, DrawingUnit, Point2D
+from .units import conversion_factor
 
 
 class CRSResolutionError(ValueError):
@@ -78,12 +79,41 @@ def _require_crs(crs: DrawingCRS | None) -> DrawingCRS:
     return crs
 
 
+def validate_crs_units(crs: DrawingCRS | None, drawing_unit: DrawingUnit) -> None:
+    """Reject a known DXF unit that contradicts the resolved projected CRS."""
+    if crs is None or drawing_unit is DrawingUnit.UNITLESS:
+        return
+    parsed = CRS.from_user_input(crs.definition)
+    if not parsed.is_projected:
+        raise CRSResolutionError(
+            f"DXF $INSUNITS={drawing_unit.name.lower()} conflicts with geographic CRS "
+            f"{crs.definition}; use unitless longitude/latitude coordinates or a projected CRS."
+        )
+    if crs.source is CRSSource.DXF_GEODATA:
+        # GEODATA's affine matrix includes its declared horizontal unit scale.
+        return
+    axis_factor = parsed.axis_info[0].unit_conversion_factor if parsed.axis_info else None
+    if axis_factor is None:
+        raise CRSResolutionError(f"Cannot determine coordinate units for {crs.definition}")
+    drawing_factor = conversion_factor(drawing_unit, DrawingUnit.METERS)
+    if not abs(drawing_factor - axis_factor) <= max(abs(axis_factor), 1.0) * 1e-9:
+        raise CRSResolutionError(
+            f"DXF $INSUNITS={drawing_unit.name.lower()} conflicts with {crs.definition} "
+            f"axis unit {parsed.axis_info[0].unit_name}; correct $INSUNITS or choose a "
+            "matching CRS."
+        )
+
+
 def _apply_matrix(point: Point2D, values: tuple[float, ...], *, inverse: bool) -> Point2D:
     matrix = Matrix44(values)
     if inverse:
         matrix.inverse()
     transformed = matrix.transform((point.x, point.y, point.z or 0.0))
-    return Point2D(x=transformed.x, y=transformed.y, z=transformed.z if point.z is not None else None)
+    return Point2D(
+        x=transformed.x,
+        y=transformed.y,
+        z=transformed.z if point.z is not None else None,
+    )
 
 
 def drawing_to_wgs84(point: Point2D, crs: DrawingCRS | None) -> Point2D:

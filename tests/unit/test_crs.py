@@ -12,10 +12,11 @@ from cad_dxf_agent.core.crs import (
     MissingCRSError,
     drawing_to_wgs84,
     resolve_drawing_crs,
+    validate_crs_units,
     wgs84_to_drawing,
 )
 from cad_dxf_agent.core.dxf_reader import load_dxf
-from cad_dxf_agent.models.cad_schema import CRSSource, DrawingCRS, Point2D
+from cad_dxf_agent.models.cad_schema import CRSSource, DrawingCRS, DrawingUnit, Point2D
 
 
 class _FakeGeoData:
@@ -105,6 +106,18 @@ def test_wgs84_round_trip_preserves_xy_and_z():
     assert round_trip.x == pytest.approx(drawing.x, abs=1e-6)
     assert round_trip.y == pytest.approx(drawing.y, abs=1e-6)
     assert round_trip.z == pytest.approx(drawing.z)
+
+
+def test_projected_crs_rejects_conflicting_dxf_units():
+    crs = DrawingCRS(
+        definition="EPSG:26916",
+        name="NAD83 / UTM zone 16N",
+        source=CRSSource.CALLER,
+    )
+
+    validate_crs_units(crs, DrawingUnit.METERS)
+    with pytest.raises(CRSResolutionError, match="conflicts"):
+        validate_crs_units(crs, DrawingUnit.FEET)
 
 
 def test_load_dxf_accepts_caller_crs(tmp_path):
