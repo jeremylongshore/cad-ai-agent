@@ -101,6 +101,48 @@ def extract_snapshots(
         return snapshots
 
 
+def scale_snapshots(snapshots: list[GeometrySnapshot], factor: float) -> list[GeometrySnapshot]:
+    """Scale geometric lengths while preserving dimensionless entity metadata."""
+    if factor == 1.0:
+        return snapshots
+
+    scaled: list[GeometrySnapshot] = []
+    for snap in snapshots:
+        attributes = dict(snap.attributes)
+        if "radius" in attributes:
+            attributes["radius"] = float(attributes["radius"]) * factor
+        if "major_axis" in attributes:
+            axis = attributes["major_axis"]
+            attributes["major_axis"] = tuple(float(value) * factor for value in axis)
+
+        text_geometry = snap.text_geometry
+        if text_geometry is not None:
+            text_geometry = text_geometry.model_copy(
+                update={
+                    "height": (
+                        text_geometry.height * factor if text_geometry.height is not None else None
+                    ),
+                    "char_height": (
+                        text_geometry.char_height * factor
+                        if text_geometry.char_height is not None
+                        else None
+                    ),
+                }
+            )
+
+        scaled.append(
+            snap.model_copy(
+                update={
+                    "points": [Point2D(x=p.x * factor, y=p.y * factor) for p in snap.points],
+                    "attributes": attributes,
+                    "text_geometry": text_geometry,
+                    "stable_id": None,
+                }
+            )
+        )
+    return scaled
+
+
 def apply_profile(
     snapshots: list[GeometrySnapshot],
     profile: ComparisonProfile,

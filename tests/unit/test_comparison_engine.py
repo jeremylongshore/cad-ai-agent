@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import json
 
+import ezdxf
 import pytest
 
 from cad_dxf_agent.core.comparison.engine import ComparisonEngine
+from cad_dxf_agent.core.units import DrawingUnitMismatchError
+from cad_dxf_agent.models.cad_schema import DrawingUnit
 from cad_dxf_agent.models.comparison_schema import (
     ChangeCategory,
     ComparisonConfig,
@@ -74,6 +77,58 @@ class TestComparisonEngine:
     def test_file_not_found(self, tmp_path):
         with pytest.raises(FileNotFoundError):
             self.engine.compare(tmp_path / "nope.dxf", tmp_path / "nah.dxf")
+
+    def test_converts_revision_units_to_master_units(self, tmp_path):
+        master_doc = ezdxf.new(dxfversion="R2018")
+        master_doc.header["$INSUNITS"] = int(DrawingUnit.INCHES)
+        master_doc.modelspace().add_line((0, 0), (10, 0))
+        master = tmp_path / "master_inches.dxf"
+        master_doc.saveas(master)
+
+        revision_doc = ezdxf.new(dxfversion="R2018")
+        revision_doc.header["$INSUNITS"] = int(DrawingUnit.MILLIMETERS)
+        revision_doc.modelspace().add_line((0, 0), (254, 0))
+        revision = tmp_path / "revision_mm.dxf"
+        revision_doc.saveas(revision)
+
+        result = self.engine.compare(master, revision)
+
+        assert result.total_changes == 0
+        assert result.summary["unchanged"] == 1
+        assert any("millimeters to inches" in warning for warning in result.warnings)
+
+    def test_refuses_known_to_unitless_comparison(self, tmp_path):
+        unitless_doc = ezdxf.new(dxfversion="R2018")
+        unitless_doc.header["$INSUNITS"] = int(DrawingUnit.UNITLESS)
+        unitless_doc.modelspace().add_line((0, 0), (10, 0))
+        unitless = tmp_path / "unitless.dxf"
+        unitless_doc.saveas(unitless)
+
+        metric_doc = ezdxf.new(dxfversion="R2018")
+        metric_doc.header["$INSUNITS"] = int(DrawingUnit.MILLIMETERS)
+        metric_doc.modelspace().add_line((0, 0), (254, 0))
+        metric = tmp_path / "metric.dxf"
+        metric_doc.saveas(metric)
+
+        with pytest.raises(DrawingUnitMismatchError, match=r"set \$INSUNITS"):
+            self.engine.compare(unitless, metric)
+
+    def test_warns_when_both_drawings_are_unitless(self, tmp_path):
+        first = ezdxf.new(dxfversion="R2018")
+        first.header["$INSUNITS"] = int(DrawingUnit.UNITLESS)
+        first.modelspace().add_line((0, 0), (10, 0))
+        master = tmp_path / "unitless_master.dxf"
+        first.saveas(master)
+
+        second = ezdxf.new(dxfversion="R2018")
+        second.header["$INSUNITS"] = int(DrawingUnit.UNITLESS)
+        second.modelspace().add_line((0, 0), (10, 0))
+        revision = tmp_path / "unitless_revision.dxf"
+        second.saveas(revision)
+
+        result = self.engine.compare(master, revision)
+
+        assert any("unitless $INSUNITS" in warning for warning in result.warnings)
 
 
 class TestComparisonEngineOutputs:

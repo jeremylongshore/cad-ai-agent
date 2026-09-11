@@ -10,6 +10,7 @@ import ezdxf
 
 from ..models.cad_schema import (
     DrawingContext,
+    DrawingUnit,
     EntityGeometry,
     EntityRef,
     EntityType,
@@ -45,6 +46,12 @@ def load_dxf(file_path: str | Path) -> DrawingContext:
         span.set_attribute("cad.file.name", file_path.name)
 
         doc = ezdxf.readfile(str(file_path))
+        raw_insunits = int(doc.header.get("$INSUNITS", 0) or 0)
+        try:
+            drawing_unit = DrawingUnit(raw_insunits)
+        except ValueError:
+            logger.warning("Invalid $INSUNITS value %s; treating drawing as unitless", raw_insunits)
+            drawing_unit = DrawingUnit.UNITLESS
 
         entities: list[EntityRef] = []
         unsupported: set[str] = set()
@@ -99,6 +106,7 @@ def load_dxf(file_path: str | Path) -> DrawingContext:
 
         ctx = DrawingContext(
             file_path=str(file_path),
+            drawing_unit=drawing_unit,
             entities=entities,
             layers=layers,
             blocks=blocks,
@@ -108,6 +116,8 @@ def load_dxf(file_path: str | Path) -> DrawingContext:
             metadata={
                 "dxf_version": doc.dxfversion,
                 "encoding": doc.encoding,
+                "insunits": int(drawing_unit),
+                "unit_name": drawing_unit.name.lower(),
             },
         )
 

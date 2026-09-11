@@ -10,12 +10,13 @@ import ezdxf
 
 from ...models.comparison_schema import ComparisonConfig, ComparisonResult, MatchSummary
 from ...otel import get_tracer
+from ..units import conversion_factor, inches_to_drawing_units, read_drawing_unit
 from .alignment import align_drawings, apply_alignment
-from .canonical import assign_stable_ids, sort_changes, sort_snapshots
+from .canonical import QuantizationConfig, assign_stable_ids, sort_changes, sort_snapshots
 from .changelog import ChangeLog, generate_changelog, generate_summary
 from .classifier import classify_changes
 from .diff_overlay import write_diff_overlay
-from .geometry import detect_titleblock_region, extract_snapshots
+from .geometry import detect_titleblock_region, extract_snapshots, scale_snapshots
 from .matcher import match_entities
 
 logger = logging.getLogger(__name__)
@@ -68,6 +69,31 @@ class ComparisonEngine:
 
             profile_warnings: list[str] = []
 
+            master_unit = read_drawing_unit(master_path)
+            revision_unit = read_drawing_unit(revision_path)
+            unit_scale = conversion_factor(revision_unit, master_unit)
+
+            if master_unit.value == 0 and revision_unit.value == 0:
+                profile_warnings.append(
+                    "Both drawings have unitless $INSUNITS; comparing raw coordinates and "
+                    "interpreting configured tolerances as drawing units."
+                )
+
+            # Canonical identity uses physical-inch defaults expressed in the
+            # master drawing's native coordinates. Match/classification config
+            # remains explicitly defined in master drawing units.
+            native_per_inch = inches_to_drawing_units(master_unit)
+            quantization = QuantizationConfig(
+                near_vertex_epsilon=0.0001 * native_per_inch,
+                spatial_bin_size=0.25 * native_per_inch,
+            )
+            if master_unit.name != revision_unit.name:
+                profile_warnings.append(
+                    "Converted revision coordinates from "
+                    f"{revision_unit.name.lower()} to {master_unit.name.lower()} "
+                    f"(factor {unit_scale:.12g})."
+                )
+
             # Auto-detect titleblock region once from master, apply to both
             if config.profile and not config.profile.exclude_regions:
                 logger.info("Extracting raw master snapshots for titleblock detection")
@@ -92,13 +118,14 @@ class ComparisonEngine:
             revision_snaps = extract_snapshots(
                 revision_path, config, _profile_warnings=profile_warnings, _source="revision"
             )
+            revision_snaps = scale_snapshots(revision_snaps, unit_scale)
 
             # Canonical model: assign stable IDs and sort deterministically
             if config.use_canonical:
                 span.set_attribute("cad.compare.canonical", True)
                 logger.info("Applying canonical model (stable IDs + deterministic sort)")
-                master_snaps = assign_stable_ids(master_snaps)
-                revision_snaps = assign_stable_ids(revision_snaps)
+                master_snaps = assign_stable_ids(master_snaps, quantization)
+                revision_snaps = assign_stable_ids(revision_snaps, quantization)
                 master_snaps = sort_snapshots(master_snaps)
                 revision_snaps = sort_snapshots(revision_snaps)
 
