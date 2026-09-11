@@ -31,6 +31,7 @@ dependencies = [
     "pyyaml>=6.0",
     "rtree>=1.0",
     "shapely>=2.0",
+    "pyproj>=3.6",
 ]
 
 [project.urls]
@@ -132,7 +133,7 @@ disallow_untyped_defs = false
 check_untyped_defs = true
 
 [[tool.mypy.overrides]]
-module = ["ezdxf.*", "PySide6.*", "opentelemetry.*", "pdfplumber.*", "fitz.*", "matplotlib.*", "fpdf.*", "google.*", "vertexai.*", "rtree.*", "shapely.*"]
+module = ["ezdxf.*", "PySide6.*", "opentelemetry.*", "pdfplumber.*", "fitz.*", "matplotlib.*", "fpdf.*", "google.*", "vertexai.*", "rtree.*", "shapely.*", "pyproj.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

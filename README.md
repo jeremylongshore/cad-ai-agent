@@ -26,6 +26,7 @@ Upload a DXF or vector PDF—or a DWG when the optional ODA File Converter is in
 | **RFI Generation** | Automated Request For Information based on detected ambiguities |
 | **Zone Detection** | Closed-loop room/area detection with area calculation |
 | **Revision Comparison** | Diff two DXF versions, review changes, apply approved edits |
+| **Georeferencing** | Resolve caller, `.prj`, or supported DXF GEODATA CRS metadata and transform drawing points to/from WGS84 |
 | **Agent Mode** | Iterative multi-turn tool-use loop for complex requests (max 10 turns) |
 
 ### Key Principles
@@ -50,6 +51,23 @@ Upload a DXF or vector PDF—or a DWG when the optional ODA File Converter is in
 | Plain-English drawing summaries | |
 | RFI generation | |
 | Zone/room detection with area calc | |
+| Optional entity elevations and projected/geographic CRS metadata | Full 3D solids and surfaces |
+
+### Geospatial coordinates
+
+`load_dxf()` resolves coordinate references in fail-closed precedence order: an explicit caller
+override, a same-name `.prj` sidecar, then supported DXF GEODATA. A present but invalid CRS, or a
+known `$INSUNITS` value that contradicts a projected CRS, raises `CRSResolutionError` instead of
+silently producing incorrect coordinates.
+
+```python
+from cad_dxf_agent.core.crs import drawing_to_wgs84
+from cad_dxf_agent.core.dxf_reader import load_dxf
+from cad_dxf_agent.models.cad_schema import Point2D
+
+context = load_dxf("site.dxf", crs="EPSG:26916")
+longitude_latitude = drawing_to_wgs84(Point2D(x=500000, y=3600000), context.crs)
+```
 | Agent-mode iterative tool-use | |
 | Protected layers + AI revision notes | |
 | Revision comparison (CLI + web) | |

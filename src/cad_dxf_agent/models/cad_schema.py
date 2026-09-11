@@ -62,6 +62,28 @@ class DrawingUnit(IntEnum):
     US_SURVEY_MILES = 24
 
 
+class CRSSource(StrEnum):
+    """Authority used to georeference a drawing."""
+
+    CALLER = "caller"
+    PRJ = "prj"
+    DXF_GEODATA = "dxf_geodata"
+
+
+class DrawingCRS(BaseModel):
+    """Resolved coordinate reference system and optional CAD-to-CRS transform."""
+
+    definition: str = Field(description="Canonical authority code or WKT accepted by pyproj.")
+    name: str
+    source: CRSSource
+    drawing_to_crs_matrix: tuple[float, ...] | None = Field(
+        default=None,
+        min_length=16,
+        max_length=16,
+        description="Row-major DXF GEODATA transform from drawing WCS into CRS coordinates.",
+    )
+
+
 class Point2D(BaseModel):
     """Planar coordinate with optional source elevation.
 
@@ -280,6 +302,10 @@ class DrawingContext(BaseModel):
     drawing_unit: DrawingUnit = Field(
         default=DrawingUnit.UNITLESS,
         description="Drawing coordinate unit from the DXF $INSUNITS header.",
+    )
+    crs: DrawingCRS | None = Field(
+        default=None,
+        description="Resolved geospatial reference; None means drawing-local coordinates only.",
     )
     entities: list[EntityRef] = Field(default_factory=list)
     layers: list[LayerRule] = Field(default_factory=list)
