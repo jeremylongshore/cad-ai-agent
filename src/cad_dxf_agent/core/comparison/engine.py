@@ -65,7 +65,6 @@ class ComparisonEngine:
             span.set_attribute("cad.compare.revision_path", Path(revision_path).name)
             span.set_attribute("cad.compare.ezdxf_version", ezdxf.version)
 
-            supplied_config = config is not None
             config = config or ComparisonConfig()
 
             profile_warnings: list[str] = []
@@ -80,26 +79,14 @@ class ComparisonEngine:
                     "interpreting configured tolerances as drawing units."
                 )
 
-            # Defaults are physical-inch tolerances. Express them in the master
-            # drawing's native coordinates; explicitly supplied configs retain
-            # their documented drawing-unit semantics.
+            # Canonical identity uses physical-inch defaults expressed in the
+            # master drawing's native coordinates. Match/classification config
+            # remains explicitly defined in master drawing units.
             native_per_inch = inches_to_drawing_units(master_unit)
             quantization = QuantizationConfig(
                 near_vertex_epsilon=0.0001 * native_per_inch,
                 spatial_bin_size=0.25 * native_per_inch,
             )
-            if not supplied_config and native_per_inch != 1.0:
-                config = config.model_copy(
-                    update={
-                        "tolerance": config.tolerance * native_per_inch,
-                        "match_search_radius": config.match_search_radius * native_per_inch,
-                        "move_threshold": config.move_threshold * native_per_inch,
-                        "alignment": config.alignment.model_copy(
-                            update={"max_residual": config.alignment.max_residual * native_per_inch}
-                        ),
-                    }
-                )
-
             if master_unit.name != revision_unit.name:
                 profile_warnings.append(
                     "Converted revision coordinates from "

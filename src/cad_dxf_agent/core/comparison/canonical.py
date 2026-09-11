@@ -1,8 +1,8 @@
 """Canonical model — quantization, normalization, and stable identity for revision workflows.
 
 The comparison engine converts revision coordinates into the master drawing's
-``$INSUNITS`` coordinate system. Physical defaults are anchored in inches and
-scaled to that native unit; explicitly supplied configs remain drawing-unit values.
+``$INSUNITS`` coordinate system. Canonical epsilon/bin defaults are anchored in
+inches and scaled to that native unit; comparison configs remain drawing-unit values.
 Quantization is configurable (default 4 decimal places).
 
 This module provides the foundation for deterministic entity identity
