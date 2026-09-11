@@ -18,6 +18,11 @@ class Settings:
 
     def __init__(self) -> None:
         self.llm_provider: str = os.getenv("CAD_LLM_PROVIDER", "mock")
+        # Provider-neutral BYOK settings. Custom providers may use these
+        # conventions directly, or ignore them and read their own variables.
+        self.llm_model: str | None = os.getenv("CAD_LLM_MODEL") or None
+        self.llm_api_key: str | None = os.getenv("CAD_LLM_API_KEY") or None
+        self.llm_base_url: str | None = os.getenv("CAD_LLM_BASE_URL") or None
 
         # Protected layers (never editable)
         raw_layers = os.getenv("CAD_PROTECTED_LAYERS", "TITLE,TITLEBLOCK,SEAL,REVISION")
@@ -101,10 +106,11 @@ class Settings:
         key_map = {
             "gemini-key": "CAD_GEMINI_API_KEY",
         }
+        # Provider-specific keys take precedence for backwards compatibility;
+        # CAD_LLM_API_KEY is the portable fallback for any model/provider.
         env_var = key_map.get(provider)
-        if env_var is None:
-            return None
-        value = os.getenv(env_var)
+        value = os.getenv(env_var) if env_var else None
+        value = value or self.llm_api_key
         if value:
             logger.debug("API key loaded for provider: %s", provider)
         return value
