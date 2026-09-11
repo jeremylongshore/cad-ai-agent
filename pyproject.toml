@@ -55,7 +55,7 @@ gcp-trace = [
     "opentelemetry-sdk>=1.21",
 ]
 convert = [
-    "pymupdf>=1.24",
+    "pdfplumber>=0.10",
     "Pillow>=10.0",
 ]
 convert-fallback = [
@@ -85,7 +85,6 @@ dev = [
     "opentelemetry-api>=1.21",
     "opentelemetry-sdk>=1.21",
     "pdfplumber>=0.10",
-    "pymupdf>=1.24",
     "Pillow>=10.0",
     "matplotlib>=3.8",
     "fpdf2>=2.7",
