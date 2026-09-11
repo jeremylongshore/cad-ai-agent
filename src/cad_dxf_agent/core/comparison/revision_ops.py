@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 
+from ...models.cad_schema import Point2D
 from ...models.comparison_schema import (
     ChangeCategory,
     ComparisonResult,
@@ -49,13 +50,21 @@ def _make_id() -> str:
     return uuid.uuid4().hex[:8]
 
 
+def _point_dict(point: Point2D) -> dict[str, float]:
+    """Serialize a point without adding a null elevation to legacy payloads."""
+    data = {"x": point.x, "y": point.y}
+    if point.z is not None:
+        data["z"] = point.z
+    return data
+
+
 def _snapshot_dict(snap) -> dict:
     """Serialize a GeometrySnapshot to a dict for forward/reverse payloads."""
     return {
         "handle": snap.handle,
         "entity_type": snap.entity_type.value,
         "layer": snap.layer,
-        "points": [{"x": p.x, "y": p.y} for p in snap.points],
+        "points": [_point_dict(p) for p in snap.points],
         "text_content": snap.text_content,
         "block_name": snap.block_name,
         "attributes": dict(snap.attributes),
@@ -65,7 +74,12 @@ def _snapshot_dict(snap) -> dict:
 def _ops_for_moved(change: EntityChange, change_index: int) -> list[RevisionOp]:
     assert change.master_snapshot is not None
     assert change.displacement is not None
-    dx, dy = change.displacement.x, change.displacement.y
+    dx, dy, dz = change.displacement.x, change.displacement.y, change.displacement.z
+    forward = {"dx": dx, "dy": dy}
+    reverse = {"dx": -dx, "dy": -dy}
+    if dz is not None:
+        forward["dz"] = dz
+        reverse["dz"] = -dz
     return [
         RevisionOp(
             op_id=_make_id(),
@@ -73,8 +87,8 @@ def _ops_for_moved(change: EntityChange, change_index: int) -> list[RevisionOp]:
             change_index=change_index,
             target_handle=change.master_snapshot.handle,
             target_layer=change.master_snapshot.layer,
-            forward={"dx": dx, "dy": dy},
-            reverse={"dx": -dx, "dy": -dy},
+            forward=forward,
+            reverse=reverse,
             confidence=change.confidence,
             match_method=change.match_method,
             description=(
@@ -159,12 +173,8 @@ def _ops_for_modified(change: EntityChange, change_index: int) -> list[RevisionO
                 change_index=change_index,
                 target_handle=change.master_snapshot.handle,
                 target_layer=change.master_snapshot.layer,
-                forward={
-                    "new_points": [{"x": p.x, "y": p.y} for p in change.revision_snapshot.points]
-                },
-                reverse={
-                    "new_points": [{"x": p.x, "y": p.y} for p in change.master_snapshot.points]
-                },
+                forward={"new_points": [_point_dict(p) for p in change.revision_snapshot.points]},
+                reverse={"new_points": [_point_dict(p) for p in change.master_snapshot.points]},
                 confidence=change.confidence,
                 match_method=change.match_method,
                 description=f"Modify geometry on {change.master_snapshot.layer}",

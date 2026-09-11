@@ -98,6 +98,18 @@ class TestApplyMove:
         assert entity.dxf.end.x == pytest.approx(15.0)
         assert entity.dxf.end.y == pytest.approx(3.0)
 
+    def test_move_line_preserves_and_applies_elevation(self):
+        doc, handle = _make_doc_with_line(start=(0, 0, 10), end=(10, 0, 12))
+        op = _make_op(handle=handle, forward={"dx": 0.0, "dy": 0.0, "dz": 3.0})
+        applier = RevisionApplier(doc)
+
+        result = applier.apply([op], _auto_approve_all([op]))
+
+        assert result.all_succeeded
+        entity = doc.entitydb.get(handle)
+        assert entity.dxf.start.z == pytest.approx(13.0)
+        assert entity.dxf.end.z == pytest.approx(15.0)
+
     def test_move_polyline(self):
         doc, handle = _make_doc_with_polyline()
         op = _make_op(handle=handle, forward={"dx": 2.0, "dy": 1.0})

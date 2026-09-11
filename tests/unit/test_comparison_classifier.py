@@ -85,6 +85,35 @@ class TestMovedClassification:
         result = classify_changes(mr, config)
         assert result.changes[0].category == ChangeCategory.UNCHANGED
 
+    def test_uniform_elevation_change_is_a_3d_move(self):
+        master = GeometrySnapshot(
+            handle="A",
+            entity_type=EntityType.LINE,
+            layer="S",
+            points=[Point2D(x=0, y=0, z=10), Point2D(x=10, y=0, z=10)],
+        )
+        revision = GeometrySnapshot(
+            handle="B",
+            entity_type=EntityType.LINE,
+            layer="S",
+            points=[Point2D(x=0, y=0, z=15), Point2D(x=10, y=0, z=15)],
+        )
+        match = MatchResult(
+            pairs=[
+                ScoredMatch(
+                    master=master,
+                    revision=revision,
+                    confidence=1.0,
+                    method=MatchMethod.spatial,
+                )
+            ]
+        )
+
+        result = classify_changes(match, ComparisonConfig(tolerance=0.25, move_threshold=0.25))
+
+        assert result.changes[0].category is ChangeCategory.MOVED
+        assert result.changes[0].displacement == Point2D(x=0, y=0, z=5)
+
 
 class TestAddedRemovedClassification:
     def test_added_and_removed(self, tmp_path):

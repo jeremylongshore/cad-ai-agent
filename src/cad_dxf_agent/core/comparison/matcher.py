@@ -107,7 +107,14 @@ def _fingerprint(snap: GeometrySnapshot) -> str:
     start/end are interchangeable.
     """
     # Round points to avoid floating-point noise
-    rounded_pts = [(round(p.x, 4), round(p.y, 4)) for p in snap.points]
+    rounded_pts = [
+        (
+            round(p.x, 4),
+            round(p.y, 4),
+            round(p.z, 4) if p.z is not None else None,
+        )
+        for p in snap.points
+    ]
     # Only sort for LINE — start/end order is arbitrary.
     # For LWPOLYLINE, SPLINE, etc., vertex order defines the shape.
     if snap.entity_type.value == "LINE":

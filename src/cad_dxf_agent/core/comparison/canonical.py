@@ -53,6 +53,7 @@ def quantize_point(point: Point2D, config: QuantizationConfig | None = None) -> 
     return Point2D(
         x=round(point.x, config.decimal_places),
         y=round(point.y, config.decimal_places),
+        z=round(point.z, config.decimal_places) if point.z is not None else None,
     )
 
 
@@ -88,6 +89,8 @@ def remove_near_duplicate_vertices(
     for pt in points[1:]:
         prev = result[-1]
         dist_sq = (pt.x - prev.x) ** 2 + (pt.y - prev.y) ** 2
+        if pt.z is not None and prev.z is not None:
+            dist_sq += (pt.z - prev.z) ** 2
         if dist_sq > eps_sq:
             result.append(pt)
     return result
@@ -159,7 +162,7 @@ def _sort_line_endpoints(points: list[Point2D]) -> list[Point2D]:
     identical canonical points.
     """
     a, b = points[0], points[1]
-    if (a.x, a.y) > (b.x, b.y):
+    if (a.x, a.y, a.z or 0.0) > (b.x, b.y, b.z or 0.0):
         return [b, a]
     return [a, b]
 

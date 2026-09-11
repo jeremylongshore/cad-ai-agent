@@ -122,13 +122,14 @@ class RevisionApplier:
             )
         dx = op.forward.get("dx", 0)
         dy = op.forward.get("dy", 0)
-        entity.translate(dx, dy, 0)
+        dz = op.forward.get("dz", 0)
+        entity.translate(dx, dy, dz)
         return AppliedRevisionOp(
             op_id=op.op_id,
             op_type=op.op_type,
             success=True,
             entity_handle=op.target_handle,
-            description=f"Moved by ({dx}, {dy})",
+            description=f"Moved by ({dx}, {dy}, {dz})",
         )
 
     def _apply_delete(self, op: RevisionOp) -> AppliedRevisionOp:
@@ -260,11 +261,29 @@ class RevisionApplier:
         dxf_type = entity.dxftype()
 
         if dxf_type == "LINE" and len(new_points) >= 2:
-            entity.dxf.start = (new_points[0]["x"], new_points[0]["y"], 0)
-            entity.dxf.end = (new_points[1]["x"], new_points[1]["y"], 0)
+            entity.dxf.start = (
+                new_points[0]["x"],
+                new_points[0]["y"],
+                new_points[0].get("z", 0),
+            )
+            entity.dxf.end = (
+                new_points[1]["x"],
+                new_points[1]["y"],
+                new_points[1].get("z", 0),
+            )
         elif dxf_type == "LWPOLYLINE":
             pts = [(p["x"], p["y"]) for p in new_points]
+            elevations = {p.get("z") for p in new_points if p.get("z") is not None}
+            if len(elevations) > 1:
+                return AppliedRevisionOp(
+                    op_id=op.op_id,
+                    op_type=op.op_type,
+                    success=False,
+                    error="LWPOLYLINE vertices cannot carry different elevations",
+                )
             entity.set_points(pts, format="xy")
+            if elevations:
+                entity.dxf.elevation = elevations.pop()
         else:
             return AppliedRevisionOp(
                 op_id=op.op_id,

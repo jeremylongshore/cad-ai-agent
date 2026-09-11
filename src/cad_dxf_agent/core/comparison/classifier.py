@@ -89,8 +89,17 @@ def _classify_pair(
     displacement = Point2D(
         x=r_snap.centroid.x - m_snap.centroid.x,
         y=r_snap.centroid.y - m_snap.centroid.y,
+        z=(
+            r_snap.centroid.z - m_snap.centroid.z
+            if r_snap.centroid.z is not None and m_snap.centroid.z is not None
+            else None
+        ),
     )
-    dist = math.sqrt(displacement.x**2 + displacement.y**2)
+    dist = math.sqrt(
+        displacement.x**2
+        + displacement.y**2
+        + (displacement.z**2 if displacement.z is not None else 0.0)
+    )
 
     points_match = _points_match(m_snap.points, r_snap.points, config.tolerance)
     content_match = _content_matches(m_snap, r_snap)
@@ -134,7 +143,10 @@ def _points_match(a: list[Point2D], b: list[Point2D], tolerance: float) -> bool:
         return False
     tol_sq = tolerance * tolerance
     for pa, pb in zip(a, b, strict=True):
-        if (pa.x - pb.x) ** 2 + (pa.y - pb.y) ** 2 > tol_sq:
+        dist_sq = (pa.x - pb.x) ** 2 + (pa.y - pb.y) ** 2
+        if pa.z is not None and pb.z is not None:
+            dist_sq += (pa.z - pb.z) ** 2
+        if dist_sq > tol_sq:
             return False
     return True
 
@@ -152,7 +164,10 @@ def _shape_matches_after_translation(
     for mp, rp in zip(master_pts, revision_pts, strict=True):
         translated_x = mp.x + displacement.x
         translated_y = mp.y + displacement.y
-        if (translated_x - rp.x) ** 2 + (translated_y - rp.y) ** 2 > tol_sq:
+        dist_sq = (translated_x - rp.x) ** 2 + (translated_y - rp.y) ** 2
+        if mp.z is not None and rp.z is not None and displacement.z is not None:
+            dist_sq += (mp.z + displacement.z - rp.z) ** 2
+        if dist_sq > tol_sq:
             return False
     return True
 
@@ -215,7 +230,10 @@ def _describe_modifications(
     else:
         changed_points = []
         for i, (mp, rp) in enumerate(zip(m_snap.points, r_snap.points, strict=True)):
-            dist = math.sqrt((mp.x - rp.x) ** 2 + (mp.y - rp.y) ** 2)
+            dist_sq = (mp.x - rp.x) ** 2 + (mp.y - rp.y) ** 2
+            if mp.z is not None and rp.z is not None:
+                dist_sq += (mp.z - rp.z) ** 2
+            dist = math.sqrt(dist_sq)
             if dist > 1e-6:
                 changed_points.append(i)
         if changed_points:
