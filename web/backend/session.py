@@ -173,7 +173,7 @@ class SessionManager:
         with self._lock:
             self._sessions[session.session_id] = session
 
-        logger.info("Created session %s for user %s", session.session_id, user_id)
+        logger.info("Created web session")
         return session
 
     def get(self, session_id: str, user_id: str) -> Session:
@@ -211,7 +211,7 @@ class SessionManager:
             self._session_locks.pop(session_id, None)
 
         self._store.delete(session_id)
-        logger.info("Deleted session %s", session_id)
+        logger.info("Deleted web session")
 
     def save_metadata(self, session: Session) -> None:
         """Persist the durable metadata for a session."""

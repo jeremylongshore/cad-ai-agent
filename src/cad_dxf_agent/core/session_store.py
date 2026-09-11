@@ -11,6 +11,7 @@ import abc
 import dataclasses
 import json
 import logging
+import re
 import shutil
 import time
 import uuid
@@ -150,7 +151,7 @@ class InMemorySessionStore(SessionStore):
         with self._lock:
             self._sessions[session_id] = metadata
 
-        logger.info("Created session %s for user %s", session_id, user_id)
+        logger.info("Created session")
         return metadata
 
     def get(self, session_id: str) -> SessionMetadata | None:
@@ -172,13 +173,19 @@ class InMemorySessionStore(SessionStore):
             self._sessions[metadata.session_id] = metadata
 
     def delete(self, session_id: str) -> None:
-        with self._lock:
-            self._sessions.pop(session_id, None)
+        safe_session_id = Path(session_id).name
+        if safe_session_id != session_id:
+            raise ValueError("Invalid session ID")
+        if re.fullmatch(r"[0-9a-f]{16}", safe_session_id) is None:
+            return
 
-        session_dir = self._session_dir / session_id
+        with self._lock:
+            self._sessions.pop(safe_session_id, None)
+
+        session_dir = self._session_dir / safe_session_id
         if session_dir.exists():
             shutil.rmtree(session_dir, ignore_errors=True)
-        logger.info("Deleted session %s", session_id)
+        logger.info("Deleted session")
 
     def cleanup_expired(self) -> int:
         expired = []

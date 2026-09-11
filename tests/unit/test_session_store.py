@@ -236,6 +236,11 @@ class TestInMemorySessionStore:
         """delete() on an unknown session_id does not raise."""
         store.delete("ghost-session-id")  # must not raise
 
+    def test_delete_rejects_path_traversal(self, store: InMemorySessionStore):
+        """delete() never resolves a caller-provided path outside the session root."""
+        with pytest.raises(ValueError, match="Invalid session ID"):
+            store.delete("../0123456789abcdef")
+
     def test_cleanup_expired_removes_old_sessions(self, store: InMemorySessionStore):
         """cleanup_expired() removes sessions whose age exceeds the TTL."""
         stale = store.create(user_id="u1")

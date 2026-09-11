@@ -918,9 +918,9 @@ async def load_document(doc_id: str, user: dict = Depends(get_user)):
             "drawing_units": ctx.metadata.get("units", "unknown"),
         }
         session.file_info = file_info
-    except Exception as e:
-        logger.warning("Failed to load DXF from library doc %s: %s", doc_id, e)
-        file_info = {"filename": doc.filename, "error": str(e)}
+    except Exception:
+        logger.warning("Failed to load DXF from library document", exc_info=True)
+        file_info = {"filename": doc.filename, "error": "Unable to load drawing"}
 
     return {
         "session_id": session.session_id,
@@ -1000,9 +1000,9 @@ async def reconnect_session(body: ReconnectRequest, user: dict = Depends(get_use
             "drawing_units": ctx.metadata.get("units", "unknown"),
         }
         session.file_info = file_info
-    except Exception as e:
-        logger.warning("Failed to load DXF for reconnect (doc %s): %s", body.document_id, e)
-        file_info = {"filename": doc.filename, "error": str(e)}
+    except Exception:
+        logger.warning("Failed to load DXF for reconnect", exc_info=True)
+        file_info = {"filename": doc.filename, "error": "Unable to load drawing"}
 
     return {
         "session_id": session.session_id,
@@ -3081,7 +3081,7 @@ def _parse_selected_region(selected_regions: list[dict] | None):
             center=Point2D(x=(min_x + max_x) / 2, y=(min_y + max_y) / 2),
         )
     except (KeyError, ValueError, TypeError):
-        logger.debug("Failed to parse selected_region: %s", selected_regions, exc_info=True)
+        logger.debug("Failed to parse selected region", exc_info=True)
         return None
 
 

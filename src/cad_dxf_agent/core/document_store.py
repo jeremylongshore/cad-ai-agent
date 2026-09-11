@@ -155,7 +155,7 @@ class InMemoryDocumentStore(DocumentStore):
             self._documents[user_id][doc.doc_id] = doc
             self._file_data[doc.doc_id] = data
 
-        logger.info("Stored document %s (%s) for user %s", doc.doc_id, filename, user_id)
+        logger.info("Stored document")
         return doc
 
     def get_document(self, user_id: str, doc_id: str) -> UserDocument | None:
@@ -303,9 +303,9 @@ class GCSDocumentStore(DocumentStore):
                 content_type="application/json",
             )
 
-            logger.info("Stored document %s (%s) to GCS for user %s", doc.doc_id, filename, user_id)
-        except Exception as exc:
-            logger.exception("Failed to upload document to GCS: %s", exc)
+            logger.info("Stored document in GCS")
+        except Exception:
+            logger.exception("Failed to upload document to GCS")
             raise
 
         return doc
@@ -319,8 +319,8 @@ class GCSDocumentStore(DocumentStore):
             if doc.status != "active":
                 return None
             return doc
-        except Exception as exc:
-            logger.warning("Failed to fetch document %s from GCS: %s", doc_id, exc)
+        except Exception:
+            logger.warning("Failed to fetch document from GCS", exc_info=True)
             return None
 
     def list_documents(self, user_id: str) -> list[UserDocument]:
@@ -353,8 +353,8 @@ class GCSDocumentStore(DocumentStore):
                 content_type="application/json",
             )
             return True
-        except Exception as exc:
-            logger.exception("Failed to delete document %s from GCS: %s", doc_id, exc)
+        except Exception:
+            logger.exception("Failed to delete document from GCS")
             return False
 
     def touch_document(self, user_id: str, doc_id: str) -> bool:
@@ -369,8 +369,8 @@ class GCSDocumentStore(DocumentStore):
                 content_type="application/json",
             )
             return True
-        except Exception as exc:
-            logger.warning("Failed to touch document %s in GCS: %s", doc_id, exc)
+        except Exception:
+            logger.warning("Failed to touch document in GCS", exc_info=True)
             return False
 
     def get_file_data(self, user_id: str, doc_id: str) -> bytes | None:
@@ -382,8 +382,8 @@ class GCSDocumentStore(DocumentStore):
             if not file_blob.exists():
                 return None
             return bytes(file_blob.download_as_bytes())
-        except Exception as exc:
-            logger.warning("Failed to download document %s from GCS: %s", doc_id, exc)
+        except Exception:
+            logger.warning("Failed to download document from GCS", exc_info=True)
             return None
 
     def save_work_progress(
@@ -419,9 +419,9 @@ class GCSDocumentStore(DocumentStore):
                     content_type="application/json",
                 )
 
-            logger.info("Saved work progress for doc %s user %s", doc_id, user_id)
-        except Exception as exc:
-            logger.warning("Failed to save work progress for doc %s: %s", doc_id, exc)
+            logger.info("Saved work progress")
+        except Exception:
+            logger.warning("Failed to save work progress", exc_info=True)
 
     def get_work_progress(self, user_id: str, doc_id: str) -> WorkProgress | None:
         try:
@@ -430,8 +430,8 @@ class GCSDocumentStore(DocumentStore):
             if not blob.exists():
                 return None
             return WorkProgress.model_validate_json(blob.download_as_text())
-        except Exception as exc:
-            logger.warning("Failed to load work progress for doc %s: %s", doc_id, exc)
+        except Exception:
+            logger.warning("Failed to load work progress", exc_info=True)
             return None
 
     def get_working_dxf(self, user_id: str, doc_id: str) -> bytes | None:
@@ -441,8 +441,8 @@ class GCSDocumentStore(DocumentStore):
             if not blob.exists():
                 return None
             return bytes(blob.download_as_bytes())
-        except Exception as exc:
-            logger.warning("Failed to load working DXF for doc %s: %s", doc_id, exc)
+        except Exception:
+            logger.warning("Failed to load working DXF", exc_info=True)
             return None
 
     def clear_work_progress(self, user_id: str, doc_id: str) -> bool:
@@ -470,6 +470,6 @@ class GCSDocumentStore(DocumentStore):
                 )
 
             return had
-        except Exception as exc:
-            logger.warning("Failed to clear work progress for doc %s: %s", doc_id, exc)
+        except Exception:
+            logger.warning("Failed to clear work progress", exc_info=True)
             return False

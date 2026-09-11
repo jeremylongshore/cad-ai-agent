@@ -212,9 +212,8 @@ def run_planner(
             span.set_attribute("cad.mode", "deterministic")
             span.set_attribute("cad.ops.count", det_result.op_count)
             logger.info(
-                "Deterministic plan used (%d ops) for prompt: %s",
+                "Deterministic plan used (%d ops)",
                 det_result.op_count,
-                prompt[:80],
             )
             det_result.planner_trace = PlannerTrace(
                 provider_name="deterministic",
@@ -225,7 +224,7 @@ def run_planner(
             return det_result
 
         span.set_attribute("cad.mode", provider.name)
-        logger.info("Running planner [%s] for prompt: %s", provider.name, prompt[:80])
+        logger.info("Running planner")
 
         timeout = settings.planner_timeout
         max_retries = settings.planner_max_retries
@@ -239,10 +238,9 @@ def run_planner(
                 )
                 span.set_attribute("cad.planner.attempt", attempt)
                 logger.info(
-                    "Planner returned %d operation(s) on attempt %d for prompt: %s",
+                    "Planner returned %d operation(s) on attempt %d",
                     changeset.op_count,
                     attempt,
-                    prompt[:80],
                 )
 
                 # Validation feedback loop (only when context + rules provided)

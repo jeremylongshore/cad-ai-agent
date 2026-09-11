@@ -46,7 +46,7 @@ def deterministic_plan(prompt: str, drawing_context: dict) -> ChangeSet | None:
     if m:
         handle = m.group(1).upper()
         if handle in known_handles:
-            logger.info("Deterministic delete: handle=%s", handle)
+            logger.info("Deterministic delete matched")
             return ChangeSet(
                 prompt=prompt,
                 operations=[
@@ -65,7 +65,7 @@ def deterministic_plan(prompt: str, drawing_context: dict) -> ChangeSet | None:
         dx = float(m.group(2))
         dy = float(m.group(3))
         if handle in known_handles:
-            logger.info("Deterministic move: handle=%s dx=%.1f dy=%.1f", handle, dx, dy)
+            logger.info("Deterministic move matched")
             return ChangeSet(
                 prompt=prompt,
                 operations=[
@@ -84,7 +84,7 @@ def deterministic_plan(prompt: str, drawing_context: dict) -> ChangeSet | None:
         handle = m.group(1).upper()
         new_text = m.group(2)
         if handle in known_handles:
-            logger.info("Deterministic edit_text: handle=%s", handle)
+            logger.info("Deterministic text edit matched")
             return ChangeSet(
                 prompt=prompt,
                 operations=[
