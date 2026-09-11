@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from enum import StrEnum
+from enum import IntEnum, StrEnum
 from functools import cached_property
 from typing import TYPE_CHECKING, Any
 
@@ -30,6 +30,36 @@ class EntityType(StrEnum):
     ELLIPSE = "ELLIPSE"
     SOLID = "SOLID"
     LEADER = "LEADER"
+
+
+class DrawingUnit(IntEnum):
+    """DXF ``$INSUNITS`` values defined by the AutoCAD file format."""
+
+    UNITLESS = 0
+    INCHES = 1
+    FEET = 2
+    MILES = 3
+    MILLIMETERS = 4
+    CENTIMETERS = 5
+    METERS = 6
+    KILOMETERS = 7
+    MICROINCHES = 8
+    MILS = 9
+    YARDS = 10
+    ANGSTROMS = 11
+    NANOMETERS = 12
+    MICRONS = 13
+    DECIMETERS = 14
+    DECAMETERS = 15
+    HECTOMETERS = 16
+    GIGAMETERS = 17
+    ASTRONOMICAL_UNITS = 18
+    LIGHT_YEARS = 19
+    PARSECS = 20
+    US_SURVEY_FEET = 21
+    US_SURVEY_INCHES = 22
+    US_SURVEY_YARDS = 23
+    US_SURVEY_MILES = 24
 
 
 class Point2D(BaseModel):
@@ -211,6 +241,10 @@ class DrawingContext(BaseModel):
     """Normalized context model for a loaded DXF drawing."""
 
     file_path: str
+    drawing_unit: DrawingUnit = Field(
+        default=DrawingUnit.UNITLESS,
+        description="Drawing coordinate unit from the DXF $INSUNITS header.",
+    )
     entities: list[EntityRef] = Field(default_factory=list)
     layers: list[LayerRule] = Field(default_factory=list)
     blocks: list[str] = Field(default_factory=list)
