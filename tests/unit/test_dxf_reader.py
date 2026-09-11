@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from cad_dxf_agent.core.dxf_reader import load_dxf
-from cad_dxf_agent.models.cad_schema import EntityType
+from cad_dxf_agent.models.cad_schema import DrawingUnit, EntityType
 
 
 class TestDxfReader:
@@ -65,6 +65,21 @@ class TestDxfReader:
 
     def test_metadata_present(self, sample_context):
         assert "dxf_version" in sample_context.metadata
+
+    def test_reads_insunits_into_typed_context(self, tmp_path):
+        import ezdxf
+
+        doc = ezdxf.new(dxfversion="R2018")
+        doc.header["$INSUNITS"] = int(DrawingUnit.MILLIMETERS)
+        doc.modelspace().add_line((0, 0), (10, 0))
+        path = tmp_path / "millimeters.dxf"
+        doc.saveas(path)
+
+        context = load_dxf(path)
+
+        assert context.drawing_unit is DrawingUnit.MILLIMETERS
+        assert context.metadata["insunits"] == 4
+        assert context.metadata["unit_name"] == "millimeters"
 
 
 class TestDxfReaderV2Entities:

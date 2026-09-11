@@ -1,7 +1,9 @@
 """Canonical model — quantization, normalization, and stable identity for revision workflows.
 
-Internal base unit: inches (matching typical structural drawing units).
-Quantization: configurable decimal places (default 4dp = 0.0001").
+The comparison engine converts revision coordinates into the master drawing's
+``$INSUNITS`` coordinate system. Canonical epsilon/bin defaults are anchored in
+inches and scaled to that native unit; comparison configs remain drawing-unit values.
+Quantization is configurable (default 4 decimal places).
 
 This module provides the foundation for deterministic entity identity
 that does NOT rely on DXF handles.
@@ -25,7 +27,7 @@ class QuantizationConfig:
 
     Attributes:
         decimal_places: Number of decimal places for coordinate rounding.
-            4dp = 0.0001" precision, sufficient for structural work.
+            The default is 4 decimal places in the normalized master coordinates.
         near_vertex_epsilon: Distance below which two vertices are considered
             duplicates and the second is removed.  Set to 0.0 to disable.
         spatial_bin_size: Grid cell size for spatial binning in stable ID
