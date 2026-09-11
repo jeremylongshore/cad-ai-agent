@@ -106,6 +106,12 @@ cad-analyze = "cad_dxf_agent.cli.analyze:main"
 [tool.hatch.version]
 path = "src/cad_dxf_agent/__init__.py"
 
+[tool.hatch.build]
+exclude = [
+    "/web/frontend/node_modules",
+    "/web/frontend/dist",
+]
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/cad_dxf_agent"]
 
