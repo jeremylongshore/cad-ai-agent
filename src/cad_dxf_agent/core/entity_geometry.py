@@ -3,12 +3,23 @@
 from __future__ import annotations
 
 import math
+from typing import Any
 
 from shapely import affinity
 from shapely.geometry import LineString, Point, Polygon
 from shapely.geometry.base import BaseGeometry
 
 from ..models.cad_schema import EntityRef, GeometryKind, Point2D
+
+
+def _legacy_point(value: Any) -> Point2D:
+    """Decode a legacy coordinate tuple without discarding an optional Z."""
+    coordinates = list(value)
+    return Point2D(
+        x=float(coordinates[0]),
+        y=float(coordinates[1]),
+        z=float(coordinates[2]) if len(coordinates) > 2 else None,
+    )
 
 
 def entity_points(entity: EntityRef) -> list[Point2D]:
@@ -18,10 +29,10 @@ def entity_points(entity: EntityRef) -> list[Point2D]:
     if entity.entity_type.value == "LINE" and entity.insert_point is not None:
         end = entity.attributes.get("end_point")
         if end is not None:
-            return [entity.insert_point, Point2D(x=float(end[0]), y=float(end[1]))]
+            return [entity.insert_point, _legacy_point(end)]
     if "vertices" in entity.attributes:
         vertices = entity.attributes["vertices"]
-        return [Point2D(x=float(v[0]), y=float(v[1])) for v in vertices]
+        return [_legacy_point(v) for v in vertices]
     return [entity.insert_point] if entity.insert_point is not None else []
 
 

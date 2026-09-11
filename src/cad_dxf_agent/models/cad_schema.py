@@ -63,10 +63,16 @@ class DrawingUnit(IntEnum):
 
 
 class Point2D(BaseModel):
-    """2D coordinate."""
+    """Planar coordinate with optional source elevation.
+
+    Planar consumers use ``x`` and ``y``. Readers preserve ``z`` when the
+    source entity exposes an elevation so civil and structural workflows do
+    not silently flatten the drawing.
+    """
 
     x: float
     y: float
+    z: float | None = None
 
 
 class GeometryKind(StrEnum):

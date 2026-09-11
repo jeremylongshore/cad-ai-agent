@@ -17,7 +17,7 @@ from ...models.comparison_schema import (
     GeometrySnapshot,
 )
 from ...otel import get_tracer
-from ..dxf_reader import _extract_mtext_geometry, _extract_text_geometry
+from ..dxf_reader import _elevation, _extract_mtext_geometry, _extract_text_geometry, _point
 
 logger = logging.getLogger(__name__)
 tracer = get_tracer(__name__)
@@ -133,7 +133,14 @@ def scale_snapshots(snapshots: list[GeometrySnapshot], factor: float) -> list[Ge
         scaled.append(
             snap.model_copy(
                 update={
-                    "points": [Point2D(x=p.x * factor, y=p.y * factor) for p in snap.points],
+                    "points": [
+                        Point2D(
+                            x=p.x * factor,
+                            y=p.y * factor,
+                            z=p.z * factor if p.z is not None else None,
+                        )
+                        for p in snap.points
+                    ],
                     "attributes": attributes,
                     "text_geometry": text_geometry,
                     "stable_id": None,
@@ -343,27 +350,28 @@ def _extract_one(
         if dxf_type == "LINE":
             start = entity.dxf.start
             end = entity.dxf.end
-            points = [Point2D(x=start.x, y=start.y), Point2D(x=end.x, y=end.y)]
+            points = [_point(start), _point(end)]
 
         elif dxf_type == "LWPOLYLINE":
             raw = list(entity.get_points(format="xy"))  # type: ignore[attr-defined]
-            points = [Point2D(x=p[0], y=p[1]) for p in raw]
+            elevation = _elevation(entity.dxf.get("elevation", None))
+            points = [_point(p, z=elevation) for p in raw]
 
         elif dxf_type == "TEXT":
             insert = entity.dxf.insert
-            points = [Point2D(x=insert.x, y=insert.y)]
+            points = [_point(insert)]
             text_content = entity.dxf.text
             text_geometry = _extract_text_geometry(entity)
 
         elif dxf_type == "MTEXT":
             insert = entity.dxf.insert
-            points = [Point2D(x=insert.x, y=insert.y)]
+            points = [_point(insert)]
             text_content = entity.plain_text()  # type: ignore[attr-defined]
             text_geometry = _extract_mtext_geometry(entity)
 
         elif dxf_type == "INSERT":
             insert = entity.dxf.insert
-            points = [Point2D(x=insert.x, y=insert.y)]
+            points = [_point(insert)]
             block_name = entity.dxf.name
             attributes["insert_xscale"] = entity.dxf.get("xscale", 1.0)
             attributes["insert_yscale"] = entity.dxf.get("yscale", 1.0)
@@ -385,12 +393,12 @@ def _extract_one(
 
         elif dxf_type == "CIRCLE":
             center = entity.dxf.center
-            points = [Point2D(x=center.x, y=center.y)]
+            points = [_point(center)]
             attributes["radius"] = entity.dxf.radius
 
         elif dxf_type == "ARC":
             center = entity.dxf.center
-            points = [Point2D(x=center.x, y=center.y)]
+            points = [_point(center)]
             attributes["radius"] = entity.dxf.radius
             attributes["start_angle"] = entity.dxf.start_angle
             attributes["end_angle"] = entity.dxf.end_angle
@@ -398,7 +406,7 @@ def _extract_one(
         elif dxf_type == "POLYLINE":
             try:
                 vertices = list(entity.vertices)  # type: ignore[attr-defined]
-                points = [Point2D(x=v.dxf.location.x, y=v.dxf.location.y) for v in vertices]
+                points = [_point(v.dxf.location) for v in vertices]
             except Exception:
                 logger.debug("POLYLINE %s: vertex read failed", handle)
                 return None
@@ -407,18 +415,18 @@ def _extract_one(
             text_content = entity.dxf.get("text", "") or ""
             try:
                 insert = entity.dxf.insert
-                points = [Point2D(x=insert.x, y=insert.y)]
+                points = [_point(insert)]
             except Exception:
                 try:
                     defpoint = entity.dxf.defpoint
-                    points = [Point2D(x=defpoint.x, y=defpoint.y)]
+                    points = [_point(defpoint)]
                 except Exception:
                     logger.debug("DIMENSION %s: no insert or defpoint", handle)
                     return None
 
         elif dxf_type == "ELLIPSE":
             center = entity.dxf.center
-            points = [Point2D(x=center.x, y=center.y)]
+            points = [_point(center)]
             attributes["ratio"] = entity.dxf.ratio
             major = entity.dxf.major_axis
             attributes["major_axis"] = (major.x, major.y, major.z)
@@ -426,18 +434,19 @@ def _extract_one(
         elif dxf_type == "SPLINE":
             try:
                 ctrl = list(entity.control_points)  # type: ignore[attr-defined]
-                points = [Point2D(x=p[0], y=p[1]) for p in ctrl]
+                points = [_point(p) for p in ctrl]
             except Exception:
                 logger.debug("SPLINE %s: control point read failed", handle)
                 return None
 
         elif dxf_type == "HATCH":
+            elevation = _elevation(entity.dxf.get("elevation", None))
             try:
                 paths = entity.paths  # type: ignore[attr-defined]
                 if paths:
                     for path in paths:
                         for v in getattr(path, "vertices", []):
-                            points.append(Point2D(x=v[0], y=v[1]))
+                            points.append(_point(v, z=elevation))
             except Exception:
                 logger.debug("HATCH %s: boundary read failed", handle)
             if not points:
@@ -448,7 +457,7 @@ def _extract_one(
                 ctx = entity.context  # type: ignore[attr-defined]
                 if hasattr(ctx, "mtext") and ctx.mtext:
                     text_content = ctx.mtext.default_content
-                    points = [Point2D(x=ctx.mtext.insert.x, y=ctx.mtext.insert.y)]
+                    points = [_point(ctx.mtext.insert)]
             except Exception:
                 logger.debug("MLEADER %s: context read failed", handle)
                 return None
@@ -456,7 +465,7 @@ def _extract_one(
         elif dxf_type == "LEADER":
             try:
                 vertices = list(entity.vertices)  # type: ignore[attr-defined]
-                points = [Point2D(x=v.x, y=v.y) for v in vertices]
+                points = [_point(v) for v in vertices]
             except Exception:
                 logger.debug("LEADER %s: vertex read failed", handle)
                 return None
@@ -466,7 +475,7 @@ def _extract_one(
                 for attr in ("vtx0", "vtx1", "vtx2", "vtx3"):
                     vtx = getattr(entity.dxf, attr, None)
                     if vtx is not None:
-                        points.append(Point2D(x=vtx.x, y=vtx.y))
+                        points.append(_point(vtx))
             except Exception:
                 logger.debug("SOLID %s: vertex read failed", handle)
                 return None

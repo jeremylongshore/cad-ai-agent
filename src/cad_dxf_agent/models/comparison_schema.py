@@ -209,7 +209,9 @@ class GeometrySnapshot(BaseModel):
             return Point2D(x=0.0, y=0.0)
         cx = sum(p.x for p in self.points) / len(self.points)
         cy = sum(p.y for p in self.points) / len(self.points)
-        return Point2D(x=cx, y=cy)
+        elevations = [p.z for p in self.points if p.z is not None]
+        cz = sum(elevations) / len(elevations) if elevations else None
+        return Point2D(x=cx, y=cy, z=cz)
 
 
 class ComparisonConfig(BaseModel):

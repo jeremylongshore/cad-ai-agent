@@ -81,6 +81,38 @@ class TestDxfReader:
         assert context.metadata["insunits"] == 4
         assert context.metadata["unit_name"] == "millimeters"
 
+    def test_preserves_entity_elevation_in_points_and_geometry(self, tmp_path):
+        import ezdxf
+
+        doc = ezdxf.new(dxfversion="R2018")
+        msp = doc.modelspace()
+        msp.add_line((0, 0, 12.5), (10, 0, 14.0))
+        msp.add_circle((20, 5, 7.25), radius=2)
+        msp.add_lwpolyline(
+            [(0, 0), (5, 0), (5, 5)],
+            dxfattribs={"elevation": 101.75},
+        )
+        path = tmp_path / "elevated.dxf"
+        doc.saveas(path)
+
+        context = load_dxf(path)
+        line = next(entity for entity in context.entities if entity.entity_type is EntityType.LINE)
+        circle = next(
+            entity for entity in context.entities if entity.entity_type is EntityType.CIRCLE
+        )
+        polyline = next(
+            entity for entity in context.entities if entity.entity_type is EntityType.LWPOLYLINE
+        )
+
+        assert line.insert_point is not None
+        assert line.insert_point.z == pytest.approx(12.5)
+        assert line.geometry is not None
+        assert [point.z for point in line.geometry.points] == [12.5, 14.0]
+        assert circle.insert_point is not None
+        assert circle.insert_point.z == pytest.approx(7.25)
+        assert polyline.geometry is not None
+        assert [point.z for point in polyline.geometry.points] == [101.75] * 3
+
 
 class TestDxfReaderV2Entities:
     """Tests for V2 entity types beyond the original V1 set."""

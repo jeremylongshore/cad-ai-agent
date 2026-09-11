@@ -31,6 +31,42 @@ tracer = get_tracer(__name__)
 SUPPORTED_TYPES = {t.value for t in EntityType}
 
 
+def _elevation(value: Any, default: float | None = None) -> float | None:
+    """Return a numeric Z value from a DXF scalar/vector elevation."""
+    if value is None:
+        return default
+    candidate = getattr(value, "z", value)
+    try:
+        return float(candidate)
+    except (TypeError, ValueError):
+        return default
+
+
+def _point(value: Any, *, z: float | None = None) -> Point2D:
+    """Build a planar point while preserving an available source Z."""
+    if hasattr(value, "x") and hasattr(value, "y"):
+        x = float(value.x)
+        y = float(value.y)
+        source_z = getattr(value, "z", None)
+    else:
+        x = float(value[0])
+        y = float(value[1])
+        source_z = value[2] if len(value) > 2 else None
+    return Point2D(x=x, y=y, z=z if z is not None else _elevation(source_z))
+
+
+def _coordinates(point: Point2D) -> tuple[float, float]:
+    """Return the historical XY tuple used by open-ended attributes."""
+    return (point.x, point.y)
+
+
+def _store_vertices(attributes: dict[str, Any], points: list[Point2D]) -> None:
+    """Store backward-compatible XY tuples plus optional typed elevations."""
+    attributes["vertices"] = [_coordinates(point) for point in points]
+    if any(point.z is not None for point in points):
+        attributes["vertex_elevations"] = [point.z for point in points]
+
+
 def load_dxf(file_path: str | Path) -> DrawingContext:
     """Load a DXF file and build a normalized DrawingContext.
 
@@ -146,23 +182,28 @@ def _parse_entity(
 
     if dxf_type == "LINE":
         start = entity.dxf.start
-        insert_point = Point2D(x=start.x, y=start.y)
+        insert_point = _point(start)
         end = entity.dxf.end
-        attributes["end_point"] = (end.x, end.y)
+        end_point = _point(end)
+        attributes["end_point"] = _coordinates(end_point)
+        if end_point.z is not None:
+            attributes["end_z"] = end_point.z
     elif dxf_type == "LWPOLYLINE":
         points = list(entity.get_points(format="xy"))  # type: ignore[attr-defined]
+        elevation = _elevation(entity.dxf.get("elevation", None))
         if points:
-            insert_point = Point2D(x=points[0][0], y=points[0][1])
-            attributes["vertices"] = [(p[0], p[1]) for p in points]
+            vertices = [_point(p, z=elevation) for p in points]
+            insert_point = vertices[0]
+            _store_vertices(attributes, vertices)
             attributes["is_closed"] = entity.closed  # type: ignore[attr-defined]
     elif dxf_type == "TEXT":
         insert = entity.dxf.insert
-        insert_point = Point2D(x=insert.x, y=insert.y)
+        insert_point = _point(insert)
         text_content = entity.dxf.text
         text_geometry = _extract_text_geometry(entity)
     elif dxf_type == "MTEXT":
         insert = entity.dxf.insert
-        insert_point = Point2D(x=insert.x, y=insert.y)
+        insert_point = _point(insert)
         text_content = entity.plain_text()  # type: ignore[attr-defined]
         text_geometry = _extract_mtext_geometry(entity)
         mtext_width = entity.dxf.get("width", None)
@@ -170,7 +211,7 @@ def _parse_entity(
             attributes["mtext_width"] = mtext_width
     elif dxf_type == "INSERT":
         insert = entity.dxf.insert
-        insert_point = Point2D(x=insert.x, y=insert.y)
+        insert_point = _point(insert)
         block_name = entity.dxf.name
         insert_xscale = entity.dxf.get("xscale", 1.0)
         insert_yscale = entity.dxf.get("yscale", 1.0)
@@ -194,7 +235,7 @@ def _parse_entity(
                     }
                     try:
                         ai = attrib.dxf.insert
-                        attrib_data[tag]["insert"] = {"x": ai.x, "y": ai.y}
+                        attrib_data[tag]["insert"] = _point(ai).model_dump(exclude_none=True)
                     except Exception as e:
                         logger.debug("INSERT %s: attrib insert read failed: %s", handle, e)
                 if attrib_data:
@@ -217,17 +258,17 @@ def _parse_entity(
             )
     elif dxf_type == "CIRCLE":
         center = entity.dxf.center
-        insert_point = Point2D(x=center.x, y=center.y)
+        insert_point = _point(center)
         attributes["radius"] = entity.dxf.radius
     elif dxf_type == "ARC":
         center = entity.dxf.center
-        insert_point = Point2D(x=center.x, y=center.y)
+        insert_point = _point(center)
         attributes["radius"] = entity.dxf.radius
         attributes["start_angle"] = entity.dxf.start_angle
         attributes["end_angle"] = entity.dxf.end_angle
     elif dxf_type == "ELLIPSE":
         center = entity.dxf.center
-        insert_point = Point2D(x=center.x, y=center.y)
+        insert_point = _point(center)
         attributes["ratio"] = entity.dxf.ratio
         major = entity.dxf.major_axis
         attributes["major_axis"] = (major.x, major.y, major.z)
@@ -236,20 +277,20 @@ def _parse_entity(
         text_content = entity.dxf.get("text", "") or ""  # type: ignore[assignment]
         try:
             insert = entity.dxf.insert
-            insert_point = Point2D(x=insert.x, y=insert.y)
+            insert_point = _point(insert)
         except Exception:
             # Some dimension subtypes lack an insert; fall back to defpoint
             try:
                 defpoint = entity.dxf.defpoint
-                insert_point = Point2D(x=defpoint.x, y=defpoint.y)
+                insert_point = _point(defpoint)
             except Exception:
                 logger.debug("DIMENSION %s: no insert or defpoint", handle)
     elif dxf_type == "HATCH":
         boundary_vertices: list[tuple[float, float]] = []
         try:
-            elevation = entity.dxf.get("elevation", None)
+            elevation = _elevation(entity.dxf.get("elevation", None))
             if elevation is not None:
-                insert_point = Point2D(x=0.0, y=0.0)
+                insert_point = Point2D(x=0.0, y=0.0, z=elevation)
         except Exception:
             logger.debug("HATCH %s: elevation read failed", handle)
         # Boundary geometry is independent of elevation and is the better
@@ -264,28 +305,32 @@ def _parse_entity(
                     insert_point = Point2D(
                         x=sum(v[0] for v in boundary_vertices) / len(boundary_vertices),
                         y=sum(v[1] for v in boundary_vertices) / len(boundary_vertices),
+                        z=elevation,
                     )
         except Exception:
             logger.debug("HATCH %s: centroid computation failed", handle)
         if boundary_vertices:
-            attributes["vertices"] = boundary_vertices
+            _store_vertices(
+                attributes,
+                [Point2D(x=x, y=y, z=elevation) for x, y in boundary_vertices],
+            )
             attributes["is_closed"] = True
     elif dxf_type == "SPLINE":
         try:
             control_points = list(entity.control_points)  # type: ignore[attr-defined]
             if control_points:
-                cp = control_points[0]
-                insert_point = Point2D(x=cp[0], y=cp[1])
-                attributes["vertices"] = [(cp[0], cp[1]) for cp in control_points]
+                parsed_points = [_point(cp) for cp in control_points]
+                insert_point = parsed_points[0]
+                _store_vertices(attributes, parsed_points)
         except Exception:
             logger.debug("SPLINE %s: control point read failed", handle)
     elif dxf_type == "POLYLINE":
         try:
-            vertices = list(entity.vertices)  # type: ignore[attr-defined]
-            if vertices:
-                loc = vertices[0].dxf.location
-                insert_point = Point2D(x=loc.x, y=loc.y)
-                attributes["vertices"] = [(v.dxf.location.x, v.dxf.location.y) for v in vertices]
+            polyline_vertices = list(entity.vertices)  # type: ignore[attr-defined]
+            if polyline_vertices:
+                parsed_points = [_point(v.dxf.location) for v in polyline_vertices]
+                insert_point = parsed_points[0]
+                _store_vertices(attributes, parsed_points)
                 attributes["is_closed"] = bool(entity.is_closed)  # type: ignore[attr-defined]
         except Exception:
             logger.debug("POLYLINE %s: vertex read failed", handle)
@@ -294,18 +339,16 @@ def _parse_entity(
             ctx = entity.context  # type: ignore[attr-defined]
             if hasattr(ctx, "mtext") and ctx.mtext:
                 text_content = ctx.mtext.default_content
-                insert_point = Point2D(
-                    x=ctx.mtext.insert.x,
-                    y=ctx.mtext.insert.y,
-                )
+                insert_point = _point(ctx.mtext.insert)
         except Exception:
             logger.debug("MLEADER %s: context read failed", handle)
     elif dxf_type == "LEADER":
         try:
             vertices = list(entity.vertices)  # type: ignore[attr-defined]
             if vertices:
-                insert_point = Point2D(x=vertices[0].x, y=vertices[0].y)
-                attributes["vertices"] = [(v.x, v.y) for v in vertices]
+                parsed_points = [_point(v) for v in vertices]
+                insert_point = parsed_points[0]
+                _store_vertices(attributes, parsed_points)
         except Exception:
             logger.debug("LEADER %s: vertex read failed", handle)
     elif dxf_type == "SOLID":
@@ -313,8 +356,9 @@ def _parse_entity(
             solid_vertices = [
                 getattr(entity.dxf, name) for name in ("vtx0", "vtx1", "vtx2", "vtx3")
             ]
-            insert_point = Point2D(x=solid_vertices[0].x, y=solid_vertices[0].y)
-            attributes["vertices"] = [(v.x, v.y) for v in solid_vertices]
+            parsed_points = [_point(v) for v in solid_vertices]
+            insert_point = parsed_points[0]
+            _store_vertices(attributes, parsed_points)
             attributes["is_closed"] = True
         except Exception:
             logger.debug("SOLID %s: vtx0 read failed", handle)
@@ -340,14 +384,18 @@ def _build_entity_geometry(
 ) -> EntityGeometry | None:
     """Build the normalized geometry model from parsed entity data."""
     raw_vertices = attributes.get("vertices", [])
-    vertices = [Point2D(x=float(v[0]), y=float(v[1])) for v in raw_vertices]
+    elevations = attributes.get("vertex_elevations", [])
+    vertices = [
+        _point(vertex, z=elevations[index] if index < len(elevations) else None)
+        for index, vertex in enumerate(raw_vertices)
+    ]
 
     if dxf_type == "LINE" and insert_point is not None:
         end = attributes.get("end_point")
         if end is not None:
             return EntityGeometry(
                 kind=GeometryKind.LINE,
-                points=[insert_point, Point2D(x=float(end[0]), y=float(end[1]))],
+                points=[insert_point, _point(end, z=attributes.get("end_z"))],
             )
     if dxf_type in {"LWPOLYLINE", "POLYLINE", "LEADER"} and vertices:
         return EntityGeometry(
