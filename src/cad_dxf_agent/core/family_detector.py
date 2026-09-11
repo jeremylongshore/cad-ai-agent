@@ -1,8 +1,8 @@
 """Document family heuristic detector — infers drawing type from content signals.
 
 Analyzes layer names, block names, and text content to infer which of the 20
-document families a drawing most likely belongs to. The result is a HINT that
-refines output phrasing — it never gates capability.
+document families a drawing most likely belongs to. The result refines output
+phrasing; stages can also use it to avoid applying unsupported rule packs.
 
 Detection strategy:
 1. Collect all signal strings (layer names, block names, text excerpts)

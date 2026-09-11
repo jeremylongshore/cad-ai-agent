@@ -87,6 +87,11 @@ def _detect_profile(prompt: str) -> str:
 
 def _build_summary(report: ComplianceReport) -> str:
     """Build a human-readable summary of compliance results."""
+    if not report.checks_run and report.findings:
+        return (
+            f"Compliance check ({report.profile_name}): NOT RUN — {report.findings[0].description}"
+        )
+
     status = "PASSED" if report.passed else f"FAILED — {report.violation_count} violation(s)"
     warnings = f" with {report.warning_count} warning(s)" if report.warning_count else ""
     score = f". Score: {report.score:.0f}/100."
