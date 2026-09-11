@@ -11,7 +11,6 @@ import abc
 import dataclasses
 import json
 import logging
-import re
 import shutil
 import time
 import uuid
@@ -128,6 +127,7 @@ class InMemorySessionStore(SessionStore):
 
     def __init__(self, session_dir: Path | None = None):
         self._sessions: dict[str, SessionMetadata] = {}
+        self._session_paths: dict[str, Path] = {}
         self._lock = Lock()
         self._session_dir = session_dir or DEFAULT_SESSION_DIR
         self._session_dir.mkdir(parents=True, exist_ok=True)
@@ -150,6 +150,7 @@ class InMemorySessionStore(SessionStore):
 
         with self._lock:
             self._sessions[session_id] = metadata
+            self._session_paths[session_id] = session_dir
 
         logger.info("Created session")
         return metadata
@@ -173,17 +174,11 @@ class InMemorySessionStore(SessionStore):
             self._sessions[metadata.session_id] = metadata
 
     def delete(self, session_id: str) -> None:
-        safe_session_id = Path(session_id).name
-        if safe_session_id != session_id:
-            raise ValueError("Invalid session ID")
-        if re.fullmatch(r"[0-9a-f]{16}", safe_session_id) is None:
-            return
-
         with self._lock:
-            self._sessions.pop(safe_session_id, None)
+            self._sessions.pop(session_id, None)
+            session_dir = self._session_paths.pop(session_id, None)
 
-        session_dir = self._session_dir / safe_session_id
-        if session_dir.exists():
+        if session_dir is not None and session_dir.exists():
             shutil.rmtree(session_dir, ignore_errors=True)
         logger.info("Deleted session")
 
