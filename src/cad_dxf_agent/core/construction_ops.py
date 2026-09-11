@@ -34,6 +34,7 @@ from ..models.construction_ops_schema import (
     RedlineReportResult,
     RevisionCloudInfo,
 )
+from .entity_geometry import entity_points
 from .text_utils import entity_to_evidence, levenshtein_similarity
 
 if TYPE_CHECKING:
@@ -156,20 +157,17 @@ class GridAnalyzer:
     def _classify_line(self, entity: EntityRef) -> tuple[GridDirection | None, float]:
         """Classify a line as horizontal or vertical by start/end points."""
         if entity.entity_type == EntityType.LWPOLYLINE:
-            vertices = entity.attributes.get("vertices", [])
+            points = entity_points(entity)
+            vertices = [(point.x, point.y) for point in points]
             if len(vertices) < 2:
                 return None, 0.0
             start, end = vertices[0], vertices[-1]
         elif entity.entity_type == EntityType.LINE:
-            if entity.insert_point is None:
+            points = entity_points(entity)
+            if len(points) < 2:
                 return None, 0.0
-            # For LINE entities we only have insert_point (start)
-            # Without end point, use attributes if stored, otherwise skip
-            end_point = entity.attributes.get("end_point")
-            if end_point is None:
-                return None, 0.0
-            start = (entity.insert_point.x, entity.insert_point.y)
-            end = end_point
+            start = (points[0].x, points[0].y)
+            end = (points[1].x, points[1].y)
         else:
             return None, 0.0
 
@@ -252,7 +250,8 @@ class MarkupRedlineGenerator:
                 continue
             if not _CLOUD_LAYER_PATTERN.search(e.layer):
                 continue
-            vertices = e.attributes.get("vertices", [])
+            points = entity_points(e)
+            vertices = [(point.x, point.y) for point in points]
             if not vertices:
                 continue
             clouds.append((e, vertices))

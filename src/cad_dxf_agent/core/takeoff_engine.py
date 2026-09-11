@@ -21,6 +21,8 @@ from cad_dxf_agent.models.takeoff_schema import (
 )
 from cad_dxf_agent.models.zone_schema import ZoneDetectionResult
 
+from .entity_geometry import entity_is_closed, entity_points
+
 
 def generate_takeoff(
     context: DrawingContext,
@@ -184,31 +186,29 @@ def _entity_length(entity: EntityRef) -> float:
 
 def _line_length(entity: EntityRef) -> float:
     """Compute length of a LINE entity from start/end points."""
-    if entity.insert_point is None:
+    points = entity_points(entity)
+    if len(points) < 2:
         return 0.0
-    end = entity.attributes.get("end_point")
-    if end is None:
-        return 0.0
-    dx = end[0] - entity.insert_point.x
-    dy = end[1] - entity.insert_point.y
+    dx = points[1].x - points[0].x
+    dy = points[1].y - points[0].y
     return math.sqrt(dx * dx + dy * dy)
 
 
 def _polyline_length(entity: EntityRef) -> float:
     """Compute total length of a LWPOLYLINE from its vertices."""
-    vertices = entity.attributes.get("vertices", [])
+    vertices = entity_points(entity)
     if len(vertices) < 2:
         return 0.0
     total = 0.0
     for i in range(len(vertices) - 1):
-        dx = vertices[i + 1][0] - vertices[i][0]
-        dy = vertices[i + 1][1] - vertices[i][1]
+        dx = vertices[i + 1].x - vertices[i].x
+        dy = vertices[i + 1].y - vertices[i].y
         total += math.sqrt(dx * dx + dy * dy)
 
     # Add closing segment if closed
-    if entity.attributes.get("is_closed", False) and len(vertices) >= 3:
-        dx = vertices[0][0] - vertices[-1][0]
-        dy = vertices[0][1] - vertices[-1][1]
+    if entity_is_closed(entity) and len(vertices) >= 3:
+        dx = vertices[0].x - vertices[-1].x
+        dy = vertices[0].y - vertices[-1].y
         total += math.sqrt(dx * dx + dy * dy)
 
     return total

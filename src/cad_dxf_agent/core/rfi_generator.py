@@ -23,6 +23,8 @@ from cad_dxf_agent.models.rfi_schema import (
 )
 from cad_dxf_agent.models.zone_schema import ZoneDetectionResult
 
+from .entity_geometry import entity_is_closed, entity_points
+
 # Block patterns for symbol detection
 _DOOR_PATTERN = re.compile(r"door|dr[_\-\s]|entry|exit|gate", re.IGNORECASE)
 _WINDOW_PATTERN = re.compile(r"window|wndw|win[_\-\s]|glazing", re.IGNORECASE)
@@ -264,18 +266,18 @@ def _check_unclosed_boundaries(
         if entity.entity_type != EntityType.LWPOLYLINE:
             continue
 
-        vertices = entity.attributes.get("vertices", [])
+        vertices = entity_points(entity)
         if len(vertices) < 3:
             continue
 
-        if entity.attributes.get("is_closed", False):
+        if entity_is_closed(entity):
             continue
 
         # Check gap between first and last vertex
         first = vertices[0]
         last = vertices[-1]
-        dx = first[0] - last[0]
-        dy = first[1] - last[1]
+        dx = first.x - last.x
+        dy = first.y - last.y
         gap = (dx * dx + dy * dy) ** 0.5
 
         if tolerance_actual < gap <= tolerance_close:

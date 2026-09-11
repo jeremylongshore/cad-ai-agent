@@ -39,6 +39,32 @@ class Point2D(BaseModel):
     y: float
 
 
+class GeometryKind(StrEnum):
+    """Normalized planar geometry families exposed to downstream consumers."""
+
+    POINT = "point"
+    LINE = "line"
+    POLYLINE = "polyline"
+    POLYGON = "polygon"
+    CIRCLE = "circle"
+    ARC = "arc"
+    ELLIPSE = "ellipse"
+    SPLINE = "spline"
+
+
+class EntityGeometry(BaseModel):
+    """Typed geometry carried by an entity independently of open DXF metadata."""
+
+    kind: GeometryKind
+    points: list[Point2D] = Field(default_factory=list)
+    closed: bool = False
+    radius: float | None = Field(default=None, ge=0.0)
+    start_angle: float | None = None
+    end_angle: float | None = None
+    major_axis: tuple[float, float, float] | None = None
+    ratio: float | None = Field(default=None, gt=0.0)
+
+
 class TextProvenance(StrEnum):
     """Source of text data, ordered by trust (highest first)."""
 
@@ -175,6 +201,10 @@ class EntityRef(BaseModel):
     layer: str
     space: str = Field(default="Model", description="Space: 'Model' or layout name")
     insert_point: Point2D | None = None
+    geometry: EntityGeometry | None = Field(
+        default=None,
+        description="Normalized typed geometry; attributes remains for open-ended DXF metadata.",
+    )
     text_content: str | None = None
     block_name: str | None = None
     attributes: dict[str, Any] = Field(default_factory=dict)

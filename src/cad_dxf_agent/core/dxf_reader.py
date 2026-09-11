@@ -10,8 +10,10 @@ import ezdxf
 
 from ..models.cad_schema import (
     DrawingContext,
+    EntityGeometry,
     EntityRef,
     EntityType,
+    GeometryKind,
     LayerRule,
     LayoutInfo,
     LoadWarning,
@@ -217,6 +219,8 @@ def _parse_entity(
         center = entity.dxf.center
         insert_point = Point2D(x=center.x, y=center.y)
         attributes["ratio"] = entity.dxf.ratio
+        major = entity.dxf.major_axis
+        attributes["major_axis"] = (major.x, major.y, major.z)
     elif dxf_type == "DIMENSION":
         # Override text or measured value
         text_content = entity.dxf.get("text", "") or ""  # type: ignore[assignment]
@@ -231,35 +235,38 @@ def _parse_entity(
             except Exception:
                 logger.debug("DIMENSION %s: no insert or defpoint", handle)
     elif dxf_type == "HATCH":
+        boundary_vertices: list[tuple[float, float]] = []
         try:
             elevation = entity.dxf.get("elevation", None)
             if elevation is not None:
                 insert_point = Point2D(x=0.0, y=0.0)
         except Exception:
             logger.debug("HATCH %s: elevation read failed", handle)
-        # Try to compute centroid from boundary paths
-        if insert_point is None:
-            try:
-                paths = entity.paths  # type: ignore[attr-defined]
-                if paths:
-                    xs, ys = [], []
-                    for path in paths:
-                        for v in getattr(path, "vertices", []):
-                            xs.append(v[0])
-                            ys.append(v[1])
-                    if xs and ys:
-                        insert_point = Point2D(
-                            x=sum(xs) / len(xs),
-                            y=sum(ys) / len(ys),
-                        )
-            except Exception:
-                logger.debug("HATCH %s: centroid computation failed", handle)
+        # Boundary geometry is independent of elevation and is the better
+        # planar location signal, so always inspect it when available.
+        try:
+            paths = entity.paths  # type: ignore[attr-defined]
+            if paths:
+                for path in paths:
+                    for vertex in getattr(path, "vertices", []):
+                        boundary_vertices.append((vertex[0], vertex[1]))
+                if boundary_vertices:
+                    insert_point = Point2D(
+                        x=sum(v[0] for v in boundary_vertices) / len(boundary_vertices),
+                        y=sum(v[1] for v in boundary_vertices) / len(boundary_vertices),
+                    )
+        except Exception:
+            logger.debug("HATCH %s: centroid computation failed", handle)
+        if boundary_vertices:
+            attributes["vertices"] = boundary_vertices
+            attributes["is_closed"] = True
     elif dxf_type == "SPLINE":
         try:
             control_points = list(entity.control_points)  # type: ignore[attr-defined]
             if control_points:
                 cp = control_points[0]
                 insert_point = Point2D(x=cp[0], y=cp[1])
+                attributes["vertices"] = [(cp[0], cp[1]) for cp in control_points]
         except Exception:
             logger.debug("SPLINE %s: control point read failed", handle)
     elif dxf_type == "POLYLINE":
@@ -268,6 +275,8 @@ def _parse_entity(
             if vertices:
                 loc = vertices[0].dxf.location
                 insert_point = Point2D(x=loc.x, y=loc.y)
+                attributes["vertices"] = [(v.dxf.location.x, v.dxf.location.y) for v in vertices]
+                attributes["is_closed"] = bool(entity.is_closed)  # type: ignore[attr-defined]
         except Exception:
             logger.debug("POLYLINE %s: vertex read failed", handle)
     elif dxf_type == "MLEADER":
@@ -286,12 +295,17 @@ def _parse_entity(
             vertices = list(entity.vertices)  # type: ignore[attr-defined]
             if vertices:
                 insert_point = Point2D(x=vertices[0].x, y=vertices[0].y)
+                attributes["vertices"] = [(v.x, v.y) for v in vertices]
         except Exception:
             logger.debug("LEADER %s: vertex read failed", handle)
     elif dxf_type == "SOLID":
         try:
-            vtx0 = entity.dxf.vtx0
-            insert_point = Point2D(x=vtx0.x, y=vtx0.y)
+            solid_vertices = [
+                getattr(entity.dxf, name) for name in ("vtx0", "vtx1", "vtx2", "vtx3")
+            ]
+            insert_point = Point2D(x=solid_vertices[0].x, y=solid_vertices[0].y)
+            attributes["vertices"] = [(v.x, v.y) for v in solid_vertices]
+            attributes["is_closed"] = True
         except Exception:
             logger.debug("SOLID %s: vtx0 read failed", handle)
 
@@ -301,11 +315,66 @@ def _parse_entity(
         layer=layer,
         space=space,
         insert_point=insert_point,
+        geometry=_build_entity_geometry(dxf_type, insert_point, attributes),
         text_content=text_content,
         block_name=block_name,
         attributes=attributes,
         text_geometry=text_geometry,
     )
+
+
+def _build_entity_geometry(
+    dxf_type: str,
+    insert_point: Point2D | None,
+    attributes: dict[str, Any],
+) -> EntityGeometry | None:
+    """Build the normalized geometry model from parsed entity data."""
+    raw_vertices = attributes.get("vertices", [])
+    vertices = [Point2D(x=float(v[0]), y=float(v[1])) for v in raw_vertices]
+
+    if dxf_type == "LINE" and insert_point is not None:
+        end = attributes.get("end_point")
+        if end is not None:
+            return EntityGeometry(
+                kind=GeometryKind.LINE,
+                points=[insert_point, Point2D(x=float(end[0]), y=float(end[1]))],
+            )
+    if dxf_type in {"LWPOLYLINE", "POLYLINE", "LEADER"} and vertices:
+        return EntityGeometry(
+            kind=GeometryKind.POLYLINE,
+            points=vertices,
+            closed=bool(attributes.get("is_closed", False)),
+        )
+    if dxf_type == "SPLINE" and vertices:
+        return EntityGeometry(kind=GeometryKind.SPLINE, points=vertices)
+    if dxf_type in {"HATCH", "SOLID"} and vertices:
+        return EntityGeometry(kind=GeometryKind.POLYGON, points=vertices, closed=True)
+    if dxf_type == "CIRCLE" and insert_point is not None:
+        return EntityGeometry(
+            kind=GeometryKind.CIRCLE,
+            points=[insert_point],
+            radius=float(attributes["radius"]),
+            closed=True,
+        )
+    if dxf_type == "ARC" and insert_point is not None:
+        return EntityGeometry(
+            kind=GeometryKind.ARC,
+            points=[insert_point],
+            radius=float(attributes["radius"]),
+            start_angle=float(attributes["start_angle"]),
+            end_angle=float(attributes["end_angle"]),
+        )
+    if dxf_type == "ELLIPSE" and insert_point is not None:
+        return EntityGeometry(
+            kind=GeometryKind.ELLIPSE,
+            points=[insert_point],
+            major_axis=tuple(attributes["major_axis"]),
+            ratio=float(attributes["ratio"]),
+            closed=True,
+        )
+    if insert_point is not None:
+        return EntityGeometry(kind=GeometryKind.POINT, points=[insert_point])
+    return None
 
 
 def _normalize_rotation(deg: float) -> float:

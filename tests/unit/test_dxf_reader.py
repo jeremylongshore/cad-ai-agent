@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from cad_dxf_agent.core.dxf_reader import load_dxf
-from cad_dxf_agent.models.cad_schema import EntityType
+from cad_dxf_agent.models.cad_schema import EntityType, GeometryKind
 
 
 class TestDxfReader:
@@ -86,6 +86,9 @@ class TestDxfReaderV2Entities:
         hatches = [e for e in context.entities if e.entity_type == EntityType.HATCH]
         assert len(hatches) == 1
         assert hatches[0].insert_point is not None
+        assert hatches[0].geometry is not None
+        assert hatches[0].geometry.kind is GeometryKind.POLYGON
+        assert len(hatches[0].geometry.points) == 4
 
     def test_spline_entity_parsed(self, tmp_path):
         """SPLINE entities are loaded."""

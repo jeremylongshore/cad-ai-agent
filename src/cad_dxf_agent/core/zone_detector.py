@@ -19,6 +19,8 @@ from cad_dxf_agent.core.primitive_extractors import LayerClassification, classif
 from cad_dxf_agent.models.cad_schema import DrawingContext, EntityType, Point2D
 from cad_dxf_agent.models.zone_schema import DetectedZone, ZoneDetectionResult
 
+from .entity_geometry import entity_is_closed, entity_points
+
 # --- Detection limits ---
 _MAX_GRAPH_NODES = 500  # Skip cycle detection for graphs larger than this
 _MAX_CYCLES = 50  # Stop cycle search after this many results
@@ -133,14 +135,12 @@ def _extract_closed_polylines(
         if structural_layers and entity.layer not in structural_layers:
             continue
 
-        vertices_raw = entity.attributes.get("vertices", [])
-        if len(vertices_raw) < 3:
+        vertices = entity_points(entity)
+        if len(vertices) < 3:
             continue
 
-        vertices = [Point2D(x=v[0], y=v[1]) for v in vertices_raw]
-
         # Check closure: explicit is_closed flag OR first vertex ≈ last vertex
-        is_closed = entity.attributes.get("is_closed", False)
+        is_closed = entity_is_closed(entity)
         if not is_closed and not _points_close(vertices[0], vertices[-1], tolerance):
             continue
 
@@ -187,15 +187,12 @@ def _extract_line_cycles(
             continue
         if structural_layers and entity.layer not in structural_layers:
             continue
-        if entity.insert_point is None:
+        points = entity_points(entity)
+        if len(points) < 2:
             continue
 
-        end_point_raw = entity.attributes.get("end_point")
-        if end_point_raw is None:
-            continue
-
-        start = _snap_point(entity.insert_point.x, entity.insert_point.y, tolerance)
-        end = _snap_point(end_point_raw[0], end_point_raw[1], tolerance)
+        start = _snap_point(points[0].x, points[0].y, tolerance)
+        end = _snap_point(points[1].x, points[1].y, tolerance)
 
         if start == end:
             continue
