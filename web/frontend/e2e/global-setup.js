@@ -19,7 +19,7 @@ const STORAGE_STATE_PATH = path.join(import.meta.dirname, '..', 'test-results', 
 const TARGET = process.env.TARGET || 'local';
 const isProduction = TARGET === 'production';
 
-const FIREBASE_API_KEY = 'AIzaSyD2ocFCZ9h9xZqU0GYojASqpsA1IwIIpGI';
+const FIREBASE_API_KEY = process.env.VITE_FIREBASE_API_KEY;
 
 /**
  * Sign in via Firebase Auth REST API (no SDK needed).
@@ -70,11 +70,11 @@ export default async function globalSetup(config) {
     // --- Production auth: sign in via REST API, inject via script tag ---
     const email = process.env.E2E_TEST_EMAIL || 'e2e-tester@intentcad.dev';
     const password = process.env.E2E_TEST_PASSWORD;
-    if (!password) {
+    if (!password || !FIREBASE_API_KEY) {
       await browser.close();
       throw new Error(
-        'E2E_TEST_PASSWORD env var required for production tests. ' +
-        'Set it in .env.test or pass via environment.'
+        'E2E_TEST_PASSWORD and VITE_FIREBASE_API_KEY env vars are required for production tests. ' +
+        'Set them in .env.test or pass them via the environment.'
       );
     }
 
