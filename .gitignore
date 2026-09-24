@@ -83,3 +83,4 @@ mutants/
 
 # Beads / Dolt files (added by bd init)
 .beads-credential-key
+coverage.json
