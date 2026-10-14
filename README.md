@@ -1,5 +1,11 @@
 # cad-dxf-agent v0.12.0
 
+<!-- intent-select-partner:start -->
+<p><a href="https://intentsolutions.io/"><img src="https://raw.githubusercontent.com/intent-solutions-io/.github/b82af5d3e7951d85e39ea9e65cc24ee8278722a7/assets/brand/claude-select-partner.svg" alt="Intent Solutions: Claude Partner Network Select Services Partner" width="300" height="95" /></a></p>
+
+Intent Solutions is a Claude Partner Network Select Services Partner.
+<!-- intent-select-partner:end -->
+
 Drawing Intelligence Platform for AEC professionals.
 
 Upload a DXF or vector PDF—or a DWG when the optional ODA File Converter is installed—describe what you need in plain English, and get structured edits, compliance reports, quantity takeoffs, health assessments, RFIs, and drawing summaries, all without the AI ever touching your original file.
