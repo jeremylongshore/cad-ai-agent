@@ -42,6 +42,6 @@
     "eslint-plugin-react-hooks": "^5.1.0",
     "eslint-plugin-security": "^3.0.1",
     "globals": "^15.13.0",
-    "vite": "^6.0.0"
+    "vite": "^6.4.5"
   }
 }
